@@ -22,7 +22,8 @@ namespace Library_Jingyu
 		_invalid_parameter_handler oldHandler, newHandler;
 		newHandler = myInvalidParameterHandler;
 
-		// CRT 함수에 nullptr 등을 넣었을 때 
+		// CRT 함수에 nullptr 등을 넣었을 때 발생하는 에러 등록.
+		// 리턴값을 받는 OldHandler는 어디다 쓰는지 모르겠음...
 		oldHandler = _set_invalid_parameter_handler(newHandler);
 
 		// CRT 오류 메시지 출력 중단. 바로 덤프로 남긴다.
