@@ -181,7 +181,7 @@ namespace Library_Jingyu
 	// 각종 시그널 발생 시 호출.
 	void CCrashDump::signalHandler(int Error)
 	{
-		printf("signalHandler()!! %d\n", Error);
+		printf("signalHandler()!!!! %d\n", Error);
 		Crash();
 	}
 }
