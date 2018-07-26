@@ -1,0 +1,19 @@
+﻿  AccountArray.cpp
+  AccountHandler.cpp
+c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\NormalAccount.h(41): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\HighCreditAccount.h(50): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+AccountHandler.cpp(50): error C2440: '=': 'NormalAccount *'에서 'ArrayBoundCheck *'(으)로 변환할 수 없습니다.
+  AccountHandler.cpp(50): note: 가리킨 형식이 관련이 없습니다. 변환하려면 reinterpret_cast, C 스타일 캐스트 또는 함수 스타일 캐스트가 필요합니다.
+AccountHandler.cpp(83): error C2440: '=': 'HighCreditAccount *'에서 'ArrayBoundCheck *'(으)로 변환할 수 없습니다.
+  AccountHandler.cpp(83): note: 가리킨 형식이 관련이 없습니다. 변환하려면 reinterpret_cast, C 스타일 캐스트 또는 함수 스타일 캐스트가 필요합니다.
+AccountHandler.cpp(103): error C2039: 'GetID': 'ArrayBoundCheck'의 멤버가 아닙니다.
+  c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\AccountArray.h(10): note: 'ArrayBoundCheck' 선언을 참조하십시오.
+AccountHandler.cpp(115): error C2039: 'Insert': 'ArrayBoundCheck'의 멤버가 아닙니다.
+  c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\AccountArray.h(10): note: 'ArrayBoundCheck' 선언을 참조하십시오.
+AccountHandler.cpp(133): error C2039: 'GetID': 'ArrayBoundCheck'의 멤버가 아닙니다.
+  c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\AccountArray.h(10): note: 'ArrayBoundCheck' 선언을 참조하십시오.
+AccountHandler.cpp(146): error C2039: 'Out': 'ArrayBoundCheck'의 멤버가 아닙니다.
+  c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\AccountArray.h(10): note: 'ArrayBoundCheck' 선언을 참조하십시오.
+AccountHandler.cpp(166): error C2039: 'Show': 'ArrayBoundCheck'의 멤버가 아닙니다.
+  c:\users\procademy\source\repos\c++ oop\project2(파일분할 이후)\project1\project1\AccountArray.h(10): note: 'ArrayBoundCheck' 선언을 참조하십시오.
+  BankingSystemMain.cpp

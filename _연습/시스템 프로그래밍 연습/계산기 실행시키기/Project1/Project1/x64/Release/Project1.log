@@ -1,0 +1,9 @@
+﻿  소스.cpp
+소스.cpp(34): warning C4996: 'wscanf': This function or variable may be unsafe. Consider using wscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.16299.0\ucrt\corecrt_wstdio.h(930): note: 'wscanf' 선언을 참조하십시오.
+소스.cpp(80): warning C4996: 'wscanf': This function or variable may be unsafe. Consider using wscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.16299.0\ucrt\corecrt_wstdio.h(930): note: 'wscanf' 선언을 참조하십시오.
+  코드를 생성하고 있습니다.
+  All 13 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  코드를 생성했습니다.
+  Project1.vcxproj -> C:\Users\Administrator\Desktop\VS\시스템 프로그래밍 연습\계산기 실행시키기\Project1\x64\Release\Project1.exe

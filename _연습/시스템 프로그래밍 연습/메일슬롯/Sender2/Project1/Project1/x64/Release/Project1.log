@@ -1,0 +1,13 @@
+﻿  Sender2.cpp
+Sender2.cpp(36): warning C4267: '인수': 'size_t'에서 'DWORD'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Sender2.cpp(24): warning C4477: 'fwscanf' : 서식 문자열 '%d'에 'int *' 형식의 인수가 필요하지만 variadic 인수 1의 형식이 'HANDLE *'입니다.
+Sender2.cpp(24): warning C4996: 'fwscanf': This function or variable may be unsafe. Consider using fwscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.16299.0\ucrt\corecrt_wstdio.h(853): note: 'fwscanf' 선언을 참조하십시오.
+Sender2.cpp(26): warning C4477: 'wprintf' : 서식 문자열 '%d'에 'int' 형식의 인수가 필요하지만 variadic 인수 1의 형식이 'HANDLE'입니다.
+Sender2.cpp(26): warning C4313: 'wprintf': 서식 문자열의 '%d'이(가) 인수 1('HANDLE' 형식)과(와) 충돌합니다.
+  코드를 생성하고 있습니다.
+  1 of 8 functions (12.5%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  Project1.vcxproj -> C:\Users\Administrator\Desktop\VS\시스템 프로그래밍 연습\메일슬롯\Sender2\Project1\x64\Release\Project1.exe

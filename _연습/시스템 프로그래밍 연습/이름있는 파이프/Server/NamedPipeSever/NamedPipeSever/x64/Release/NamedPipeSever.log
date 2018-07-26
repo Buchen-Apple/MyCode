@@ -1,0 +1,10 @@
+﻿  NamedPipeServer.cpp
+NamedPipeServer.cpp(74): warning C4267: '=': 'size_t'에서 'DWORD'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+NamedPipeServer.cpp(62): warning C4996: '_wfopen': This function or variable may be unsafe. Consider using _wfopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  C:\Program Files (x86)\Windows Kits\10\Include\10.0.16299.0\ucrt\corecrt_wstdio.h(130): note: '_wfopen' 선언을 참조하십시오.
+  코드를 생성하고 있습니다.
+  0 of 6 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  NamedPipeSever.vcxproj -> C:\Users\procademy\source\repos\시스템 프로그래밍 연습\이름있는 파이프\Server\NamedPipeSever\x64\Release\NamedPipeSever.exe

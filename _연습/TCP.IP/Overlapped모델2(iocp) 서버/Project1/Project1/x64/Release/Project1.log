@@ -1,0 +1,9 @@
+﻿  소스.cpp
+소스.cpp(154): warning C4101: 'temp2' :참조되지 않은 지역 변수입니다.
+소스.cpp(154): warning C4101: 'temp1' :참조되지 않은 지역 변수입니다.
+  코드를 생성하고 있습니다.
+  2 of 9 functions (22.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  Project1.vcxproj -> C:\Users\procademy\source\repos\TCP.IP\Overlapped모델2(iocp) 서버\Project1\x64\Release\Project1.exe
