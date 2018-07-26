@@ -261,28 +261,46 @@ namespace Library_Jingyu
 	// 실제로 파일에 텍스틑를 저장하는 함수
 	bool CSystemLog::FileSave(TCHAR* FileName, TCHAR* SaveText)
 	{
-		// 5. 파일 저장.
 		// 락 걸고 한다. -------------
 		AcquireSRWLockExclusive(&m_lSrwlock);
 
 		FILE *fp;
-		if (_tfopen_s(&fp, FileName, _T("at")) != 0)
-		{
-			// 파일 오픈 실패 시 메시지 출력.
-			printf("CSystemLog. _tfopen_s() error. (%d)", errno);
 
-			ReleaseSRWLockExclusive(&m_lSrwlock);
-			return false;
+		// 1. r+ 모드로 먼저 열어본다. (r+는 읽기 쓰기 다 가능하지만, 읽기 우선)
+		_tfopen_s(&fp, FileName, _T("r+, ccs=UNICODE"));
+
+		// 2. 만약, 파일이 없다면, 파일을 w모드로, 파일을 생성한 후 쓴다.
+		if (fp == nullptr)
+		{
+			_tfopen_s(&fp, FileName, _T("w, ccs=UNICODE"));
+
+			if (_fputts(SaveText, fp) == EOF)
+			{
+				// 파일 쓰기 실패 시 메시지 출력
+				printf("CSystemLog. _fputts() error. (%d)", errno);
+
+				fclose(fp);
+				ReleaseSRWLockExclusive(&m_lSrwlock);
+				return false;
+			}
 		}
 
-		if (_fputts(SaveText, fp) == EOF)
+		// 3. 파일이 있으면, 파일 포인터를 파일 끝으로 이동시킨 후, 쓴다.
+		else
 		{
-			// 파일 쓰기 실패 시 메시지 출력
-			printf("CSystemLog. _fputts() error. (%d)", errno);
+			fseek(fp, 0, SEEK_END);
+			if (_fputts(SaveText, fp) == EOF)
+			{
+				// 파일 쓰기 실패 시 메시지 출력
+				printf("CSystemLog. _fputts() error. (%d)", errno);
 
-			ReleaseSRWLockExclusive(&m_lSrwlock);
-			return false;
+				fclose(fp);
+				ReleaseSRWLockExclusive(&m_lSrwlock);
+				return false;
+			}
+
 		}
+		
 
 		fclose(fp);
 
@@ -346,13 +364,13 @@ namespace Library_Jingyu
 
 		va_list vlist;
 		va_start(vlist, stringFormat);
-		retval = StringCbVPrintf(tcContent, SYSTEM_LOG_SIZE, stringFormat, vlist);
+		retval = StringCchVPrintf(tcContent, SYSTEM_LOG_SIZE, stringFormat, vlist);
 		va_end(vlist);
 
 		// 인터락으로 로그 카운트 1 증가
 		ULONGLONG Count = InterlockedIncrement(&m_ullLogCount);
 
-		// StringCbVPrintf() 에러 처리. S_OK가 아니면 무조건 에러
+		// StringCchVPrintf() 에러 처리. S_OK가 아니면 무조건 에러
 		// 에러나면 에러났다고 로그 저장.
 		if (retval != S_OK)
 		{
@@ -363,7 +381,7 @@ namespace Library_Jingyu
 			// 약 700글자 정도
 			_tcsncpy_s(tcContent, SYSTEM_LOG_SIZE, tcContent, 700);
 
-			StringCbPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
 				_T("LOG_ERROR_Content"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcContent);
 
 			// 파일에 저장
@@ -381,7 +399,7 @@ namespace Library_Jingyu
 		TCHAR tcConsoleBuff[SYSTEM_LOG_SIZE];
 
 		// 저장용 로그 스트링 만들기 ---------------------
-		retval = StringCbPrintf(tcSaveBuff, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s\n"),
+		retval = StringCchPrintf(tcSaveBuff, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s\n"),
 			type, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, tcContent);
 
 		// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
@@ -394,7 +412,7 @@ namespace Library_Jingyu
 			// 약 700글자 정도
 			_tcsncpy_s(tcContent, SYSTEM_LOG_SIZE, tcContent, 700);
 
-			StringCbPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
 				_T("LOG_ERROR_SaveBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcContent);
 
 			// 파일에 저장
@@ -406,7 +424,7 @@ namespace Library_Jingyu
 		}
 
 		// 화면 출력용 스트링 만들기 ---------------------
-		retval = StringCbPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
+		retval = StringCchPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
 			type, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, tcContent);
 
 		// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
@@ -419,7 +437,7 @@ namespace Library_Jingyu
 			// 약 700글자 정도
 			_tcsncpy_s(tcContent, SYSTEM_LOG_SIZE, tcContent, 700);
 
-			StringCbPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
 				_T("LOG_ERROR_ConsoleBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcContent);
 
 			// 파일에 저장
@@ -500,7 +518,7 @@ namespace Library_Jingyu
 		// 3. 파일 이름 만들기
 		// [년월_타입.txt]
 		TCHAR tcFileName[100];
-		HRESULT retval = StringCbPrintf(tcFileName, 100, _T("%s\\%d%02d_%s.txt"), m_tcDirectory, stNowTime.wYear, stNowTime.wMonth, type);
+		HRESULT retval = StringCchPrintf(tcFileName, 100, _T("%s\\%d%02d_%s.txt"), m_tcDirectory, stNowTime.wYear, stNowTime.wMonth, type);
 
 		// StringCbPrintf 에러처리. S_OK가 아니면 무조건 에러
 		// 에러나면 에러났다고 로그 저장.
@@ -531,7 +549,7 @@ namespace Library_Jingyu
 
 		// 5. 변환한 16진수와 PacketDesc인자를 합쳐서 1개의 로그 스트링으로 만든다.
 		TCHAR tcContent[SYSTEM_LOG_SIZE];
-		retval = StringCbPrintf(tcContent, SYSTEM_LOG_SIZE, _T("%s : %s"), PacketDesc, tcHex);
+		retval = StringCchPrintf(tcContent, SYSTEM_LOG_SIZE, _T("%s : %s"), PacketDesc, tcHex);
 
 		delete[] bContent;
 		delete[] tcHex;
@@ -546,7 +564,7 @@ namespace Library_Jingyu
 		ULONGLONG Count = InterlockedIncrement(&m_ullLogCount);
 
 		// 저장용 로그 스트링 만들기 ---------------------
-		retval = StringCbPrintf(tcSaveBuff, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s\n"),
+		retval = StringCchPrintf(tcSaveBuff, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s\n"),
 			type, stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, tcContent);
 
 		// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
@@ -559,7 +577,7 @@ namespace Library_Jingyu
 			// 약 700글자 정도
 			_tcsncpy_s(tcSaveBuff, SYSTEM_LOG_SIZE, tcSaveBuff, 700);
 
-			StringCbPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
 				_T("LOG_ERROR_SaveBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcSaveBuff);
 
 			// 파일에 저장
@@ -571,7 +589,7 @@ namespace Library_Jingyu
 		}
 
 		// 화면 출력용 스트링 만들기 ---------------------
-		retval = StringCbPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
+		retval = StringCchPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
 			type, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, tcContent);
 
 		// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
@@ -584,7 +602,7 @@ namespace Library_Jingyu
 			// 약 700글자 정도
 			_tcsncpy_s(tcConsoleBuff, SYSTEM_LOG_SIZE, tcConsoleBuff, 700);
 
-			StringCbPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
 				_T("LOG_ERROR_ConsoleBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcConsoleBuff);
 
 			// 파일에 저장
