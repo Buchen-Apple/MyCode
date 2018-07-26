@@ -269,7 +269,7 @@ namespace Library_Jingyu
 		// 1. r+ 모드로 먼저 열어본다. (r+는 읽기 쓰기 다 가능하지만, 읽기 우선)
 		_tfopen_s(&fp, FileName, _T("r+, ccs=UNICODE"));
 
-		// 2. 만약, 파일이 없다면, 파일을 w모드로, 파일을 생성한 후 쓴다.
+		// 2. 만약, 파일이 없다면, w모드로 파일 생성한 후 Write.
 		if (fp == nullptr)
 		{
 			_tfopen_s(&fp, FileName, _T("w, ccs=UNICODE"));
@@ -285,7 +285,7 @@ namespace Library_Jingyu
 			}
 		}
 
-		// 3. 파일이 있으면, 파일 포인터를 파일 끝으로 이동시킨 후, 쓴다.
+		// 3. 파일이 있으면, 파일 포인터를 파일 끝으로 이동시킨 후, Write
 		else
 		{
 			fseek(fp, 0, SEEK_END);
@@ -354,9 +354,7 @@ namespace Library_Jingyu
 		{
 			// 파일 이름을 못만들면 로그 저장 못함. 그냥 출력하고 끝.
 			printf("LOG_ERROR_FileName. LogSave Error!!\n");
-
 			return false;
-
 		}
 
 		// 4. 가변인자의 값을 스트링 1개로 뽑아내기.
