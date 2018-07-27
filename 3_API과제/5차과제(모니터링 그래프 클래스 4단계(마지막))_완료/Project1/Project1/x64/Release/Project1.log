@@ -1,0 +1,19 @@
+﻿  stdafx.cpp
+  ChildWindow.cpp
+ChildWindow.cpp(346): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(351): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(380): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(385): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(427): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(447): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(492): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(494): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+ChildWindow.cpp(508): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  Graph_Ypos_Queue.cpp
+  Project1.cpp
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  0 of 27 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Project1.vcxproj -> C:\Users\procademy\source\repos\API과제\5차과제(모니터링 그래프 클래스 4단계(마지막))_완료\Project1\x64\Release\Project1.exe
