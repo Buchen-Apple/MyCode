@@ -1,0 +1,6 @@
+﻿  SelectTCPServer.cpp
+c:\users\procademy\source\repos\tcp,ip 과제\3차 과제_select모델 만들어보기\selecttcpserver\selecttcpserver\selecttcpserver.cpp(73): warning C4101: 'clinetaddr' :참조되지 않은 지역 변수입니다.
+c:\users\procademy\source\repos\tcp,ip 과제\3차 과제_select모델 만들어보기\selecttcpserver\selecttcpserver\selecttcpserver.cpp(72): warning C4101: 'clinet_sock' :참조되지 않은 지역 변수입니다.
+c:\users\procademy\source\repos\tcp,ip 과제\3차 과제_select모델 만들어보기\selecttcpserver\selecttcpserver\selecttcpserver.cpp(74): warning C4101: 'i' :참조되지 않은 지역 변수입니다.
+c:\users\procademy\source\repos\tcp,ip 과제\3차 과제_select모델 만들어보기\selecttcpserver\selecttcpserver\selecttcpserver.cpp(74): warning C4101: 'addrlen' :참조되지 않은 지역 변수입니다.
+  SelectTCPServer.vcxproj -> C:\Users\procademy\source\repos\TCP,IP 과제\3차 과제_Select모델 만들어보기\SelectTCPServer\Debug\SelectTCPServer.exe

@@ -1,0 +1,2 @@
+#TargetFrameworkVersion=v4.0:PlatformToolSet=v141:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=10.0.16299.0
+Release|x64|C:\Users\Administrator\Desktop\VS\TCP,IP 과제\번외_링버퍼 정적 라이브러리_20180403\RingBuff\|

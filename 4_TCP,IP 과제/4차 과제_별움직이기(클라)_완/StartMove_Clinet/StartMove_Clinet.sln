@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2003
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "StartMove_Clinet", "StartMove_Clinet\StartMove_Clinet.vcxproj", "{CD17254F-AF6A-4AA1-869D-43C43E31689D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Debug|x64.ActiveCfg = Debug|x64
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Debug|x64.Build.0 = Debug|x64
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Debug|x86.ActiveCfg = Debug|Win32
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Debug|x86.Build.0 = Debug|Win32
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Release|x64.ActiveCfg = Release|x64
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Release|x64.Build.0 = Release|x64
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Release|x86.ActiveCfg = Release|Win32
+		{CD17254F-AF6A-4AA1-869D-43C43E31689D}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B3FB7D26-9307-423F-9C63-26EE0ABBA343}
+	EndGlobalSection
+EndGlobal

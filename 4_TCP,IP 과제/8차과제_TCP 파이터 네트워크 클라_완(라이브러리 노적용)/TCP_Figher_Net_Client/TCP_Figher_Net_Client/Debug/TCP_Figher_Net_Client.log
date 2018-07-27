@@ -1,0 +1,15 @@
+﻿  stdafx.cpp
+  TCP_Figher_Net_Client.cpp
+c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\list_template.h(109): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\list_template.h(103): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>::iterator'에 대한 참조를 확인하세요.
+  c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\list_template.h(254): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>'에 대한 참조를 확인하세요.
+c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\tcp_figher_net_client.cpp(289): warning C4244: '인수': 'LONGLONG'에서 'DWORD'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\tcp_figher_net_client.cpp(332): warning C4244: '인수': 'LONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  SpriteDib.cpp
+c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\spritedib.cpp(562): warning C4244: '초기화 중': 'unsigned long'에서 'BYTE'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\tcp,ip 과제\8차과제_tcp 파이터 네트워크 클라\tcp_figher_net_client\tcp_figher_net_client\spritedib.cpp(575): warning C4244: '초기화 중': 'DWORD'에서 'BYTE'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  ScreenDib.cpp
+  PlayerObject.cpp
+  BaseObject.cpp
+  코드를 생성하고 있습니다...
+  TCP_Figher_Net_Client.vcxproj -> C:\Users\procademy\source\repos\TCP,IP 과제\8차과제_TCP 파이터 네트워크 클라\TCP_Figher_Net_Client\Debug\TCP_Figher_Net_Client.exe

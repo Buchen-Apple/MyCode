@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2003
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UDP_Broadcast_server", "UDP_Broadcast_server\UDP_Broadcast_server.vcxproj", "{14412697-203F-4C48-B26E-220BC8BE9A35}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Debug|x64.ActiveCfg = Debug|x64
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Debug|x64.Build.0 = Debug|x64
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Debug|x86.ActiveCfg = Debug|Win32
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Debug|x86.Build.0 = Debug|Win32
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Release|x64.ActiveCfg = Release|x64
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Release|x64.Build.0 = Release|x64
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Release|x86.ActiveCfg = Release|Win32
+		{14412697-203F-4C48-B26E-220BC8BE9A35}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C0A0E787-492C-4817-9545-0E41D97D3F50}
+	EndGlobalSection
+EndGlobal

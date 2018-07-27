@@ -1,0 +1,9 @@
+﻿  UDP_Broadcast_server.cpp
+UDP_Broadcast_server.cpp(43): warning C4244: '인수': 'DWORD'에서 'u_short'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+UDP_Broadcast_server.cpp(69): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  1 of 8 functions (12.5%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  UDP_Broadcast_server.vcxproj -> C:\Users\procademy\source\repos\TCP,IP 과제\5차 과제_UDP 브로드캐스트 서버_완\UDP_Broadcast_server\x64\Release\UDP_Broadcast_server.exe

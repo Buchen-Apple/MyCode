@@ -1,0 +1,8 @@
+﻿  UDP_Broadcast.cpp
+UDP_Broadcast.cpp(100): warning C4244: '인수': 'DWORD'에서 'u_short'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  3 of 5 functions (60.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  UDP_Broadcast.vcxproj -> C:\Users\procademy\source\repos\TCP,IP 과제\5차 과제_UDP 브로드캐스트_클라_완\UDP_Broadcast\x64\Release\UDP_Broadcast.exe
