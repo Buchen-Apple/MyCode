@@ -1,0 +1,3 @@
+﻿  stdafx.cpp
+  JsonTest_FileCreate.cpp
+c:\users\procademy\source\repos\6_게임 서버 프로그래밍\3차과제_제이슨 테스트해보기\jsontest\jsontest\jsontest_filecreate.cpp(20): error C4716: 'LoadFile': 값을 반환해야 합니다.

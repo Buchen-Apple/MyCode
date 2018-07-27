@@ -1,0 +1,8 @@
+﻿  Network_Func.cpp
+C:\Users\procademy\source\repos\Library_Jingyu\ProtocolBuff\ProtocolBuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  1 of 320 functions ( 0.3%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
+  Chat_Client.vcxproj -> C:\Users\procademy\source\repos\6_게임 서버 프로그래밍\2차과제_채팅클라제작_완\Chat_Client\x64\Release\Chat_Client.exe

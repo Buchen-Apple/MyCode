@@ -1,0 +1,18 @@
+﻿  stdafx.cpp
+  ProtocolBuff.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\ProtocolBuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  RingBuff.cpp
+  Network_Func.cpp
+C:\Users\procademy\source\repos\Library_Jingyu\ProtocolBuff\ProtocolBuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+Network_Func.cpp(346): warning C4018: '<': signed 또는 unsigned가 일치하지 않습니다.
+Network_Func.cpp(405): warning C4244: '초기화 중': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Network_Func.cpp(633): warning C4018: '<': signed 또는 unsigned가 일치하지 않습니다.
+Network_Func.cpp(1596): warning C4018: '<': signed 또는 unsigned가 일치하지 않습니다.
+  TCP_Dummy.cpp
+C:\Users\procademy\source\repos\Library_Jingyu\ProtocolBuff\ProtocolBuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+TCP_Dummy.cpp(103): warning C4018: '>=': signed 또는 unsigned가 일치하지 않습니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  All 334 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  TCP_Dummy.vcxproj -> C:\Users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_TCP 파이터 더미\TCP_Dummy\x64\Release\TCP_Dummy.exe
