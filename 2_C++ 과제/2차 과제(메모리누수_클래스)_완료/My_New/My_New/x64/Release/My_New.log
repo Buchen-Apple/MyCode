@@ -1,0 +1,26 @@
+﻿  Main.cpp
+  My_New.cpp
+My_New.cpp(119): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(119): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(128): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(128): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(154): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(154): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(163): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(163): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(176): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(176): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(181): warning C4477: 'fprintf_s' : 서식 문자열 '%X'에 'unsigned int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 'void *'입니다.
+My_New.cpp(181): warning C4313: 'fprintf_s': 서식 문자열의 '%X'이(가) 인수 2('void *' 형식)과(와) 충돌합니다.
+My_New.cpp(185): warning C4477: 'fprintf_s' : 서식 문자열 '%d'에 'int' 형식의 인수가 필요하지만 variadic 인수 1의 형식이 '::size_t'입니다.
+  My_New.cpp(185): note: 서식 문자열에서 '%zd'을(를) 사용하는 것이 좋습니다.
+My_New.cpp(185): warning C4477: 'fprintf_s' : 서식 문자열 '%d'에 'int' 형식의 인수가 필요하지만 variadic 인수 2의 형식이 '::size_t'입니다.
+  My_New.cpp(185): note: 서식 문자열에서 '%zd'을(를) 사용하는 것이 좋습니다.
+  코드를 생성하고 있습니다.
+c:\users\procademy\source\repos\c++ 과제\2차 과제(메모리누수_클래스)_완료 - 복사본\my_new\my_new\main.cpp(23): warning C4700: 초기화되지 않은 'test' 지역 변수를 사용했습니다.
+c:\users\procademy\source\repos\c++ 과제\2차 과제(메모리누수_클래스)_완료 - 복사본\my_new\my_new\main.cpp(27): warning C4700: 초기화되지 않은 'test2' 지역 변수를 사용했습니다.
+  17 of 26 functions (65.4%) were compiled, the rest were copied from previous compilation.
+  코드를 생성했습니다.
+    7 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  My_New.vcxproj -> C:\Users\procademy\source\repos\C++ 과제\2차 과제(메모리누수_클래스)_완료 - 복사본\My_New\x64\Release\My_New.exe

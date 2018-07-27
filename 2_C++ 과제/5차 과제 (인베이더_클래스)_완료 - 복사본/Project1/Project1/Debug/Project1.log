@@ -1,0 +1,5 @@
+﻿  Main.cpp
+c:\users\procademy\source\repos\c++ 과제\5차 과제 (인베이더_클래스)\project1\project1\clist_template.h(99): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  c:\users\procademy\source\repos\c++ 과제\5차 과제 (인베이더_클래스)\project1\project1\clist_template.h(95): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>::iterator'에 대한 참조를 확인하세요.
+  c:\users\procademy\source\repos\c++ 과제\5차 과제 (인베이더_클래스)\project1\project1\clist_template.h(244): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>'에 대한 참조를 확인하세요.
+  Project1.vcxproj -> C:\Users\procademy\source\repos\C++ 과제\5차 과제 (인베이더_클래스)\Project1\Debug\Project1.exe

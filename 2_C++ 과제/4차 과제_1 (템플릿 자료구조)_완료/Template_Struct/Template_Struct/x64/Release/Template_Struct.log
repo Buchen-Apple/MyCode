@@ -1,0 +1,10 @@
+﻿  Main.cpp
+c:\users\procademy\source\repos\c++ 과제\4차 과제_1 (템플릿 자료구조)_완료\template_struct\template_struct\CList_Template.h(99): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  c:\users\procademy\source\repos\c++ 과제\4차 과제_1 (템플릿 자료구조)_완료\template_struct\template_struct\CList_Template.h(95): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>::iterator'에 대한 참조를 확인하세요.
+  c:\users\procademy\source\repos\c++ 과제\4차 과제_1 (템플릿 자료구조)_완료\template_struct\template_struct\CList_Template.h(244): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>'에 대한 참조를 확인하세요.
+  코드를 생성하고 있습니다.
+  0 of 35 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+  코드를 생성했습니다.
+    0 functions had inline decision re-evaluated but remain unchanged
+  Template_Struct.vcxproj -> C:\Users\procademy\source\repos\C++ 과제\4차 과제_1 (템플릿 자료구조)_완료\Template_Struct\x64\Release\Template_Struct.exe

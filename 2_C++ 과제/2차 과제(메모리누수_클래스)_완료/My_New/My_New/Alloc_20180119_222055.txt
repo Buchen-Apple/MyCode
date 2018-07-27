@@ -1,0 +1,8 @@
+NOALLOC  [0x0]
+ARRAY    [0xC4919620]  [    4]  Main.cpp : 16
+NOALLOC  [0x0]
+ARRAY    [0xC491D530]  [    32]  Main.cpp : 18
+LEAK     [0xC4915250]  [    1]  Main.cpp : 14
+
+ÃÑ Alloc È½¼ö : 7
+ÃÑ Alloc ¿ë·® : 85
