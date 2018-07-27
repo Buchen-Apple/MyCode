@@ -1,0 +1,9 @@
+:MONSTER
+{
+       // 몬스터 정보
+       m_iName = "몬스터"
+       m_iHp = 100
+       m_iMp = 20
+       m_iAtack = 5
+       m_iArmor = 50
+}
