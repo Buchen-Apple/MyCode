@@ -16,9 +16,7 @@
 
 
 namespace Library_Jingyu
-{
-	#define _Mycountof(_array)  sizeof(_array) / sizeof(TCHAR)
-	
+{	
 
 	// 싱글톤 얻은 후, 디렉토리 생성 define
 	#define SYSLOG_SET_DIRECTORY(_dir)								\
