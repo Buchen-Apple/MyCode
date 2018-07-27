@@ -1,0 +1,8 @@
+﻿  Project1.cpp
+  DLinked_List.cpp
+c:\users\administrator\desktop\vs\알고리즘,자료구조 과제\6차과제_a star 알고리즘(진행중)\project1\project1\dlinked_list.cpp(124): fatal error C1010: 미리 컴파일된 헤더를 찾는 동안 예기치 않은 파일의 끝이 나타났습니다. '#include "stdafx.h"'을(를) 소스에 추가하시겠습니까?
+  A_Search.cpp
+c:\users\administrator\desktop\vs\알고리즘,자료구조 과제\6차과제_a star 알고리즘(진행중)\project1\project1\a_search.cpp(174): fatal error C1010: 미리 컴파일된 헤더를 찾는 동안 예기치 않은 파일의 끝이 나타났습니다. '#include "stdafx.h"'을(를) 소스에 추가하시겠습니까?
+  코드를 생성하고 있습니다...
+c:\users\administrator\desktop\vs\알고리즘,자료구조 과제\6차과제_a star 알고리즘(진행중)\project1\project1\project1.cpp(340): error C4703: 초기화되지 않았을 수 있는 로컬 포인터 변수 'hMyBrush'이(가) 사용되었습니다.
+c:\users\administrator\desktop\vs\알고리즘,자료구조 과제\6차과제_a star 알고리즘(진행중)\project1\project1\project1.cpp(339): error C4703: 초기화되지 않았을 수 있는 로컬 포인터 변수 'hOldBrush'이(가) 사용되었습니다.

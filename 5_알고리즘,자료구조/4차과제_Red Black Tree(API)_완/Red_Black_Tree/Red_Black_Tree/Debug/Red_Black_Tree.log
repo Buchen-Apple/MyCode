@@ -1,0 +1,3 @@
+﻿  소스.cpp
+c:\users\administrator\desktop\vs\알고리즘,자료구조 과제\4차과제_red black tree(api)_완\red_black_tree\red_black_tree\소스.cpp(62): warning C4244: '인수': 'time_t'에서 'unsigned int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  Red_Black_Tree.vcxproj -> C:\Users\Administrator\Desktop\VS\알고리즘,자료구조 과제\4차과제_Red Black Tree(API)_완\Red_Black_Tree\Debug\Red_Black_Tree.exe

@@ -1,0 +1,11 @@
+﻿  Network_Func.cpp
+c:\users\procademy\source\repos\알고리즘,자료구조\1차과제_tcp 파이터 네트워크 클라_완(직렬화버퍼적용,진짜완)\tcp_figher_net_client\tcp_figher_net_client\List_Template.h(109): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  c:\users\procademy\source\repos\알고리즘,자료구조\1차과제_tcp 파이터 네트워크 클라_완(직렬화버퍼적용,진짜완)\tcp_figher_net_client\tcp_figher_net_client\List_Template.h(103): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>::iterator'에 대한 참조를 확인하세요.
+  c:\users\procademy\source\repos\알고리즘,자료구조\1차과제_tcp 파이터 네트워크 클라_완(직렬화버퍼적용,진짜완)\tcp_figher_net_client\tcp_figher_net_client\List_Template.h(254): note: 컴파일 중인 클래스 템플릿 인스턴스화 'CList<T>'에 대한 참조를 확인하세요.
+Network_Func.cpp(28): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  1 of 143 functions ( 0.7%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  TCP_Figher_Net_Client.vcxproj -> C:\Users\procademy\source\repos\알고리즘,자료구조\1차과제_TCP 파이터 네트워크 클라_완(직렬화버퍼적용,진짜완)\TCP_Figher_Net_Client\x64\Release\TCP_Figher_Net_Client.exe

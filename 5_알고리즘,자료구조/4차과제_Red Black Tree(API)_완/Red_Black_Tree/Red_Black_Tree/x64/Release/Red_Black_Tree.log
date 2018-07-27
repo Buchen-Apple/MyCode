@@ -1,0 +1,14 @@
+﻿  Red_Black_Tree.cpp
+Red_Black_Tree.cpp(321): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(324): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(324): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(350): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(358): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(387): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+Red_Black_Tree.cpp(395): warning C4244: '인수': 'double'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  2 of 17 functions (11.8%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  Red_Black_Tree.vcxproj -> C:\Users\procademy\source\repos\알고리즘,자료구조\4차과제_Red Black Tree(API)_완\Red_Black_Tree\x64\Release\Red_Black_Tree.exe
