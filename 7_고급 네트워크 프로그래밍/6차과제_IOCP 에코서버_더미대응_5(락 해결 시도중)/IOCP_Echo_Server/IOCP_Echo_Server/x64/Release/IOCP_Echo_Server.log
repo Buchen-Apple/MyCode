@@ -1,0 +1,13 @@
+﻿  stdafx.cpp
+  ProtocolBuff.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  RingBuff_20180624.cpp
+  IOCP_Echo_Server.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  NetworkFunc.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  All 178 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  IOCP_Echo_Server.vcxproj -> C:\Users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_IOCP 에코서버_더미대응_5(락 해결 시도중)\IOCP_Echo_Server\x64\Release\IOCP_Echo_Server.exe

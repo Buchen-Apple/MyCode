@@ -1,0 +1,21 @@
+﻿  stdafx.cpp
+  ProtocolBuff.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+  RingBuff_20180623.cpp
+  IOCP_Echo_Server.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\iocp_echo_server.cpp(129): warning C4267: '초기화 중': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\iocp_echo_server.cpp(240): warning C4018: '<': signed 또는 unsigned가 일치하지 않습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\iocp_echo_server.cpp(330): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\iocp_echo_server.cpp(341): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  NetworkFunc.cpp
+c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\networkfunc.cpp(164): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\networkfunc.cpp(181): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\networkfunc.cpp(415): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_iocp 에코서버_더미대응\iocp_echo_server\iocp_echo_server\networkfunc.cpp(437): warning C4244: '초기화 중': 'LONG64'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  All 176 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  코드를 생성했습니다.
+  IOCP_Echo_Server.vcxproj -> C:\Users\procademy\source\repos\7_고급 네트워크 프로그래밍\6차과제_IOCP 에코서버_더미대응\IOCP_Echo_Server\x64\Release\IOCP_Echo_Server.exe

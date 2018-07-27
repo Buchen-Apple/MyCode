@@ -1,0 +1,11 @@
+﻿  1차 과제.cpp
+1차 과제.cpp(111): warning C4311: '형식 캐스팅': 'DWORD *'에서 'unsigned int'(으)로 포인터가 잘립니다.
+1차 과제.cpp(111): warning C4302: '형식 캐스팅': 'DWORD *'에서 'unsigned int'(으)로 잘립니다.
+1차 과제.cpp(134): warning C4311: '형식 캐스팅': 'DWORD *'에서 'unsigned int'(으)로 포인터가 잘립니다.
+1차 과제.cpp(134): warning C4302: '형식 캐스팅': 'DWORD *'에서 'unsigned int'(으)로 잘립니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  0 of 9 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  1차 과제.vcxproj -> C:\Users\procademy\source\repos\7_고급 네트워크 프로그래밍\1차과제_스레드 과제_완_2\1차 과제\x64\Release\1차 과제.exe
