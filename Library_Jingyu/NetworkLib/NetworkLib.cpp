@@ -253,6 +253,12 @@ namespace Library_Jingyu
 			}
 		}
 
+		// 링거 건다.
+		/*LINGER Loptval;
+		Loptval.l_onoff = 1;
+		Loptval.l_linger = 0;
+		setsockopt(m_soListen_sock, SOL_SOCKET, SO_LINGER, (char*)&Loptval, sizeof(Loptval));*/
+
 		// 엑셉트 스레드 생성
 		m_hAcceptHandle = (HANDLE)_beginthreadex(NULL, 0, AcceptThread, this, 0, NULL);
 		if (m_hAcceptHandle == NULL)
@@ -457,6 +463,10 @@ namespace Library_Jingyu
 		return m_bServerLife;
 	}
 
+	ULONGLONG CLanServer::GetTotalCount()
+	{
+		return TotalCount;
+	}
 
 
 
@@ -473,6 +483,7 @@ namespace Library_Jingyu
 		m_bServerLife = false;
 
 		InitializeSRWLock(&m_srwSession_map_srwl);
+		TotalCount = 0;
 	}
 
 	// 소멸자
@@ -494,15 +505,13 @@ namespace Library_Jingyu
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 	
 		// map에서 제외시키기
-		size_t retval;
-
 		Lock_Map();
-		retval = map_Session.erase(sessionID);		
+		size_t retval = map_Session.erase(sessionID);
+		Unlock_Map();
 
 		// 만약, 없는 유저라면 그냥 삭제된걸로 치고, 리턴한다.
 		if (retval == 0)
-		{
-			Unlock_Map();
+		{		
 			// 유저 함수 호출
 			printf("없는유저!!\n");
 
@@ -513,8 +522,6 @@ namespace Library_Jingyu
 		// 클로즈 소켓, 세션 동적해제	
 		closesocket(DeleteSession->m_Client_sock);
 		delete DeleteSession;
-
-		Unlock_Map();
 
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
@@ -641,6 +648,7 @@ namespace Library_Jingyu
 				g_This->RecvProc(NowSession);
 
 				// 2. 리시브 다시 걸기
+				// 실제 map에 존재하는 유저만 건다.
 				g_This->RecvPost(NowSession);
 			}
 
@@ -661,6 +669,7 @@ namespace Library_Jingyu
 				NowSession->m_lSendFlag = 0;
 
 				// 3. 다시 샌드 시도
+				// 실제 map에 존재하는 유저만 건다.
 				g_This->SendPost(NowSession);
 
 				// 4. 샌드 완료됐다고 컨텐츠에 알려줌
@@ -758,6 +767,8 @@ namespace Library_Jingyu
 		
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
+
+			g_This->TotalCount++;
 
 			// ------------------
 			// 비동기 입출력 시작
@@ -1190,9 +1201,14 @@ namespace Library_Jingyu
 				// 비동기 입출력이 시작된게 아니라면
 				if (Error != WSA_IO_PENDING)
 				{
+					// IOcount 하나 감소
+					InterlockedDecrement(&NowSession->m_lIOCount);
+
 					// 에러가 버퍼 부족이라면
 					if (Error == WSAENOBUFS)
 					{
+						InterlockedDecrement(&NowSession->m_lIOCount);
+
 						// 일단 끊어야하니 셧다운 호출
 						NowSession->Struct_Lock();
 						NowSession->m_bShutdownState = true;
