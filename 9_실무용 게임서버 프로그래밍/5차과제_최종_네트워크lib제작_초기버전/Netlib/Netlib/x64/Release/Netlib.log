@@ -1,4 +1,5 @@
 ﻿  stdafx.cpp
+  Log.cpp
   ProtocolBuff.cpp
 c:\git_public\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
 c:\git_public\library_jingyu\protocolbuff\protocolbuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
@@ -8,6 +9,6 @@ c:\git_public\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함
   NetworkLib.cpp
 c:\git_public\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
   코드를 생성하고 있습니다.
-  All 206 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 221 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\5차과제_최종_네트워크lib제작_초기버전\Netlib\x64\Release\Netlib.exe

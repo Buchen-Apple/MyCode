@@ -18,6 +18,8 @@
 namespace Library_Jingyu
 {	
 
+	#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
+
 	// 싱글톤 얻은 후, 디렉토리 생성 define
 	#define SYSLOG_SET_DIRECTORY(_dir)								\
 	CSystemLog* cLog = CSystemLog::GetInstance();					\

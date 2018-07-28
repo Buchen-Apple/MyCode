@@ -5,7 +5,6 @@
 
 namespace Library_Jingyu
 {
-
 	// --------------------------------------
 	// 게임 로그 DB와 커넥트 할 때 필요한 정보들.
 	// --------------------------------------
@@ -245,7 +244,7 @@ namespace Library_Jingyu
 
 		// 2. 설정된 디렉토리 보관하기.
 		// 앞으로 파일 저장은 다 경로에 저장된다.
-		_tcscpy_s(m_tcDirectory, _Mycountof(m_tcDirectory), directory);
+		_tcscpy_s(m_tcDirectory, _MyCountof(m_tcDirectory), directory);
 
 		return true;
 	}
@@ -323,16 +322,16 @@ namespace Library_Jingyu
 		switch (level)
 		{
 		case CSystemLog::LEVEL_DEBUG:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("DEBUG"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("DEBUG"));
 			break;
 		case CSystemLog::LEVEL_WARNING:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("WARNING"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("WARNING"));
 			break;
 		case CSystemLog::LEVEL_ERROR:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("ERROR"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("ERROR"));
 			break;
 		case CSystemLog::LEVEL_SYSTEM:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("SYSTEM"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("SYSTEM"));
 			break;
 		default:
 			printf("'level' Parameter Error!!!\n");
@@ -493,16 +492,16 @@ namespace Library_Jingyu
 		switch (level)
 		{
 		case CSystemLog::LEVEL_DEBUG:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("DEBUG"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("DEBUG"));
 			break;
 		case CSystemLog::LEVEL_WARNING:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("WARNING"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("WARNING"));
 			break;
 		case CSystemLog::LEVEL_ERROR:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("ERROR"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("ERROR"));
 			break;
 		case CSystemLog::LEVEL_SYSTEM:
-			_tcscpy_s(tcLogLevel, _Mycountof(tcLogLevel), _T("SYSTEM"));
+			_tcscpy_s(tcLogLevel, _MyCountof(tcLogLevel), _T("SYSTEM"));
 			break;
 		default:
 			printf("'level' Parameter Error!!!\n");
