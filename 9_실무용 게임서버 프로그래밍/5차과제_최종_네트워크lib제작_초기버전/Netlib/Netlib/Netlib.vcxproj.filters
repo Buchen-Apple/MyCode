@@ -21,9 +21,6 @@
     <ClInclude Include="targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="NetworkLib.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -35,9 +32,6 @@
     <ClCompile Include="Netlib.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="NetworkLib.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -45,6 +39,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
