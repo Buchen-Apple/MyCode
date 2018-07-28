@@ -22,8 +22,8 @@ namespace Library_Jingyu
 
 	// 싱글톤 얻은 후, 디렉토리 생성 define
 	#define SYSLOG_SET_DIRECTORY(_dir)								\
-	CSystemLog* cLog = CSystemLog::GetInstance();					\
-	cLog->SetDirectory(L"Test")										\
+	cLog = CSystemLog::GetInstance();								\
+	cLog->SetDirectory(_dir)										\
 
 	// LogLevel 설정 define
 	#define SYSLOG_SET_LEVEL(_level)								\

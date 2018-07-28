@@ -695,8 +695,9 @@ namespace Library_Jingyu
 			if (client_sock == INVALID_SOCKET)
 			{
 				int Error = WSAGetLastError();
-				// 10004번 에러면 정상종료.
-				if (Error == WSAEINTR)
+				// 10004번(WSAEINTR) 에러면 정상종료. 함수호출이 중단되었다는 것.
+				// 10038번(WSAEINTR) 은 소켓이 아닌 항목에 작업을 시도했다는 것. 이미 리슨소켓은 closesocket된것이니 에러 아님.
+				if (Error == WSAEINTR || Error == WSAENOTSOCK)
 				{
 					// Accept 스레드 정상 종료
 					break;
@@ -1186,30 +1187,8 @@ namespace Library_Jingyu
 				// 비동기 입출력이 시작된게 아니라면
 				if (Error != WSA_IO_PENDING)
 				{
-					if (Error != WSAESHUTDOWN && Error != WSAECONNRESET && Error != WSAECONNABORTED)
-					{
-						// 일단 끊어야하니 셧다운 호출
-						NowSession->Struct_Lock();
-						NowSession->m_bShutdownState = true;
-						NowSession->Struct_Unlock();
-
-						shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-						// 내 에러, 윈도우에러 보관
-						m_iOSErrorCode = Error;
-						m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSASEND_FAIL;
-
-						// 에러 스트링 만들고
-						TCHAR tcErrorString[300];
-						StringCchPrintf(tcErrorString, 300, _T("WSASendFail... UserID : %d, [%s:%d]"),
-							NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-						// 에러 함수 호출
-						OnError((int)euError::NETWORK_LIB_ERROR__WSASEND_FAIL, tcErrorString);
-					}
-
 					// 에러가 버퍼 부족이라면
-					else if (Error == WSAENOBUFS)
+					if (Error == WSAENOBUFS)
 					{
 						// 일단 끊어야하니 셧다운 호출
 						NowSession->Struct_Lock();
@@ -1230,6 +1209,31 @@ namespace Library_Jingyu
 						// 에러 함수 호출
 						OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
 					}
+
+					// 버퍼만 체크
+					//else if (Error != WSAESHUTDOWN && Error != WSAECONNRESET && Error != WSAECONNABORTED && Error != WSAEMFILE)
+					//{
+					//	// 일단 끊어야하니 셧다운 호출
+					//	NowSession->Struct_Lock();
+					//	NowSession->m_bShutdownState = true;
+					//	NowSession->Struct_Unlock();
+
+					//	shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+					//	// 내 에러, 윈도우에러 보관
+					//	m_iOSErrorCode = Error;
+					//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSASEND_FAIL;
+
+					//	// 에러 스트링 만들고
+					//	TCHAR tcErrorString[300];
+					//	StringCchPrintf(tcErrorString, 300, _T("WSASendFail... UserID : %d, [%s:%d]"),
+					//		NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+					//	// 에러 함수 호출
+					//	OnError((int)euError::NETWORK_LIB_ERROR__WSASEND_FAIL, tcErrorString);
+					//}
+
+					
 
 					return false;
 				}
