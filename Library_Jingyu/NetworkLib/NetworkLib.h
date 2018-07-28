@@ -64,8 +64,6 @@ namespace Library_Jingyu
 		// 현재 접속중인 유저 수
 		ULONGLONG m_ullJoinUserCount;
 
-		ULONGLONG TotalCount;
-
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
 
@@ -161,10 +159,6 @@ namespace Library_Jingyu
 		// return true : 가동중
 		// return false : 가동중 아님
 		bool GetServerState();
-
-		ULONGLONG GetTotalCount();
-
-
 
 	public:
 		// -----------------------

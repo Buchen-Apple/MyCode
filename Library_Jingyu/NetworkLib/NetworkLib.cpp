@@ -41,7 +41,7 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
 		NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
-		NETWORK_LIB_ERROR__DISCONNECT_WAIT_CLINET		// 접속 종료 대기중인 클라이언트에게 send를 하거나 할 경우
+		NETWORK_LIB_ERROR__WFSO_ERROR					// WaitForSingleObject 에러.
 	};
 
 	// 세션 구조체
@@ -59,9 +59,6 @@ namespace Library_Jingyu
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
 
-		// shutdown 상태인지 체크. shutdown 날린 상태면 보낼거 있어도 보내면 안됨.
-		bool m_bShutdownState;
-
 		// 내 구조체 동기화 객체.
 		SRWLOCK m_srwStruct_srwl;
 
@@ -77,7 +74,6 @@ namespace Library_Jingyu
 			InitializeSRWLock(&m_srwStruct_srwl);
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
-			m_bShutdownState = false;
 		}
 
 		// 락 걸기
@@ -292,7 +288,11 @@ namespace Library_Jingyu
 		DWORD retval = WaitForSingleObject(m_hAcceptHandle, INFINITE);
 		if (retval != WAIT_OBJECT_0)
 		{
-			printf("엑셉트 스레드 에러\n");		
+			m_iOSErrorCode = GetLastError();
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
+
+			// 에러 발생 함수 호출
+			OnError((int)euError::NETWORK_LIB_ERROR__WFSO_ERROR, L"WaitForSingleObject_Error");
 		}
 
 		// 2. 모든 유저에게 Shutdown
@@ -301,13 +301,7 @@ namespace Library_Jingyu
 
 		map<ULONGLONG, stSession*>::iterator itor = map_Session.begin();
 		for (; itor != map_Session.end(); ++itor)
-		{
-			itor->second->Struct_Lock();
-			itor->second->m_bShutdownState = true;
-			shutdown(itor->second->m_Client_sock, SD_BOTH);
-			itor->second->Struct_Unlock();
-		}
-		
+			shutdown(itor->second->m_Client_sock, SD_BOTH);		
 
 		Unlock_Map();
 
@@ -362,22 +356,10 @@ namespace Library_Jingyu
 			return false;
 		}
 	
-		// 2. shutdown중이 아닌 유저만 넣기 가능
-		NowSession->Struct_Lock();
-		bool Check = NowSession->m_bShutdownState;
-		NowSession->Struct_Unlock();
-
-		if (Check == true)
-		{
-			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__DISCONNECT_WAIT_CLINET;
-			return false;
-		}
-	
-		// 3. 헤더 만들기 (페이로드 사이즈가 들어간다)
+		// 2. 헤더 만들기 (페이로드 사이즈가 들어간다)
 		WORD Header = payloadBuff->GetUseSize();
 	
-		// 4. 넣기
+		// 3. 넣기
 		NowSession->m_SendQueue.EnterLOCK();  // 락 ---------------------------	
 
 		// 헤더 인큐
@@ -386,7 +368,10 @@ namespace Library_Jingyu
 		{
 			NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
 
-												  // 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
+			// 해당 유저는 접속을 끊는다.
+			shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL;
 			return false;
 		}
@@ -397,6 +382,9 @@ namespace Library_Jingyu
 		{
 			NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
 
+			 // 해당 유저는 접속을 끊는다.
+			shutdown(NowSession->m_Client_sock, SD_BOTH);
+
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL;		
 			return false;
@@ -404,7 +392,7 @@ namespace Library_Jingyu
 
 		NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
 
-		// 5. SendPost시도
+		// 4. SendPost시도
 		SendPost(NowSession);
 
 		return true;
@@ -427,10 +415,6 @@ namespace Library_Jingyu
 
 		// 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
-		NowSession->Struct_Lock();
-		NowSession->m_bShutdownState = true;
-		NowSession->Struct_Unlock();
-
 		shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 		return true;
@@ -462,12 +446,7 @@ namespace Library_Jingyu
 	{
 		return m_bServerLife;
 	}
-
-	ULONGLONG CLanServer::GetTotalCount()
-	{
-		return TotalCount;
-	}
-
+	
 
 
 
@@ -483,7 +462,6 @@ namespace Library_Jingyu
 		m_bServerLife = false;
 
 		InitializeSRWLock(&m_srwSession_map_srwl);
-		TotalCount = 0;
 	}
 
 	// 소멸자
@@ -768,8 +746,6 @@ namespace Library_Jingyu
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
 
-			g_This->TotalCount++;
-
 			// ------------------
 			// 비동기 입출력 시작
 			// ------------------
@@ -866,10 +842,6 @@ namespace Library_Jingyu
 			if (PeekSize == -1)
 			{
 				// 일단 끊어야하니 셧다운 호출
-				NowSession->Struct_Lock();
-				NowSession->m_bShutdownState = true;
-				NowSession->Struct_Unlock();
-
 				shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 				// 내 에러 보관. 윈도우 에러는 없음.
@@ -904,10 +876,6 @@ namespace Library_Jingyu
 			if (DequeueSize == -1)
 			{
 				// 일단 끊어야하니 셧다운 호출
-				NowSession->Struct_Lock();
-				NowSession->m_bShutdownState = true;
-				NowSession->Struct_Unlock();
-
 				shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 				// 내 에러 보관. 윈도우 에러는 없음.
@@ -991,10 +959,6 @@ namespace Library_Jingyu
 				if (Error == WSAENOBUFS)
 				{				
 					// 일단 끊어야하니 셧다운 호출
-					NowSession->Struct_Lock();
-					NowSession->m_bShutdownState = true;
-					NowSession->Struct_Unlock();
-
 					shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 					// 내 에러, 윈도우에러 보관
@@ -1070,10 +1034,6 @@ namespace Library_Jingyu
 				if (Error == WSAENOBUFS)
 				{			
 					// 일단 끊어야하니 셧다운 호출
-					NowSession->Struct_Lock();
-					NowSession->m_bShutdownState = true;
-					NowSession->Struct_Unlock();
-
 					shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 					// 내 에러, 윈도우에러 보관
@@ -1210,10 +1170,6 @@ namespace Library_Jingyu
 						InterlockedDecrement(&NowSession->m_lIOCount);
 
 						// 일단 끊어야하니 셧다운 호출
-						NowSession->Struct_Lock();
-						NowSession->m_bShutdownState = true;
-						NowSession->Struct_Unlock();
-
 						shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 						// 내 에러, 윈도우에러 보관
@@ -1233,10 +1189,6 @@ namespace Library_Jingyu
 					//else if (Error != WSAESHUTDOWN && Error != WSAECONNRESET && Error != WSAECONNABORTED && Error != WSAEMFILE)
 					//{
 					//	// 일단 끊어야하니 셧다운 호출
-					//	NowSession->Struct_Lock();
-					//	NowSession->m_bShutdownState = true;
-					//	NowSession->Struct_Unlock();
-
 					//	shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 					//	// 내 에러, 윈도우에러 보관
