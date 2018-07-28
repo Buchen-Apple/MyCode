@@ -24,6 +24,9 @@
     <ClInclude Include="NetworkLib.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -36,6 +39,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

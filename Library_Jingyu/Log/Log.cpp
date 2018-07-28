@@ -346,7 +346,7 @@ namespace Library_Jingyu
 		// 3. 파일 이름 만들기
 		// [년월_타입.txt]
 		TCHAR tcFileName[100];
-		HRESULT retval = StringCbPrintf(tcFileName, 100, _T("%s\\%d%02d_%s.txt"), m_tcDirectory, stNowTime.wYear, stNowTime.wMonth, type);
+		HRESULT retval = StringCchPrintf(tcFileName, 100, _T("%s\\%d%02d_%s.txt"), m_tcDirectory, stNowTime.wYear, stNowTime.wMonth, type);
 
 		// StringCbPrintf 에러처리. S_OK가 아니면 무조건 에러
 		// 에러나면 에러났다고 로그 저장.

@@ -33,11 +33,14 @@ namespace Library_Jingyu
 
 		// SRW Lock 초기화
 		InitializeSRWLock(&sl);
+
+		//InitializeCriticalSection(&cs);
 	}
 
 	// 소멸자
 	CRingBuff::~CRingBuff()
 	{
+		//DeleteCriticalSection(&cs);
 		delete[] m_Buff;
 	}
 
@@ -461,6 +464,7 @@ namespace Library_Jingyu
 	/////////////////////////////////////////////////////////////////////////
 	void CRingBuff::EnterLOCK()
 	{
+		//EnterCriticalSection(&cs);
 		AcquireSRWLockExclusive(&sl);
 	}
 
@@ -473,6 +477,7 @@ namespace Library_Jingyu
 	/////////////////////////////////////////////////////////////////////////
 	void CRingBuff::LeaveLOCK()
 	{
+		//LeaveCriticalSection(&cs);
 		ReleaseSRWLockExclusive(&sl);
 	}
 
