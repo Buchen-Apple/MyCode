@@ -41,7 +41,8 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
 		NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
-		NETWORK_LIB_ERROR__WFSO_ERROR					// WaitForSingleObject 에러.
+		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
+		NETWORK_LIB_ERROR__IOCP_IO_FAIL					// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
 	};
 
 	// 세션 구조체
@@ -58,15 +59,20 @@ namespace Library_Jingyu
 
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
+		
+		// I/O가 외부적인 요인(물리적인 연결 에러라던가..)으로 실패했을 때 약 5회정도 재시도 해본다. 
+		// 이 시도한 횟수를 저장할 변수. 실패할 때 마다 1씩 증가하다가, 5가되면 더 이상 접속시도 안함
+		// I/O가 성공하면 그 즉시 0이된다.
+		LONG	m_lReyryCount;
 
 		// 내 구조체 동기화 객체.
 		SRWLOCK m_srwStruct_srwl;
+		
+		CRingBuff m_RecvQueue;
+		CRingBuff m_SendQueue;
 
 		OVERLAPPED m_overRecvOverlapped;
 		OVERLAPPED m_overSendOverlapped;
-
-		CRingBuff m_RecvQueue;
-		CRingBuff m_SendQueue;
 
 		// 생성자
 		stSession()
@@ -74,8 +80,10 @@ namespace Library_Jingyu
 			InitializeSRWLock(&m_srwStruct_srwl);
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
+			m_lReyryCount = 0;
 		}
 
+	private:
 		// 락 걸기
 		void LockSession_Func()
 		{
@@ -105,7 +113,7 @@ namespace Library_Jingyu
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, bool Nodelay, int MaxConnect)
-	{
+	{	
 		// 각종 변수 초기화 함수
 		Init();
 
@@ -598,20 +606,46 @@ namespace Library_Jingyu
 				// 그게 아니면 IOCP 에러 발생한 것
 
 				// 윈도우 에러, 내 에러 보관
-				g_This->m_iOSErrorCode = WSAGetLastError();
+				g_This->m_iOSErrorCode = GetLastError();
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__IOCP_ERROR;
 
 				// 에러 발생 함수 호출
 				g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_ERROR, L"IOCP_Error");
 
-				break;
+				// break 안한다. 해당 유저는 자연스럽게 I/O가 줄어들어서 종료.
 			}
 
-			// overlapped가 nullptr이 아니라면 내 요청 관련 에러 체크
-			else
-			{
-				// 지금 하는거 없음.			
-			}
+			/*
+			 overlapped가 nullptr이 아니면서 리턴값이 false면, I/O에 대한 에러일 수 있으니 GetLastError 하고 일정 횟수 I/O 재요청. (물리적인 연결 실패 등으로 인한 에러?)
+			 근데.. 이거 의미없는거같다. 걍 체크 안하는게 맞는거같기도 하고.
+			 접속 -> 끊고 -> 다시 접속을 반복하다 보니까 접속이 끊긴 클라에 대해 ERROR_NETNAME_DELETED(해당 네트워크를 더 이상 사용할수 없음)이게 계속 뜨는데,
+			 일단 위 에러는 제외한다고 쳐도, 이미 연결 끊긴 유저에게 재접속 기회를 주는게 맞나 모르겠다. 물리적으로 끊겼으면 그냥 끊긴걸로 처리?
+			 클라에게 알려주는 용도로(에러표시용)으로 남겨둬야할까? 고민중...
+			*/
+			//else if(retval == false && GetLastError() != ERROR_NETNAME_DELETED)
+			//{
+			//	// 윈도우 에러, 내 에러 보관
+			//	g_This->m_iOSErrorCode = GetLastError();
+			//	g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__IOCP_IO_FAIL;
+
+			//	// 실패에 대해 재전송 시도
+			//	// m_lReyryCount가 5가 아닐 때만 시도한다.
+			//	if (NowSession->m_lReyryCount != 5)
+			//	{
+			//		InterlockedIncrement(&NowSession->m_lReyryCount);
+
+			//		// Recv가 실패했을 경우, 리시브를 다시 걸어본다.
+			//		if (&NowSession->m_overRecvOverlapped == overlapped)
+			//			g_This->RecvPost(NowSession);
+
+			//		// Send가 실패했을 경우, 샌드를 다시 걸어본다.
+			//		else if (&NowSession->m_overSendOverlapped == overlapped)
+			//			g_This->SendPost(NowSession);
+			//	}
+
+			//	// 에러 발생 함수 호출
+			//	g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_IO_FAIL, L"IOCP_IO_Fail");				
+			//}
 
 			// -----------------
 			// Recv 로직
@@ -619,6 +653,9 @@ namespace Library_Jingyu
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
 			if (&NowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
+				// m_lReyryCount값을 0으로 변경
+				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
+
 				// rear 이동
 				NowSession->m_RecvQueue.MoveWritePos(cbTransferred);
 
@@ -626,7 +663,6 @@ namespace Library_Jingyu
 				g_This->RecvProc(NowSession);
 
 				// 2. 리시브 다시 걸기
-				// 실제 map에 존재하는 유저만 건다.
 				g_This->RecvPost(NowSession);
 			}
 
@@ -636,6 +672,9 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&NowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+				// m_lReyryCount값을 0으로 변경
+				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
+
 				// 1. front 이동	
 				NowSession->m_SendQueue.EnterLOCK();		// 락 -----------------------
 
@@ -647,7 +686,6 @@ namespace Library_Jingyu
 				NowSession->m_lSendFlag = 0;
 
 				// 3. 다시 샌드 시도
-				// 실제 map에 존재하는 유저만 건다.
 				g_This->SendPost(NowSession);
 
 				// 4. 샌드 완료됐다고 컨텐츠에 알려줌
