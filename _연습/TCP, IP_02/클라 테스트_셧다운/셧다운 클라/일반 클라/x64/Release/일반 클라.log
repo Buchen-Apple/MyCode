@@ -1,0 +1,9 @@
+﻿  일반 클라.cpp
+c:\users\administrator\desktop\vs\_연습\tcp, ip\클라 테스트_셧다운\셧다운 클라\일반 클라\일반 클라.cpp(99): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\users\administrator\desktop\vs\_연습\tcp, ip\클라 테스트_셧다운\셧다운 클라\일반 클라\일반 클라.cpp(117): warning C4267: '인수': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  1 of 9 functions (11.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  일반 클라.vcxproj -> C:\Users\Administrator\Desktop\VS\_연습\TCP, IP\클라 테스트_셧다운\셧다운 클라\x64\Release\일반 클라.exe

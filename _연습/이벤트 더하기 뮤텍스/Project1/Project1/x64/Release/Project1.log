@@ -1,0 +1,9 @@
+﻿  Project1.cpp
+Project1.cpp(82): warning C4477: 'wprintf' : 서식 문자열 '%d'에 'int' 형식의 인수가 필요하지만 variadic 인수 1의 형식이 '::size_t'입니다.
+  Project1.cpp(82): note: 서식 문자열에서 '%zd'을(를) 사용하는 것이 좋습니다.
+  코드를 생성하고 있습니다.
+  2 of 7 functions (28.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
+  Project1.vcxproj -> C:\Users\Administrator\Desktop\VS\_연습\이벤트 더하기 뮤텍스\Project1\x64\Release\Project1.exe

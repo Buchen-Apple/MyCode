@@ -1,0 +1,4 @@
+﻿  Server.cpp
+c:\users\administrator\desktop\vs\_연습\tcp, ip\complete routine 연습\server\server\server.cpp(125): error C4996: 'inet_ntoa': Use inet_ntop() or InetNtop() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  c:\program files (x86)\windows kits\10\include\10.0.17134.0\um\winsock2.h(1848): note: 'inet_ntoa' 선언을 참조하십시오.
+c:\users\administrator\desktop\vs\_연습\tcp, ip\complete routine 연습\server\server\server.cpp(100): warning C4101: 'retval' :참조되지 않은 지역 변수입니다.
