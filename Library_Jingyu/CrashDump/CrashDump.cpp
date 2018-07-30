@@ -31,7 +31,7 @@ namespace Library_Jingyu
 		_CrtSetReportMode(_CRT_ASSERT, 0);	// 어설션 오류 출력 중단 (어셜션 오류 : 출력이 false인 경우 에러 발생시킴)
 		_CrtSetReportMode(_CRT_ERROR, 0);	// Error 메시지 출력 중단.
 
-											// CRT 에러가 발생하면, 후킹할 함수 등록(함수포인터)
+		// CRT 에러가 발생하면, 후킹할 함수 등록(함수포인터)
 		_CrtSetReportHook(_custom_Report_hook);
 
 
@@ -53,8 +53,7 @@ namespace Library_Jingyu
 		signal(SIGFPE, signalHandler);		// 부동 소수점 오류
 		signal(SIGSEGV, signalHandler);		// 잘못된 저장소에 엑세스
 		signal(SIGTERM, signalHandler);		// 종료 요청.
-
-
+		
 		SetHandlerDump();
 	}
 

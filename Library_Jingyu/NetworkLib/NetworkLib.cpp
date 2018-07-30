@@ -10,6 +10,7 @@
 #include "NetworkLib.h"
 #include "RingBuff\RingBuff.h"
 #include "Log\Log.h"
+#include "CrashDump\CrashDump.h"
 
 
 
@@ -89,21 +90,20 @@ namespace Library_Jingyu
 		}
 
 	private:
-		// 락 걸기
-		void LockSession_Func()
+		// Exclusive_락 걸기
+		void LockSession_Exclusive_Func()
 		{
 			AcquireSRWLockExclusive(&m_srwStruct_srwl);
 		}
 
-		// 락 풀기
-		void UnlockSession_Func()
+		// Exclusive_락 풀기
+		void UnlockSession_Exclusive_Func()
 		{
 			ReleaseSRWLockExclusive(&m_srwStruct_srwl);
 		}
 
-
-	#define	Struct_Lock()	LockSession_Func()
-	#define Struct_Unlock()	UnlockSession_Func()
+#define	Struct_Lock()	LockSession_Exclusive_Func()
+#define Struct_Unlock()	UnlockSession_Exclusive_Func()
 	
 	};
 
@@ -236,7 +236,8 @@ namespace Library_Jingyu
 		}
 
 		// 리슨
-		if (listen(m_soListen_sock, SOMAXCONN) == SOCKET_ERROR)
+		retval = listen(m_soListen_sock, SOMAXCONN);
+		if (retval == SOCKET_ERROR)
 		{
 			// 윈도우 에러, 내 에러 보관
 			m_iOSErrorCode = WSAGetLastError();
@@ -256,7 +257,8 @@ namespace Library_Jingyu
 		// 연결된 리슨 소켓의 송신버퍼 크기를 0으로 변경. 그래야 정상적으로 비동기 입출력으로 실행
 		// 리슨 소켓만 바꾸면 모든 클라 송신버퍼 크기는 0이된다.
 		int optval = 0;
-		if (setsockopt(m_soListen_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval)) == SOCKET_ERROR)
+		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
+		if (optval == SOCKET_ERROR)
 		{
 			// 윈도우 에러, 내 에러 보관
 			m_iOSErrorCode = WSAGetLastError();
@@ -278,7 +280,9 @@ namespace Library_Jingyu
 		if (Nodelay == true)
 		{
 			BOOL optval = TRUE;
-			if (setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval)) == SOCKET_ERROR)
+			retval = setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
+
+			if (retval == SOCKET_ERROR)
 			{
 				// 윈도우 에러, 내 에러 보관
 				m_iOSErrorCode = WSAGetLastError();
@@ -328,7 +332,7 @@ namespace Library_Jingyu
 		m_bServerLife = true;		
 
 		// 서버 오픈 로그 찍기		
-		cNetLibLog->LogSave(L"System", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -339,6 +343,7 @@ namespace Library_Jingyu
 		// 1. Accept 스레드 종료. 더 이상 접속을 받으면 안되니 Accept스레드 먼저 종료
 		// Accept 스레드는 리슨소켓을 closesocket하면 된다.
 		closesocket(m_soListen_sock);
+
 		DWORD retval = WaitForSingleObject(m_hAcceptHandle, INFINITE);
 		if (retval != WAIT_OBJECT_0)
 		{
@@ -355,13 +360,13 @@ namespace Library_Jingyu
 
 		// 2. 모든 유저에게 Shutdown
 		// 모든 유저에게 셧다운 날림
-		Lock_Map();
+		Lock_Exclusive_Map();
 
 		map<ULONGLONG, stSession*>::iterator itor = map_Session.begin();
 		for (; itor != map_Session.end(); ++itor)
 			shutdown(itor->second->m_Client_sock, SD_BOTH);		
 
-		Unlock_Map();
+		Unlock_Exclusive_Map();
 
 		// 모든 유저가 종료되었는지 체크
 		while (1)
@@ -439,8 +444,8 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet : [%s : %d] NetError(%d)",
-				NowSession->m_IP, NowSession->m_prot, (int)m_iMyErrorCode);
+			// ---> 일단 현재 더미테스트 중에는 너무 많이 발생하니 뺀다.
+			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
 			return false;
 		}
@@ -492,7 +497,9 @@ namespace Library_Jingyu
 		NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
 
 		// 4. SendPost시도
-		SendPost(NowSession);
+		bool Check = SendPost(NowSession);
+		if (Check == false)
+			return false;
 
 		return true;
 	}
@@ -572,6 +579,7 @@ namespace Library_Jingyu
 		// 서버 가동상태 false로 시작 
 		m_bServerLife = false;
 
+		// SRWLock 초기화
 		InitializeSRWLock(&m_srwSession_map_srwl);
 	}
 
@@ -581,7 +589,7 @@ namespace Library_Jingyu
 		// 서버 가동상태 false로 변경
 		m_bServerLife = false;
 
-		// 접속 중인 유저가 있으면 Stop함수 호출.
+		// 접속 중인 유저가 1명이라도 있으면 Stop함수 호출.
 		if (m_ullJoinUserCount != 0)
 		{
 			Stop();
@@ -594,9 +602,9 @@ namespace Library_Jingyu
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 	
 		// map에서 제외시키기
-		Lock_Map();
+		Lock_Exclusive_Map();
 		size_t retval = map_Session.erase(sessionID);
-		Unlock_Map();
+		Unlock_Exclusive_Map();
 
 		// 만약, 없는 유저라면 그냥 삭제된걸로 치고, 리턴한다.
 		if (retval == 0)
@@ -666,10 +674,11 @@ namespace Library_Jingyu
 	// 워커스레드
 	UINT WINAPI	CLanServer::WorkerThread(LPVOID lParam)
 	{
-		int retval;
+		int iRetval;
+		bool bCheck;
 
 		DWORD cbTransferred;
-		stSession* NowSession;
+		stSession* stNowSession;
 		OVERLAPPED* overlapped;
 
 		CLanServer* g_This = (CLanServer*)lParam;
@@ -678,7 +687,7 @@ namespace Library_Jingyu
 		{
 			// 변수들 초기화
 			cbTransferred = 0;
-			NowSession = nullptr;
+			stNowSession = nullptr;
 			overlapped = nullptr;
 
 			// GQCS 완료 시 함수 호출
@@ -686,7 +695,7 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			retval = GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&NowSession, &overlapped, INFINITE);
+			iRetval = GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
 
 			// GQCS 깨어날 시 함수호출
 			g_This->OnWorkerThreadBegin();
@@ -698,7 +707,7 @@ namespace Library_Jingyu
 			if (overlapped == NULL)
 			{
 				// 셋 다 0이면 스레드 종료.
-				if (cbTransferred == 0 && NowSession == NULL)
+				if (cbTransferred == 0 && stNowSession == NULL)
 				{
 					// printf("워커 스레드 정상종료\n");
 
@@ -761,54 +770,58 @@ namespace Library_Jingyu
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			if (&NowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// m_lReyryCount값을 0으로 변경
 				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
 
 				// rear 이동
-				NowSession->m_RecvQueue.MoveWritePos(cbTransferred);
+				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);
 
 				// 1. 링버퍼 후, 패킷 처리
-				g_This->RecvProc(NowSession);
+				g_This->RecvProc(stNowSession);
 
-				// 2. 리시브 다시 걸기
-				g_This->RecvPost(NowSession);
+				// 2. 리시브 다시 걸기. false가 리턴되면 종료된 유저이니 다시 위로 올라간다.
+				bCheck = g_This->RecvPost(stNowSession);
+				if (bCheck == false)
+					continue;
 			}
 
 			// -----------------
 			// Send 로직
 			// -----------------
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
-			else if (&NowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
+			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
 				// m_lReyryCount값을 0으로 변경
 				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
 
 				// 1. front 이동	
-				NowSession->m_SendQueue.EnterLOCK();		// 락 -----------------------
+				stNowSession->m_SendQueue.EnterLOCK();		// 락 -----------------------
 
-				NowSession->m_SendQueue.RemoveData(cbTransferred);
+				stNowSession->m_SendQueue.RemoveData(cbTransferred);
 
-				NowSession->m_SendQueue.LeaveLOCK();		// 락 해제 ------------------
+				stNowSession->m_SendQueue.LeaveLOCK();		// 락 해제 ------------------
 
 				// 2. 샌드 가능 상태로 변경
-				NowSession->m_lSendFlag = 0;
+				stNowSession->m_lSendFlag = 0;
 
-				// 3. 다시 샌드 시도
-				g_This->SendPost(NowSession);
+				// 3. 다시 샌드 시도. false가 리턴되면 종료된 유저이니 다시 위로 올라간다.
+				bCheck = g_This->SendPost(stNowSession);
+				if (bCheck == false)
+					continue;
 
 				// 4. 샌드 완료됐다고 컨텐츠에 알려줌
-				g_This->OnSend(NowSession->m_ullSessionID, cbTransferred);
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 			}
 
 			// -----------------
 			// I/O카운트 감소 및 삭 제 처리
 			// -----------------
 			// I/O카운트 감소 후, 0이라면접속 종료
-			long NowVal = InterlockedDecrement(&NowSession->m_lIOCount);
+			long NowVal = InterlockedDecrement(&stNowSession->m_lIOCount);
 			if (NowVal == 0)
-				g_This->InDisconnect(NowSession);
+				g_This->InDisconnect(stNowSession);
 		}
 		return 0;
 	}
@@ -899,7 +912,8 @@ namespace Library_Jingyu
 			// 1. NewSession 동적해제
 			// 2. 맵에 추가하지 않음.
 			// 3. 여기서 다시 Accept하러 돌아감.
-			if (g_This->RecvPost_Accept(NewSession) == false)
+			Check = g_This->RecvPost_Accept(NewSession);
+			if (Check == false)
 			{
 				delete NewSession;
 				continue;
@@ -911,9 +925,9 @@ namespace Library_Jingyu
 			// map 등록 후, 접속자 수 추가
 			// ------------------
 			// 셋팅된 구조체를 map에 등록
-			g_This->Lock_Map();
+			g_This->Lock_Exclusive_Map();
 			g_This->map_Session.insert(pair<ULONGLONG, stSession*>(NewSession->m_ullSessionID, NewSession));
-			g_This->Unlock_Map();
+			g_This->Unlock_Exclusive_Map();
 
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
@@ -928,36 +942,48 @@ namespace Library_Jingyu
 		return 0;
 	}
 
-	// map에 락 걸기
-	void CLanServer::LockMap_Func()
+	// map에 Exclusive 락 걸기
+	void CLanServer::LockMap_Exclusive_Func()
 	{
 		AcquireSRWLockExclusive(&m_srwSession_map_srwl);
 	}
 
-	// map에 락 풀기
-	void CLanServer::UnlockMap_Func()
+	// map에 Exclusive 락 풀기
+	void CLanServer::UnlockMap_Exclusive_Func()
 	{
 		ReleaseSRWLockExclusive(&m_srwSession_map_srwl);
 	}
 
+	// map에 Shared 락 걸기, 락 풀기
+	void CLanServer::LockMap_Shared_Func()
+	{
+		AcquireSRWLockShared(&m_srwSession_map_srwl);
+	}
+
+	// map에 Shared 락 풀기
+	void CLanServer::UnlockMap_Shared_Func()
+	{
+		ReleaseSRWLockShared(&m_srwSession_map_srwl);
+	}
+	
 	// ClinetID로 Session구조체 찾기 함수
 	CLanServer::stSession* CLanServer::FineSessionPtr(ULONGLONG ClinetID)
 	{
 		// 락 ------------------
-		Lock_Map();
+		Lock_Shared_Map();
 		map <ULONGLONG, stSession*>::iterator iter;
 
 		iter = map_Session.find(ClinetID);
 		if (iter == map_Session.end())
 		{
 			// 락 끝 ------------------
-			Unlock_Map();
+			Unlock_Shared_Map();
 			return nullptr;
 		}
 
 		stSession* NowSession = iter->second;
 
-		Unlock_Map();
+		Unlock_Shared_Map();
 		// 락 끝 ------------------
 
 		return NowSession;
@@ -1076,8 +1102,9 @@ namespace Library_Jingyu
 	}
 
 	// Accept용 RecvProc함수
-	// return true : 성공적으로 WSARecv() 완료
-	// return false : WSARecv()에서 WSA_IO_PENDING 외의 에러 발생
+	// 
+	// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
+	// return false : I/O카운트가 0이되어서 종료된 유저임
 	bool CLanServer::RecvPost_Accept(stSession* NowSession)
 	{
 		// ------------------
@@ -1117,7 +1144,7 @@ namespace Library_Jingyu
 		int retval = WSARecv(NowSession->m_Client_sock, wsabuf, wsabufCount, &recvBytes, &flags, &NowSession->m_overRecvOverlapped, NULL);
 
 
-		// 4. 에러 처리
+		// 4. WSARecv() 에러 처리
 		if (retval == SOCKET_ERROR)
 		{
 			int Error = WSAGetLastError();
@@ -1130,7 +1157,10 @@ namespace Library_Jingyu
 
 				// I/O 카운트가 0이라면 접속 종료.
 				if (Nowval == 0)
+				{
 					InDisconnect(NowSession);
+					return false;
+				}
 
 				// 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
 				if (Error == WSAENOBUFS)
@@ -1154,8 +1184,6 @@ namespace Library_Jingyu
 					// 에러 함수 호출
 					OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
 				}
-
-				return false;
 			}
 		}
 
@@ -1163,7 +1191,10 @@ namespace Library_Jingyu
 	}
 
 	// RecvPost 함수. 비동기 입출력 시작
-	void CLanServer::RecvPost(stSession* NowSession)
+	//
+	// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
+	// return false : I/O카운트가 0이되어서 종료된 유저임
+	bool CLanServer::RecvPost(stSession* NowSession)
 	{
 		// ------------------
 		// 비동기 입출력 시작
@@ -1209,7 +1240,15 @@ namespace Library_Jingyu
 			// 비동기 입출력이 시작된게 아니라면
 			if (Error != WSA_IO_PENDING)
 			{
-				InterlockedDecrement(&NowSession->m_lIOCount);
+				// I/O카운트 1감소.
+				long Nowval = InterlockedDecrement(&NowSession->m_lIOCount);
+
+				// I/O 카운트가 0이라면 접속 종료.
+				if (Nowval == 0)
+				{
+					InDisconnect(NowSession);
+					return false;
+				}
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
 				if (Error == WSAENOBUFS)
@@ -1235,6 +1274,8 @@ namespace Library_Jingyu
 				}
 			}
 		}
+
+		return true;
 	}
 
 
@@ -1246,7 +1287,10 @@ namespace Library_Jingyu
 	// Lib 내부에서만 사용하는 샌드 관련 함수들
 	// ------------
 	// 샌드 버퍼의 데이터 WSASend() 하기
-	void CLanServer::SendPost(stSession* NowSession)
+	//
+	// return true : 성공적으로 WSASend() 완료 or 어쨋든 종료된 유저는 아님
+	// return false : I/O카운트가 0이되어서 종료된 유저임
+	bool CLanServer::SendPost(stSession* NowSession)
 	{
 		while (1)
 		{
@@ -1258,7 +1302,7 @@ namespace Library_Jingyu
 			if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
 			{
 				// 이땐 샌드중이니 그냥 리턴
-				return;
+				return true;
 			}
 
 			// 2. SendBuff에 데이터가 있는지 확인
@@ -1344,13 +1388,18 @@ namespace Library_Jingyu
 				if (Error != WSA_IO_PENDING)
 				{
 					// IOcount 하나 감소
-					InterlockedDecrement(&NowSession->m_lIOCount);
+					long Nowval = InterlockedDecrement(&NowSession->m_lIOCount);
+
+					// I/O 카운트가 0이라면 접속 종료.
+					if (Nowval == 0)
+					{
+						InDisconnect(NowSession);
+						return false;
+					}
 
 					// 에러가 버퍼 부족이라면
 					if (Error == WSAENOBUFS)
 					{
-						InterlockedDecrement(&NowSession->m_lIOCount);
-
 						// 일단 끊어야하니 셧다운 호출
 						shutdown(NowSession->m_Client_sock, SD_BOTH);
 
@@ -1393,6 +1442,8 @@ namespace Library_Jingyu
 			}
 			break;
 		}
+
+		return true;
 	}
 
 }

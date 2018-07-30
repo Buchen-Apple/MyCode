@@ -67,16 +67,25 @@ namespace Library_Jingyu
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
 
-#define	Lock_Map()	LockMap_Func()
-#define Unlock_Map()	UnlockMap_Func()
+		// Exclusive 락 걸기, 풀기
+#define	Lock_Exclusive_Map()		LockMap_Exclusive_Func()
+#define Unlock_Exclusive_Map()	UnlockMap_Exclusive_Func()
+
+		// Shared  락 걸기, 풀기
+#define	Lock_Shared_Map()		LockMap_Shared_Func()
+#define Unlock_Shared_Map()	UnlockMap_Shared_Func()
 
 	private:
 		// ----------------------
 		// private 함수들
 		// ----------------------
-		// 락 걸기, 락 풀기
-		void LockMap_Func();
-		void UnlockMap_Func();
+		// Exclusive 락 걸기, 락 풀기
+		void LockMap_Exclusive_Func();
+		void UnlockMap_Exclusive_Func();
+
+		// Shared 락 걸기, 락 풀기
+		void LockMap_Shared_Func();
+		void UnlockMap_Shared_Func();
 
 		// ClinetID로 stSession포인터 알아오는 함수
 		stSession* FineSessionPtr(ULONGLONG ClinetID);
@@ -98,15 +107,22 @@ namespace Library_Jingyu
 		void RecvProc(stSession* NowSession);
 
 		// Accept용 RecvProc함수
-		// return true : 성공적으로 WSARecv() 완료
-		// return false : WSARecv()에서 WSA_IO_PENDING 외의 에러 발생
+		//
+		// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
+		// return false : I/O카운트가 0이되어서 종료된 유저임
 		bool RecvPost_Accept(stSession* NowSession);
 
 		// RecvPost함수
-		void RecvPost(stSession* NowSession);
+		//
+		// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
+		// return false : I/O카운트가 0이되어서 종료된 유저임
+		bool RecvPost(stSession* NowSession);
 
 		// SendPost함수
-		void SendPost(stSession* NowSession);
+		//
+		// return true : 성공적으로 WSASend() 완료 or 어쨋든 종료된 유저는 아님
+		// return false : I/O카운트가 0이되어서 종료된 유저임
+		bool SendPost(stSession* NowSession);
 
 		// 내부에서 실제로 유저를 끊는 함수.
 		void InDisconnect(stSession* NowSession);
