@@ -89,7 +89,6 @@ namespace Library_Jingyu
 			m_lReyryCount = 0;
 		}
 
-	private:
 		// Exclusive_락 걸기
 		void LockSession_Exclusive_Func()
 		{
@@ -437,6 +436,7 @@ namespace Library_Jingyu
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
 		// 1. ClinetID로 세션구조체 알아오기
+		Lock_Shared_Map(); // 맵 락 ----------- 
 		stSession* NowSession = FineSessionPtr(ClinetID);
 		if (NowSession == nullptr)
 		{
@@ -447,21 +447,23 @@ namespace Library_Jingyu
 			// ---> 일단 현재 더미테스트 중에는 너무 많이 발생하니 뺀다.
 			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
+			Unlock_Shared_Map(); // 맵 언락 ----------- 
+
 			return false;
 		}
+
+		NowSession->Struct_Lock(); // 세션 락 ----------- 
+		Unlock_Shared_Map(); // 맵 언락 ----------- 		
 	
 		// 2. 헤더 만들기 (페이로드 사이즈가 들어간다)
 		WORD Header = payloadBuff->GetUseSize();
 	
 		// 3. 넣기 (헤더, 페이로드를 2번 인큐하는거..어떻게 안될까)
-		NowSession->m_SendQueue.EnterLOCK();  // 락 ---------------------------	
 
 		// 헤더 인큐
 		int EnqueueCheck = NowSession->m_SendQueue.Enqueue((char*)&Header, dfNETWORK_PACKET_HEADER_SIZE);
 		if (EnqueueCheck == -1)
 		{
-			NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
-
 			// 해당 유저는 접속을 끊는다.
 			shutdown(NowSession->m_Client_sock, SD_BOTH);
 
@@ -472,6 +474,7 @@ namespace Library_Jingyu
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
 				NowSession->m_IP, NowSession->m_prot, (int)m_iMyErrorCode);
 			
+			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
 			return false;
 		}
 
@@ -479,8 +482,6 @@ namespace Library_Jingyu
 		EnqueueCheck = NowSession->m_SendQueue.Enqueue(payloadBuff->GetBufferPtr(), Header);
 		if (EnqueueCheck == -1)
 		{
-			NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
-
 			 // 해당 유저는 접속을 끊는다.
 			shutdown(NowSession->m_Client_sock, SD_BOTH);
 
@@ -491,17 +492,16 @@ namespace Library_Jingyu
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
 				NowSession->m_IP, NowSession->m_prot, (int)m_iMyErrorCode);
 
+			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
 			return false;
 		}
 
-		NowSession->m_SendQueue.LeaveLOCK();  // 락 해제 ---------------------------	
-
 		// 4. SendPost시도
 		bool Check = SendPost(NowSession);
-		if (Check == false)
-			return false;
 
-		return true;
+		NowSession->Struct_Unlock(); // 세션 언락 ----------- 
+
+		return Check;
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
@@ -512,7 +512,9 @@ namespace Library_Jingyu
 	bool CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
 		// 유저 찾는다.
+		Lock_Shared_Map();
 		stSession* NowSession = FineSessionPtr(ClinetID);
+		Unlock_Shared_Map();
 
 		// 유저 못찾았으면 에러코드 남기고 false 리턴
 		if (NowSession == nullptr)
@@ -602,17 +604,25 @@ namespace Library_Jingyu
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 	
 		// map에서 제외시키기
-		Lock_Exclusive_Map();
-		size_t retval = map_Session.erase(sessionID);
-		Unlock_Exclusive_Map();
+		Lock_Exclusive_Map();  // 맵 락 -----------------
+		DeleteSession->Struct_Lock();  // 세션 락 -----------------
 
+		size_t retval = map_Session.erase(sessionID);
 		// 만약, 없는 유저라면 그냥 삭제된걸로 치고, 리턴한다.
 		if (retval == 0)
-		{		
+		{
+			Unlock_Exclusive_Map(); // 맵 언락 -----------------
+			DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
+
 			// 유저 함수 호출
-			OnClientLeave(sessionID);			
+			OnClientLeave(sessionID);
 			return;
-		}	
+		}
+
+		Unlock_Exclusive_Map(); // 맵 언락 -----------------
+		DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
+
+		
 
 		// 클로즈 소켓, 세션 동적해제	
 		closesocket(DeleteSession->m_Client_sock);
@@ -727,7 +737,7 @@ namespace Library_Jingyu
 				// 에러 발생 함수 호출
 				g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_ERROR, L"IOCP_Error");
 
-				// break 안한다. 해당 유저는 자연스럽게 I/O가 줄어들어서 종료.
+				break;
 			}
 
 			/*
@@ -797,11 +807,7 @@ namespace Library_Jingyu
 				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
 
 				// 1. front 이동	
-				stNowSession->m_SendQueue.EnterLOCK();		// 락 -----------------------
-
 				stNowSession->m_SendQueue.RemoveData(cbTransferred);
-
-				stNowSession->m_SendQueue.LeaveLOCK();		// 락 해제 ------------------
 
 				// 2. 샌드 가능 상태로 변경
 				stNowSession->m_lSendFlag = 0;
@@ -838,7 +844,7 @@ namespace Library_Jingyu
 
 		CLanServer* g_This = (CLanServer*)lParam;
 
-		while (true)
+		while (1)
 		{
 			ZeroMemory(&clientaddr, sizeof(clientaddr));
 			addrlen = sizeof(clientaddr);
@@ -867,8 +873,8 @@ namespace Library_Jingyu
 				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
-			}
-
+			}	
+					
 			// ------------------
 			// IP와 포트 알아오기.
 			// ------------------
@@ -896,7 +902,18 @@ namespace Library_Jingyu
 			NewSession->m_prot = port;
 			NewSession->m_Client_sock = client_sock;
 			NewSession->m_ullSessionID = g_This->m_ullSessionID++;
-						
+			
+			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
+			InterlockedIncrement(&g_This->m_ullJoinUserCount);
+			
+			// ------------------
+			// map 등록 후, 접속자 수 추가
+			// ------------------
+			// 셋팅된 구조체를 map에 등록
+			g_This->Lock_Exclusive_Map();
+			g_This->map_Session.insert(pair<ULONGLONG, stSession*>(NewSession->m_ullSessionID, NewSession));
+			g_This->Unlock_Exclusive_Map();
+			
 
 			// ------------------
 			// IOCP 연결
@@ -915,22 +932,18 @@ namespace Library_Jingyu
 			Check = g_This->RecvPost_Accept(NewSession);
 			if (Check == false)
 			{
+				// 접속자 수 감소. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
+				InterlockedDecrement(&g_This->m_ullJoinUserCount);
+
+				// 맵에서 해제
+				g_This->Lock_Exclusive_Map();
+				g_This->map_Session.erase(NewSession->m_ullSessionID);
+				g_This->Unlock_Exclusive_Map();
+
+				// 동적해제
 				delete NewSession;
 				continue;
-			}
-
-
-			// ------------------
-			// 여기까지 오면 정상적으로 접속된 유저
-			// map 등록 후, 접속자 수 추가
-			// ------------------
-			// 셋팅된 구조체를 map에 등록
-			g_This->Lock_Exclusive_Map();
-			g_This->map_Session.insert(pair<ULONGLONG, stSession*>(NewSession->m_ullSessionID, NewSession));
-			g_This->Unlock_Exclusive_Map();
-
-			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
-			InterlockedIncrement(&g_This->m_ullJoinUserCount);
+			}			
 
 
 			// ------------------
@@ -969,23 +982,16 @@ namespace Library_Jingyu
 	// ClinetID로 Session구조체 찾기 함수
 	CLanServer::stSession* CLanServer::FineSessionPtr(ULONGLONG ClinetID)
 	{
-		// 락 ------------------
-		Lock_Shared_Map();
 		map <ULONGLONG, stSession*>::iterator iter;
 
 		iter = map_Session.find(ClinetID);
 		if (iter == map_Session.end())
 		{
-			// 락 끝 ------------------
-			Unlock_Shared_Map();
+
 			return nullptr;
 		}
 
 		stSession* NowSession = iter->second;
-
-		Unlock_Shared_Map();
-		// 락 끝 ------------------
-
 		return NowSession;
 	}
 
@@ -1300,10 +1306,7 @@ namespace Library_Jingyu
 			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
 			if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-			{
-				// 이땐 샌드중이니 그냥 리턴
 				return true;
-			}
 
 			// 2. SendBuff에 데이터가 있는지 확인
 			// 여기서 구한 UseSize는 이제 스냅샷 이다. 아래에서 버퍼 셋팅할때도 사용한다.
@@ -1316,9 +1319,7 @@ namespace Library_Jingyu
 				// 3. 진짜로 사이즈가 없는지 다시한번 체크. 락 풀고 왔는데, 컨텍스트 스위칭 일어나서 다른 스레드가 건드렸을 가능성
 				// 사이즈 있으면 위로 올라가서 한번 더 시도
 				if (NowSession->m_SendQueue.GetUseSize() > 0)
-				{
 					continue;
-				}
 
 				break;
 			}
@@ -1389,6 +1390,8 @@ namespace Library_Jingyu
 				{
 					// IOcount 하나 감소
 					long Nowval = InterlockedDecrement(&NowSession->m_lIOCount);
+
+					InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
 
 					// I/O 카운트가 0이라면 접속 종료.
 					if (Nowval == 0)
