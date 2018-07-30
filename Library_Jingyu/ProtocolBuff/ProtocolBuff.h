@@ -49,7 +49,7 @@ namespace Library_Jingyu
 		void Clear();
 
 		// 데이터 넣기
-		int PutData(const char* pSrc, int size) throw (CException);
+		int PutData(const char* pSrc, int size);
 
 		// 데이터 빼기
 		int GetData(char* pSrc, int size);

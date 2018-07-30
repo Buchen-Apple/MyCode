@@ -20,9 +20,8 @@ namespace Library_Jingyu
 
 	#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
-	// 싱글톤 얻은 후, 디렉토리 생성 define
+	// 디렉토리 생성 define
 	#define SYSLOG_SET_DIRECTORY(_dir)								\
-	cLog = CSystemLog::GetInstance();								\
 	cLog->SetDirectory(_dir)										\
 
 	// LogLevel 설정 define
@@ -83,7 +82,7 @@ namespace Library_Jingyu
 	{
 	public:
 		// 로그 레벨
-		// ex)LEVEL_DEBUG으로 셋팅된다면, LEVEL_DEBUG보다 큰 레벨의 로그가 남음
+		// ex)LEVEL_DEBUG으로 셋팅된다면, LEVEL_DEBUG보다 큰 레벨의 로그가 남음. (LEVEL_DEBUG, LEVEL_WARNING, LEVEL_ERROR, LEVEL_SYSTEM가 전부 남음)
 		enum en_LogLevel
 		{
 			LEVEL_DEBUG = 0, LEVEL_WARNING, LEVEL_ERROR, LEVEL_SYSTEM

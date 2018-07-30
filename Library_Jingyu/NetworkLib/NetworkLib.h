@@ -95,16 +95,18 @@ namespace Library_Jingyu
 		void ExitFunc(int w_ThreadCount);
 
 		// RecvProc 함수. 큐의 내용 체크 후 PacketProc으로 넘긴다.
-		bool RecvProc(stSession* NowSession);
+		void RecvProc(stSession* NowSession);
 
-		// Accept용 RecvPost함수
+		// Accept용 RecvProc함수
+		// return true : 성공적으로 WSARecv() 완료
+		// return false : WSARecv()에서 WSA_IO_PENDING 외의 에러 발생
 		bool RecvPost_Accept(stSession* NowSession);
 
 		// RecvPost함수
-		bool RecvPost(stSession* NowSession);
+		void RecvPost(stSession* NowSession);
 
 		// SendPost함수
-		bool SendPost(stSession* NowSession);
+		void SendPost(stSession* NowSession);
 
 		// 내부에서 실제로 유저를 끊는 함수.
 		void InDisconnect(stSession* NowSession);
@@ -128,6 +130,7 @@ namespace Library_Jingyu
 		// ----------------------------- 기능 함수들 ---------------------------
 		// 서버 시작
 		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
 		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, bool Nodelay, int MaxConnect);
@@ -137,11 +140,17 @@ namespace Library_Jingyu
 
 		// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 		// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
+		//
+		// return true : 해당 유저에게 셧다운 잘 날림.
+		// return false : 접속중이지 않은 유저를 접속해제하려고 함.
 		bool Disconnect(ULONGLONG ClinetID);
 
 		// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
 		// SendPacket은 그냥 아무때나 하면 된다.
 		// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
+		//
+		// return true : SendQ에 성공적으로 데이터 넣음.
+		// return true : SendQ에 데이터 넣기 실패.
 		bool SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff);
 
 
@@ -166,6 +175,7 @@ namespace Library_Jingyu
 		// -----------------------
 
 		// Accept 직후, 호출된다.
+		//
 		// return false : 클라이언트 접속 거부
 		// return true : 접속 허용
 		virtual bool OnConnectionRequest(TCHAR* IP, USHORT port) = 0;

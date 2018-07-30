@@ -68,7 +68,7 @@ namespace Library_Jingyu
 	}
 
 	// µ¥ÀÌÅÍ ³Ö±â
-	int CProtocolBuff::PutData(const char* pSrc, int size)	throw (CException)
+	int CProtocolBuff::PutData(const char* pSrc, int size)
 	{
 		// Å¥ ²ËÃ¡´ÂÁö Ã¼Å©
 		if (m_Rear == m_Size)
