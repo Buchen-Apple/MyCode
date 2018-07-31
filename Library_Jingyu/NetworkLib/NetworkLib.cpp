@@ -19,6 +19,9 @@ namespace Library_Jingyu
 	// 로그 찍을 전역변수 하나 받기.
 	CSystemLog* cNetLibLog = CSystemLog::GetInstance();	
 
+	// 덤프 남길 변수 하나 받기
+	CCrashDump* cNetDump = CCrashDump::GetInstance();
+
 
 	// 헤더 사이즈
 	#define dfNETWORK_PACKET_HEADER_SIZE	2
@@ -72,7 +75,7 @@ namespace Library_Jingyu
 		LONG	m_lReyryCount;
 
 		// 내 구조체 동기화 객체.
-		SRWLOCK m_srwStruct_srwl;
+		CRITICAL_SECTION m_csStruct_Lock;
 		
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
@@ -83,26 +86,32 @@ namespace Library_Jingyu
 		// 생성자
 		stSession()
 		{
-			InitializeSRWLock(&m_srwStruct_srwl);
+			InitializeCriticalSection(&m_csStruct_Lock);
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
 			m_lReyryCount = 0;
 		}
 
-		// Exclusive_락 걸기
-		void LockSession_Exclusive_Func()
+		// 소멸자
+		~stSession()
 		{
-			AcquireSRWLockExclusive(&m_srwStruct_srwl);
+			DeleteCriticalSection(&m_csStruct_Lock);
 		}
 
-		// Exclusive_락 풀기
-		void UnlockSession_Exclusive_Func()
+		// Critical_Section 락 걸기
+		void LockSession_CS_Func()
 		{
-			ReleaseSRWLockExclusive(&m_srwStruct_srwl);
+			EnterCriticalSection(&m_csStruct_Lock);
 		}
 
-#define	Struct_Lock()	LockSession_Exclusive_Func()
-#define Struct_Unlock()	UnlockSession_Exclusive_Func()
+		// Critical_Section 락 풀기
+		void UnlockSession_CS_Func()
+		{
+			LeaveCriticalSection(&m_csStruct_Lock);
+		}
+
+#define	Struct_Lock()	LockSession_CS_Func()
+#define Struct_Unlock()	UnlockSession_CS_Func()
 	
 	};
 
@@ -113,15 +122,15 @@ namespace Library_Jingyu
 	// 유저가 호출 하는 함수
 	// -----------------------------
 	// 서버 시작
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
-	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, bool Nodelay, int MaxConnect)
-	{			
-
-		// 각종 변수 초기화 함수
-		Init();
+	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
+	{	
+		// 새로 시작하니까 에러코드들 초기화
+		m_iOSErrorCode = 0;
+		m_iMyErrorCode = (euError)0;		
 
 		// 윈속 초기화
 		WSADATA wsa;
@@ -306,26 +315,32 @@ namespace Library_Jingyu
 		setsockopt(m_soListen_sock, SOL_SOCKET, SO_LINGER, (char*)&Loptval, sizeof(Loptval));*/
 
 		// 엑셉트 스레드 생성
-		m_hAcceptHandle = (HANDLE)_beginthreadex(NULL, 0, AcceptThread, this, 0, NULL);
-		if (m_hAcceptHandle == NULL)
+		m_iA_ThreadCount = AcceptThreadCount;
+
+		m_hAcceptHandle = new HANDLE[m_iA_ThreadCount];
+		for (int i = 0; i < m_iA_ThreadCount; ++i)
 		{
-			// 윈도우 에러, 내 에러 보관
-			m_iOSErrorCode = errno;
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_CREATE_FAIL;
+			m_hAcceptHandle[i] = (HANDLE)_beginthreadex(NULL, 0, AcceptThread, this, 0, NULL);
+			if (m_hAcceptHandle == NULL)
+			{
+				// 윈도우 에러, 내 에러 보관
+				m_iOSErrorCode = errno;
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_CREATE_FAIL;
 
-			// 각종 핸들 반환 및 동적해제 절차.
-			ExitFunc(m_iW_ThreadCount);
+				// 각종 핸들 반환 및 동적해제 절차.
+				ExitFunc(m_iW_ThreadCount);
 
-			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
-				(int)m_iMyErrorCode, m_iOSErrorCode);
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
+					(int)m_iMyErrorCode, m_iOSErrorCode);
 
-			// false 리턴
-			return false;
+				// false 리턴
+				return false;
+			}
 		}
 
-		// 엑셉트 스레드 수를 1로 변경. 필요 없을수도 있지만 혹시 모르니 카운트
-		m_iA_ThreadCount = 1;
+		// 최대 접속 가능 유저 수 셋팅
+		m_iMaxJoinUser = MaxConnect;
 
 		// 서버 열렸음 !!
 		m_bServerLife = true;		
@@ -343,12 +358,23 @@ namespace Library_Jingyu
 		// Accept 스레드는 리슨소켓을 closesocket하면 된다.
 		closesocket(m_soListen_sock);
 
-		DWORD retval = WaitForSingleObject(m_hAcceptHandle, INFINITE);
-		if (retval != WAIT_OBJECT_0)
+		// Accept스레드 종료 대기
+		DWORD retval = WaitForMultipleObjects(m_iA_ThreadCount, m_hAcceptHandle, TRUE, INFINITE);
+
+		// 리턴값이 [WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + m_iW_ThreadCount - 1] 가 아니라면, 뭔가 에러가 발생한 것. 에러 찍고 걍 리턴한다.
+		if (retval < WAIT_OBJECT_0 &&
+			retval > WAIT_OBJECT_0 + m_iW_ThreadCount - 1)
 		{
-			m_iOSErrorCode = GetLastError();
+			// 에러 값이 WAIT_FAILED일 경우, GetLastError()로 확인해야함.
+			if (retval == WAIT_FAILED)
+				m_iOSErrorCode = GetLastError();
+
+			// 그게 아니라면 리턴값에 이미 에러가 들어있음.
+			else
+				m_iOSErrorCode = retval;
+
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
-			
+
 			// 로그 찍기 (로그 레벨 : 에러)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
@@ -370,10 +396,10 @@ namespace Library_Jingyu
 		// 모든 유저가 종료되었는지 체크
 		while (1)
 		{
-			if (m_ullJoinUserCount == 0)
+			if (map_Session.size() == 0)
 				break;
 
-			Sleep(2);
+			Sleep(1);
 		}
 
 		// 3. 워커 스레드 종료
@@ -408,14 +434,16 @@ namespace Library_Jingyu
 
 		// 4. 각종 리소스 반환
 		// 1) 엑셉트 스레드 핸들 반환
-		CloseHandle(m_hAcceptHandle);
+		for(int i=0; i<m_iA_ThreadCount; ++i)
+			CloseHandle(m_hAcceptHandle[i]);
 
 		// 2) 워커 스레드 핸들 반환
 		for (int i = 0; i < m_iW_ThreadCount; ++i)
 			CloseHandle(m_hWorkerHandle[i]);
 
-		// 3) 워커 스레드 배열 동적해제
+		// 3) 워커 스레드 배열, 엑셉트 스레드 배열 동적해제
 		delete[] m_hWorkerHandle;
+		delete[] m_hAcceptHandle;
 
 		// 4) IOCP핸들 반환
 		CloseHandle(m_hIOCPHandle);
@@ -425,6 +453,12 @@ namespace Library_Jingyu
 
 		// 5. 서버 가동중 아님 상태로 변경
 		m_bServerLife = false;
+
+		// 6. 각종 변수 초기화
+		Reset();
+
+		// 7. 서버 종료 로그 찍기		
+		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
@@ -498,8 +532,9 @@ namespace Library_Jingyu
 
 		// 4. SendPost시도
 		bool Check = SendPost(NowSession);
-
-		NowSession->Struct_Unlock(); // 세션 언락 ----------- 
+		if(Check == true)
+			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
+		
 
 		return Check;
 	}
@@ -588,12 +623,10 @@ namespace Library_Jingyu
 	// 소멸자
 	CLanServer::~CLanServer()
 	{
-		// 서버 가동상태 false로 변경
-		m_bServerLife = false;
-
-		// 접속 중인 유저가 1명이라도 있으면 Stop함수 호출.
-		if (m_ullJoinUserCount != 0)
+		// 서버가 가동중이었으면, 상태를 false 로 바꾸고, 서버 종료절차 진행
+		if (m_bServerLife == true )
 		{
+			m_bServerLife = false;
 			Stop();
 		}
 	}
@@ -605,14 +638,12 @@ namespace Library_Jingyu
 	
 		// map에서 제외시키기
 		Lock_Exclusive_Map();  // 맵 락 -----------------
-		DeleteSession->Struct_Lock();  // 세션 락 -----------------
 
 		size_t retval = map_Session.erase(sessionID);
 		// 만약, 없는 유저라면 그냥 삭제된걸로 치고, 리턴한다.
 		if (retval == 0)
 		{
 			Unlock_Exclusive_Map(); // 맵 언락 -----------------
-			DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
 
 			// 유저 함수 호출
 			OnClientLeave(sessionID);
@@ -620,17 +651,17 @@ namespace Library_Jingyu
 		}
 
 		Unlock_Exclusive_Map(); // 맵 언락 -----------------
-		DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
-
-		
-
-		// 클로즈 소켓, 세션 동적해제	
-		closesocket(DeleteSession->m_Client_sock);
-		delete DeleteSession;
 
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
 
+		DeleteSession->Struct_Lock();  // 세션 락 -----------------
+		DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
+		
+		// 클로즈 소켓, 세션 동적해제	
+		closesocket(DeleteSession->m_Client_sock);
+		delete DeleteSession;
+		
 		// 유저 함수 호출
 		OnClientLeave(sessionID);
 	}
@@ -803,31 +834,34 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+
 				// m_lReyryCount값을 0으로 변경
 				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
 
-				// 1. front 이동	
+				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
+
+				// 2. front 이동	
 				stNowSession->m_SendQueue.RemoveData(cbTransferred);
 
-				// 2. 샌드 가능 상태로 변경
-				stNowSession->m_lSendFlag = 0;
+				// 3. 샌드 가능 상태로 변경
+				//stNowSession->m_lSendFlag = 0;
+				InterlockedExchange(&stNowSession->m_lSendFlag, FALSE);
 
 				// 3. 다시 샌드 시도. false가 리턴되면 종료된 유저이니 다시 위로 올라간다.
 				bCheck = g_This->SendPost(stNowSession);
 				if (bCheck == false)
-					continue;
-
-				// 4. 샌드 완료됐다고 컨텐츠에 알려줌
-				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
+					continue;				
 			}
 
 			// -----------------
-			// I/O카운트 감소 및 삭 제 처리
+			// I/O카운트 감소 및 삭제 처리
 			// -----------------
 			// I/O카운트 감소 후, 0이라면접속 종료
 			long NowVal = InterlockedDecrement(&stNowSession->m_lIOCount);
 			if (NowVal == 0)
 				g_This->InDisconnect(stNowSession);
+
 		}
 		return 0;
 	}
@@ -901,11 +935,9 @@ namespace Library_Jingyu
 			StringCchCopy(NewSession->m_IP, _MyCountof(NewSession->m_IP), tcTempIP);
 			NewSession->m_prot = port;
 			NewSession->m_Client_sock = client_sock;
-			NewSession->m_ullSessionID = g_This->m_ullSessionID++;
-			
-			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
-			InterlockedIncrement(&g_This->m_ullJoinUserCount);
-			
+			NewSession->m_ullSessionID = InterlockedIncrement(&g_This->m_ullUniqueSessionID);
+						
+
 			// ------------------
 			// map 등록 후, 접속자 수 추가
 			// ------------------
@@ -913,6 +945,9 @@ namespace Library_Jingyu
 			g_This->Lock_Exclusive_Map();
 			g_This->map_Session.insert(pair<ULONGLONG, stSession*>(NewSession->m_ullSessionID, NewSession));
 			g_This->Unlock_Exclusive_Map();
+
+			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
+			InterlockedIncrement(&g_This->m_ullJoinUserCount);
 			
 
 			// ------------------
@@ -923,33 +958,24 @@ namespace Library_Jingyu
 					
 
 			// ------------------
-			// 비동기 입출력 시작
-			// ------------------
-			// 반환값이 false라면, 리시브 걸다가 실패한 것 (즉, 정상적으로 접속되지 않은 유저) 이기 때문에
-			// 1. NewSession 동적해제
-			// 2. 맵에 추가하지 않음.
-			// 3. 여기서 다시 Accept하러 돌아감.
-			Check = g_This->RecvPost_Accept(NewSession);
-			if (Check == false)
-			{
-				// 접속자 수 감소. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
-				InterlockedDecrement(&g_This->m_ullJoinUserCount);
-
-				// 맵에서 해제
-				g_This->Lock_Exclusive_Map();
-				g_This->map_Session.erase(NewSession->m_ullSessionID);
-				g_This->Unlock_Exclusive_Map();
-
-				// 동적해제
-				delete NewSession;
-				continue;
-			}			
-
-
-			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
 			// ------------------
-			g_This->OnClientJoin(NewSession->m_ullSessionID);
+			InterlockedIncrement(&NewSession->m_lIOCount);	// I/O카운트 ++. 들어가기전에 1에서 시작
+			g_This->OnClientJoin(NewSession->m_ullSessionID);			
+
+			// ------------------
+			// 비동기 입출력 시작
+			// ------------------
+			// 반환값이 false라면, 이 안에서 종료된 유저임.
+			g_This->RecvPost(NewSession);
+
+			// I/O카운트 --. 
+			long lRetval = InterlockedDecrement(&NewSession->m_lIOCount);  
+
+			// I/O카운트 종료 후, 0이라면 삭제처리
+			if (lRetval == 0)
+				g_This->InDisconnect(NewSession);
+			
 		}
 
 		return 0;
@@ -995,18 +1021,17 @@ namespace Library_Jingyu
 		return NowSession;
 	}
 
-	// 각종 변수들을 초기값으로 초기화
-	void CLanServer::Init()
+	// 각종 변수들을 리셋시킨다.
+	void CLanServer::Reset()
 	{	
 		m_iW_ThreadCount = 0;
 		m_iA_ThreadCount = 0;
 		m_hWorkerHandle = nullptr;
 		m_hIOCPHandle = 0;
 		m_soListen_sock = 0;
-		m_iOSErrorCode = 0;
-		m_iMyErrorCode = (euError)0;
-		m_ullSessionID = 0;
-		m_ullJoinUserCount = 0;
+		m_iMaxJoinUser = 0;
+		InterlockedExchange(&m_ullUniqueSessionID, 0);
+		InterlockedExchange(&m_ullJoinUserCount, 0);
 	}
 
 
@@ -1105,95 +1130,6 @@ namespace Library_Jingyu
 		}
 
 		return;
-	}
-
-	// Accept용 RecvProc함수
-	// 
-	// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
-	// return false : I/O카운트가 0이되어서 종료된 유저임
-	bool CLanServer::RecvPost_Accept(stSession* NowSession)
-	{
-		// ------------------
-		// 비동기 입출력 시작
-		// ------------------
-		// 1. WSABUF 셋팅.
-		WSABUF wsabuf[2];
-		int wsabufCount = 0;
-
-		int FreeSize = NowSession->m_RecvQueue.GetFreeSize();
-		int Size = NowSession->m_RecvQueue.GetNotBrokenPutSize();
-
-		if (Size < FreeSize)
-		{
-			wsabuf[0].buf = NowSession->m_RecvQueue.GetRearBufferPtr();
-			wsabuf[0].len = Size;
-
-			wsabuf[1].buf = NowSession->m_RecvQueue.GetBufferPtr();
-			wsabuf[1].len = FreeSize - Size;
-			wsabufCount = 2;
-
-		}
-		else
-		{
-			wsabuf[0].buf = NowSession->m_RecvQueue.GetRearBufferPtr();
-			wsabuf[0].len = Size;
-
-			wsabufCount = 1;
-		}
-
-		// 2. Overlapped 구조체 초기화
-		ZeroMemory(&NowSession->m_overRecvOverlapped, sizeof(NowSession->m_overRecvOverlapped));
-
-		// 3. WSARecv()
-		DWORD recvBytes = 0, flags = 0;
-		InterlockedIncrement(&NowSession->m_lIOCount);
-		int retval = WSARecv(NowSession->m_Client_sock, wsabuf, wsabufCount, &recvBytes, &flags, &NowSession->m_overRecvOverlapped, NULL);
-
-
-		// 4. WSARecv() 에러 처리
-		if (retval == SOCKET_ERROR)
-		{
-			int Error = WSAGetLastError();
-
-			// 비동기 입출력이 시작된게 아니라면
-			if (Error != WSA_IO_PENDING)
-			{
-				// I/O카운트 1감소.
-				long Nowval = InterlockedDecrement(&NowSession->m_lIOCount);
-
-				// I/O 카운트가 0이라면 접속 종료.
-				if (Nowval == 0)
-				{
-					InDisconnect(NowSession);
-					return false;
-				}
-
-				// 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
-				if (Error == WSAENOBUFS)
-				{				
-					// 일단 끊어야하니 셧다운 호출
-					shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-					// 내 에러, 윈도우에러 보관
-					m_iOSErrorCode = Error;
-					m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSAENOBUFS;
-
-					// 에러 스트링 만들고
-					TCHAR tcErrorString[300];
-					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
-						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-					// 로그 찍기 (로그 레벨 : 에러)
-					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv--> %s,  NetError(%d), OSError(%d)",
-						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
-
-					// 에러 함수 호출
-					OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
-				}
-			}
-		}
-
-		return true;
 	}
 
 	// RecvPost 함수. 비동기 입출력 시작

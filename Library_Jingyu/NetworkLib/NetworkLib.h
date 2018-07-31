@@ -31,7 +31,7 @@ namespace Library_Jingyu
 		// private 변수들
 		// ----------------------
 		// 엑셉트 스레드 핸들
-		HANDLE  m_hAcceptHandle;
+		HANDLE*  m_hAcceptHandle;
 
 		// 워커스레드 핸들 배열, 
 		HANDLE* m_hWorkerHandle;
@@ -59,10 +59,13 @@ namespace Library_Jingyu
 		euError m_iMyErrorCode;
 
 		// 유저가 접속할 때 마다 1씩 증가하는 고유한 키.
-		ULONGLONG m_ullSessionID;
+		ULONGLONG m_ullUniqueSessionID;
 
 		// 현재 접속중인 유저 수
 		ULONGLONG m_ullJoinUserCount;
+
+		// 최대 접속 가능 유저 수
+		int m_iMaxJoinUser;
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
@@ -106,12 +109,6 @@ namespace Library_Jingyu
 		// RecvProc 함수. 큐의 내용 체크 후 PacketProc으로 넘긴다.
 		void RecvProc(stSession* NowSession);
 
-		// Accept용 RecvProc함수
-		//
-		// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
-		// return false : I/O카운트가 0이되어서 종료된 유저임
-		bool RecvPost_Accept(stSession* NowSession);
-
 		// RecvPost함수
 		//
 		// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
@@ -127,8 +124,8 @@ namespace Library_Jingyu
 		// 내부에서 실제로 유저를 끊는 함수.
 		void InDisconnect(stSession* NowSession);
 
-		// 각종 변수들을 초기값으로 초기화
-		void Init();
+		// 각종 변수들을 리셋시킨다.
+		void Reset();
 
 
 	public:
@@ -145,11 +142,11 @@ namespace Library_Jingyu
 
 		// ----------------------------- 기능 함수들 ---------------------------
 		// 서버 시작
-		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
 		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
-		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, bool Nodelay, int MaxConnect);
+		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect);
 
 		// 서버 스탑.
 		void Stop();
