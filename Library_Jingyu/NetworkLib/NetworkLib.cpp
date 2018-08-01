@@ -640,13 +640,10 @@ namespace Library_Jingyu
 		Lock_Exclusive_Map();  // 맵 락 -----------------
 
 		size_t retval = map_Session.erase(sessionID);
-		// 만약, 없는 유저라면 그냥 삭제된걸로 치고, 리턴한다.
+		// 만약, 없는 유저라면 이미 삭제된걸로 치고, 리턴한다.
 		if (retval == 0)
 		{
 			Unlock_Exclusive_Map(); // 맵 언락 -----------------
-
-			// 유저 함수 호출
-			OnClientLeave(sessionID);
 			return;
 		}
 
