@@ -72,10 +72,15 @@ namespace Library_Jingyu
 		// I/O가 외부적인 요인(물리적인 연결 에러라던가..)으로 실패했을 때 약 5회정도 재시도 해본다. 
 		// 이 시도한 횟수를 저장할 변수. 실패할 때 마다 1씩 증가하다가, 5가되면 더 이상 접속시도 안함
 		// I/O가 성공하면 그 즉시 0이된다.
-		LONG	m_lReyryCount;
+		//LONG	m_lReyryCount;
 
-		// 내 구조체 동기화 객체.
-		CRITICAL_SECTION m_csStruct_Lock;
+		// 해당 인덱스 배열이 사용중인지 체크
+		// true : 사용중
+		// false : 사용중 아님
+		bool m_bUseFalg;
+
+		// 해당 배열의 현재 인덱스
+		int m_iIndex;
 		
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
@@ -85,36 +90,88 @@ namespace Library_Jingyu
 
 		// 생성자
 		stSession()
-		{
-			InitializeCriticalSection(&m_csStruct_Lock);
+		{			
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
-			m_lReyryCount = 0;
+			m_iIndex = 0;
+			m_bUseFalg = false;
+			//m_lReyryCount = 0;
 		}
 
 		// 소멸자
-		~stSession()
-		{
-			DeleteCriticalSection(&m_csStruct_Lock);
-		}
+		// 필요없어짐
+		//~stSession() {}
 
-		// Critical_Section 락 걸기
-		void LockSession_CS_Func()
-		{
-			EnterCriticalSection(&m_csStruct_Lock);
-		}
-
-		// Critical_Section 락 풀기
-		void UnlockSession_CS_Func()
-		{
-			LeaveCriticalSection(&m_csStruct_Lock);
-		}
-
-#define	Struct_Lock()	LockSession_CS_Func()
-#define Struct_Unlock()	UnlockSession_CS_Func()
 	
 	};
 
+	// 미사용 인덱스 관리 구조체(스택)
+	struct CLanServer::stEmptyStack
+	{
+		// 스택은 Last-In-First_Out
+		int m_iTop;
+		int m_iMax;
+
+		int* m_iArray;
+
+		// 인덱스 얻기
+		//
+		// 반환값 ULONGLONG ---> 이 반환값으로 시프트 연산 할 수도 있어서, 혹시 모르니 unsigned로 리턴한다.
+		// 0이상(0포함) : 인덱스 정상 반환
+		// 10000000(천만) : 빈 인덱스 없음.
+		ULONGLONG Pop()
+		{
+			// 인덱스 비었나 체크 ----------
+			// 빈 인덱스가 없으면 18,000,000,000,000,000,000 
+			// 보통 Max로 설정한 유저가 모두 들어왔을 경우, 빈 인덱스가 없다.
+			if (m_iTop == 0)
+				return 10000000;
+
+			// 빈 인덱스가 있으면, m_iTop을 감소 후 인덱스 리턴.
+			m_iTop--;
+			int iRetval = m_iArray[m_iTop];
+			
+
+			return iRetval;
+		}
+
+		// 인덱스 넣기
+		//
+		// 반환값 bool
+		// true : 인덱스 정상으로 들어감
+		// false : 인덱스 들어가지 않음 (이미 Max만큼 꽉 참)
+		bool Push(int PushIndex)
+		{
+			// 인덱스가 꽉찼나 체크 ---------
+			// 인덱스가 꽉찼으면 false 리턴
+			if (m_iTop == m_iMax)
+				return false;
+
+			// 인덱스가 꽉차지 않았으면, 추가
+			m_iArray[m_iTop] = PushIndex;
+			m_iTop++;
+
+			return true;
+		}
+
+		stEmptyStack(int Max)
+		{
+			m_iTop = Max;
+			m_iMax = Max;
+
+			m_iArray = new int[Max];
+
+			// 최초 생성 시, 모두 빈 인덱스
+			for (int i = 0; i < Max; ++i)
+				m_iArray[i] = i;
+		}
+
+		~stEmptyStack()
+		{
+			delete[] m_iArray;
+		}
+
+	};
 
 
 
@@ -306,9 +363,15 @@ namespace Library_Jingyu
 			}
 		}
 
+		// 최대 접속 가능 유저 수 셋팅
+		m_iMaxJoinUser = MaxConnect;
+
+		// 세션 배열 동적할당, 미사용 세션 관리 스택 동적할당.
+		m_stSessionArray = new stSession[MaxConnect];
+		m_stEmptyIndexStack = new stEmptyStack(MaxConnect);
+
 		// 엑셉트 스레드 생성
 		m_iA_ThreadCount = AcceptThreadCount;
-
 		m_hAcceptHandle = new HANDLE[m_iA_ThreadCount];
 		for (int i = 0; i < m_iA_ThreadCount; ++i)
 		{
@@ -331,8 +394,7 @@ namespace Library_Jingyu
 			}
 		}
 
-		// 최대 접속 가능 유저 수 셋팅
-		m_iMaxJoinUser = MaxConnect;
+		
 
 		// 서버 열렸음 !!
 		m_bServerLife = true;		
@@ -442,6 +504,10 @@ namespace Library_Jingyu
 
 		// 5) 윈속 해제
 		WSACleanup();
+
+		// 6) 세션 배열, 세션 미사용 인덱스 관리 스택 동적해제
+		delete[] m_stSessionArray;
+		delete[] m_stEmptyIndexStack;
 
 		// 5. 서버 가동중 아님 상태로 변경
 		m_bServerLife = false;
@@ -925,28 +991,40 @@ namespace Library_Jingyu
 			// ------------------
 			// 세션 구조체 생성 후 셋팅
 			// ------------------
-			stSession* NewSession = new stSession;
-			StringCchCopy(NewSession->m_IP, _MyCountof(NewSession->m_IP), tcTempIP);
-			NewSession->m_prot = port;
-			NewSession->m_Client_sock = client_sock;
-			//NewSession->m_ullSessionID = InterlockedIncrement(&ullUniqueSessionID);
-			NewSession->m_ullSessionID = ++ullUniqueSessionID;
-						
+			// 1) 미사용 인덱스 알아오기
+			g_This->Lock_Exclusive_Stack(); // 미사용 인덱스 스택 락 -----------
+			ULONGLONG iIndex = g_This->m_stEmptyIndexStack->Pop();
+			if (iIndex == 10000000)
+			{
+				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
-			// ------------------
-			// map 등록 후, 접속자 수 추가
-			// ------------------
-			// 셋팅된 구조체를 map에 등록
-			g_This->Lock_Exclusive_Map();
-			g_This->map_Session.insert(pair<ULONGLONG, stSession*>(NewSession->m_ullSessionID, NewSession));
-			g_This->Unlock_Exclusive_Map();
-						
+				// 에러 찍기 (OnError 호출)
+				printf("Stack_Index_Full!!\n");
+
+				break;
+			}
+			g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
+
+			// 2) 해당 세션 배열, 사용중으로 변경
+			g_This->m_stSessionArray[iIndex].m_bUseFalg = true;
+
+			// 3) 신규 세션키 + 인덱스 만든 후, 세션 배열에 추가하기.
+			// 그 외 기타정보 추가
+			ULONGLONG MixKey = InterlockedIncrement(&ullUniqueSessionID) | (iIndex << 48);
+			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
+			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
+			g_This->m_stSessionArray[iIndex].m_prot = port;
+			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
+			g_This->m_stSessionArray[iIndex].m_ullSessionID = InterlockedIncrement(&ullUniqueSessionID);
+							
 
 			// ------------------
 			// IOCP 연결
 			// ------------------
 			// 소켓과 IOCP 연결
-			if (CreateIoCompletionPort((HANDLE)client_sock, g_This->m_hIOCPHandle, (ULONG_PTR)NewSession, 0) == NULL)
+
+			/*if (CreateIoCompletionPort((HANDLE)client_sock, g_This->m_hIOCPHandle, (ULONG_PTR)NewSession, 0) == NULL)*/
+			if (CreateIoCompletionPort((HANDLE)client_sock, g_This->m_hIOCPHandle, (ULONG_PTR)&g_This->m_stSessionArray[iIndex], 0) == NULL)
 			{
 				// 윈도우 에러, 내 에러 보관
 				g_This->m_iOSErrorCode = WSAGetLastError();
@@ -962,26 +1040,26 @@ namespace Library_Jingyu
 				break;
 			}
 					
-
+			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
+			InterlockedIncrement(&g_This->m_ullJoinUserCount);
 
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
 			// ------------------
-			NewSession->m_lIOCount++; // I/O카운트 ++. 들어가기전에 1에서 시작. 아직 recv,send 그 어떤것도 안걸었기 때문에 그냥 ++해도 안전!
-			g_This->OnClientJoin(NewSession->m_ullSessionID);	
+			g_This->m_stSessionArray[iIndex].m_lIOCount++; // I/O카운트 ++. 들어가기전에 1에서 시작. 아직 recv,send 그 어떤것도 안걸었기 때문에 그냥 ++해도 안전!
+			g_This->OnClientJoin(MixKey);
 
-			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
-			InterlockedIncrement(&g_This->m_ullJoinUserCount);
+			
 
 			// ------------------
 			// 비동기 입출력 시작
 			// ------------------
 			// 반환값이 false라면, 이 안에서 종료된 유저임. 근데 안받음
-			g_This->RecvPost(NewSession);
+			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
 			// I/O카운트 --. 0이라면 삭제처리
-			if (InterlockedDecrement(&NewSession->m_lIOCount) == 0)
-				g_This->InDisconnect(NewSession);
+			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
+				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
 			
 		}
 
@@ -1012,6 +1090,47 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_srwSession_map_srwl);
 	}
 	
+
+	// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
+	void CLanServer::LockStack_Exclusive_Func()
+	{
+		AcquireSRWLockExclusive(&m_srwSession_stack_srwl);
+	}
+
+	void CLanServer::UnlockStack_Exclusive_Func()
+	{
+		ReleaseSRWLockExclusive(&m_srwSession_stack_srwl);
+	}
+
+	// 미사용 세션 관리 스택에 Shared 락 걸기, 락 풀기
+	void CLanServer::LockStack_Shared_Func()
+	{
+		AcquireSRWLockShared(&m_srwSession_stack_srwl);
+	}
+
+	void CLanServer::UnlockStack_Shared_Func()
+	{
+		ReleaseSRWLockShared(&m_srwSession_stack_srwl);
+	}
+
+
+
+	// 조합된 키를 입력받으면, Index 리턴하는 함수
+	WORD CLanServer::GetSessionIndex(ULONGLONG MixKey)
+	{
+		return MixKey >> 48;		
+	}
+
+	// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
+	ULONGLONG CLanServer::GetRealSessionKey(ULONGLONG MixKey)
+	{
+		return MixKey & 0x0000ffffffffffff;
+	}
+
+
+
+
+
 	// ClinetID로 Session구조체 찾기 함수
 	CLanServer::stSession* CLanServer::FineSessionPtr(ULONGLONG ClinetID)
 	{
@@ -1036,7 +1155,7 @@ namespace Library_Jingyu
 		m_hIOCPHandle = 0;
 		m_soListen_sock = 0;
 		m_iMaxJoinUser = 0;
-		InterlockedExchange(&m_ullJoinUserCount, 0);
+		m_ullJoinUserCount = 0;		
 	}
 
 

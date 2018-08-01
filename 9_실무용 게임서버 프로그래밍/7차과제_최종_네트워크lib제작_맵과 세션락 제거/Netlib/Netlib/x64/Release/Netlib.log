@@ -1,11 +1,7 @@
-﻿  stdafx.cpp
-  CrashDump.cpp
-  Log.cpp
-  NetworkLib.cpp
-  ProtocolBuff.cpp
-  RingBuff.cpp
-  Netlib.cpp
+﻿  NetworkLib.cpp
   코드를 생성하고 있습니다.
-  All 269 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  2 of 275 functions ( 0.7%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    2 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
-  Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\6차과제_최종_네트워크lib제작_로그인패킷 테스트 추가\Netlib\x64\Release\Netlib.exe
+  Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\7차과제_최종_네트워크lib제작_맵과 세션락 제거\Netlib\x64\Release\Netlib.exe

@@ -26,6 +26,9 @@ namespace Library_Jingyu
 		// Session구조체 전방선언
 		struct stSession;
 
+		// 미사용 인덱스 관리 구조체(스택)
+		struct stEmptyStack;
+
 
 		// ----------------------
 		// private 변수들
@@ -46,20 +49,22 @@ namespace Library_Jingyu
 		// 리슨소켓
 		SOCKET m_soListen_sock;
 
-		// 세션 관리하는 자료구조(map)
-		// 키 : SessionID
-		// 값 : stSession 구조체
-		map<ULONGLONG, stSession*> map_Session;
 
-		// map에 사용하는 SRWLock
-		SRWLOCK m_srwSession_map_srwl;
+		// ----- 세션 관리용 -------
+		// 세션 관리 배열
+		stSession* m_stSessionArray;
+
+		// 미사용 세션 관리 스택
+		stEmptyStack* m_stEmptyIndexStack;
+
+		// 미세용 세션 관리 스택의 SRWLock
+		SRWLOCK m_srwSession_stack_srwl;
+
+		// --------------------------
 
 		// 윈도우 에러 보관 변수, 내가 지정한 에러 보관 변수
 		int m_iOSErrorCode;
 		euError m_iMyErrorCode;
-
-		// 유저가 접속할 때 마다 1씩 증가하는 고유한 키.
-		//ULONGLONG m_ullUniqueSessionID;
 
 		// 현재 접속중인 유저 수
 		ULONGLONG m_ullJoinUserCount;
@@ -70,25 +75,39 @@ namespace Library_Jingyu
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
 
-		// Exclusive 락 걸기, 풀기
-#define	Lock_Exclusive_Map()		LockMap_Exclusive_Func()
-#define Unlock_Exclusive_Map()	UnlockMap_Exclusive_Func()
 
-		// Shared  락 걸기, 풀기
-#define	Lock_Shared_Map()		LockMap_Shared_Func()
-#define Unlock_Shared_Map()	UnlockMap_Shared_Func()
+
+
+		// 미사용 세션 관리 스택용 Exclusive 락 걸기, 풀기
+#define	Lock_Exclusive_Stack()		LockMap_Exclusive_Func()
+#define Unlock_Exclusive_Stack()	UnlockMap_Exclusive_Func()
+
+
+		// 세션 배열용 Shared  락 걸기, 풀기
+#define	Lock_Shared_Stack()		LockMap_Shared_Func()
+#define Unlock_Shared_Stack()	UnlockMap_Shared_Func()
+
 
 	private:
 		// ----------------------
 		// private 함수들
 		// ----------------------
-		// Exclusive 락 걸기, 락 풀기
-		void LockMap_Exclusive_Func();
-		void UnlockMap_Exclusive_Func();
 
-		// Shared 락 걸기, 락 풀기
-		void LockMap_Shared_Func();
-		void UnlockMap_Shared_Func();
+
+
+		// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
+		void LockStack_Exclusive_Func();
+		void UnlockStack_Exclusive_Func();
+
+		// 미사용 세션 관리 스택에 Shared 락 걸기, 락 풀기
+		void LockStack_Shared_Func();
+		void UnlockStack_Shared_Func();
+
+		// 조합된 키를 입력받으면, Index 리턴하는 함수
+		WORD GetSessionIndex(ULONGLONG MixKey);
+
+		// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
+		ULONGLONG GetRealSessionKey(ULONGLONG MixKey);
 
 		// ClinetID로 stSession포인터 알아오는 함수
 		stSession* FineSessionPtr(ULONGLONG ClinetID);
