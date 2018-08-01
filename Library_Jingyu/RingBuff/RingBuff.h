@@ -7,7 +7,7 @@ namespace Library_Jingyu
 {
 	class CRingBuff
 	{ 
-	#define BUF_SIZE 10000
+	#define BUF_SIZE 8192
 
 	private:
 		char* m_Buff;

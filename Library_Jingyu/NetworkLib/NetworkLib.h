@@ -59,7 +59,7 @@ namespace Library_Jingyu
 		euError m_iMyErrorCode;
 
 		// 유저가 접속할 때 마다 1씩 증가하는 고유한 키.
-		ULONGLONG m_ullUniqueSessionID;
+		//ULONGLONG m_ullUniqueSessionID;
 
 		// 현재 접속중인 유저 수
 		ULONGLONG m_ullJoinUserCount;

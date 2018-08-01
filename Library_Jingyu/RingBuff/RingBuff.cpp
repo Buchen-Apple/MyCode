@@ -62,13 +62,9 @@ namespace Library_Jingyu
 		int TempFront = m_Front;
 
 		// 사용중 공간 계산
-		// rear가 더 크다면
-		if (TempRear > TempFront)
+		// rear가 더 크거나 같다면
+		if (TempRear >= TempFront)
 			return TempRear - TempFront;
-
-		// 둘이 같다면
-		else if (TempRear == TempFront)
-			return 0;
 
 		// front가 더 크다면
 		else
@@ -87,13 +83,9 @@ namespace Library_Jingyu
 		int TempFront = m_Front;
 
 		// 남은 공간 계산하기
-		// rear가 더 크다면
-		if (TempRear > TempFront)
+		// rear가 더 크거나 같다면
+		if (TempRear >= TempFront)
 			return (m_BuffSize - 1) - (TempRear - TempFront);
-
-		// 둘이 같다면
-		else if (TempRear == TempFront)
-			return m_BuffSize - 1;
 
 		// m_Front가 더 크다면
 		else
@@ -107,18 +99,15 @@ namespace Library_Jingyu
 	// Parameters: 없음.
 	// Return: (int)사용가능 용량.
 	////////////////////////////////////////////////////////////////////////
+	// 한 번에 읽을 수 있는 크기
 	int	CRingBuff::GetNotBrokenGetSize(void)
 	{
 		int TempRear = m_Rear;
 		int TempFront = m_Front;
 
 		// 한 번에 읽을 수 있는 크기
-		// m_Rear와 m_Front가 같으면, 텅 빈상태이니 읽을게 없다.
-		if (TempRear == TempFront)
-			return 0;
-
-		// rear가 더 크다면.
-		if (TempRear > TempFront)
+		// rear가 크거나 같다면
+		if (TempRear >= TempFront)
 			return TempRear - TempFront;
 
 		// front가 더 크다면
@@ -126,6 +115,7 @@ namespace Library_Jingyu
 			return m_BuffSize - (TempFront + 1);	
 	}
 
+	//한 번에 쓸 수 있는 크기
 	int	CRingBuff::GetNotBrokenPutSize(void)
 	{
 		int TempRear = m_Rear;
@@ -166,43 +156,168 @@ namespace Library_Jingyu
 		if (iSize == 0)
 			return 0;
 
-		// 실제 인큐 사이즈를 저장할 변수
-		int iRealEnqueueSize = 0;
+		// --------------------
+		// 1. 한번에 넣을 수 있는 사이즈, free 사이즈를 얻는다.
+		// --------------------
+		int EnqueueSize;
+		int FreeSize;
 
-		// 인큐 한 사이즈를 저장할 변수 iRealCpySize.
-		int iRealCpySize = 0;
-
-		while (iSize > 0)
+		// Rear가 더 크거나 같다면
+		if (TempRear >= TempFront)
 		{
-			// Rear 1칸 이동
-			TempRear = NextIndex(TempRear, 1);		
+			// 한 번에 넣을 수 있는 사이즈
+			EnqueueSize = m_BuffSize - (TempRear + 1);
 
-			// 큐 꽉찼는지 체크
-			if (TempRear == TempFront)
-				return -1;
-
-			// 실제 넣을 수 있는 사이즈를 찾는다.
-			if (TempRear >= TempFront)
-				iRealEnqueueSize = m_BuffSize - TempRear;
-			else
-				iRealEnqueueSize = TempFront - TempRear;
-
-			if (iRealEnqueueSize > iSize)
-				iRealEnqueueSize = iSize;
-
-			// 메모리 복사
-			memcpy(&m_Buff[TempRear], chpData + iRealCpySize, iRealEnqueueSize);
-
-			// rear의 위치 이동
-			TempRear = NextIndex(TempRear, iRealEnqueueSize - 1);
-
-			iRealCpySize += iRealEnqueueSize;
-			iSize -= iRealEnqueueSize;			
+			// free 사이즈 구하기
+			FreeSize = (m_BuffSize - 1) - (TempRear - TempFront);
 		}
 
+		// front가 더 크다면
+		else
+		{
+			// 한 번에 넣을 수 있는 사이즈
+			EnqueueSize = (TempFront - 1) - TempRear;
+
+			// free 사이즈 구하기
+			FreeSize = EnqueueSize;
+		}
+
+		// --------------------
+		// 2. 만약 여유공간이 0이라면, 버퍼 꽉찬 것.
+		// --------------------
+		if (FreeSize == 0)
+			return -1;
+
+		// --------------------
+		// 3. TempRear 1칸 이동. 현재는 카피 전 무조건 하는 행동..
+		// --------------------
+		TempRear = NextIndex(TempRear, 1);
+
+
+		// --------------------
+		// 4. 한 번에 인큐할 수 있을경우
+		// --------------------
+		if (EnqueueSize >= iSize)
+		{	
+			// 1 ~ 8바이트까지는 캐스팅해서 강제로 넣는다.
+			if (iSize <= 8)
+			{
+				switch (iSize)
+				{
+				case 1:
+					*(char *)&m_Buff[TempRear] = *(char *)chpData;
+					break;
+				case 2:
+					*(short *)&m_Buff[TempRear] = *(short *)chpData;
+					break;
+				case 3:
+					*(short *)&m_Buff[TempRear] = *(short *)chpData;
+					*(char *)&m_Buff[TempRear + sizeof(short)] = *(char *)&chpData[sizeof(short)];
+					break;
+				case 4:
+					*(int *)&m_Buff[TempRear] = *(int *)chpData;
+					break;
+				case 5:
+					*(int *)&m_Buff[TempRear] = *(int *)chpData;
+					*(char *)&m_Buff[TempRear + sizeof(int)] = *(char *)&chpData[sizeof(int)];
+					break;
+				case 6:
+					*(int *)&m_Buff[TempRear] = *(int *)chpData;
+					*(short *)&m_Buff[TempRear + sizeof(int)] = *(short *)&chpData[sizeof(int)];
+					break;
+				case 7:
+					*(int *)&m_Buff[TempRear] = *(int *)chpData;
+					*(short *)&m_Buff[TempRear + sizeof(int)] = *(short *)&chpData[sizeof(int)];
+					*(char *)&m_Buff[TempRear + sizeof(int) + sizeof(short)] = *(char *)&chpData[sizeof(int) + sizeof(short)];
+					break;
+				case 8:
+					*((__int64 *)&m_Buff[TempRear]) = *((__int64 *)chpData);
+					break;
+				}
+			}
+
+			// 8바이트 이상이면 memcpy한다
+			else
+			{
+				memcpy_s(&m_Buff[TempRear], iSize, chpData, iSize);
+			}
+
+			// 카피 끝났으면 TempRear움직인다.
+			TempRear = NextIndex(TempRear, iSize - 1);
+		}
+
+		// --------------------
+		// 4. 두 번에 인큐할 수 있을 경우
+		// --------------------
+		else
+		{
+			// memcpy_s 2회
+			// 1) 먼저, 현재 위치부터 버퍼 끝까지 1회 넣는다. 
+			memcpy_s(&m_Buff[TempRear], EnqueueSize, chpData, EnqueueSize);
+
+			// 2) TempRear 이동시킨 후, 그 위치부터 나머지 넣는다.
+			TempRear = NextIndex(TempRear, EnqueueSize);			
+			memcpy_s(&m_Buff[TempRear], iSize - EnqueueSize, &chpData[EnqueueSize], iSize - EnqueueSize);
+
+			// 3) TempRear 위치 다시 이동
+			TempRear = NextIndex(TempRear, iSize - EnqueueSize - 1);
+
+		}
+
+		// --------------------
+		// 5. m_Rear갱신 후 리턴.
+		// --------------------
 		m_Rear = TempRear;
 
-		return iRealCpySize;
+		return iSize;
+
+
+
+		// ----------- 과거
+		//int TempRear = m_Rear;
+		//int TempFront = m_Front;
+
+		//// 매개변수 size가 0이면 리턴
+		//if (iSize == 0)
+		//	return 0;
+
+		//// 실제 인큐 사이즈를 저장할 변수
+		//int iRealEnqueueSize = 0;
+
+		//// 인큐 한 사이즈를 저장할 변수 iRealCpySize.
+		//int iRealCpySize = 0;
+
+		//while (iSize > 0)
+		//{
+		//	// Rear 1칸 이동
+		//	TempRear = NextIndex(TempRear, 1);		
+
+		//	// 큐 꽉찼는지 체크
+		//	if (TempRear == TempFront)
+		//		return -1;
+
+		//	// 실제 넣을 수 있는 사이즈를 찾는다.
+		//	if (TempRear >= TempFront)
+		//		iRealEnqueueSize = m_BuffSize - TempRear;
+		//	else
+		//		iRealEnqueueSize = TempFront - TempRear;
+
+		//	if (iRealEnqueueSize > iSize)
+		//		iRealEnqueueSize = iSize;
+
+		//	// 메모리 복사
+		//	memcpy(&m_Buff[TempRear], chpData + iRealCpySize, iRealEnqueueSize);
+
+		//	// rear의 위치 이동
+		//	TempRear = NextIndex(TempRear, iRealEnqueueSize - 1);
+
+		//	iRealCpySize += iRealEnqueueSize;
+		//	iSize -= iRealEnqueueSize;			
+		//}
+
+		//m_Rear = TempRear;
+
+		//return iRealCpySize;
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -213,57 +328,185 @@ namespace Library_Jingyu
 	/////////////////////////////////////////////////////////////////////////
 	int	CRingBuff::Dequeue(char *chpDest, int iSize)
 	{
-		int TempFront = m_Front;
 		int TempRear = m_Rear;
+		int TempFront = m_Front;
 
 		// 매개변수 size가 0이면 리턴
 		if (iSize == 0)
 			return 0;
 
-		// 실제 Dequeue 할 사이즈
-		int iRealDequeueSIze = 0;
+		// --------------------
+		// 1. 한번에 뺄 수 있는 사이즈, Use 사이즈를 얻는다.
+		// --------------------
+		int DequeueSize;
+		int UseSize;
 
-		// Dequeue 한 사이즈를 저장할 변수 iRealCpySize.
-		int iRealCpySize = 0;
 
-		while (iSize > 0)
+		// Rear가 더 크거나 같다면
+		if (TempRear >= TempFront)
 		{
-			// 큐 비었나 체크
-			if (TempFront == TempRear)
-				return -1;
+			// 한 번에 뺄 수 있는 사이즈
+			DequeueSize = TempRear - TempFront;
 
-			// 이번에 Dequeue할 수 있는 사이즈를 찾는다.
-			// rear가 더 크다면.
-			if (TempRear > TempFront)
-				iRealDequeueSIze = TempRear - TempFront;
-
-			// front가 더 크다면
-			else
-				iRealDequeueSIze = m_BuffSize - (TempFront + 1);
-
-			if (iRealDequeueSIze > iSize)
-				iRealDequeueSIze = iSize;
-
-			// Front 1칸 앞으로 이동
-			TempFront = NextIndex(TempFront, 1);
-
-			// 메모리 복사
-			if (iRealDequeueSIze == 0)
-				iRealDequeueSIze = 1;
-
-			memcpy_s(chpDest + iRealCpySize, GetFreeSize(), &m_Buff[TempFront], iRealDequeueSIze);
-			//memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealDequeueSIze);
-
-			// 디큐한 만큼 m_Front이동
-			TempFront = NextIndex(TempFront, iRealDequeueSIze - 1);
-
-			iRealCpySize += iRealDequeueSIze;
-			iSize -= iRealDequeueSIze;
+			// Use 사이즈 구하기
+			UseSize = TempRear - TempFront;
 		}
 
+		// front가 더 크다면
+		else
+		{
+			// 한 번에 뺄 수 있는 사이즈
+			DequeueSize = m_BuffSize - (TempFront + 1);
+
+			// free 사이즈 구하기
+			UseSize = m_BuffSize - (TempFront - TempRear);
+		}
+
+		// --------------------
+		// 2. 만약 사용중 공간이 0이라면, 디큐할 데이터가 없는것.
+		// --------------------
+		if (UseSize == 0)
+			return -1;
+
+		// --------------------
+		// 3. TempFont 1칸 이동. 현재는 카피 전 무조건 하는 행동..
+		// --------------------
+		TempFront = NextIndex(TempFront, 1);
+
+
+		// --------------------
+		// 4. 한 번에 디큐할 수 있을경우
+		// --------------------
+		if (DequeueSize >= iSize)
+		{
+			// 1 ~ 8바이트까지는 캐스팅해서 강제로 넣는다.
+			if (iSize <= 8)
+			{
+				switch (iSize)
+				{
+				case 1:
+					*(char *)chpDest = *(char *)&m_Buff[TempFront];
+					break;
+				case 2:
+					*(short *)chpDest = *(short *)&m_Buff[TempFront];
+					break;
+				case 3:
+					*(short *)chpDest = *(short *)&m_Buff[TempFront];
+					*(char *)&chpDest[sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(short)];
+					break;
+				case 4:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					break;
+				case 5:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(char *)&chpDest[sizeof(int)] = *(char *)&m_Buff[TempFront + sizeof(int)];
+					break;
+				case 6:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					break;
+				case 7:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					*(char *)&chpDest[sizeof(int) + sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(int) + sizeof(short)];
+					break;
+				case 8:
+					*((__int64 *)chpDest) = *((__int64 *)&m_Buff[TempFront]);
+					break;
+				}
+			}
+
+			// 8바이트 이상이면 memcpy한다
+			else
+			{
+				memcpy_s(chpDest, iSize, &m_Buff[TempFront], iSize);
+			}
+
+			// 카피 끝났으면 TempFront움직인다.
+			TempFront = NextIndex(TempFront, iSize - 1);
+		}
+
+		// --------------------
+		// 4. 두 번에 인큐할 수 있을 경우
+		// --------------------
+		else
+		{
+			// memcpy_s 2회
+			// 1) 먼저, 현재 위치부터 버퍼 끝까지 1회 디큐
+			memcpy_s(chpDest, DequeueSize, &m_Buff[TempFront], DequeueSize);
+
+			// 2) TempFront 이동시킨 후, 그 위치부터 나머지 넣는다.
+			TempFront = NextIndex(TempFront, DequeueSize);
+			memcpy_s(&chpDest[DequeueSize], iSize - DequeueSize, &m_Buff[TempFront], iSize - DequeueSize);
+
+			// 3) TempFront 위치 다시 이동
+			TempFront = NextIndex(TempFront, iSize - DequeueSize - 1);
+
+		}
+
+		// --------------------
+		// 5. m_Front갱신 후 리턴.
+		// --------------------
 		m_Front = TempFront;
 
-		return iRealCpySize;
+		return iSize;
+
+
+
+
+
+		// -------------- 과거
+		//int TempFront = m_Front;
+		//int TempRear = m_Rear;
+
+		//// 매개변수 size가 0이면 리턴
+		//if (iSize == 0)
+		//	return 0;
+
+		//// 실제 Dequeue 할 사이즈
+		//int iRealDequeueSIze = 0;
+
+		//// Dequeue 한 사이즈를 저장할 변수 iRealCpySize.
+		//int iRealCpySize = 0;
+
+		//while (iSize > 0)
+		//{
+		//	// 큐 비었나 체크
+		//	if (TempFront == TempRear)
+		//		return -1;
+
+		//	// 이번에 Dequeue할 수 있는 사이즈를 찾는다.
+		//	// rear가 더 크다면.
+		//	if (TempRear > TempFront)
+		//		iRealDequeueSIze = TempRear - TempFront;
+
+		//	// front가 더 크다면
+		//	else
+		//		iRealDequeueSIze = m_BuffSize - (TempFront + 1);
+
+		//	if (iRealDequeueSIze > iSize)
+		//		iRealDequeueSIze = iSize;
+
+		//	// Front 1칸 앞으로 이동
+		//	TempFront = NextIndex(TempFront, 1);
+
+		//	// 메모리 복사
+		//	if (iRealDequeueSIze == 0)
+		//		iRealDequeueSIze = 1;
+
+		//	memcpy_s(chpDest + iRealCpySize, GetFreeSize(), &m_Buff[TempFront], iRealDequeueSIze);
+		//	//memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealDequeueSIze);
+
+		//	// 디큐한 만큼 m_Front이동
+		//	TempFront = NextIndex(TempFront, iRealDequeueSIze - 1);
+
+		//	iRealCpySize += iRealDequeueSIze;
+		//	iSize -= iRealDequeueSIze;
+		//}
+
+		//m_Front = TempFront;
+
+		//return iRealCpySize;
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -274,53 +517,182 @@ namespace Library_Jingyu
 	/////////////////////////////////////////////////////////////////////////
 	int	CRingBuff::Peek(char *chpDest, int iSize)
 	{
-		// Peek 한 사이즈를 저장할 변수 iRealCpySize.
-		int TempFront = m_Front;
 		int TempRear = m_Rear;
-		int iRealCpySize = 0;
+		int TempFront = m_Front;
 
 		// 매개변수 size가 0이면 리턴
 		if (iSize == 0)
 			return 0;
 
-		// 실제 Peek 할 사이즈
-		int iRealPeekSIze = 0;		
+		// --------------------
+		// 1. 한번에 뺄 수 있는 사이즈, Use 사이즈를 얻는다.
+		// --------------------
+		int DequeueSize;
+		int UseSize;
 
-		while (iSize > 0)
+
+		// Rear가 더 크거나 같다면
+		if (TempRear >= TempFront)
 		{
-			// 큐 비었나 체크
-			if (TempFront == TempRear)
-				return -1;
+			// 한 번에 뺄 수 있는 사이즈
+			DequeueSize = TempRear - TempFront;
 
-			// 이번에 Peek할 수 있는 사이즈를 찾는다.
-			// rear가 더 크다면.
-			if (TempRear > TempFront)
-				iRealPeekSIze = TempRear - TempFront;
-
-			// front가 더 크다면
-			else
-				iRealPeekSIze = m_BuffSize - (TempFront + 1);
-
-			if (iRealPeekSIze > iSize)
-				iRealPeekSIze = iSize;
-
-			// 임시 Front 1칸 앞으로 이동
-			TempFront = NextIndex(TempFront, 1);
-			
-			// 메모리 복사
-			if (iRealPeekSIze == 0)
-				iRealPeekSIze = 1;
-
-			memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealPeekSIze);
-
-			// 디큐한 만큼 임시 m_Front이동
-			TempFront = NextIndex(TempFront, iRealPeekSIze - 1);
-			
-			iRealCpySize += iRealPeekSIze;
-			iSize -= iRealPeekSIze;
+			// Use 사이즈 구하기
+			UseSize = TempRear - TempFront;
 		}
 
-		return iRealCpySize;
+		// front가 더 크다면
+		else
+		{
+			// 한 번에 뺄 수 있는 사이즈
+			DequeueSize = m_BuffSize - (TempFront + 1);
+
+			// free 사이즈 구하기
+			UseSize = m_BuffSize - (TempFront - TempRear);
+		}
+
+		// --------------------
+		// 2. 만약 사용중 공간이 0이라면, 디큐할 데이터가 없는것.
+		// --------------------
+		if (UseSize == 0)
+			return -1;
+
+		// --------------------
+		// 3. TempFont 1칸 이동. 현재는 카피 전 무조건 하는 행동..
+		// --------------------
+		TempFront = NextIndex(TempFront, 1);
+
+
+		// --------------------
+		// 4. 한 번에 디큐할 수 있을경우
+		// --------------------
+		if (DequeueSize >= iSize)
+		{
+			// 1 ~ 8바이트까지는 캐스팅해서 강제로 넣는다.
+			if (iSize <= 8)
+			{
+				switch (iSize)
+				{
+				case 1:
+					*(char *)chpDest = *(char *)&m_Buff[TempFront];
+					break;
+				case 2:
+					*(short *)chpDest = *(short *)&m_Buff[TempFront];
+					break;
+				case 3:
+					*(short *)chpDest = *(short *)&m_Buff[TempFront];
+					*(char *)&chpDest[sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(short)];
+					break;
+				case 4:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					break;
+				case 5:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(char *)&chpDest[sizeof(int)] = *(char *)&m_Buff[TempFront + sizeof(int)];
+					break;
+				case 6:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					break;
+				case 7:
+					*(int *)chpDest = *(int *)&m_Buff[TempFront];
+					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					*(char *)&chpDest[sizeof(int) + sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(int) + sizeof(short)];
+					break;
+				case 8:
+					*((__int64 *)chpDest) = *((__int64 *)&m_Buff[TempFront]);
+					break;
+				}
+			}
+
+			// 8바이트 이상이면 memcpy한다
+			else
+			{
+				memcpy_s(chpDest, iSize, &m_Buff[TempFront], iSize);
+			}
+
+			// 카피 끝났으면 TempFront움직인다.
+			TempFront = NextIndex(TempFront, iSize - 1);
+		}
+
+		// --------------------
+		// 4. 두 번에 인큐할 수 있을 경우
+		// --------------------
+		else
+		{
+			// memcpy_s 2회
+			// 1) 먼저, 현재 위치부터 버퍼 끝까지 1회 디큐
+			memcpy_s(chpDest, DequeueSize, &m_Buff[TempFront], DequeueSize);
+
+			// 2) TempFront 이동시킨 후, 그 위치부터 나머지 넣는다.
+			TempFront = NextIndex(TempFront, DequeueSize);
+			memcpy_s(&chpDest[DequeueSize], iSize - DequeueSize, &m_Buff[TempFront], iSize - DequeueSize);
+
+			// 3) TempFront 위치 다시 이동
+			TempFront = NextIndex(TempFront, iSize - DequeueSize - 1);
+
+		}
+
+		// --------------------
+		// 5. m_Front갱신 '안하고!!' 그냥 리턴
+		// --------------------
+
+		return iSize;
+
+
+
+
+
+
+
+		// ------------ 과거
+		//// Peek 한 사이즈를 저장할 변수 iRealCpySize.
+		//int TempFront = m_Front;
+		//int TempRear = m_Rear;
+		//int iRealCpySize = 0;
+
+		//// 매개변수 size가 0이면 리턴
+		//if (iSize == 0)
+		//	return 0;
+
+		//// 실제 Peek 할 사이즈
+		//int iRealPeekSIze = 0;		
+
+		//while (iSize > 0)
+		//{
+		//	// 큐 비었나 체크
+		//	if (TempFront == TempRear)
+		//		return -1;
+
+		//	// 이번에 Peek할 수 있는 사이즈를 찾는다.
+		//	// rear가 더 크다면.
+		//	if (TempRear > TempFront)
+		//		iRealPeekSIze = TempRear - TempFront;
+
+		//	// front가 더 크다면
+		//	else
+		//		iRealPeekSIze = m_BuffSize - (TempFront + 1);
+
+		//	if (iRealPeekSIze > iSize)
+		//		iRealPeekSIze = iSize;
+
+		//	// 임시 Front 1칸 앞으로 이동
+		//	TempFront = NextIndex(TempFront, 1);
+		//	
+		//	// 메모리 복사
+		//	if (iRealPeekSIze == 0)
+		//		iRealPeekSIze = 1;
+
+		//	memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealPeekSIze);
+
+		//	// 디큐한 만큼 임시 m_Front이동
+		//	TempFront = NextIndex(TempFront, iRealPeekSIze - 1);
+		//	
+		//	iRealCpySize += iRealPeekSIze;
+		//	iSize -= iRealPeekSIze;
+		//}
+
+		//return iRealCpySize;
 	}
 
 
