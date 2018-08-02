@@ -33,7 +33,7 @@ namespace Library_Jingyu
 		m_Size = size;
 		m_pProtocolBuff = new char[size];
 		m_Front = 0;
-		m_Rear = 0;
+		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 	}
 
 	// 버퍼 크기 재설정
@@ -143,6 +143,12 @@ namespace Library_Jingyu
 		return iRealMoveSize;
 		
 	}
+	
+	// Rear를 인자로 받은 값으로 강제로 변경시키기
+	int CProtocolBuff::CompulsionMoveWritePos(int size)
+	{
+		return m_Rear = size;
+	}
 
 	// Front 움직이기
 	int CProtocolBuff::MoveReadPos(int size)
@@ -170,13 +176,19 @@ namespace Library_Jingyu
 
 		return iRealRemoveSize;		
 	}
+	
+	// Front를 인자로 받은 값으로 강제로 변경시키기
+	int CProtocolBuff::CompulsionMoveReadPos(int size)
+	{
+		m_Front = size;
+	}
 
 	// 현재 사용중인 용량 얻기.
 	int	CProtocolBuff::GetUseSize(void)
 	{
 		//return m_Size - GetFreeSize();
 
-		return m_Rear;
+		return m_Rear - m_Front;
 	}
 
 	// 현재 버퍼에 남은 용량 얻기.

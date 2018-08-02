@@ -2,10 +2,66 @@
   CrashDump.cpp
   Log.cpp
   NetworkLib.cpp
+c:\git_public\library_jingyu\networklib\networklib.cpp(442): error C3861: 'Lock_Exclusive_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(444): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(444): error C2228: '.begin' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(444): note: 'unknown-type' 형식입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(445): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(445): error C2228: '.end' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(445): note: 'unknown-type' 형식입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(448): error C3861: 'Unlock_Exclusive_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(453): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(453): error C2228: '.size' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(453): note: 'unknown-type' 형식입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(531): error C3861: 'Lock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(542): error C3861: 'Unlock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(547): error C2039: 'Struct_Lock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(548): error C3861: 'Unlock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(569): error C2039: 'Struct_Unlock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(587): error C2039: 'Struct_Unlock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(594): error C2039: 'Struct_Unlock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(608): error C3861: 'Lock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(614): error C3861: 'Unlock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(625): error C3861: 'Unlock_Shared_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(680): error C2065: 'm_srwSession_map_srwl': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(700): error C3861: 'Lock_Exclusive_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(703): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(703): error C2228: '.erase' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(703): note: 'unknown-type' 형식입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(705): error C3861: 'Unlock_Exclusive_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(709): error C3861: 'Unlock_Exclusive_Map': 식별자를 찾을 수 없습니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(711): error C2039: 'Struct_Lock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(712): error C2039: 'Struct_Unlock': 'Library_Jingyu::CLanServer::stSession'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(59): note: 'Library_Jingyu::CLanServer::stSession' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(995): error C2039: 'LockMap_Exclusive_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(999): error C2039: 'UnlockMap_Exclusive_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1006): error C2039: 'UnlockMap_Exclusive_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1070): error C2039: 'LockMap_Exclusive_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1072): error C2065: 'm_srwSession_map_srwl': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1076): error C2039: 'UnlockMap_Exclusive_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1078): error C2065: 'm_srwSession_map_srwl': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1082): error C2039: 'LockMap_Shared_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1084): error C2065: 'm_srwSession_map_srwl': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1088): error C2039: 'UnlockMap_Shared_Func': 'Library_Jingyu::CLanServer'의 멤버가 아닙니다.
+  c:\git_public\library_jingyu\networklib\networklib.h(18): note: 'Library_Jingyu::CLanServer' 선언을 참조하십시오.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1090): error C2065: 'm_srwSession_map_srwl': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1139): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1139): error C2228: '.find' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(1139): note: 'unknown-type' 형식입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1140): error C2065: 'map_Session': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\networklib\networklib.cpp(1140): error C2228: '.end' 왼쪽에는 클래스/구조체/공용 구조체가 있어야 합니다.
+  c:\git_public\library_jingyu\networklib\networklib.cpp(1140): note: 'unknown-type' 형식입니다.
   ProtocolBuff.cpp
   RingBuff.cpp
   Netlib.cpp
-  코드를 생성하고 있습니다.
-  All 269 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  코드를 생성했습니다.
-  Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\6차과제_최종_네트워크lib제작_로그인패킷 테스트 추가\Netlib\x64\Release\Netlib.exe

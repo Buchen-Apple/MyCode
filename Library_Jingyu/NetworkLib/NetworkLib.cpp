@@ -13,6 +13,10 @@
 #include "CrashDump\CrashDump.h"
 
 
+#include <mmsystem.h>
+#pragma comment(lib,"winmm.lib")
+
+
 
 namespace Library_Jingyu
 {
@@ -25,6 +29,9 @@ namespace Library_Jingyu
 
 	// 헤더 사이즈
 	#define dfNETWORK_PACKET_HEADER_SIZE	2
+
+	// 한 번에 샌드할 수 있는 WSABUF의 카운트
+	#define dfSENDPOST_MAX_WSABUF			100
 
 
 	// ------------------------------
@@ -45,6 +52,7 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__IOCP_ERROR,					// IOCP 자체 에러
 		NETWORK_LIB_ERROR__NOT_FIND_CLINET,				// map 검색 등을 할때 클라이언트를 못찾은경우.
 		NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL	,		// Enqueue사이즈가 꽉찬 유저
+		NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY,			// Dequeue 시, 큐가 비어있는 유저. Peek을 시도하는데 큐가 비었을 상황은 없음
 		NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
@@ -75,13 +83,18 @@ namespace Library_Jingyu
 		//LONG	m_lReyryCount;
 
 		// 해당 인덱스 배열이 사용중인지 체크
-		// true : 사용중
-		// false : 사용중 아님
-		bool m_bUseFalg;
+		// 1이면 사용중, 0이면 사용중 아님
+		LONG m_lUseFlag;
 
 		// 해당 배열의 현재 인덱스
-		int m_iIndex;
+		ULONGLONG m_lIndex;
+
+		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
+		int m_iWSASendCount;
 		
+		// SendPost에서 샌드를 한 데이터의 포인터들 배열
+		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
+
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
 
@@ -93,9 +106,20 @@ namespace Library_Jingyu
 		{			
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
-			m_iIndex = 0;
-			m_bUseFalg = false;
-			//m_lReyryCount = 0;
+			m_lIndex = 0;
+			m_lUseFlag = FALSE;
+			m_iWSASendCount = 0;
+		}
+
+		void Reset_Func()
+		{
+			// -- SendFlag, I/O카운트, SendCount 초기화
+			m_lIOCount = 0;
+			m_lSendFlag = 0;
+
+			// 큐 초기화
+			m_RecvQueue.ClearBuffer();
+			m_SendQueue.ClearBuffer();
 		}
 
 		// 소멸자
@@ -112,7 +136,7 @@ namespace Library_Jingyu
 		int m_iTop;
 		int m_iMax;
 
-		int* m_iArray;
+		ULONGLONG* m_iArray;
 
 		// 인덱스 얻기
 		//
@@ -128,11 +152,9 @@ namespace Library_Jingyu
 				return 10000000;
 
 			// 빈 인덱스가 있으면, m_iTop을 감소 후 인덱스 리턴.
-			m_iTop--;
-			int iRetval = m_iArray[m_iTop];
-			
+			m_iTop--;			
 
-			return iRetval;
+			return m_iArray[m_iTop];
 		}
 
 		// 인덱스 넣기
@@ -140,7 +162,7 @@ namespace Library_Jingyu
 		// 반환값 bool
 		// true : 인덱스 정상으로 들어감
 		// false : 인덱스 들어가지 않음 (이미 Max만큼 꽉 참)
-		bool Push(int PushIndex)
+		bool Push(ULONGLONG PushIndex)
 		{
 			// 인덱스가 꽉찼나 체크 ---------
 			// 인덱스가 꽉찼으면 false 리턴
@@ -159,7 +181,7 @@ namespace Library_Jingyu
 			m_iTop = Max;
 			m_iMax = Max;
 
-			m_iArray = new int[Max];
+			m_iArray = new ULONGLONG[Max];
 
 			// 최초 생성 시, 모두 빈 인덱스
 			for (int i = 0; i < Max; ++i)
@@ -185,6 +207,8 @@ namespace Library_Jingyu
 	// return true : 성공
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
 	{	
+		timeBeginPeriod(1);
+
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
 		m_iMyErrorCode = (euError)0;		
@@ -408,6 +432,8 @@ namespace Library_Jingyu
 	// 서버 스탑.
 	void CLanServer::Stop()
 	{
+		timeEndPeriod(1);
+
 		// 1. Accept 스레드 종료. 더 이상 접속을 받으면 안되니 Accept스레드 먼저 종료
 		// Accept 스레드는 리슨소켓을 closesocket하면 된다.
 		closesocket(m_soListen_sock);
@@ -415,7 +441,7 @@ namespace Library_Jingyu
 		// Accept스레드 종료 대기
 		DWORD retval = WaitForMultipleObjects(m_iA_ThreadCount, m_hAcceptHandle, TRUE, INFINITE);
 
-		// 리턴값이 [WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + m_iW_ThreadCount - 1] 가 아니라면, 뭔가 에러가 발생한 것. 에러 찍고 걍 리턴한다.
+		// 리턴값이 [WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + m_iW_ThreadCount - 1] 가 아니라면, 뭔가 에러가 발생한 것. 에러 찍는다
 		if (retval < WAIT_OBJECT_0 &&
 			retval > WAIT_OBJECT_0 + m_iW_ThreadCount - 1)
 		{
@@ -439,18 +465,16 @@ namespace Library_Jingyu
 
 		// 2. 모든 유저에게 Shutdown
 		// 모든 유저에게 셧다운 날림
-		Lock_Exclusive_Map();
-
-		map<ULONGLONG, stSession*>::iterator itor = map_Session.begin();
-		for (; itor != map_Session.end(); ++itor)
-			shutdown(itor->second->m_Client_sock, SD_BOTH);		
-
-		Unlock_Exclusive_Map();
+		for (int i = 0; i < m_iMaxJoinUser; ++i)
+		{
+			if(m_stSessionArray[i].m_lUseFlag == TRUE)
+				shutdown(m_stSessionArray[i].m_Client_sock, SD_BOTH);				
+		}
 
 		// 모든 유저가 종료되었는지 체크
 		while (1)
 		{
-			if (map_Session.size() == 0)
+			if (m_ullJoinUserCount == 0)
 				break;
 
 			Sleep(1);
@@ -463,7 +487,7 @@ namespace Library_Jingyu
 		// 워커스레드 종료 대기
 		retval = WaitForMultipleObjects(m_iW_ThreadCount, m_hWorkerHandle, TRUE, INFINITE);
 
-		// 리턴값이 [WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + m_iW_ThreadCount - 1] 가 아니라면, 뭔가 에러가 발생한 것. 에러 찍고 걍 리턴한다.
+		// 리턴값이 [WAIT_OBJECT_0 ~ WAIT_OBJECT_0 + m_iW_ThreadCount - 1] 가 아니라면, 뭔가 에러가 발생한 것. 에러 찍는다
 		if (retval < WAIT_OBJECT_0 &&
 			retval > WAIT_OBJECT_0 + m_iW_ThreadCount - 1)
 		{
@@ -524,75 +548,49 @@ namespace Library_Jingyu
 	// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 	//
 	// return true : SendQ에 성공적으로 데이터 넣음.
-	// return true : SendQ에 데이터 넣기 실패.
+	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
-		// 1. ClinetID로 세션구조체 알아오기
-		Lock_Shared_Map(); // 맵 락 ----------- 
-		stSession* NowSession = FineSessionPtr(ClinetID);
-		if (NowSession == nullptr)
+		// 1. ClinetID로 세션의 Index 알아오기
+		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
+
+		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
+		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
 		{
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			// ---> 일단 현재 더미테스트 중에는 너무 많이 발생하니 뺀다.
+			// 필요하면 찍는다. 지금 아래있는건 과거에 쓰던거
 			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
-			Unlock_Shared_Map(); // 맵 언락 ----------- 
-
 			return false;
-		}
-
-		NowSession->Struct_Lock(); // 세션 락 ----------- 
-		Unlock_Shared_Map(); // 맵 언락 ----------- 		
+		}		
 	
-		// 2. 헤더 만들기 (페이로드 사이즈가 들어간다)
-		WORD Header = payloadBuff->GetUseSize();
-	
-		// 3. 넣기 (헤더, 페이로드를 2번 인큐하는거..어떻게 안될까)
+		// 3. 헤더를 넣어서, 패킷 완성하기
+		SetProtocolBuff_HeaderSet(payloadBuff);
 
-		// 헤더 인큐
-		int EnqueueCheck = NowSession->m_SendQueue.Enqueue((char*)&Header, dfNETWORK_PACKET_HEADER_SIZE);
+		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
+		void* payloadBuffAddr = payloadBuff;
+
+		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuffAddr, sizeof(void*));
 		if (EnqueueCheck == -1)
 		{
-			// 해당 유저는 접속을 끊는다.
-			shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL;
 
 			// 로그 찍기 (로그 레벨 : 에러)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
-				NowSession->m_IP, NowSession->m_prot, (int)m_iMyErrorCode);
+				m_stSessionArray[wArrayIndex].m_IP, m_stSessionArray[wArrayIndex].m_prot, (int)m_iMyErrorCode);
+
+			// 해당 유저는 접속을 끊는다.
+			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
 			
-			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
 			return false;
-		}
-
-		// 페이로드 인큐
-		EnqueueCheck = NowSession->m_SendQueue.Enqueue(payloadBuff->GetBufferPtr(), Header);
-		if (EnqueueCheck == -1)
-		{
-			 // 해당 유저는 접속을 끊는다.
-			shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL;	
-
-			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
-				NowSession->m_IP, NowSession->m_prot, (int)m_iMyErrorCode);
-
-			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
-			return false;
-		}
+		}		
 
 		// 4. SendPost시도
-		bool Check = SendPost(NowSession);
-		if(Check == true)
-			NowSession->Struct_Unlock(); // 세션 언락 ----------- 
-		
+		bool Check = SendPost(&m_stSessionArray[wArrayIndex]);		
 
 		return Check;
 	}
@@ -604,15 +602,12 @@ namespace Library_Jingyu
 	// return false : 접속중이지 않은 유저를 접속해제하려고 함.
 	bool CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
-		// 유저 찾는다.
-		Lock_Shared_Map(); // 맵 락 ---------------------
-		stSession* NowSession = FineSessionPtr(ClinetID);		
+		// 1. ClinetID로 세션의 Index 알아오기
+		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 
-		// 유저 못찾았으면 에러코드 남기고 false 리턴
-		if (NowSession == nullptr)
+		// 2. 내가 찾던 유저가 아니거나, 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
+		if (m_stSessionArray[wArrayIndex].m_lIndex != wArrayIndex || m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
 		{
-			Unlock_Shared_Map(); // 언 락 ---------------------
-
 			// 내 에러 남김. (윈도우 에러는 없음)
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
@@ -622,11 +617,9 @@ namespace Library_Jingyu
 			return false;
 		}
 
-		Unlock_Shared_Map(); // 언 락 ---------------------
-
 		// 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
-		shutdown(NowSession->m_Client_sock, SD_BOTH);
+		shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
 
 		return true;
 	}
@@ -677,7 +670,7 @@ namespace Library_Jingyu
 		m_bServerLife = false;
 
 		// SRWLock 초기화
-		InitializeSRWLock(&m_srwSession_map_srwl);
+		InitializeSRWLock(&m_srwSession_stack_srwl);
 	}
 
 	// 소멸자
@@ -694,32 +687,37 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
+
+		int TempCount = DeleteSession->m_iWSASendCount;
+		DeleteSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
+
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
-	
-		// map에서 제외시키기
-		Lock_Exclusive_Map();  // 맵 락 -----------------
 
-		// 만약, 없는 유저라면 이미 삭제된걸로 치고, 리턴한다.
-		if (map_Session.erase(sessionID) == 0)
+		// 보낸 카운트가 있으면 모두 동적해제 한다.
+		if (TempCount > 0)
 		{
-			Unlock_Exclusive_Map(); // 맵 언락 -----------------
-			return;
+			for (int i = 0; i < TempCount; ++i)
+				delete DeleteSession->m_cpbufSendPayload[i];			
+		}	
+
+		DeleteSession->m_lUseFlag = FALSE;
+
+		// 미사용 인덱스 스택에 반납
+		Lock_Exclusive_Stack();
+		if (m_stEmptyIndexStack->Push(DeleteSession->m_lIndex) == false)
+		{
+			printf("IndexStackFull!!!!!\n");
 		}
+		Unlock_Exclusive_Stack();
 
-		Unlock_Exclusive_Map(); // 맵 언락 -----------------
-
-		DeleteSession->Struct_Lock();  // 세션 락 -----------------
-		DeleteSession->Struct_Unlock(); // 세션 언락 -----------------
-		
-		// 클로즈 소켓, 세션 동적해제	
+		// 클로즈 소켓
 		closesocket(DeleteSession->m_Client_sock);
-		delete DeleteSession;
 
 		// 유저 수 감소
-		InterlockedDecrement(&m_ullJoinUserCount);
-		
-		// 유저 함수 호출
+		InterlockedDecrement(&m_ullJoinUserCount);	
+
 		OnClientLeave(sessionID);
+		return;
 	}
 
 	// Start에서 에러가 날 시 호출하는 함수.
@@ -824,51 +822,12 @@ namespace Library_Jingyu
 				break;
 			}
 
-			/*
-			 overlapped가 nullptr이 아니면서 리턴값이 false면, I/O에 대한 에러일 수 있으니 GetLastError 하고 일정 횟수 I/O 재요청. (물리적인 연결 실패 등으로 인한 에러?)
-			 근데.. 이거 의미없는거같다. 걍 체크 안하는게 맞는거같기도 하고.
-			 접속 -> 끊고 -> 다시 접속을 반복하다 보니까 접속이 끊긴 클라에 대해 ERROR_NETNAME_DELETED(해당 네트워크를 더 이상 사용할수 없음)이게 계속 뜨는데,
-			 일단 위 에러는 제외한다고 쳐도, 이미 연결 끊긴 유저에게 재접속 기회를 주는게 맞나 모르겠다. 물리적으로 끊겼으면 그냥 끊긴걸로 처리?
-			 클라에게 알려주는 용도로(에러표시용)으로 남겨둬야할까? 고민중...
-			*/
-			//else if(retval == false && GetLastError() != ERROR_NETNAME_DELETED)
-			//{
-			//	// 윈도우 에러, 내 에러 보관
-			//	g_This->m_iOSErrorCode = GetLastError();
-			//	g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__IOCP_IO_FAIL;
-
-			//	// 실패에 대해 재전송 시도
-			//	// m_lReyryCount가 5가 아닐 때만 시도한다.
-			//	if (NowSession->m_lReyryCount != 5)
-			//	{
-			//		InterlockedIncrement(&NowSession->m_lReyryCount);
-
-			//		// Recv가 실패했을 경우, 리시브를 다시 걸어본다.
-			//		if (&NowSession->m_overRecvOverlapped == overlapped)
-			//			g_This->RecvPost(NowSession);
-
-			//		// Send가 실패했을 경우, 샌드를 다시 걸어본다.
-			//		else if (&NowSession->m_overSendOverlapped == overlapped)
-			//			g_This->SendPost(NowSession);
-			//	}
-
-			//  // 로그 찍기 (로그 레벨 : 에러)
-			//  cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"IOCP_IO_Fail --> GQCS return Error : [%s : %d] NetError(%d), OSError(%d)",
-			//	NowSession->m_IP, NowSession->m_prot, (int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
-
-			//	// 에러 발생 함수 호출
-			//	g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_IO_FAIL, L"IOCP_IO_Fail");				
-			//}
-
 			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
 			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
-				// m_lReyryCount값을 0으로 변경
-				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
-
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);
 
@@ -886,21 +845,20 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
-
-				// m_lReyryCount값을 0으로 변경
-				//InterlockedExchange(&NowSession->m_lReyryCount, 0);
-
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
-				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);			
 
-				// 2. front 이동	
-				stNowSession->m_SendQueue.RemoveData(cbTransferred);
+				// 2. 보냈던 직렬화버퍼 삭제
+				int TempCount = stNowSession->m_iWSASendCount;
+				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
 
-				// 3. 샌드 가능 상태로 변경
-				//stNowSession->m_lSendFlag = 0;
+				for (int i = 0; i < TempCount; ++i)
+					delete stNowSession->m_cpbufSendPayload[i];		
+
+				// 4. 샌드 가능 상태로 변경
 				InterlockedExchange(&stNowSession->m_lSendFlag, FALSE);
 
-				// 3. 다시 샌드 시도. false가 리턴되면 종료된 유저이니 다시 위로 올라간다.
+				// 5. 다시 샌드 시도. false가 리턴되면 종료된 유저이니 다시 위로 올라간다.
 				if (g_This->SendPost(stNowSession) == false)
 					continue;				
 			}
@@ -970,13 +928,17 @@ namespace Library_Jingyu
 				closesocket(client_sock);
 				continue;
 			}
-					
+				
+
+
 			// ------------------
 			// IP와 포트 알아오기.
 			// ------------------
 			TCHAR tcTempIP[30];
 			InetNtop(AF_INET, &clientaddr.sin_addr, tcTempIP, 30);
 			USHORT port = ntohs(clientaddr.sin_port);
+
+
 
 
 			// ------------------
@@ -986,6 +948,8 @@ namespace Library_Jingyu
 			// true면 접속 계속 진행. true에서 할게 있으면 OnConnectionRequest함수 인자로 뭔가를 던진다.
 			if (g_This->OnConnectionRequest(tcTempIP, port) == false)
 				continue;
+
+
 
 
 			// ------------------
@@ -1000,30 +964,38 @@ namespace Library_Jingyu
 
 				// 에러 찍기 (OnError 호출)
 				printf("Stack_Index_Full!!\n");
+				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
 				break;
 			}
 			g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
 			// 2) 해당 세션 배열, 사용중으로 변경
-			g_This->m_stSessionArray[iIndex].m_bUseFalg = true;
+			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
 
-			// 3) 신규 세션키 + 인덱스 만든 후, 세션 배열에 추가하기.
-			// 그 외 기타정보 추가
+			// 3) 초기화하기
+			// -- 소켓
+			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
+
+			// -- 세션키(믹스 키)와 인덱스
 			ULONGLONG MixKey = InterlockedIncrement(&ullUniqueSessionID) | (iIndex << 48);
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
+			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
+
+			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
-			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
-			g_This->m_stSessionArray[iIndex].m_ullSessionID = InterlockedIncrement(&ullUniqueSessionID);
+			
+			// -- SendFlag, I/O카운트, 큐 초기화 초기화
+			g_This->m_stSessionArray[iIndex].Reset_Func();			
 							
+
+
 
 			// ------------------
 			// IOCP 연결
 			// ------------------
 			// 소켓과 IOCP 연결
-
-			/*if (CreateIoCompletionPort((HANDLE)client_sock, g_This->m_hIOCPHandle, (ULONG_PTR)NewSession, 0) == NULL)*/
 			if (CreateIoCompletionPort((HANDLE)client_sock, g_This->m_hIOCPHandle, (ULONG_PTR)&g_This->m_stSessionArray[iIndex], 0) == NULL)
 			{
 				// 윈도우 에러, 내 에러 보관
@@ -1042,6 +1014,8 @@ namespace Library_Jingyu
 					
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
+
+
 
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
@@ -1065,31 +1039,6 @@ namespace Library_Jingyu
 
 		return 0;
 	}
-
-	// map에 Exclusive 락 걸기
-	void CLanServer::LockMap_Exclusive_Func()
-	{
-		AcquireSRWLockExclusive(&m_srwSession_map_srwl);
-	}
-
-	// map에 Exclusive 락 풀기
-	void CLanServer::UnlockMap_Exclusive_Func()
-	{
-		ReleaseSRWLockExclusive(&m_srwSession_map_srwl);
-	}
-
-	// map에 Shared 락 걸기, 락 풀기
-	void CLanServer::LockMap_Shared_Func()
-	{
-		AcquireSRWLockShared(&m_srwSession_map_srwl);
-	}
-
-	// map에 Shared 락 풀기
-	void CLanServer::UnlockMap_Shared_Func()
-	{
-		ReleaseSRWLockShared(&m_srwSession_map_srwl);
-	}
-	
 
 	// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
 	void CLanServer::LockStack_Exclusive_Func()
@@ -1127,24 +1076,14 @@ namespace Library_Jingyu
 		return MixKey & 0x0000ffffffffffff;
 	}
 
-
-
-
-
-	// ClinetID로 Session구조체 찾기 함수
-	CLanServer::stSession* CLanServer::FineSessionPtr(ULONGLONG ClinetID)
+	// CProtocolBuff에 헤더 넣는 함수
+	void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
 	{
-		map <ULONGLONG, stSession*>::iterator iter;
-
-		iter = map_Session.find(ClinetID);
-		if (iter == map_Session.end())
-		{
-			return nullptr;
-		}
-
-		stSession* NowSession = iter->second;
-		return NowSession;
+		WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
+		memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
 	}
+
+
 
 	// 각종 변수들을 리셋시킨다.
 	void CLanServer::Reset()
@@ -1223,8 +1162,9 @@ namespace Library_Jingyu
 
 			// 5. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
 			CProtocolBuff PayloadBuff;
+			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);
 
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff.GetBufferPtr(), Header_PaylaodSize);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
 			{
@@ -1364,7 +1304,7 @@ namespace Library_Jingyu
 				return true;
 
 			// 2. SendBuff에 데이터가 있는지 확인
-			// 여기서 구한 UseSize는 이제 스냅샷 이다. 아래에서 버퍼 셋팅할때도 사용한다.
+			// 여기서 구한 UseSize는 이제 스냅샷 이다. 
 			int UseSize = NowSession->m_SendQueue.GetUseSize();
 			if (UseSize == 0)
 			{
@@ -1383,48 +1323,46 @@ namespace Library_Jingyu
 			// Send 준비하기
 			// ------------------
 			// 1. WSABUF 셋팅.
-			WSABUF wsabuf[2];
-			int wsabufCount = 0;
+			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];		
 
-			// 2. BrokenSize 구하기
-			// !!!!여기 주의!!! 
-			// 만약 BrokenSize를, UseSize보다 먼저 구해오면 흐름이 깨진다!!! 
-			// 
-			// ------------
-			// 시나리오...
-			// [Front = 0, rear = 10]인 상황에 BrokenSize를 구하면 10이 나온다. (BrokenSize = 10)
-			// 그 사이에 컨텍스트 스위칭이 일어나서 다른 스레드가 데이터를 넣는다. (Fornt = 0, rear = 20)
-			// 다시 컨텍스트 스위칭으로 해당 스레드로 돌아온 후 UseSize를 구하면 20이 나온다 (Front = 0, rear = 20, BrokenSize = 10, UseSize = 20)
-			// ------------
-			// 
-			// 이 상황에서, BrokenSize와 UseSize를 비교하면, 끊긴 상황이 아닌데 버퍼를 2개 사용하게된다.
-			// 이 경우, [0]번 버퍼에 &Buff[0]이 들어가고 사이즈가 10, [1]번 버퍼에도 &Buff[0]이 들어가고 사이즈가 10이 들어가는 상황이 발생한다.
-			// 동일한 데이터가 가게 된다!! 
-			// 이 경우, 상대쪽에서는 보내지 않은 데이터?라서 에러를 보낼수도 있고.. 혹은 그냥 뭐가 이상하게 처리되서 서버로 샌드를 안할수도 있고 그런다.
-			// 주의하자!!!!!
+			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
+				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
-			int BrokenSize = NowSession->m_SendQueue.GetNotBrokenGetSize();
-
-			// 3. UseSize가 더 크다면, 버퍼가 끊겼다는 소리. 2개를 끊어서 보낸다.
-			if (BrokenSize <  UseSize)
+			// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
+			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
+			if (wsabufCount == -1)
 			{
-				// fornt 위치의 버퍼를 포인터로 던짐(나는 1칸 앞에 쓰기 때문에, 이 안에서 1칸 앞까지 계산해줌)
-				wsabuf[0].buf = NowSession->m_SendQueue.GetFrontBufferPtr();
-				wsabuf[0].len = BrokenSize;
+				// 큐가 텅 비어있음. 위에서 있다고 왔는데 여기서 없는것은 진짜 말도안되는 에러!
+				// 내 에러보관
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY;
 
-				wsabuf[1].buf = NowSession->m_SendQueue.GetBufferPtr();;
-				wsabuf[1].len = UseSize - BrokenSize;
-				wsabufCount = 2;
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, _T("QUEUE_PEEK_EMPTY. UserID : %d, [%s:%d]"),
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);
+
+				// 끊는다.
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+				// 샌드 Flag 0으로 변경 (샌드 가능상태)
+				InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
+
+				// 에러 함수 호출
+				OnError((int)euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY, tcErrorString);
+
+				return false;
 			}
+			NowSession->m_iWSASendCount = wsabufCount / 8;
 
-			// 3-2. 그게 아니라면, WSABUF를 1개만 셋팅한다.
-			else
-			{
-				// fornt 위치의 버퍼를 포인터로 던짐(나는 1칸 앞에 쓰기 때문에, 이 안에서 1칸 앞까지 계산해줌)
-				wsabuf[0].buf = NowSession->m_SendQueue.GetFrontBufferPtr();
-				wsabuf[0].len = BrokenSize;
-
-				wsabufCount = 1;
+			// 4. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
+			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
+			{				
+				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
+				wsabuf[i].len = NowSession->m_cpbufSendPayload[i]->GetUseSize();
 			}
 
 			// 4. Overlapped 구조체 초기화
@@ -1435,7 +1373,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&NowSession->m_lIOCount);
 
 			// 6. 에러 처리
-			if (WSASend(NowSession->m_Client_sock, wsabuf, wsabufCount, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
+			if (WSASend(NowSession->m_Client_sock, wsabuf, NowSession->m_iWSASendCount, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
 			{
 				int Error = WSAGetLastError();
 
@@ -1455,9 +1393,6 @@ namespace Library_Jingyu
 					// 에러가 버퍼 부족이라면
 					if (Error == WSAENOBUFS)
 					{
-						// 일단 끊어야하니 셧다운 호출
-						shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 						// 내 에러, 윈도우에러 보관
 						m_iOSErrorCode = Error;
 						m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSAENOBUFS;
@@ -1471,28 +1406,12 @@ namespace Library_Jingyu
 						cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 							tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
+						// 끊는다.
+						shutdown(NowSession->m_Client_sock, SD_BOTH);
+
 						// 에러 함수 호출
 						OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
 					}
-
-					// 버퍼만 체크
-					//else if (Error != WSAESHUTDOWN && Error != WSAECONNRESET && Error != WSAECONNABORTED && Error != WSAEMFILE)
-					//{
-					//	// 일단 끊어야하니 셧다운 호출
-					//	shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-					//	// 내 에러, 윈도우에러 보관
-					//	m_iOSErrorCode = Error;
-					//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSASEND_FAIL;
-
-					//	// 에러 스트링 만들고
-					//	TCHAR tcErrorString[300];
-					//	StringCchPrintf(tcErrorString, 300, _T("WSASendFail... UserID : %d, [%s:%d]"),
-					//		NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-					//	// 에러 함수 호출
-					//	OnError((int)euError::NETWORK_LIB_ERROR__WSASEND_FAIL, tcErrorString);
-					//}		
 				}
 			}
 			break;

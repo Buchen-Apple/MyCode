@@ -60,8 +60,14 @@ namespace Library_Jingyu
 		// Rear 움직이기
 		int MoveWritePos(int size);
 
+		// Rear를 인자로 받은 값으로 강제로 변경시키기
+		int CompulsionMoveWritePos(int size);
+
 		// Front 움직이기
 		int MoveReadPos(int size);
+
+		// Front를 인자로 받은 값으로 강제로 변경시키기
+		int CompulsionMoveReadPos(int size);
 
 		// 현재 사용중인 용량 얻기.
 		int GetUseSize(void);

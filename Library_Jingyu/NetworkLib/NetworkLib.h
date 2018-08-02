@@ -54,7 +54,7 @@ namespace Library_Jingyu
 		// 세션 관리 배열
 		stSession* m_stSessionArray;
 
-		// 미사용 세션 관리 스택
+		// 미사용 인덱스 관리 스택
 		stEmptyStack* m_stEmptyIndexStack;
 
 		// 미세용 세션 관리 스택의 SRWLock
@@ -79,22 +79,20 @@ namespace Library_Jingyu
 
 
 		// 미사용 세션 관리 스택용 Exclusive 락 걸기, 풀기
-#define	Lock_Exclusive_Stack()		LockMap_Exclusive_Func()
-#define Unlock_Exclusive_Stack()	UnlockMap_Exclusive_Func()
+#define	Lock_Exclusive_Stack()		LockStack_Exclusive_Func()
+#define Unlock_Exclusive_Stack()	UnlockStack_Exclusive_Func()
 
 
 		// 세션 배열용 Shared  락 걸기, 풀기
-#define	Lock_Shared_Stack()		LockMap_Shared_Func()
-#define Unlock_Shared_Stack()	UnlockMap_Shared_Func()
+#define	Lock_Shared_Stack()		LockStack_Shared_Func()
+#define Unlock_Shared_Stack()	UnlockStack_Shared_Func()
 
 
 	private:
 		// ----------------------
 		// private 함수들
 		// ----------------------
-
-
-
+		
 		// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
 		void LockStack_Exclusive_Func();
 		void UnlockStack_Exclusive_Func();
@@ -109,8 +107,8 @@ namespace Library_Jingyu
 		// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
 		ULONGLONG GetRealSessionKey(ULONGLONG MixKey);
 
-		// ClinetID로 stSession포인터 알아오는 함수
-		stSession* FineSessionPtr(ULONGLONG ClinetID);
+		// CProtocolBuff에 헤더 넣는 함수
+		void SetProtocolBuff_HeaderSet(CProtocolBuff* Packet);
 
 		// 워커 스레드
 		static UINT	WINAPI	WorkerThread(LPVOID lParam);
