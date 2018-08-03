@@ -106,7 +106,7 @@ namespace Library_Jingyu
 		long m_iWSASendCount;
 		
 		// SendPost에서 샌드를 한 데이터의 포인터들 배열
-		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
+		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF] = { 0 };
 
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
@@ -565,6 +565,7 @@ namespace Library_Jingyu
 	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
+		payloadBuff->m_lLastAccessPos = CProtocolBuff::eLas_SendPacket;
 		// 1. ClinetID로 세션의 Index 알아오기
 		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 
@@ -577,6 +578,8 @@ namespace Library_Jingyu
 			// 로그 찍기 (로그 레벨 : 디버그)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
+			LeakDel(payloadBuff);
+
 			return false;
 		}		
 	
@@ -584,9 +587,9 @@ namespace Library_Jingyu
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
 		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
-		void* payloadBuffAddr = payloadBuff;
+		//void* payloadBuffAddr = payloadBuff;
 
-		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuffAddr, sizeof(void*));
+		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuff, sizeof(void*));
 		if (EnqueueCheck == -1)
 		{
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
@@ -598,7 +601,9 @@ namespace Library_Jingyu
 
 			// 해당 유저는 접속을 끊는다.
 			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
-			
+
+			LeakDel(payloadBuff);
+
 			return false;
 		}		
 
@@ -684,6 +689,10 @@ namespace Library_Jingyu
 
 		// SRWLock 초기화
 		InitializeSRWLock(&m_srwSession_stack_srwl);
+
+		//!!
+		InitializeSRWLock(&m_srwLeak);
+		//!!
 	}
 
 	// 소멸자
@@ -711,10 +720,24 @@ namespace Library_Jingyu
 		// 보낸 카운트가 있으면 모두 동적해제 한다.
 		if (TempCount > 0)
 		{
-			for (int i = 0; i < TempCount; ++i)
+			for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
 			{
-				delete DeleteSession->m_cpbufSendPayload[i];
-				PacketAllocCountSub();
+				if (i < TempCount)
+				{
+					//!!
+					DeleteSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eDel_Release;
+					DeleteSession->m_cpbufSendPayload[i]->m_lDelPos = CProtocolBuff::eDel_Release;
+					LeakDel(DeleteSession->m_cpbufSendPayload[i]);
+					//!!
+					delete DeleteSession->m_cpbufSendPayload[i];
+					PacketAllocCountSub();
+				}
+				else if(DeleteSession->m_cpbufSendPayload[i])
+				{
+					int a = 0;
+				}
+
+				DeleteSession->m_cpbufSendPayload[i] = NULL;
 			}
 		}			
 
@@ -736,6 +759,11 @@ namespace Library_Jingyu
 		// 꺼낸 Dequeue만큼 돌면서 삭제한다.
 		for (int i = 0; i < DequeueSize; ++i)
 		{
+			//!!
+			Payload[i]->m_lLastAccessPos = CProtocolBuff::eDel_Release2;
+			Payload[i]->m_lDelPos = CProtocolBuff::eDel_Release2;
+			LeakDel(Payload[i]);
+			//!!
 			delete Payload[i];
 			if (PacketAllocCountSub() != 0)
 			{
@@ -944,10 +972,24 @@ namespace Library_Jingyu
 				int TempCount = stNowSession->m_iWSASendCount;
 				InterlockedExchange(&stNowSession->m_iWSASendCount, 0);  // 보낸 카운트 0으로 만듬.
 
-				for (int i = 0; i < TempCount; ++i)
+				for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
 				{
-					delete stNowSession->m_cpbufSendPayload[i];
-					PacketAllocCountSub();
+					if (i < TempCount)
+					{
+						//!!
+						stNowSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eDel_SendCommit;
+						stNowSession->m_cpbufSendPayload[i]->m_lDelPos = CProtocolBuff::eDel_SendCommit;
+						g_This->LeakDel(stNowSession->m_cpbufSendPayload[i]);
+						//!!
+						delete stNowSession->m_cpbufSendPayload[i];
+						PacketAllocCountSub();
+					}
+					else if (stNowSession->m_cpbufSendPayload[i])
+					{
+						int a = 0;
+					}
+
+					stNowSession->m_cpbufSendPayload[i] = NULL;
 				}
 
 				// 4. 샌드 가능 상태로 변경
@@ -1429,7 +1471,7 @@ namespace Library_Jingyu
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
-			// 2. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
+			// 2. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도
 			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
 			if (wsabufByte == -1)
 			{
@@ -1457,11 +1499,21 @@ namespace Library_Jingyu
 
 				return false;
 			}
-			InterlockedExchange(&NowSession->m_iWSASendCount, wsabufByte / 8);
+
+			if (0 != wsabufByte % 8)
+			{
+				int a = 0;
+			}
+
+			int iMax = wsabufByte / 8;
+			InterlockedExchange(&NowSession->m_iWSASendCount, iMax);
 
 			// 3. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
-			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
+			for (int i = 0; i < iMax; i++)
 			{				
+				NowSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eLas_SendPost;
+				NowSession->m_cpbufSendPayload[i]->m_lArrIdx = i;
+				NowSession->m_cpbufSendPayload[i]->m_lCount = iMax;
 				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_cpbufSendPayload[i]->GetUseSize();
 			}
