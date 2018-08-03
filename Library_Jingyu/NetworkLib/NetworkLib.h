@@ -8,7 +8,10 @@ using namespace std;
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #include <unordered_map>
+=======
+>>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 
 =======
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
@@ -26,33 +29,6 @@ namespace Library_Jingyu
 	// --------------
 	class CLanServer
 	{
-		//!!
-	public:
-		SRWLOCK m_srwLeak;
-		typedef std::unordered_map<UINT_PTR, CProtocolBuff *> UMAP_LEAK;
-		UMAP_LEAK m_umapLeak;
-		void LeakIn(CProtocolBuff *_p)
-		{
-			AcquireSRWLockExclusive(&m_srwLeak);
-
-			UINT_PTR g = (UINT_PTR)_p;
-			m_umapLeak.insert(UMAP_LEAK::value_type(g, _p));
-
-			ReleaseSRWLockExclusive(&m_srwLeak);
-		}
-		void LeakDel(CProtocolBuff *_p)
-		{
-			AcquireSRWLockExclusive(&m_srwLeak);
-
-			size_t g = m_umapLeak.erase((UINT_PTR)_p);
-			if (0 == g)
-			{
-				int a = 0;
-			}
-
-			ReleaseSRWLockExclusive(&m_srwLeak);
-		}
-		//!!
 	private:
 		// ----------------------
 		// private ±¸Á¶Ã¼ or enum Àü¹æ¼±¾ð

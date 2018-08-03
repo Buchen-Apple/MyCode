@@ -115,7 +115,7 @@ namespace Library_Jingyu
 		long m_iWSASendCount;
 		
 		// SendPost¿¡¼­ »÷µå¸¦ ÇÑ µ¥ÀÌÅÍÀÇ Æ÷ÀÎÅÍµé ¹è¿­
-		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF] = { 0 };
+		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
 
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
@@ -577,7 +577,6 @@ namespace Library_Jingyu
 	// return false : SendQ¿¡ µ¥ÀÌÅÍ ³Ö±â ½ÇÆÐ or ¿øÇÏ´ø À¯Àú ¸øÃ£À½
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
-		payloadBuff->m_lLastAccessPos = CProtocolBuff::eLas_SendPacket;
 		// 1. ClinetID·Î ¼¼¼ÇÀÇ Index ¾Ë¾Æ¿À±â
 		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 
@@ -591,8 +590,6 @@ namespace Library_Jingyu
 			// ÇÊ¿äÇÏ¸é Âï´Â´Ù. Áö±Ý ¾Æ·¡ÀÖ´Â°Ç °ú°Å¿¡ ¾²´ø°Å
 			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
-			LeakDel(payloadBuff);
-
 			return false;
 		}		
 	
@@ -600,9 +597,9 @@ namespace Library_Jingyu
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
 		// 4. ÀÎÅ¥. ÆÐÅ¶ÀÇ "ÁÖ¼Ò"¸¦ ÀÎÅ¥ÇÑ´Ù(8¹ÙÀÌÆ®)
-		//void* payloadBuffAddr = payloadBuff;
+		void* payloadBuffAddr = payloadBuff;
 
-		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuff, sizeof(void*));
+		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuffAddr, sizeof(void*));
 		if (EnqueueCheck == -1)
 		{
 			// À¯Àú°¡ È£ÃâÇÑ ÇÔ¼ö´Â, ¿¡·¯ È®ÀÎÀÌ °¡´ÉÇÏ±â ¶§¹®¿¡ OnErrorÇÔ¼ö È£Ãâ ¾ÈÇÔ.
@@ -614,9 +611,7 @@ namespace Library_Jingyu
 
 			// ÇØ´ç À¯Àú´Â Á¢¼ÓÀ» ²÷´Â´Ù.
 			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
-
-			LeakDel(payloadBuff);
-
+			
 			return false;
 		}		
 
@@ -702,10 +697,6 @@ namespace Library_Jingyu
 
 		// SRWLock ÃÊ±âÈ­
 		InitializeSRWLock(&m_srwSession_stack_srwl);
-
-		//!!
-		InitializeSRWLock(&m_srwLeak);
-		//!!
 	}
 
 	// ¼Ò¸êÀÚ
@@ -741,24 +732,14 @@ namespace Library_Jingyu
 		if (TempCount > 0)
 		{
 <<<<<<< HEAD
+<<<<<<< HEAD
 			for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
+=======
+			for (int i = 0; i < TempCount; ++i)
+>>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 			{
-				if (i < TempCount)
-				{
-					//!!
-					DeleteSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eDel_Release;
-					DeleteSession->m_cpbufSendPayload[i]->m_lDelPos = CProtocolBuff::eDel_Release;
-					LeakDel(DeleteSession->m_cpbufSendPayload[i]);
-					//!!
-					delete DeleteSession->m_cpbufSendPayload[i];
-					PacketAllocCountSub();
-				}
-				else if(DeleteSession->m_cpbufSendPayload[i])
-				{
-					int a = 0;
-				}
-
-				DeleteSession->m_cpbufSendPayload[i] = NULL;
+				delete DeleteSession->m_cpbufSendPayload[i];
+				PacketAllocCountSub();
 			}
 		}			
 
@@ -780,11 +761,6 @@ namespace Library_Jingyu
 		// ²¨³½ Dequeue¸¸Å­ µ¹¸é¼­ »èÁ¦ÇÑ´Ù.
 		for (int i = 0; i < DequeueSize; ++i)
 		{
-			//!!
-			Payload[i]->m_lLastAccessPos = CProtocolBuff::eDel_Release2;
-			Payload[i]->m_lDelPos = CProtocolBuff::eDel_Release2;
-			LeakDel(Payload[i]);
-			//!!
 			delete Payload[i];
 			if (PacketAllocCountSub() != 0)
 			{
@@ -1002,24 +978,14 @@ namespace Library_Jingyu
 				InterlockedExchange(&stNowSession->m_iWSASendCount, 0);  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 				for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
+=======
+				for (int i = 0; i < TempCount; ++i)
+>>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 				{
-					if (i < TempCount)
-					{
-						//!!
-						stNowSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eDel_SendCommit;
-						stNowSession->m_cpbufSendPayload[i]->m_lDelPos = CProtocolBuff::eDel_SendCommit;
-						g_This->LeakDel(stNowSession->m_cpbufSendPayload[i]);
-						//!!
-						delete stNowSession->m_cpbufSendPayload[i];
-						PacketAllocCountSub();
-					}
-					else if (stNowSession->m_cpbufSendPayload[i])
-					{
-						int a = 0;
-					}
-
-					stNowSession->m_cpbufSendPayload[i] = NULL;
+					delete stNowSession->m_cpbufSendPayload[i];
+					PacketAllocCountSub();
 				}
 =======
 				for (int i = 0; i < TempCount; ++i)
@@ -1509,7 +1475,11 @@ namespace Library_Jingyu
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ
+=======
+			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
+>>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
 			if (wsabufByte == -1)
 =======
@@ -1543,6 +1513,7 @@ namespace Library_Jingyu
 				return false;
 			}
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 			NowSession->m_iWSASendCount = wsabufCount / 8;
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
@@ -1554,13 +1525,13 @@ namespace Library_Jingyu
 
 			int iMax = wsabufByte / 8;
 			InterlockedExchange(&NowSession->m_iWSASendCount, iMax);
+=======
+			InterlockedExchange(&NowSession->m_iWSASendCount, wsabufByte / 8);
+>>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 
 			// 3. ½ÇÁ¦·Î ²¨³½ Æ÷ÀÎÆ® ¼ö(¹ÙÀÌÆ® ¾Æ´Ô! ÁÖÀÇ)¸¸Å­ µ¹¸é¼­ WSABUF±¸Á¶Ã¼¿¡ ÇÒ´ç
-			for (int i = 0; i < iMax; i++)
+			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
 			{				
-				NowSession->m_cpbufSendPayload[i]->m_lLastAccessPos = CProtocolBuff::eLas_SendPost;
-				NowSession->m_cpbufSendPayload[i]->m_lArrIdx = i;
-				NowSession->m_cpbufSendPayload[i]->m_lCount = iMax;
 				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_cpbufSendPayload[i]->GetUseSize();
 			}

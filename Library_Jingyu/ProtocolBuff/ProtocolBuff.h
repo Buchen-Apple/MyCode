@@ -19,30 +19,6 @@ namespace Library_Jingyu
 
 	class CProtocolBuff
 	{
-		//!!
-	public:
-		enum eNewPos
-		{
-			eDel_SendCommit,
-			eDel_Release,
-			eDel_Release2,
-			eDel_ETC1,
-			eDel_ETC2,
-			eCre_Join,
-			eCre_Send,
-
-			eLas_RecvPost,
-			eLas_SendPost,
-			eLas_SendPacket,
-			eLas_SendPacket_Deque,
-			eEnd
-		};
-		long m_lLastAccessPos = -1;
-		long m_lDelPos = -1;
-		long m_lCreatePos = -1;
-		long m_lArrIdx = -1;
-		long m_lCount = -1;
-		//!!
 	private:
 		// 직렬화 버퍼
 		char* m_pProtocolBuff;
