@@ -19,6 +19,9 @@ LONG g_llPacketAllocCount = 0;
 #include <mmsystem.h>
 #pragma comment(lib,"winmm.lib")
 
+<<<<<<< HEAD
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+=======
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 
 
@@ -37,6 +40,7 @@ namespace Library_Jingyu
 	// ÇÑ ¹ø¿¡ »÷µåÇÒ ¼ö ÀÖ´Â WSABUFÀÇ Ä«¿îÆ®
 	#define dfSENDPOST_MAX_WSABUF			100
 <<<<<<< HEAD
+<<<<<<< HEAD
 	
 	void PacketAllocCountAdd()
 	{
@@ -52,6 +56,8 @@ namespace Library_Jingyu
 	{
 		return g_llPacketAllocCount;
 	}
+=======
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 =======
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 
@@ -561,9 +567,12 @@ namespace Library_Jingyu
 
 		// 7. ¼­¹ö Á¾·á ·Î±× Âï±â		
 <<<<<<< HEAD
+<<<<<<< HEAD
 		_tprintf_s(L"PacketCount : [%d]\n", g_llPacketAllocCount);
 
 		//g_llPacketAllocCount = 0;
+=======
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 =======
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
@@ -736,6 +745,7 @@ namespace Library_Jingyu
 			for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
 =======
 			for (int i = 0; i < TempCount; ++i)
+<<<<<<< HEAD
 >>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 			{
 				delete DeleteSession->m_cpbufSendPayload[i];
@@ -822,6 +832,11 @@ namespace Library_Jingyu
 		DeleteSession->m_lUseFlag = FALSE;
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 
+=======
+				delete DeleteSession->m_cpbufSendPayload[i];			
+		}	
+
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 		DeleteSession->m_lUseFlag = FALSE;
 
 		// ¹Ì»ç¿ë ÀÎµ¦½º ½ºÅÃ¿¡ ¹Ý³³
@@ -982,6 +997,7 @@ namespace Library_Jingyu
 				for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
 =======
 				for (int i = 0; i < TempCount; ++i)
+<<<<<<< HEAD
 >>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 				{
 					delete stNowSession->m_cpbufSendPayload[i];
@@ -989,6 +1005,9 @@ namespace Library_Jingyu
 				}
 =======
 				for (int i = 0; i < TempCount; ++i)
+					delete stNowSession->m_cpbufSendPayload[i];		
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+=======
 					delete stNowSession->m_cpbufSendPayload[i];		
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 
@@ -1064,11 +1083,14 @@ namespace Library_Jingyu
 			{
 				closesocket(client_sock);
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 				// ¿¡·¯ ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
 				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User_Max... : NowJoinUser(%d), MaxUser(%d)",
 					g_This->m_ullJoinUserCount, g_This->m_iMaxJoinUser);
 
+=======
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 =======
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 				continue;
@@ -1476,12 +1498,18 @@ namespace Library_Jingyu
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ
 =======
 			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
 >>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
 			if (wsabufByte == -1)
+=======
+			// 3. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
+			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
+			if (wsabufCount == -1)
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 =======
 			// 3. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
 			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
@@ -1514,6 +1542,7 @@ namespace Library_Jingyu
 			}
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 			NowSession->m_iWSASendCount = wsabufCount / 8;
 >>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
@@ -1528,6 +1557,9 @@ namespace Library_Jingyu
 =======
 			InterlockedExchange(&NowSession->m_iWSASendCount, wsabufByte / 8);
 >>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
+=======
+			NowSession->m_iWSASendCount = wsabufCount / 8;
+>>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 
 			// 3. ½ÇÁ¦·Î ²¨³½ Æ÷ÀÎÆ® ¼ö(¹ÙÀÌÆ® ¾Æ´Ô! ÁÖÀÇ)¸¸Å­ µ¹¸é¼­ WSABUF±¸Á¶Ã¼¿¡ ÇÒ´ç
 			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
