@@ -88,11 +88,6 @@ namespace Library_Jingyu
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
 
-		// I/O가 외부적인 요인(물리적인 연결 에러라던가..)으로 실패했을 때 약 5회정도 재시도 해본다. 
-		// 이 시도한 횟수를 저장할 변수. 실패할 때 마다 1씩 증가하다가, 5가되면 더 이상 접속시도 안함
-		// I/O가 성공하면 그 즉시 0이된다.
-		//LONG	m_lReyryCount;
-
 		// 해당 인덱스 배열이 사용중인지 체크
 		// 1이면 사용중, 0이면 사용중 아님
 		LONG m_lUseFlag;
@@ -102,9 +97,6 @@ namespace Library_Jingyu
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
 		int m_iWSASendCount;
-
-		// SendPost에서 샌드를 한 데이터의 포인터들 배열
-		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
 
 		CRingBuff m_RecvQueue;
 		CRingBuff m_SendQueue;
@@ -127,6 +119,7 @@ namespace Library_Jingyu
 			// -- SendFlag, I/O카운트, SendCount 초기화
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
+			m_iWSASendCount = 0;
 
 			// 큐 초기화
 			m_RecvQueue.ClearBuffer();
@@ -582,9 +575,9 @@ namespace Library_Jingyu
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
 		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
-		void* payloadBuffAddr = payloadBuff;
+		//void* payloadBuffAddr = payloadBuff;
 
-		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuffAddr, sizeof(void*));
+		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuff, sizeof(void*));
 		if (EnqueueCheck == -1)
 		{
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
@@ -698,22 +691,9 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
-		DeleteSession->m_lUseFlag = FALSE;
+		DeleteSession->m_lUseFlag = FALSE;	
 
-		int TempCount = DeleteSession->m_iWSASendCount;
-		//DeleteSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
-
-		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
-
-		// 보낸 카운트가 있으면 모두 동적해제 한다.
-		if (TempCount > 0)
-		{
-			for (int i = 0; i < TempCount; ++i)
-			{
-				delete DeleteSession->m_cpbufSendPayload[i];
-				InterlockedDecrement(&g_llPacketAllocCount);
-			}
-		}
+		ULONGLONG sessionID = DeleteSession->m_ullSessionID;		
 
 		// 샌드 큐에 데이터가 있으면 동적해제 한다.
 		int UseSize = DeleteSession->m_SendQueue.GetUseSize();
@@ -745,7 +725,7 @@ namespace Library_Jingyu
 		}
 
 		// 클로즈 소켓
-		closesocket(DeleteSession->m_Client_sock);
+		closesocket(DeleteSession->m_Client_sock);		
 
 		// 미사용 인덱스 스택에 반납
 		Lock_Exclusive_Stack();
@@ -893,15 +873,18 @@ namespace Library_Jingyu
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
 				// 2. 보냈던 직렬화버퍼 삭제
-				int TempCount = stNowSession->m_iWSASendCount;			
+				CProtocolBuff* TempBuff[dfSENDPOST_MAX_WSABUF];
+				int DequeueSize = stNowSession->m_SendQueue.Dequeue((char*)TempBuff, stNowSession->m_iWSASendCount * 8);
 
-				for (int i = 0; i < TempCount; ++i)
+				// 꺼낸 Dequeue만큼 돌면서 삭제한다.
+				for (int i = 0; i < DequeueSize / 8; ++i)
 				{
-					delete stNowSession->m_cpbufSendPayload[i];
+					delete TempBuff[i];
 					InterlockedDecrement(&g_llPacketAllocCount);
 				}
 
-				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
+				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.		
+				
 
 				// 4. 샌드 가능 상태로 변경
 				InterlockedExchange(&stNowSession->m_lSendFlag, FALSE);
@@ -1038,11 +1021,8 @@ namespace Library_Jingyu
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
 
-			// -- SendFlag, I/O카운트, 큐 초기화 초기화
+			// -- SendFlag, I/O카운트, 큐, Send했던 카운트 초기화
 			g_This->m_stSessionArray[iIndex].Reset_Func();
-
-			g_This->m_stSessionArray[iIndex].m_iWSASendCount = 0;
-
 
 
 
@@ -1377,13 +1357,32 @@ namespace Library_Jingyu
 			// Send 준비하기
 			// ------------------
 			// 1. WSABUF 셋팅.
-			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];
+			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];			
+
+			//// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도	
+			//int TempUseSize = NowSession->m_SendQueue.GetUseSize();
+
+			//if (TempUseSize > dfSENDPOST_MAX_WSABUF * 8)
+			//	TempUseSize = dfSENDPOST_MAX_WSABUF * 8;
+
+			//else if (TempUseSize > 8 && TempUseSize % 8 != 0)
+			//	TempUseSize = (TempUseSize / 8) * 8;
+
+			// // 3. 픽 구조
+			//CProtocolBuff* TempBuff[100];
+			//int wsabufByte = (NowSession->m_SendQueue.Peek((char*)TempBuff, TempUseSize));
+
+			
 
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
-			// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
-			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
+			else if (UseSize > 8 && UseSize % 8 != 0)
+				UseSize = (UseSize / 8) * 8;
+
+			// 3. 픽 구조
+			CProtocolBuff* TempBuff[100];
+			int wsabufByte = (NowSession->m_SendQueue.Peek((char*)TempBuff, UseSize));
 			if (wsabufByte == -1)
 			{
 				// 큐가 텅 비어있음. 위에서 있다고 왔는데 여기서 없는것은 진짜 말도안되는 에러!
@@ -1412,11 +1411,11 @@ namespace Library_Jingyu
 			}
 			int Temp = wsabufByte / 8;
 
-			// 4. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
+			// 4. 실제로 픽 한 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
 			for (int i = 0; i < Temp; i++)
 			{
-				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
-				wsabuf[i].len = NowSession->m_cpbufSendPayload[i]->GetUseSize();
+				wsabuf[i].buf = TempBuff[i]->GetBufferPtr();
+				wsabuf[i].len = TempBuff[i]->GetUseSize();
 			}
 
 			 NowSession->m_iWSASendCount = Temp;
