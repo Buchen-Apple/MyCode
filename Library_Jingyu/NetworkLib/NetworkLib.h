@@ -10,6 +10,11 @@ using namespace std;
 
 namespace Library_Jingyu
 {
+	void PacketAllocCountAdd();
+	LONG PacketAllocCountSub();
+	LONG PacketAllocCount_Get();
+
+
 	// --------------
 	// CLanServer 클래스는, 내부 서버 간 통신에 사용된다.
 	// 내부 서버간 통신은, 접속 받는쪽을 서버 / 접속하는 쪽을 클라로 나눠서 생각한다 (개념적으로)

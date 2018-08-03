@@ -13,7 +13,7 @@
 #include "CrashDump\CrashDump.h"
 
 
-extern LONG g_llPacketAllocCount;
+LONG g_llPacketAllocCount = 0;
 
 
 namespace Library_Jingyu
@@ -24,21 +24,27 @@ namespace Library_Jingyu
 	// 덤프 남길 변수 하나 받기
 	CCrashDump* cNetDump = CCrashDump::GetInstance();
 
-	// 패킷 동적할당, 해제 카운트
-	LONGLONG g_PacketAllocCount = 0;
-
 
 	// 헤더 사이즈
 	#define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
 	#define dfSENDPOST_MAX_WSABUF			100
-
-
 	
+	void PacketAllocCountAdd()
+	{
+		InterlockedIncrement(&g_llPacketAllocCount);
+	}
 
-	
+	LONG PacketAllocCountSub()
+	{
+		return InterlockedDecrement(&g_llPacketAllocCount);
+	}
 
+	LONG PacketAllocCount_Get()
+	{
+		return g_llPacketAllocCount;
+	}
 
 
 	// ------------------------------
@@ -97,7 +103,7 @@ namespace Library_Jingyu
 		ULONGLONG m_lIndex;
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
-		int m_iWSASendCount;
+		long m_iWSASendCount;
 		
 		// SendPost에서 샌드를 한 데이터의 포인터들 배열
 		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
@@ -546,6 +552,8 @@ namespace Library_Jingyu
 
 		// 7. 서버 종료 로그 찍기		
 		_tprintf_s(L"PacketCount : [%d]\n", g_llPacketAllocCount);
+
+		//g_llPacketAllocCount = 0;
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
@@ -691,13 +699,14 @@ namespace Library_Jingyu
 
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
-	{
-		DeleteSession->m_lUseFlag = FALSE;
-
-		int TempCount = DeleteSession->m_iWSASendCount;
-		DeleteSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
+	{	
 
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
+
+		OnClientLeave(sessionID);
+
+		int TempCount = DeleteSession->m_iWSASendCount;
+		InterlockedExchange(&DeleteSession->m_iWSASendCount, 0);  // 보낸 카운트 0으로 만듬.		
 
 		// 보낸 카운트가 있으면 모두 동적해제 한다.
 		if (TempCount > 0)
@@ -705,35 +714,74 @@ namespace Library_Jingyu
 			for (int i = 0; i < TempCount; ++i)
 			{
 				delete DeleteSession->m_cpbufSendPayload[i];
-				InterlockedDecrement(&g_llPacketAllocCount);
+				PacketAllocCountSub();
 			}
 		}			
 
 		// 샌드 큐에 데이터가 있으면 동적해제 한다.
+		CProtocolBuff* Payload[1024];
 		int UseSize = DeleteSession->m_SendQueue.GetUseSize();
+		int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, UseSize);
 
-		while (UseSize > 0)
+		DequeueSize = DequeueSize / 8;
+
+		if (DequeueSize != UseSize / 8)
 		{
-			int TempSize = UseSize;
+			// 에러 로그 찍기
+			// 로그 찍기(로그 레벨 : 에러)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). DequeueSize, UseSize Not SAME! : Rear(%d), Front(%d)",
+				DequeueSize, UseSize / 8);
+		}
 
-			if (UseSize > 8000)
-				TempSize = 8000;
-
-			// UseSize 사이즈 만큼 디큐
-			CProtocolBuff* Payload[1000];
-			int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, TempSize);
-
-			// 꺼낸 수 만큼 UseSize 줄임. 다음 절차를 위해.
-			UseSize -= DequeueSize;
-
-			DequeueSize = DequeueSize / 8;
-
-			// 꺼낸 Dequeue만큼 돌면서 삭제한다.
-			for (int i = 0; i < DequeueSize; ++i)
+		// 꺼낸 Dequeue만큼 돌면서 삭제한다.
+		for (int i = 0; i < DequeueSize; ++i)
+		{
+			delete Payload[i];
+			if (PacketAllocCountSub() != 0)
 			{
-				delete Payload[i];
-				InterlockedDecrement(&g_llPacketAllocCount);
+				// 에러 로그 찍기
+				// 로그 찍기(로그 레벨 : 에러)
+				//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). PacketAllocCount Not 0 : %d",
+				//	g_llPacketAllocCount);
 			}
+		}
+
+
+
+		//int UseSize = DeleteSession->m_SendQueue.GetUseSize();
+
+		//while (UseSize > 0)
+		//{
+		//	int Temp = UseSize;
+
+		//	if (Temp > 8000)
+		//		Temp = 8000;
+
+		//	// UseSize 사이즈 만큼 디큐
+		//	CProtocolBuff* Payload[1000];
+		//	int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, Temp);
+
+		//	UseSize -= DequeueSize;
+
+		//	DequeueSize = DequeueSize / 8;
+
+		//	// 꺼낸 Dequeue만큼 돌면서 삭제한다.
+		//	for (int i = 0; i < DequeueSize; ++i)
+		//	{
+		//		delete Payload[i];
+		//		PacketAllocCountSub();
+		//	}
+		//}
+
+		int* RearValue = (int*)DeleteSession->m_SendQueue.GetWriteBufferPtr();
+		int* FrontValue = (int*)DeleteSession->m_SendQueue.GetReadBufferPtr();
+
+		if (*RearValue != *FrontValue)
+		{
+			// 에러 로그 찍기
+			// 로그 찍기(로그 레벨 : 에러)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). Rear, Front Not SAME! : Rear(%d), Front(%d)",
+				RearValue, FrontValue);
 		}
 
 		// 리셋
@@ -741,6 +789,8 @@ namespace Library_Jingyu
 
 		// 클로즈 소켓
 		closesocket(DeleteSession->m_Client_sock);		
+
+		DeleteSession->m_lUseFlag = FALSE;
 
 		// 미사용 인덱스 스택에 반납
 		Lock_Exclusive_Stack();
@@ -758,7 +808,7 @@ namespace Library_Jingyu
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);	
 
-		OnClientLeave(sessionID);
+		
 		return;
 	}
 
@@ -892,12 +942,12 @@ namespace Library_Jingyu
 
 				// 2. 보냈던 직렬화버퍼 삭제
 				int TempCount = stNowSession->m_iWSASendCount;
-				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
+				InterlockedExchange(&stNowSession->m_iWSASendCount, 0);  // 보낸 카운트 0으로 만듬.
 
 				for (int i = 0; i < TempCount; ++i)
 				{
 					delete stNowSession->m_cpbufSendPayload[i];
-					InterlockedDecrement(&g_llPacketAllocCount);
+					PacketAllocCountSub();
 				}
 
 				// 4. 샌드 가능 상태로 변경
@@ -1145,7 +1195,7 @@ namespace Library_Jingyu
 		m_hIOCPHandle = 0;
 		m_soListen_sock = 0;
 		m_iMaxJoinUser = 0;
-		m_ullJoinUserCount = 0;		
+		m_ullJoinUserCount = 0;				
 	}
 
 
@@ -1379,7 +1429,7 @@ namespace Library_Jingyu
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
-			// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
+			// 2. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
 			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
 			if (wsabufByte == -1)
 			{
@@ -1407,9 +1457,9 @@ namespace Library_Jingyu
 
 				return false;
 			}
-			NowSession->m_iWSASendCount = wsabufByte / 8;
+			InterlockedExchange(&NowSession->m_iWSASendCount, wsabufByte / 8);
 
-			// 4. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
+			// 3. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
 			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
 			{				
 				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
