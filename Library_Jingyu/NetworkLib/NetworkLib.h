@@ -1,4 +1,5 @@
 #ifndef __NETWORK_LIB_H__
+
 #define __NETWORK_LIB_H__
 #include <windows.h>
 #include <map>
@@ -7,24 +8,9 @@
 using namespace std;
 
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-#include <unordered_map>
-=======
->>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 namespace Library_Jingyu
 {
-	void PacketAllocCountAdd();
-	LONG PacketAllocCountSub();
-	LONG PacketAllocCount_Get();
-
-
 	// --------------
 	// CLanServer Å¬·¡½º´Â, ³»ºÎ ¼­¹ö °£ Åë½Å¿¡ »ç¿ëµÈ´Ù.
 	// ³»ºÎ ¼­¹ö°£ Åë½ÅÀº, Á¢¼Ó ¹Þ´ÂÂÊÀ» ¼­¹ö / Á¢¼ÓÇÏ´Â ÂÊÀ» Å¬¶ó·Î ³ª´²¼­ »ý°¢ÇÑ´Ù (°³³äÀûÀ¸·Î)
@@ -86,7 +72,7 @@ namespace Library_Jingyu
 		ULONGLONG m_ullJoinUserCount;
 
 		// ÃÖ´ë Á¢¼Ó °¡´É À¯Àú ¼ö
-		ULONGLONG m_iMaxJoinUser;
+		int m_iMaxJoinUser;
 
 		// ¼­¹ö °¡µ¿ ¿©ºÎ. true¸é ÀÛµ¿Áß / false¸é ÀÛµ¿Áß ¾Æ´Ô
 		bool m_bServerLife;
@@ -108,7 +94,7 @@ namespace Library_Jingyu
 		// ----------------------
 		// private ÇÔ¼öµé
 		// ----------------------
-		
+
 		// ¹Ì»ç¿ë ¼¼¼Ç °ü¸® ½ºÅÃ¿¡ Exclusive ¶ô °É±â, ¶ô Ç®±â
 		void LockStack_Exclusive_Func();
 		void UnlockStack_Exclusive_Func();

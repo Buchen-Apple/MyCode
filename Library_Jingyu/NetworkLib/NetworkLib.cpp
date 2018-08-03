@@ -8,58 +8,41 @@
 #include <strsafe.h>
 
 #include "NetworkLib.h"
+#include "CrashDump\CrashDump.h"
 #include "RingBuff\RingBuff.h"
 #include "Log\Log.h"
-#include "CrashDump\CrashDump.h"
 
 
-<<<<<<< HEAD
-LONG g_llPacketAllocCount = 0;
-=======
 #include <mmsystem.h>
 #pragma comment(lib,"winmm.lib")
 
-<<<<<<< HEAD
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+
+LONG g_llPacketAllocCount = 0;
 
 
 namespace Library_Jingyu
 {
 	// ·Î±× ÂïÀ» Àü¿ªº¯¼ö ÇÏ³ª ¹Þ±â.
-	CSystemLog* cNetLibLog = CSystemLog::GetInstance();	
+	CSystemLog* cNetLibLog = CSystemLog::GetInstance();
 
 	// ´ýÇÁ ³²±æ º¯¼ö ÇÏ³ª ¹Þ±â
 	CCrashDump* cNetDump = CCrashDump::GetInstance();
 
+	// ÆÐÅ¶ µ¿ÀûÇÒ´ç, ÇØÁ¦ Ä«¿îÆ®
+	LONGLONG g_PacketAllocCount = 0;
+
 
 	// Çì´õ »çÀÌÁî
-	#define dfNETWORK_PACKET_HEADER_SIZE	2
+#define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// ÇÑ ¹ø¿¡ »÷µåÇÒ ¼ö ÀÖ´Â WSABUFÀÇ Ä«¿îÆ®
-	#define dfSENDPOST_MAX_WSABUF			100
-<<<<<<< HEAD
-<<<<<<< HEAD
-	
-	void PacketAllocCountAdd()
-	{
-		InterlockedIncrement(&g_llPacketAllocCount);
-	}
+#define dfSENDPOST_MAX_WSABUF			100
 
-	LONG PacketAllocCountSub()
-	{
-		return InterlockedDecrement(&g_llPacketAllocCount);
-	}
 
-	LONG PacketAllocCount_Get()
-	{
-		return g_llPacketAllocCount;
-	}
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+
+
+
+
 
 
 	// ------------------------------
@@ -79,13 +62,13 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__SOCKOPT_FAIL,				// ¼ÒÄÏ ¿É¼Ç º¯°æ ½ÇÆÐ
 		NETWORK_LIB_ERROR__IOCP_ERROR,					// IOCP ÀÚÃ¼ ¿¡·¯
 		NETWORK_LIB_ERROR__NOT_FIND_CLINET,				// map °Ë»ö µîÀ» ÇÒ¶§ Å¬¶óÀÌ¾ðÆ®¸¦ ¸øÃ£Àº°æ¿ì.
-		NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL	,		// Enqueue»çÀÌÁî°¡ ²ËÂù À¯Àú
+		NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL,		// Enqueue»çÀÌÁî°¡ ²ËÂù À¯Àú
 		NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY,			// Dequeue ½Ã, Å¥°¡ ºñ¾îÀÖ´Â À¯Àú. PeekÀ» ½ÃµµÇÏ´Âµ¥ Å¥°¡ ºñ¾úÀ» »óÈ²Àº ¾øÀ½
 		NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost¿¡¼­ WSASend ½ÇÆÐ
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv½Ã ¹öÆÛ»çÀÌÁî ºÎÁ·
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv ¿Ï·áÅëÁö°¡ ¿Ô´Âµ¥, ¸®½Ãºê ¹öÆÛ°¡ ºñ¾îÀÖ´Ù°í ³ª¿À´Â À¯Àú.
-		NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// ¿¢¼ÁÆ® ½º·¹µå ºñÁ¤»ó Á¾·á. º¸Åë accept()ÇÔ¼ö¿¡¼­ ÀÌ»óÇÑ ¿¡·¯°¡ ³ª¿Â°Í.
-		NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// ¿öÄ¿ ½º·¹µå ºñÁ¤»ó Á¾·á. 
+		NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT,		// ¿¢¼ÁÆ® ½º·¹µå ºñÁ¤»ó Á¾·á. º¸Åë accept()ÇÔ¼ö¿¡¼­ ÀÌ»óÇÑ ¿¡·¯°¡ ³ª¿Â°Í.
+		NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT,		// ¿öÄ¿ ½º·¹µå ºñÁ¤»ó Á¾·á. 
 		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject ¿¡·¯.
 		NETWORK_LIB_ERROR__IOCP_IO_FAIL					// IOCP¿¡¼­ I/O ½ÇÆÐ ¿¡·¯. ÀÌ ¶§´Â, ÀÏÁ¤ È½¼ö´Â I/O¸¦ Àç½ÃµµÇÑ´Ù.
 	};
@@ -104,7 +87,7 @@ namespace Library_Jingyu
 
 		// Send°¡´É »óÅÂÀÎÁö Ã¼Å©. 1ÀÌ¸é SendÁß, 0ÀÌ¸é SendÁß ¾Æ´Ô
 		LONG	m_lSendFlag;
-		
+
 		// I/O°¡ ¿ÜºÎÀûÀÎ ¿äÀÎ(¹°¸®ÀûÀÎ ¿¬°á ¿¡·¯¶ó´ø°¡..)À¸·Î ½ÇÆÐÇßÀ» ¶§ ¾à 5È¸Á¤µµ Àç½Ãµµ ÇØº»´Ù. 
 		// ÀÌ ½ÃµµÇÑ È½¼ö¸¦ ÀúÀåÇÒ º¯¼ö. ½ÇÆÐÇÒ ¶§ ¸¶´Ù 1¾¿ Áõ°¡ÇÏ´Ù°¡, 5°¡µÇ¸é ´õ ÀÌ»ó Á¢¼Ó½Ãµµ ¾ÈÇÔ
 		// I/O°¡ ¼º°øÇÏ¸é ±× Áï½Ã 0ÀÌµÈ´Ù.
@@ -118,8 +101,8 @@ namespace Library_Jingyu
 		ULONGLONG m_lIndex;
 
 		// ÇöÀç, WSASend¿¡ ¸î °³ÀÇ µ¥ÀÌÅÍ¸¦ »÷µåÇß´Â°¡. (¹ÙÀÌÆ® ¾Æ´Ô! Ä«¿îÆ®. ÁÖÀÇ!)
-		long m_iWSASendCount;
-		
+		int m_iWSASendCount;
+
 		// SendPost¿¡¼­ »÷µå¸¦ ÇÑ µ¥ÀÌÅÍÀÇ Æ÷ÀÎÅÍµé ¹è¿­
 		CProtocolBuff* m_cpbufSendPayload[dfSENDPOST_MAX_WSABUF];
 
@@ -131,7 +114,7 @@ namespace Library_Jingyu
 
 		// »ý¼ºÀÚ
 		stSession()
-		{			
+		{
 			m_lIOCount = 0;
 			m_lSendFlag = 0;
 			m_lIndex = 0;
@@ -154,7 +137,7 @@ namespace Library_Jingyu
 		// ÇÊ¿ä¾ø¾îÁü
 		//~stSession() {}
 
-	
+
 	};
 
 	// ¹Ì»ç¿ë ÀÎµ¦½º °ü¸® ±¸Á¶Ã¼(½ºÅÃ)
@@ -180,7 +163,7 @@ namespace Library_Jingyu
 				return 10000000;
 
 			// ºó ÀÎµ¦½º°¡ ÀÖÀ¸¸é, m_iTopÀ» °¨¼Ò ÈÄ ÀÎµ¦½º ¸®ÅÏ.
-			m_iTop--;			
+			m_iTop--;
 
 			return m_iArray[m_iTop];
 		}
@@ -234,11 +217,12 @@ namespace Library_Jingyu
 	// return false : ¿¡·¯ ¹ß»ý ½Ã. ¿¡·¯ÄÚµå ¼ÂÆÃ ÈÄ false ¸®ÅÏ
 	// return true : ¼º°ø
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
-	{		
+	{
+		timeBeginPeriod(1);
 
 		// »õ·Î ½ÃÀÛÇÏ´Ï±î ¿¡·¯ÄÚµåµé ÃÊ±âÈ­
 		m_iOSErrorCode = 0;
-		m_iMyErrorCode = (euError)0;		
+		m_iMyErrorCode = (euError)0;
 
 		// À©¼Ó ÃÊ±âÈ­
 		WSADATA wsa;
@@ -253,9 +237,9 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)", 
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
-		
+
 			// false ¸®ÅÏ
 			return false;
 		}
@@ -274,7 +258,7 @@ namespace Library_Jingyu
 			// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
-		
+
 			// false ¸®ÅÏ
 			return false;
 		}
@@ -298,7 +282,7 @@ namespace Library_Jingyu
 				// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
 				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
-			
+
 				// false ¸®ÅÏ
 				return false;
 			}
@@ -321,7 +305,7 @@ namespace Library_Jingyu
 
 			// false ¸®ÅÏ
 			return false;
-		
+
 		}
 
 		// ¹ÙÀÎµù
@@ -356,7 +340,7 @@ namespace Library_Jingyu
 			// À©µµ¿ì ¿¡·¯, ³» ¿¡·¯ º¸°ü
 			m_iOSErrorCode = WSAGetLastError();
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__LISTEN_FAIL;
-		
+
 			// °¢Á¾ ÇÚµé ¹ÝÈ¯ ¹× µ¿ÀûÇØÁ¦ ÀýÂ÷.
 			ExitFunc(m_iW_ThreadCount);
 
@@ -445,10 +429,10 @@ namespace Library_Jingyu
 			}
 		}
 
-		
+
 
 		// ¼­¹ö ¿­·ÈÀ½ !!
-		m_bServerLife = true;		
+		m_bServerLife = true;
 
 		// ¼­¹ö ¿ÀÇÂ ·Î±× Âï±â		
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -458,7 +442,8 @@ namespace Library_Jingyu
 
 	// ¼­¹ö ½ºÅ¾.
 	void CLanServer::Stop()
-	{	
+	{
+		timeEndPeriod(1);
 
 		// 1. Accept ½º·¹µå Á¾·á. ´õ ÀÌ»ó Á¢¼ÓÀ» ¹ÞÀ¸¸é ¾ÈµÇ´Ï Accept½º·¹µå ¸ÕÀú Á¾·á
 		// Accept ½º·¹µå´Â ¸®½¼¼ÒÄÏÀ» closesocketÇÏ¸é µÈ´Ù.
@@ -493,8 +478,8 @@ namespace Library_Jingyu
 		// ¸ðµç À¯Àú¿¡°Ô ¼Ë´Ù¿î ³¯¸²
 		for (int i = 0; i < m_iMaxJoinUser; ++i)
 		{
-			if(m_stSessionArray[i].m_lUseFlag == TRUE)
-				shutdown(m_stSessionArray[i].m_Client_sock, SD_BOTH);				
+			if (m_stSessionArray[i].m_lUseFlag == TRUE)
+				shutdown(m_stSessionArray[i].m_Client_sock, SD_BOTH);
 		}
 
 		// ¸ðµç À¯Àú°¡ Á¾·áµÇ¾ú´ÂÁö Ã¼Å©
@@ -520,13 +505,13 @@ namespace Library_Jingyu
 			// ¿¡·¯ °ªÀÌ WAIT_FAILEDÀÏ °æ¿ì, GetLastError()·Î È®ÀÎÇØ¾ßÇÔ.
 			if (retval == WAIT_FAILED)
 				m_iOSErrorCode = GetLastError();
-			
+
 			// ±×°Ô ¾Æ´Ï¶ó¸é ¸®ÅÏ°ª¿¡ ÀÌ¹Ì ¿¡·¯°¡ µé¾îÀÖÀ½.
 			else
 				m_iOSErrorCode = retval;
 
 			// ³» ¿¡·¯ ¼ÂÆÃ
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT;
 
 			// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
@@ -538,7 +523,7 @@ namespace Library_Jingyu
 
 		// 4. °¢Á¾ ¸®¼Ò½º ¹ÝÈ¯
 		// 1) ¿¢¼ÁÆ® ½º·¹µå ÇÚµé ¹ÝÈ¯
-		for(int i=0; i<m_iA_ThreadCount; ++i)
+		for (int i = 0; i<m_iA_ThreadCount; ++i)
 			CloseHandle(m_hAcceptHandle[i]);
 
 		// 2) ¿öÄ¿ ½º·¹µå ÇÚµé ¹ÝÈ¯
@@ -557,7 +542,7 @@ namespace Library_Jingyu
 
 		// 6) ¼¼¼Ç ¹è¿­, ¼¼¼Ç ¹Ì»ç¿ë ÀÎµ¦½º °ü¸® ½ºÅÃ µ¿ÀûÇØÁ¦
 		delete[] m_stSessionArray;
-		delete[] m_stEmptyIndexStack;
+		delete m_stEmptyIndexStack;
 
 		// 5. ¼­¹ö °¡µ¿Áß ¾Æ´Ô »óÅÂ·Î º¯°æ
 		m_bServerLife = false;
@@ -566,15 +551,7 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. ¼­¹ö Á¾·á ·Î±× Âï±â		
-<<<<<<< HEAD
-<<<<<<< HEAD
 		_tprintf_s(L"PacketCount : [%d]\n", g_llPacketAllocCount);
-
-		//g_llPacketAllocCount = 0;
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
@@ -595,13 +572,12 @@ namespace Library_Jingyu
 			// À¯Àú°¡ È£ÃâÇÑ ÇÔ¼ö´Â, ¿¡·¯ È®ÀÎÀÌ °¡´ÉÇÏ±â ¶§¹®¿¡ OnErrorÇÔ¼ö È£Ãâ ¾ÈÇÔ.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
-			// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-			// ÇÊ¿äÇÏ¸é Âï´Â´Ù. Áö±Ý ¾Æ·¡ÀÖ´Â°Ç °ú°Å¿¡ ¾²´ø°Å
-			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
+			// ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet :  NetError(%d)", (int)m_iMyErrorCode);
 
 			return false;
-		}		
-	
+		}
+
 		// 3. Çì´õ¸¦ ³Ö¾î¼­, ÆÐÅ¶ ¿Ï¼ºÇÏ±â
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
@@ -620,12 +596,12 @@ namespace Library_Jingyu
 
 			// ÇØ´ç À¯Àú´Â Á¢¼ÓÀ» ²÷´Â´Ù.
 			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
-			
+
 			return false;
-		}		
+		}
 
 		// 4. SendPost½Ãµµ
-		bool Check = SendPost(&m_stSessionArray[wArrayIndex]);		
+		bool Check = SendPost(&m_stSessionArray[wArrayIndex]);
 
 		return Check;
 	}
@@ -640,14 +616,14 @@ namespace Library_Jingyu
 		// 1. ClinetID·Î ¼¼¼ÇÀÇ Index ¾Ë¾Æ¿À±â
 		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 
-		// 2. ³»°¡ Ã£´ø À¯Àú°¡ ¾Æ´Ï°Å³ª, ¹Ì»ç¿ë ¹è¿­ÀÌ¸é ¹º°¡ Àß¸øµÈ °ÍÀÌ´Ï false ¸®ÅÏ
-		if (m_stSessionArray[wArrayIndex].m_lIndex != wArrayIndex || m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
+		// 2. ¹Ì»ç¿ë ¹è¿­ÀÌ¸é ¹º°¡ Àß¸øµÈ °ÍÀÌ´Ï false ¸®ÅÏ
+		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
 		{
 			// ³» ¿¡·¯ ³²±è. (À©µµ¿ì ¿¡·¯´Â ¾øÀ½)
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
-			// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet : NetError(%d)", (int)m_iMyErrorCode);
+			// ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet : NetError(%d)", (int)m_iMyErrorCode);
 
 			return false;
 		}
@@ -685,7 +661,7 @@ namespace Library_Jingyu
 	{
 		return m_bServerLife;
 	}
-	
+
 
 
 
@@ -696,10 +672,10 @@ namespace Library_Jingyu
 	// -----------------------------
 	// »ý¼ºÀÚ
 	CLanServer::CLanServer()
-	{	
+	{
 		// ·Î±× ÃÊ±âÈ­
 		cNetLibLog->SetDirectory(L"LanServer");
-		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_DEBUG);
+		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_ERROR);
 
 		// ¼­¹ö °¡µ¿»óÅÂ false·Î ½ÃÀÛ 
 		m_bServerLife = false;
@@ -712,7 +688,7 @@ namespace Library_Jingyu
 	CLanServer::~CLanServer()
 	{
 		// ¼­¹ö°¡ °¡µ¿ÁßÀÌ¾úÀ¸¸é, »óÅÂ¸¦ false ·Î ¹Ù²Ù°í, ¼­¹ö Á¾·áÀýÂ÷ ÁøÇà
-		if (m_bServerLife == true )
+		if (m_bServerLife == true)
 		{
 			m_bServerLife = false;
 			Stop();
@@ -721,142 +697,70 @@ namespace Library_Jingyu
 
 	// ½ÇÁ¦·Î Á¢¼ÓÁ¾·á ½ÃÅ°´Â ÇÔ¼ö
 	void CLanServer::InDisconnect(stSession* DeleteSession)
-<<<<<<< HEAD
-	{	
-=======
 	{
+		DeleteSession->m_lUseFlag = FALSE;
 
 		int TempCount = DeleteSession->m_iWSASendCount;
-		DeleteSession->m_iWSASendCount = 0;  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+		//DeleteSession->m_iWSASendCount = 0;  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.
 
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
-
-		OnClientLeave(sessionID);
-
-		int TempCount = DeleteSession->m_iWSASendCount;
-		InterlockedExchange(&DeleteSession->m_iWSASendCount, 0);  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.		
 
 		// º¸³½ Ä«¿îÆ®°¡ ÀÖÀ¸¸é ¸ðµÎ µ¿ÀûÇØÁ¦ ÇÑ´Ù.
 		if (TempCount > 0)
 		{
-<<<<<<< HEAD
-<<<<<<< HEAD
-			for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
-=======
 			for (int i = 0; i < TempCount; ++i)
-<<<<<<< HEAD
->>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 			{
 				delete DeleteSession->m_cpbufSendPayload[i];
-				PacketAllocCountSub();
+				InterlockedDecrement(&g_llPacketAllocCount);
 			}
-		}			
+		}
 
 		// »÷µå Å¥¿¡ µ¥ÀÌÅÍ°¡ ÀÖÀ¸¸é µ¿ÀûÇØÁ¦ ÇÑ´Ù.
-		CProtocolBuff* Payload[1024];
 		int UseSize = DeleteSession->m_SendQueue.GetUseSize();
-		int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, UseSize);
 
-		DequeueSize = DequeueSize / 8;
-
-		if (DequeueSize != UseSize / 8)
+		while (UseSize > 0)
 		{
-			// ¿¡·¯ ·Î±× Âï±â
-			// ·Î±× Âï±â(·Î±× ·¹º§ : ¿¡·¯)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). DequeueSize, UseSize Not SAME! : Rear(%d), Front(%d)",
-				DequeueSize, UseSize / 8);
-		}
+			int TempSize;
 
-		// ²¨³½ Dequeue¸¸Å­ µ¹¸é¼­ »èÁ¦ÇÑ´Ù.
-		for (int i = 0; i < DequeueSize; ++i)
-		{
-			delete Payload[i];
-			if (PacketAllocCountSub() != 0)
+			if (UseSize > 8000)
+				int TempSize = 8000;
+			else
+				TempSize = UseSize;
+
+			// UseSize »çÀÌÁî ¸¸Å­ µðÅ¥
+			CProtocolBuff* Payload[1000];
+			int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, TempSize);
+
+			// ²¨³½ ¼ö ¸¸Å­ UseSize ÁÙÀÓ. ´ÙÀ½ ÀýÂ÷¸¦ À§ÇØ.
+			UseSize -= DequeueSize;
+
+			DequeueSize = DequeueSize / 8;
+
+			// ²¨³½ Dequeue¸¸Å­ µ¹¸é¼­ »èÁ¦ÇÑ´Ù.
+			for (int i = 0; i < DequeueSize; ++i)
 			{
-				// ¿¡·¯ ·Î±× Âï±â
-				// ·Î±× Âï±â(·Î±× ·¹º§ : ¿¡·¯)
-				//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). PacketAllocCount Not 0 : %d",
-				//	g_llPacketAllocCount);
+				delete Payload[i];
+				InterlockedDecrement(&g_llPacketAllocCount);
 			}
 		}
 
-
-
-		//int UseSize = DeleteSession->m_SendQueue.GetUseSize();
-
-		//while (UseSize > 0)
-		//{
-		//	int Temp = UseSize;
-
-		//	if (Temp > 8000)
-		//		Temp = 8000;
-
-		//	// UseSize »çÀÌÁî ¸¸Å­ µðÅ¥
-		//	CProtocolBuff* Payload[1000];
-		//	int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, Temp);
-
-		//	UseSize -= DequeueSize;
-
-		//	DequeueSize = DequeueSize / 8;
-
-		//	// ²¨³½ Dequeue¸¸Å­ µ¹¸é¼­ »èÁ¦ÇÑ´Ù.
-		//	for (int i = 0; i < DequeueSize; ++i)
-		//	{
-		//		delete Payload[i];
-		//		PacketAllocCountSub();
-		//	}
-		//}
-
-		int* RearValue = (int*)DeleteSession->m_SendQueue.GetWriteBufferPtr();
-		int* FrontValue = (int*)DeleteSession->m_SendQueue.GetReadBufferPtr();
-
-		if (*RearValue != *FrontValue)
-		{
-			// ¿¡·¯ ·Î±× Âï±â
-			// ·Î±× Âï±â(·Î±× ·¹º§ : ¿¡·¯)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"InDisconnect(). Rear, Front Not SAME! : Rear(%d), Front(%d)",
-				RearValue, FrontValue);
-		}
-
-		// ¸®¼Â
-		DeleteSession->Reset_Func();
-
 		// Å¬·ÎÁî ¼ÒÄÏ
-		closesocket(DeleteSession->m_Client_sock);		
-=======
-			for (int i = 0; i < TempCount; ++i)
-				delete DeleteSession->m_cpbufSendPayload[i];			
-		}	
-
-		DeleteSession->m_lUseFlag = FALSE;
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-
-=======
-				delete DeleteSession->m_cpbufSendPayload[i];			
-		}	
-
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-		DeleteSession->m_lUseFlag = FALSE;
+		closesocket(DeleteSession->m_Client_sock);
 
 		// ¹Ì»ç¿ë ÀÎµ¦½º ½ºÅÃ¿¡ ¹Ý³³
 		Lock_Exclusive_Stack();
 		if (m_stEmptyIndexStack->Push(DeleteSession->m_lIndex) == false)
 		{
-			// ¿¡·¯ ·Î±× Âï±â
-			// ·Î±× Âï±â(·Î±× ·¹º§ : µð¹ö±×)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"InDisconnect(). Stack_Index_Full! : NowJoinUser(%d), MaxUser(%d)",
-				m_ullJoinUserCount, m_iMaxJoinUser);
+			printf("IndexStackFull!!!!!\n");
 		}
 		Unlock_Exclusive_Stack();
 
-		// Å¬·ÎÁî ¼ÒÄÏ
-		closesocket(DeleteSession->m_Client_sock);
+
 
 		// À¯Àú ¼ö °¨¼Ò
-		InterlockedDecrement(&m_ullJoinUserCount);	
+		InterlockedDecrement(&m_ullJoinUserCount);
 
-		
+		OnClientLeave(sessionID);
 		return;
 	}
 
@@ -986,37 +890,25 @@ namespace Library_Jingyu
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
 				// 1. »÷µå ¿Ï·áµÆ´Ù°í ÄÁÅÙÃ÷¿¡ ¾Ë·ÁÁÜ
-				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);			
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
 				// 2. º¸³Â´ø Á÷·ÄÈ­¹öÆÛ »èÁ¦
-				int TempCount = stNowSession->m_iWSASendCount;
-				InterlockedExchange(&stNowSession->m_iWSASendCount, 0);  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.
+				int TempCount = stNowSession->m_iWSASendCount;			
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-				for (int i = 0; i < dfSENDPOST_MAX_WSABUF; ++i)
-=======
 				for (int i = 0; i < TempCount; ++i)
-<<<<<<< HEAD
->>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
 				{
 					delete stNowSession->m_cpbufSendPayload[i];
-					PacketAllocCountSub();
+					InterlockedDecrement(&g_llPacketAllocCount);
 				}
-=======
-				for (int i = 0; i < TempCount; ++i)
-					delete stNowSession->m_cpbufSendPayload[i];		
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
-					delete stNowSession->m_cpbufSendPayload[i];		
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+
+				stNowSession->m_iWSASendCount = 0;  // º¸³½ Ä«¿îÆ® 0À¸·Î ¸¸µë.
 
 				// 4. »÷µå °¡´É »óÅÂ·Î º¯°æ
 				InterlockedExchange(&stNowSession->m_lSendFlag, FALSE);
 
 				// 5. ´Ù½Ã »÷µå ½Ãµµ. false°¡ ¸®ÅÏµÇ¸é Á¾·áµÈ À¯ÀúÀÌ´Ï ´Ù½Ã À§·Î ¿Ã¶ó°£´Ù.
 				if (g_This->SendPost(stNowSession) == false)
-					continue;				
+					continue;
 			}
 
 			// -----------------
@@ -1064,17 +956,17 @@ namespace Library_Jingyu
 				// ±×°Ô ¾Æ´Ï¶ó¸é OnError ÇÔ¼ö È£Ãâ
 				// À©µµ¿ì ¿¡·¯, ³» ¿¡·¯ º¸°ü
 				g_This->m_iOSErrorCode = Error;
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
 
 				// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abnormal_exit : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// ¿¡·¯ ¹ß»ý ÇÔ¼ö È£Ãâ
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abnormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
-			}	
+			}
 
 			// ------------------
 			// ÃÖ´ë Á¢¼ÓÀÚ ¼ö ÀÌ»ó Á¢¼Ó ºÒ°¡
@@ -1082,20 +974,13 @@ namespace Library_Jingyu
 			if (g_This->m_iMaxJoinUser <= g_This->m_ullJoinUserCount)
 			{
 				closesocket(client_sock);
-<<<<<<< HEAD
-<<<<<<< HEAD
 
-				// ¿¡·¯ ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User_Max... : NowJoinUser(%d), MaxUser(%d)",
-					g_This->m_ullJoinUserCount, g_This->m_iMaxJoinUser);
-
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+				// ·Î±× Âï±â(·Î±× ·¹º§ : µð¹ö±×)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 				continue;
 			}
-				
+
 
 
 			// ------------------
@@ -1129,16 +1014,15 @@ namespace Library_Jingyu
 			{
 				g_This->Unlock_Exclusive_Stack(); // ¹Ì»ç¿ë ÀÎµ¦½º ½ºÅÃ ¶ô ÇØÁ¦ -----------
 
-				// ¿¡·¯ ·Î±× Âï±â
-				// ·Î±× Âï±â(·Î±× ·¹º§ : µð¹ö±×)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Stack_Index_Empty... : NowJoinUser(%d), MaxUser(%d)",
-					g_This->m_ullJoinUserCount, g_This->m_iMaxJoinUser);
+												  // ¿¡·¯ Âï±â (OnError È£Ãâ)
+				printf("Stack_Index_Full!!\n");
+				g_This->Unlock_Exclusive_Stack(); // ¹Ì»ç¿ë ÀÎµ¦½º ½ºÅÃ ¶ô ÇØÁ¦ -----------
 
 				break;
 			}
 			g_This->Unlock_Exclusive_Stack(); // ¹Ì»ç¿ë ÀÎµ¦½º ½ºÅÃ ¶ô ÇØÁ¦ -----------
 
-			// 2) ÇØ´ç ¼¼¼Ç ¹è¿­, »ç¿ëÁßÀ¸·Î º¯°æ
+											  // 2) ÇØ´ç ¼¼¼Ç ¹è¿­, »ç¿ëÁßÀ¸·Î º¯°æ
 			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
 
 			// 3) ÃÊ±âÈ­ÇÏ±â
@@ -1153,10 +1037,12 @@ namespace Library_Jingyu
 			// -- IP¿Í Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
-			
+
 			// -- SendFlag, I/OÄ«¿îÆ®, Å¥ ÃÊ±âÈ­ ÃÊ±âÈ­
-			g_This->m_stSessionArray[iIndex].Reset_Func();			
-							
+			g_This->m_stSessionArray[iIndex].Reset_Func();
+
+			g_This->m_stSessionArray[iIndex].m_iWSASendCount = 0;
+
 
 
 
@@ -1168,18 +1054,18 @@ namespace Library_Jingyu
 			{
 				// À©µµ¿ì ¿¡·¯, ³» ¿¡·¯ º¸°ü
 				g_This->m_iOSErrorCode = WSAGetLastError();
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
 
-				// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				// ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// ¿¡·¯ ¹ß»ý ÇÔ¼ö È£Ãâ
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abonormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
 			}
-					
+
 			// Á¢¼ÓÀÚ ¼ö Áõ°¡. disconnect¿¡¼­µµ »ç¿ëµÇ´Â º¯¼öÀÌ±â ¶§¹®¿¡ ÀÎÅÍ¶ô »ç¿ë
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
 
@@ -1191,7 +1077,7 @@ namespace Library_Jingyu
 			g_This->m_stSessionArray[iIndex].m_lIOCount++; // I/OÄ«¿îÆ® ++. µé¾î°¡±âÀü¿¡ 1¿¡¼­ ½ÃÀÛ. ¾ÆÁ÷ recv,send ±× ¾î¶²°Íµµ ¾È°É¾ú±â ¶§¹®¿¡ ±×³É ++ÇØµµ ¾ÈÀü!
 			g_This->OnClientJoin(MixKey);
 
-			
+
 
 			// ------------------
 			// ºñµ¿±â ÀÔÃâ·Â ½ÃÀÛ
@@ -1202,7 +1088,7 @@ namespace Library_Jingyu
 			// I/OÄ«¿îÆ® --. 0ÀÌ¶ó¸é »èÁ¦Ã³¸®
 			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
-			
+
 		}
 
 		return 0;
@@ -1235,7 +1121,7 @@ namespace Library_Jingyu
 	// Á¶ÇÕµÈ Å°¸¦ ÀÔ·Â¹ÞÀ¸¸é, Index ¸®ÅÏÇÏ´Â ÇÔ¼ö
 	WORD CLanServer::GetSessionIndex(ULONGLONG MixKey)
 	{
-		return MixKey >> 48;		
+		return MixKey >> 48;
 	}
 
 	// Á¶ÇÕµÈ Å°¸¦ ÀÔ·Â¹ÞÀ¸¸é, ÁøÂ¥ ¼¼¼ÇÅ°¸¦ ¸®ÅÏÇÏ´Â ÇÔ¼ö.
@@ -1255,14 +1141,14 @@ namespace Library_Jingyu
 
 	// °¢Á¾ º¯¼öµéÀ» ¸®¼Â½ÃÅ²´Ù.
 	void CLanServer::Reset()
-	{	
+	{
 		m_iW_ThreadCount = 0;
 		m_iA_ThreadCount = 0;
 		m_hWorkerHandle = nullptr;
 		m_hIOCPHandle = 0;
 		m_soListen_sock = 0;
 		m_iMaxJoinUser = 0;
-		m_ullJoinUserCount = 0;				
+		m_ullJoinUserCount = 0;
 	}
 
 
@@ -1304,16 +1190,16 @@ namespace Library_Jingyu
 
 				// ¿¡·¯ ½ºÆ®¸µ ¸¸µé°í
 				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"), 
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-				// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+				// ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);
 
 				// ¿¡·¯ ÇÔ¼ö È£Ãâ
 				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
-			
+
 				// Á¢¼ÓÀÌ ²÷±æ À¯ÀúÀÌ´Ï ´õ´Â ¾Æ¹«°Íµµ ¾ÈÇÏ°í ¸®ÅÏ
 				return;
 			}
@@ -1421,7 +1307,7 @@ namespace Library_Jingyu
 
 				// ¿¡·¯°¡ ¹öÆÛ ºÎÁ·ÀÌ¶ó¸é, I/OÄ«¿îÆ® Â÷°¨ÀÌ ³¡ÀÌ ¾Æ´Ï¶ó ²÷¾î¾ßÇÑ´Ù.
 				if (Error == WSAENOBUFS)
-				{			
+				{
 					// ÀÏ´Ü ²÷¾î¾ßÇÏ´Ï ¼Ë´Ù¿î È£Ãâ
 					shutdown(NowSession->m_Client_sock, SD_BOTH);
 
@@ -1434,8 +1320,8 @@ namespace Library_Jingyu
 					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-					// ·Î±× Âï±â (·Î±× ·¹º§ : ¿¡·¯)
-					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					// ·Î±× Âï±â (·Î±× ·¹º§ : µð¹ö±×)
+					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// ¿¡·¯ ÇÔ¼ö È£Ãâ
@@ -1491,30 +1377,14 @@ namespace Library_Jingyu
 			// Send ÁØºñÇÏ±â
 			// ------------------
 			// 1. WSABUF ¼ÂÆÃ.
-			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];		
+			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];
 
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ
-=======
-			// 2. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
->>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
+			// 3. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
 			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
 			if (wsabufByte == -1)
-=======
-			// 3. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
-			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
-			if (wsabufCount == -1)
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-=======
-			// 3. ÇÑ ¹ø¿¡ 100°³ÀÇ Æ÷ÀÎÅÍ(ÃÑ 800¹ÙÀÌÆ®)¸¦ ²¨³»µµ·Ï ½Ãµµ			
-			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
-			if (wsabufCount == -1)
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
 			{
 				// Å¥°¡ ÅÖ ºñ¾îÀÖÀ½. À§¿¡¼­ ÀÖ´Ù°í ¿Ô´Âµ¥ ¿©±â¼­ ¾ø´Â°ÍÀº ÁøÂ¥ ¸»µµ¾ÈµÇ´Â ¿¡·¯!
 				// ³» ¿¡·¯º¸°ü
@@ -1540,33 +1410,16 @@ namespace Library_Jingyu
 
 				return false;
 			}
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-			NowSession->m_iWSASendCount = wsabufCount / 8;
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
+			int Temp = wsabufByte / 8;
 
-			if (0 != wsabufByte % 8)
+			// 4. ½ÇÁ¦·Î ²¨³½ Æ÷ÀÎÆ® ¼ö(¹ÙÀÌÆ® ¾Æ´Ô! ÁÖÀÇ)¸¸Å­ µ¹¸é¼­ WSABUF±¸Á¶Ã¼¿¡ ÇÒ´ç
+			for (int i = 0; i < Temp; i++)
 			{
-				int a = 0;
-			}
-
-			int iMax = wsabufByte / 8;
-			InterlockedExchange(&NowSession->m_iWSASendCount, iMax);
-=======
-			InterlockedExchange(&NowSession->m_iWSASendCount, wsabufByte / 8);
->>>>>>> parent of 8d940d8... ì„±ì¤€ì”¨ë²„ì „ ver 1
-=======
-			NowSession->m_iWSASendCount = wsabufCount / 8;
->>>>>>> parent of 4721bdb... 218-08-03 7ì°¨ê³¼ì œ ver 04
-
-			// 3. ½ÇÁ¦·Î ²¨³½ Æ÷ÀÎÆ® ¼ö(¹ÙÀÌÆ® ¾Æ´Ô! ÁÖÀÇ)¸¸Å­ µ¹¸é¼­ WSABUF±¸Á¶Ã¼¿¡ ÇÒ´ç
-			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
-			{				
 				wsabuf[i].buf = NowSession->m_cpbufSendPayload[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_cpbufSendPayload[i]->GetUseSize();
 			}
+
+			 NowSession->m_iWSASendCount = Temp;
 
 			// 4. Overlapped ±¸Á¶Ã¼ ÃÊ±âÈ­
 			ZeroMemory(&NowSession->m_overSendOverlapped, sizeof(NowSession->m_overSendOverlapped));
@@ -1576,13 +1429,13 @@ namespace Library_Jingyu
 			InterlockedIncrement(&NowSession->m_lIOCount);
 
 			// 6. ¿¡·¯ Ã³¸®
-			if (WSASend(NowSession->m_Client_sock, wsabuf, NowSession->m_iWSASendCount, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
+			if (WSASend(NowSession->m_Client_sock, wsabuf, Temp, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
 			{
 				int Error = WSAGetLastError();
 
 				// ºñµ¿±â ÀÔÃâ·ÂÀÌ ½ÃÀÛµÈ°Ô ¾Æ´Ï¶ó¸é
 				if (Error != WSA_IO_PENDING)
-				{	
+				{
 					// »÷µå Flag 0À¸·Î º¯°æ (»÷µå °¡´É»óÅÂ)
 					InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
 
@@ -1591,7 +1444,7 @@ namespace Library_Jingyu
 					{
 						InDisconnect(NowSession);
 						return false;
-					}					
+					}
 
 					// ¿¡·¯°¡ ¹öÆÛ ºÎÁ·ÀÌ¶ó¸é
 					if (Error == WSAENOBUFS)
@@ -1624,5 +1477,3 @@ namespace Library_Jingyu
 	}
 
 }
-
-
