@@ -13,11 +13,7 @@
 #include "CrashDump\CrashDump.h"
 
 
-#include <mmsystem.h>
-#pragma comment(lib,"winmm.lib")
-
-
-LONG g_llPacketAllocCount = 0;
+extern LONG g_llPacketAllocCount;
 
 
 namespace Library_Jingyu
@@ -217,8 +213,7 @@ namespace Library_Jingyu
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
-	{	
-		timeBeginPeriod(1);
+	{		
 
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
@@ -442,8 +437,7 @@ namespace Library_Jingyu
 
 	// 서버 스탑.
 	void CLanServer::Stop()
-	{
-		timeEndPeriod(1);
+	{	
 
 		// 1. Accept 스레드 종료. 더 이상 접속을 받으면 안되니 Accept스레드 먼저 종료
 		// Accept 스레드는 리슨소켓을 closesocket하면 된다.
@@ -741,6 +735,9 @@ namespace Library_Jingyu
 				InterlockedDecrement(&g_llPacketAllocCount);
 			}
 		}
+
+		// 리셋
+		DeleteSession->Reset_Func();
 
 		// 클로즈 소켓
 		closesocket(DeleteSession->m_Client_sock);		
