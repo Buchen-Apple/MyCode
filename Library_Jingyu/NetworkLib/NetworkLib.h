@@ -71,7 +71,7 @@ namespace Library_Jingyu
 		ULONGLONG m_ullJoinUserCount;
 
 		// 최대 접속 가능 유저 수
-		int m_iMaxJoinUser;
+		ULONGLONG m_iMaxJoinUser;
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;

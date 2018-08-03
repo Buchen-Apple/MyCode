@@ -67,8 +67,8 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
-		NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
-		NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT,		// 워커 스레드 비정상 종료. 
+		NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
+		NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// 워커 스레드 비정상 종료. 
 		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
 		NETWORK_LIB_ERROR__IOCP_IO_FAIL					// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
 	};
@@ -511,7 +511,7 @@ namespace Library_Jingyu
 				m_iOSErrorCode = retval;
 
 			// 내 에러 셋팅
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT;
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
@@ -675,7 +675,7 @@ namespace Library_Jingyu
 	{	
 		// 로그 초기화
 		cNetLibLog->SetDirectory(L"LanServer");
-		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_ERROR);
+		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_DEBUG);
 
 		// 서버 가동상태 false로 시작 
 		m_bServerLife = false;
@@ -720,12 +720,10 @@ namespace Library_Jingyu
 
 		while (UseSize > 0)
 		{
-			int TempSize;
+			int TempSize = UseSize;
 
 			if (UseSize > 8000)
-				int TempSize = 8000;
-			else
-				TempSize = UseSize;
+				TempSize = 8000;
 
 			// UseSize 사이즈 만큼 디큐
 			CProtocolBuff* Payload[1000];
@@ -751,7 +749,10 @@ namespace Library_Jingyu
 		Lock_Exclusive_Stack();
 		if (m_stEmptyIndexStack->Push(DeleteSession->m_lIndex) == false)
 		{
-			printf("IndexStackFull!!!!!\n");
+			// 에러 로그 찍기
+			// 로그 찍기(로그 레벨 : 디버그)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"InDisconnect(). Stack_Index_Full! : NowJoinUser(%d), MaxUser(%d)",
+				m_ullJoinUserCount, m_iMaxJoinUser);
 		}
 		Unlock_Exclusive_Stack();
 
@@ -955,14 +956,14 @@ namespace Library_Jingyu
 				// 그게 아니라면 OnError 함수 호출
 				// 윈도우 에러, 내 에러 보관
 				g_This->m_iOSErrorCode = Error;
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abnormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abnormal_exit");
 
 				break;
 			}	
@@ -974,9 +975,10 @@ namespace Library_Jingyu
 			{
 				closesocket(client_sock);
 
-				// 로그 찍기(로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
-				(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
+				// 에러 로그 찍기 (로그 레벨 : 디버그)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User_Max... : NowJoinUser(%d), MaxUser(%d)",
+					g_This->m_ullJoinUserCount, g_This->m_iMaxJoinUser);
+
 				continue;
 			}
 				
@@ -1013,9 +1015,10 @@ namespace Library_Jingyu
 			{
 				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
-				// 에러 찍기 (OnError 호출)
-				printf("Stack_Index_Full!!\n");
-				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
+				// 에러 로그 찍기
+				// 로그 찍기(로그 레벨 : 디버그)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Stack_Index_Empty... : NowJoinUser(%d), MaxUser(%d)",
+					g_This->m_ullJoinUserCount, g_This->m_iMaxJoinUser);
 
 				break;
 			}
@@ -1051,14 +1054,14 @@ namespace Library_Jingyu
 			{
 				// 윈도우 에러, 내 에러 보관
 				g_This->m_iOSErrorCode = WSAGetLastError();
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 디버그)
 				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
 			}
