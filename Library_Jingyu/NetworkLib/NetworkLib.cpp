@@ -17,6 +17,8 @@
 #pragma comment(lib,"winmm.lib")
 
 
+LONG g_llPacketAllocCount = 0;
+
 
 namespace Library_Jingyu
 {
@@ -26,12 +28,21 @@ namespace Library_Jingyu
 	// 덤프 남길 변수 하나 받기
 	CCrashDump* cNetDump = CCrashDump::GetInstance();
 
+	// 패킷 동적할당, 해제 카운트
+	LONGLONG g_PacketAllocCount = 0;
+
 
 	// 헤더 사이즈
 	#define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
 	#define dfSENDPOST_MAX_WSABUF			100
+
+
+	
+
+	
+
 
 
 	// ------------------------------
@@ -226,7 +237,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)", 
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 		
 			// false 리턴
@@ -531,7 +542,7 @@ namespace Library_Jingyu
 
 		// 6) 세션 배열, 세션 미사용 인덱스 관리 스택 동적해제
 		delete[] m_stSessionArray;
-		delete[] m_stEmptyIndexStack;
+		delete m_stEmptyIndexStack;
 
 		// 5. 서버 가동중 아님 상태로 변경
 		m_bServerLife = false;
@@ -540,6 +551,7 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. 서버 종료 로그 찍기		
+		_tprintf_s(L"PacketCount : [%d]\n", g_llPacketAllocCount);
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
@@ -560,9 +572,8 @@ namespace Library_Jingyu
 			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
-			// 로그 찍기 (로그 레벨 : 에러)
-			// 필요하면 찍는다. 지금 아래있는건 과거에 쓰던거
-			//cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
+			// 로그 찍기 (로그 레벨 : 디버그)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet :  NetError(%d)",(int)m_iMyErrorCode);
 
 			return false;
 		}		
@@ -605,14 +616,14 @@ namespace Library_Jingyu
 		// 1. ClinetID로 세션의 Index 알아오기
 		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 
-		// 2. 내가 찾던 유저가 아니거나, 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
-		if (m_stSessionArray[wArrayIndex].m_lIndex != wArrayIndex || m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
+		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
+		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
 		{
 			// 내 에러 남김. (윈도우 에러는 없음)
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
 
-			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Not Fine Clinet : NetError(%d)", (int)m_iMyErrorCode);
+			// 로그 찍기 (로그 레벨 : 디버그)
+			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet : NetError(%d)", (int)m_iMyErrorCode);
 
 			return false;
 		}
@@ -687,6 +698,7 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
+		DeleteSession->m_lUseFlag = FALSE;
 
 		int TempCount = DeleteSession->m_iWSASendCount;
 		DeleteSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
@@ -697,10 +709,43 @@ namespace Library_Jingyu
 		if (TempCount > 0)
 		{
 			for (int i = 0; i < TempCount; ++i)
-				delete DeleteSession->m_cpbufSendPayload[i];			
-		}	
+			{
+				delete DeleteSession->m_cpbufSendPayload[i];
+				InterlockedDecrement(&g_llPacketAllocCount);
+			}
+		}			
 
-		DeleteSession->m_lUseFlag = FALSE;
+		// 샌드 큐에 데이터가 있으면 동적해제 한다.
+		int UseSize = DeleteSession->m_SendQueue.GetUseSize();
+
+		while (UseSize > 0)
+		{
+			int TempSize;
+
+			if (UseSize > 8000)
+				int TempSize = 8000;
+			else
+				TempSize = UseSize;
+
+			// UseSize 사이즈 만큼 디큐
+			CProtocolBuff* Payload[1000];
+			int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, TempSize);
+
+			// 꺼낸 수 만큼 UseSize 줄임. 다음 절차를 위해.
+			UseSize -= DequeueSize;
+
+			DequeueSize = DequeueSize / 8;
+
+			// 꺼낸 Dequeue만큼 돌면서 삭제한다.
+			for (int i = 0; i < DequeueSize; ++i)
+			{
+				delete Payload[i];
+				InterlockedDecrement(&g_llPacketAllocCount);
+			}
+		}
+
+		// 클로즈 소켓
+		closesocket(DeleteSession->m_Client_sock);		
 
 		// 미사용 인덱스 스택에 반납
 		Lock_Exclusive_Stack();
@@ -710,8 +755,7 @@ namespace Library_Jingyu
 		}
 		Unlock_Exclusive_Stack();
 
-		// 클로즈 소켓
-		closesocket(DeleteSession->m_Client_sock);
+		
 
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);	
@@ -853,7 +897,10 @@ namespace Library_Jingyu
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
 
 				for (int i = 0; i < TempCount; ++i)
-					delete stNowSession->m_cpbufSendPayload[i];		
+				{
+					delete stNowSession->m_cpbufSendPayload[i];
+					InterlockedDecrement(&g_llPacketAllocCount);
+				}
 
 				// 4. 샌드 가능 상태로 변경
 				InterlockedExchange(&stNowSession->m_lSendFlag, FALSE);
@@ -926,6 +973,10 @@ namespace Library_Jingyu
 			if (g_This->m_iMaxJoinUser <= g_This->m_ullJoinUserCount)
 			{
 				closesocket(client_sock);
+
+				// 로그 찍기(로그 레벨 : 디버그)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 				continue;
 			}
 				
@@ -1002,8 +1053,8 @@ namespace Library_Jingyu
 				g_This->m_iOSErrorCode = WSAGetLastError();
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
 
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				// 로그 찍기 (로그 레벨 : 디버그)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
@@ -1139,8 +1190,8 @@ namespace Library_Jingyu
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"), 
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+				// 로그 찍기 (로그 레벨 : 디버그)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);
 
 				// 에러 함수 호출
@@ -1266,8 +1317,8 @@ namespace Library_Jingyu
 					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-					// 로그 찍기 (로그 레벨 : 에러)
-					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					// 로그 찍기 (로그 레벨 : 디버그)
+					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// 에러 함수 호출
@@ -1329,8 +1380,8 @@ namespace Library_Jingyu
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
 			// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도			
-			int wsabufCount = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
-			if (wsabufCount == -1)
+			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_cpbufSendPayload, UseSize));
+			if (wsabufByte == -1)
 			{
 				// 큐가 텅 비어있음. 위에서 있다고 왔는데 여기서 없는것은 진짜 말도안되는 에러!
 				// 내 에러보관
@@ -1356,7 +1407,7 @@ namespace Library_Jingyu
 
 				return false;
 			}
-			NowSession->m_iWSASendCount = wsabufCount / 8;
+			NowSession->m_iWSASendCount = wsabufByte / 8;
 
 			// 4. 실제로 꺼낸 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
 			for (int i = 0; i < NowSession->m_iWSASendCount; i++)
