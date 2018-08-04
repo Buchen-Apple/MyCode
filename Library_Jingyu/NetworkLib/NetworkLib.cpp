@@ -12,11 +12,6 @@
 #include "RingBuff\RingBuff.h"
 #include "Log\Log.h"
 
-
-#include <mmsystem.h>
-#pragma comment(lib,"winmm.lib")
-
-
 LONG g_llPacketAllocCount = 0;
 
 
@@ -36,7 +31,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
-#define dfSENDPOST_MAX_WSABUF			100
+#define dfSENDPOST_MAX_WSABUF			300
 
 
 
@@ -67,10 +62,11 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패
 		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
 		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
-		NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
-		NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT,		// 워커 스레드 비정상 종료. 
+		NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
+		NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// 워커 스레드 비정상 종료. 
 		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
-		NETWORK_LIB_ERROR__IOCP_IO_FAIL					// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
+		NETWORK_LIB_ERROR__IOCP_IO_FAIL,				// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
+		NETWORK_LIB_ERROR__JOIN_USER_FULL				// 유저가 풀이라서 더 이상 접속 못받음
 	};
 
 	// 세션 구조체
@@ -211,8 +207,6 @@ namespace Library_Jingyu
 	// return true : 성공
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
 	{
-		timeBeginPeriod(1);
-
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
 		m_iMyErrorCode = (euError)0;
@@ -436,8 +430,6 @@ namespace Library_Jingyu
 	// 서버 스탑.
 	void CLanServer::Stop()
 	{
-		timeEndPeriod(1);
-
 		// 1. Accept 스레드 종료. 더 이상 접속을 받으면 안되니 Accept스레드 먼저 종료
 		// Accept 스레드는 리슨소켓을 closesocket하면 된다.
 		closesocket(m_soListen_sock);
@@ -504,7 +496,7 @@ namespace Library_Jingyu
 				m_iOSErrorCode = retval;
 
 			// 내 에러 셋팅
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABONORMAL_EXIT;
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
@@ -691,7 +683,8 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
-		DeleteSession->m_lUseFlag = FALSE;	
+
+		DeleteSession->m_lUseFlag = FALSE;
 
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;		
 
@@ -939,14 +932,14 @@ namespace Library_Jingyu
 				// 그게 아니라면 OnError 함수 호출
 				// 윈도우 에러, 내 에러 보관
 				g_This->m_iOSErrorCode = Error;
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 에러)
 				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
 			}
@@ -959,8 +952,7 @@ namespace Library_Jingyu
 				closesocket(client_sock);
 
 				// 로그 찍기(로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
-					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User Full!!!!");
 				continue;
 			}
 
@@ -997,7 +989,7 @@ namespace Library_Jingyu
 			{
 				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
-												  // 에러 찍기 (OnError 호출)
+				// 에러 찍기 (OnError 호출)
 				printf("Stack_Index_Full!!\n");
 				g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
 
@@ -1034,14 +1026,14 @@ namespace Library_Jingyu
 			{
 				// 윈도우 에러, 내 에러 보관
 				g_This->m_iOSErrorCode = WSAGetLastError();
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
-				// 로그 찍기 (로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABONORMAL_EXIT, L"accpet(). Abonormal_exit");
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
 			}
@@ -1173,8 +1165,8 @@ namespace Library_Jingyu
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-				// 로그 찍기 (로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"%s, NetError(%d)",
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);
 
 				// 에러 함수 호출
@@ -1300,8 +1292,8 @@ namespace Library_Jingyu
 					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-					// 로그 찍기 (로그 레벨 : 디버그)
-					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					// 로그 찍기 (로그 레벨 : 에러)
+					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// 에러 함수 호출
@@ -1359,29 +1351,14 @@ namespace Library_Jingyu
 			// 1. WSABUF 셋팅.
 			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];			
 
-			//// 3. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도	
-			//int TempUseSize = NowSession->m_SendQueue.GetUseSize();
-
-			//if (TempUseSize > dfSENDPOST_MAX_WSABUF * 8)
-			//	TempUseSize = dfSENDPOST_MAX_WSABUF * 8;
-
-			//else if (TempUseSize > 8 && TempUseSize % 8 != 0)
-			//	TempUseSize = (TempUseSize / 8) * 8;
-
-			// // 3. 픽 구조
-			//CProtocolBuff* TempBuff[100];
-			//int wsabufByte = (NowSession->m_SendQueue.Peek((char*)TempBuff, TempUseSize));
-
-			
-
+			// 2. 한 번에 100개의 포인터(총 800바이트)를 꺼내도록 시도 (픽 구조)	
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
 			else if (UseSize > 8 && UseSize % 8 != 0)
 				UseSize = (UseSize / 8) * 8;
 
-			// 3. 픽 구조
-			CProtocolBuff* TempBuff[100];
+			CProtocolBuff* TempBuff[dfSENDPOST_MAX_WSABUF];
 			int wsabufByte = (NowSession->m_SendQueue.Peek((char*)TempBuff, UseSize));
 			if (wsabufByte == -1)
 			{
@@ -1409,6 +1386,7 @@ namespace Library_Jingyu
 
 				return false;
 			}
+
 			int Temp = wsabufByte / 8;
 
 			// 4. 실제로 픽 한 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
@@ -1435,9 +1413,6 @@ namespace Library_Jingyu
 				// 비동기 입출력이 시작된게 아니라면
 				if (Error != WSA_IO_PENDING)
 				{
-					// 샌드 Flag 0으로 변경 (샌드 가능상태)
-					InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
-
 					// IOcount 하나 감소. I/O 카운트가 0이라면 접속 종료.
 					if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 					{
