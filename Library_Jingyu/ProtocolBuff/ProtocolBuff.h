@@ -1,6 +1,8 @@
 #ifndef __PROTOCOL_BUFF_H__
 #define __PROTOCOL_BUFF_H__
 
+#include <Windows.h>
+
 namespace Library_Jingyu
 {
 	// Recv()패킷 처리 중, 예외 발생 시 던지는 예외클래스이다.
@@ -33,7 +35,7 @@ namespace Library_Jingyu
 		int m_Rear;
 
 		// 레퍼런스 카운트. 소멸 체크하는 카운트
-		static int m_RefCount;
+		LONG m_RefCount;
 
 	private:
 		// 초기화
@@ -95,17 +97,21 @@ namespace Library_Jingyu
 		}
 
 	public:
-		// static 함수들
+		// ------
+		// 레퍼런스 카운트 관련 함수
+		// ------
 
+		// static 함수 -----------
 		// Alloc. 현재는 이 안에서 new 후 레퍼런스 카운트 1 증가
-		static CProtocolBuff * Alloc();
+		static CProtocolBuff* Alloc();
 
 		// Free. 현재는 이 안에서 레퍼런스 카운트 1 감소.
 		// 만약, 레퍼런스 카운트가 0이라면 삭제함. delete 함
-		static void Free();
+		static void Free(CProtocolBuff* PBuff);
 
+		// 일반 함수 -----------
 		// 레퍼런스 카운트 1 Add하는 함수
-		static void Add();
+		void Add();
 	};
 
 

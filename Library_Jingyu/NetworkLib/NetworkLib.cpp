@@ -4,7 +4,6 @@
 #include <Ws2tcpip.h>
 
 #include <process.h>
-#include <Windows.h>
 #include <strsafe.h>
 
 #include "NetworkLib.h"
@@ -235,7 +234,7 @@ namespace Library_Jingyu
 		}
 
 		// 입출력 완료 포트 생성
-		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
+		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
 		if (m_hIOCPHandle == NULL)
 		{
 			// 윈도우 에러, 내 에러 보관
@@ -570,8 +569,8 @@ namespace Library_Jingyu
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
 		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
-		//void* payloadBuffAddr = payloadBuff;
-
+		// 직렬화 버퍼 레퍼런스 카운트 1 증가
+		payloadBuff->Add();
 		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuff, sizeof(void*));
 		if (EnqueueCheck == -1)
 		{
@@ -582,11 +581,17 @@ namespace Library_Jingyu
 			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
 				m_stSessionArray[wArrayIndex].m_IP, m_stSessionArray[wArrayIndex].m_prot, (int)m_iMyErrorCode);
 
+			// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 삭제도 한다.
+			CProtocolBuff::Free(payloadBuff);
+
 			// 해당 유저는 접속을 끊는다.
 			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
 
 			return false;
 		}
+
+		// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 삭제도 한다.
+		CProtocolBuff::Free(payloadBuff);
 
 		// 4. SendPost시도
 		bool Check = SendPost(&m_stSessionArray[wArrayIndex]);
@@ -715,7 +720,8 @@ namespace Library_Jingyu
 			// 꺼낸 Dequeue만큼 돌면서 삭제한다.
 			for (int i = 0; i < DequeueSize; ++i)
 			{
-				delete Payload[i];
+				CProtocolBuff::Free(Payload[i]);
+				//delete Payload[i];
 				InterlockedDecrement(&g_llPacketAllocCount);
 			}
 		}
@@ -875,7 +881,8 @@ namespace Library_Jingyu
 				// 꺼낸 Dequeue만큼 돌면서 삭제한다.
 				for (int i = 0; i < DequeueSize / 8; ++i)
 				{
-					delete TempBuff[i];
+					CProtocolBuff::Free(TempBuff[i]);
+					// delete TempBuff[i];
 					InterlockedDecrement(&g_llPacketAllocCount);
 				}
 

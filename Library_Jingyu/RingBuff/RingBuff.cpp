@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "RingBuff\RingBuff.h"
-#include <string.h>
 
 namespace Library_Jingyu
 {

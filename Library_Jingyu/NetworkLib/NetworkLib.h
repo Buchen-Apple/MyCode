@@ -2,7 +2,6 @@
 
 #define __NETWORK_LIB_H__
 #include <windows.h>
-#include <map>
 #include "ProtocolBuff\ProtocolBuff.h"
 
 using namespace std;
@@ -19,6 +18,18 @@ namespace Library_Jingyu
 	class CLanServer
 	{
 	private:
+
+
+		// 미사용 세션 관리 스택용 Exclusive 락 걸기, 풀기
+#define	Lock_Exclusive_Stack()		LockStack_Exclusive_Func()
+#define Unlock_Exclusive_Stack()	UnlockStack_Exclusive_Func()
+
+
+		// 세션 배열용 Shared  락 걸기, 풀기
+#define	Lock_Shared_Stack()		LockStack_Shared_Func()
+#define Unlock_Shared_Stack()	UnlockStack_Shared_Func()
+
+
 		// ----------------------
 		// private 구조체 or enum 전방선언
 		// ----------------------
@@ -76,18 +87,6 @@ namespace Library_Jingyu
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
-
-
-
-
-		// 미사용 세션 관리 스택용 Exclusive 락 걸기, 풀기
-#define	Lock_Exclusive_Stack()		LockStack_Exclusive_Func()
-#define Unlock_Exclusive_Stack()	UnlockStack_Exclusive_Func()
-
-
-		// 세션 배열용 Shared  락 걸기, 풀기
-#define	Lock_Shared_Stack()		LockStack_Shared_Func()
-#define Unlock_Shared_Stack()	UnlockStack_Shared_Func()
 
 
 	private:
