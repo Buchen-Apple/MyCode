@@ -1,2 +1,2 @@
 #TargetFrameworkVersion=v4.0:PlatformToolSet=v141:EnableManagedIncrementalBuild=false:VCToolArchitecture=Native32Bit:WindowsTargetPlatformVersion=10.0.17134.0
-Release|x64|C:\Git_Public\9_실무용 게임서버 프로그래밍\8차과제_최종_네트워크lib제작_직렬화버퍼 수정\Netlib\|
+Release|x64|C:\Git_Public\9_실무용 게임서버 프로그래밍\7차과제_최종_네트워크lib제작_맵과 세션락 제거\Netlib\|
