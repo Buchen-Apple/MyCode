@@ -4,6 +4,8 @@
 
 namespace Library_Jingyu
 {
+#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
+
 	// 사이즈 지정 안한 생성자 1
 	CRingBuff::CRingBuff(void)
 	{

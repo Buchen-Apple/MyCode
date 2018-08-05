@@ -17,6 +17,9 @@ LONG g_llPacketAllocCount = 0;
 
 namespace Library_Jingyu
 {
+
+#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
+
 	// 로그 찍을 전역변수 하나 받기.
 	CSystemLog* cNetLibLog = CSystemLog::GetInstance();
 

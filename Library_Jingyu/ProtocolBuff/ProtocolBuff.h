@@ -32,6 +32,9 @@ namespace Library_Jingyu
 		// Rear
 		int m_Rear;
 
+		// 레퍼런스 카운트. 소멸 체크하는 카운트
+		static int m_RefCount;
+
 	private:
 		// 초기화
 		void Init(int size);
@@ -90,6 +93,19 @@ namespace Library_Jingyu
 			PutData(reinterpret_cast<char*>(&value), sizeof(T));
 			return *this;
 		}
+
+	public:
+		// static 함수들
+
+		// Alloc. 현재는 이 안에서 new 후 레퍼런스 카운트 1 증가
+		static CProtocolBuff * Alloc();
+
+		// Free. 현재는 이 안에서 레퍼런스 카운트 1 감소.
+		// 만약, 레퍼런스 카운트가 0이라면 삭제함. delete 함
+		static void Free();
+
+		// 레퍼런스 카운트 1 Add하는 함수
+		static void Add();
 	};
 
 

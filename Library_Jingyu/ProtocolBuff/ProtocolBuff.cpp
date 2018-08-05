@@ -7,7 +7,11 @@
 namespace Library_Jingyu
 {
 
+#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
+
 #define BUFF_SIZE 10000
+
+	int CProtocolBuff::m_RefCount = 0;
 
 	// 사이즈 지정한 생성자
 	CProtocolBuff::CProtocolBuff(int size)
@@ -30,7 +34,7 @@ namespace Library_Jingyu
 	// 초기화
 	void CProtocolBuff::Init(int size)
 	{
-		m_Size = size;
+		m_Size = size;		
 		m_pProtocolBuff = new char[size];
 		m_Front = 0;
 		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.

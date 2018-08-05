@@ -5,6 +5,8 @@
 
 namespace Library_Jingyu
 {
+#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
+
 	// --------------------------------------
 	// 게임 로그 DB와 커넥트 할 때 필요한 정보들.
 	// --------------------------------------
