@@ -152,7 +152,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff.h" />
-    <ClInclude Include="My_Smart_Ptr.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>

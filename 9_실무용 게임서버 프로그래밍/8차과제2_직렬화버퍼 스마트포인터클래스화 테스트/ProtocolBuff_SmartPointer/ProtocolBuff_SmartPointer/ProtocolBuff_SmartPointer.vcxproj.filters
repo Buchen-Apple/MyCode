@@ -21,9 +21,6 @@
     <ClInclude Include="targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="My_Smart_Ptr.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>

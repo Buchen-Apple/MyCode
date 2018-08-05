@@ -70,8 +70,9 @@ namespace Library_Jingyu
 	My_Smart_PTR<T>::My_Smart_PTR(const My_Smart_PTR<T>& Copy)
 	{
 		m_pPtr = Copy.m_pPtr;
+		InterlockedIncrement(Copy.m_lCount);
 		m_lCount = Copy.m_lCount;
-		InterlockedIncrement(m_lCount);
+		
 	}
 
 	// 소멸자
@@ -118,8 +119,9 @@ namespace Library_Jingyu
 		m_pPtr = ref.m_pPtr;
 
 		// refcount 갱신
+		InterlockedIncrement(Copy.m_lCount);
 		m_lCount = Copy.m_lCount; 
-		InterlockedIncrement(m_lCount);
+		
 	}
 
 
