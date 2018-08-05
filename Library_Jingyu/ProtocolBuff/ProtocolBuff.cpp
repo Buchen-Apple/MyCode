@@ -8,8 +8,6 @@ namespace Library_Jingyu
 
 #define BUFF_SIZE 1024
 
-	//LONG CProtocolBuff::m_RefCount = 0;
-
 	// 사이즈 지정한 생성자
 	CProtocolBuff::CProtocolBuff(int size)
 	{

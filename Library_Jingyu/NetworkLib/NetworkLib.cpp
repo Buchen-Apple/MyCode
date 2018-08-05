@@ -234,7 +234,7 @@ namespace Library_Jingyu
 		}
 
 		// 입출력 완료 포트 생성
-		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
+		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
 		if (m_hIOCPHandle == NULL)
 		{
 			// 윈도우 에러, 내 에러 보관
