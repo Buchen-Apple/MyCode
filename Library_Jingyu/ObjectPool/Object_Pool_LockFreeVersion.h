@@ -3,6 +3,7 @@
 
 #include <new.h>
 #include <stdlib.h>
+#include <Windows.h>
 
 namespace Library_Jingyu
 {
@@ -252,13 +253,14 @@ namespace Library_Jingyu
 			if (m_iBlockNum > 0)
 				return nullptr;
 
+			// m_iBlockNum <= 0 라면, 유저가 갯수 제한을 두지 않은것. 
+			// 새로 생성한다.
 			else
 			{
 				st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
 				pNode->stpNextBlock = NULL;
 				pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
-				// 플레이스먼트 뉴 사용 여부와 관계 없이, 여기까지 왔는데 m_iBlockNum < 0 이라면, 무조건 새로 생성하는 것.
 				// 플레이스먼트 뉴 호출
 				new (&pNode->stData) DATA();
 
