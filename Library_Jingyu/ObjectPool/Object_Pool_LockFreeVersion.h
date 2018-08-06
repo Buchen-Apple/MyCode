@@ -24,13 +24,23 @@ namespace Library_Jingyu
 			int			  stMyCode;
 		};
 
+		// -------------
+		// Top으로 사용할 구조체
+		struct st_TOP
+		{
+			LONG64 m_ullCount;		// 리틀엔디안이기 때문에, 위에 있는 변수가 하위 주소로 간다. 즉, 현재 순서라면 [0x1457(m_pTop), 0x2314(m_ullCount)] 순서대로 주소가 들어간다
+			st_BLOCK_NODE* m_pTop;			
+		};
+
 	private:
 		char* m_Memory;				// 나중에 소멸자에서 한 번에 free하기 위한 변수
 		int m_iBlockNum;			// 최대 블럭 개수
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
 		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
-		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		st_BLOCK_NODE* m_pTop;		// Top 위치를 가리킬 변수. 배열형태로 2개 사용
+		LONG m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
+		//st_BLOCK_NODE* m_pTop;		// Top 위치를 가리킬 변수. 배열형태로 2개 사용
+		LONG64 m_ullCount;
+		st_TOP m_stpTop;
 
 		SRWLOCK sl;
 
@@ -128,6 +138,7 @@ namespace Library_Jingyu
 		m_iBlockNum = iBlockNum;
 		m_bPlacementNew = bPlacementNew;
 		m_iAllocCount = m_iUseCount = 0;
+		m_ullCount = 0;
 
 		// iBlockNum > 0이라면,
 		if (iBlockNum > 0)
@@ -141,8 +152,9 @@ namespace Library_Jingyu
 			// pMemory 기억해둔다. 차후 소멸자에서 free하기 위해서
 			m_Memory = pMemory;
 
-			// 첫 위치를 Top으로 가리킨다. 
-			m_pTop = (st_BLOCK_NODE*)pMemory;
+			// 첫 위치를 Top으로 가리킨다. 			
+			m_stpTop.m_pTop = (st_BLOCK_NODE*)pMemory;
+			//m_pTop = (st_BLOCK_NODE*)pMemory;
 
 			// 최초 1개의 노드 제작
 			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pMemory;
@@ -162,8 +174,10 @@ namespace Library_Jingyu
 				if (bPlacementNew == false)
 					new (&pNode->stData) DATA();
 
-				pNode->stpNextBlock = m_pTop;
-				m_pTop = pNode;
+				pNode->stpNextBlock = m_stpTop.m_pTop;
+				m_stpTop.m_pTop = pNode;
+				// pNode->stpNextBlock = m_pTop;
+				// m_pTop = pNode;
 
 				/*
 				if (i == 0)
@@ -192,7 +206,8 @@ namespace Library_Jingyu
 			pNode->stpNextBlock = NULL;
 			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
-			m_pTop = pNode;
+			m_stpTop.m_pTop = pNode;
+			//m_pTop = pNode;
 
 			m_iAllocCount++;
 		}
@@ -237,7 +252,7 @@ namespace Library_Jingyu
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	// 블럭 하나를 할당받는다.
+	// 블럭 하나를 할당받는다. (Pop)
 	//
 	// Parameters: 없음.
 	// Return: (DATA *) 데이타 블럭 포인터.
@@ -248,7 +263,8 @@ namespace Library_Jingyu
 		//////////////////////////////////
 		// m_pTop가 NULL일때 처리
 		//////////////////////////////////
-		if (m_pTop == NULL)
+		if (m_stpTop.m_pTop == NULL)
+		//if (m_pTop == NULL)
 		{
 			if (m_iBlockNum > 0)
 				return nullptr;
@@ -274,16 +290,45 @@ namespace Library_Jingyu
 		//////////////////////////////////
 		// m_pTop가 NULL이 아닐 때 처리
 		//////////////////////////////////
-		st_BLOCK_NODE* pNode = m_pTop;
-		m_pTop = pNode->stpNextBlock;
+		st_TOP localTop, localNextTop;
 
+		// ---- 락프리 적용 ----
+		do
+		{			
+			ULONGLONG Value = InterlockedIncrement64(&m_ullCount);
+			m_stpTop.m_ullCount = Value;
+
+			// 로컬 Top 셋팅
+			localTop.m_ullCount = Value;
+			localTop.m_pTop = m_stpTop.m_pTop;
+
+			// 로컬 NextTop 셋팅
+			localNextTop.m_ullCount = Value;
+			localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
+
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localNextTop.m_ullCount, (LONG64)localNextTop.m_pTop, (LONG64*)&localNextTop));
+
+		
+		// 이 아래에서는 모두 스냅샷으로 찍은 localNextTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
 		// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
 		if (m_bPlacementNew == true)
-			new (&pNode->stData) DATA();
+			new (&localNextTop.m_pTop->stData) DATA();
 
-		m_iUseCount++;
+		InterlockedIncrement(&m_iUseCount);
 
-		return &pNode->stData;
+		return &localNextTop.m_pTop->stData;
+
+
+		// st_BLOCK_NODE* pNode = m_pTop;
+		//m_pTop = pNode->stpNextBlock;
+
+		//// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
+		//if (m_bPlacementNew == true)
+		//	new (&pNode->stData) DATA();
+
+		//m_iUseCount++;
+
+		//return &pNode->stData;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -310,8 +355,11 @@ namespace Library_Jingyu
 			pData->~DATA();
 
 		// m_pTop에 연결한다.
-		pNode->stpNextBlock = m_pTop;
-		m_pTop = pNode;
+		pNode->stpNextBlock = m_stpTop.m_pTop;
+		m_stpTop.m_pTop = pNode;
+
+		// pNode->stpNextBlock = m_pTop;
+		// m_pTop = pNode;
 
 		m_iUseCount--;
 

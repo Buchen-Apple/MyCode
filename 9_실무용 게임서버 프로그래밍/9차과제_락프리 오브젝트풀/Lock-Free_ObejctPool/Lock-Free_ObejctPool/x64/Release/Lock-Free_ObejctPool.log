@@ -1,6 +1,9 @@
-﻿  stdafx.cpp
-  Lock-Free_ObejctPool.cpp
-  코드를 생성하고 있습니다.
-  코드를 생성했습니다.
-  All 1 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  Lock-Free_ObejctPool.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\Lock-Free_ObejctPool\x64\Release\Lock-Free_ObejctPool.exe
+﻿  Lock-Free_ObejctPool.cpp
+c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(234): error C2065: 'm_pTop': 선언되지 않은 식별자입니다.
+  c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(219): note: 클래스 템플릿 멤버 함수 'Library_Jingyu::CMemoryPool<Test>::~CMemoryPool(void)'을(를) 컴파일하고 있습니다.
+  c:\git_public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\lock-free_obejctpool\lock-free_obejctpool\lock-free_obejctpool.cpp(17): note: 컴파일 중인 함수 템플릿 인스턴스화 'Library_Jingyu::CMemoryPool<Test>::~CMemoryPool(void)'에 대한 참조를 확인하십시오.
+  c:\git_public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\lock-free_obejctpool\lock-free_obejctpool\lock-free_obejctpool.cpp(17): note: 컴파일 중인 클래스 템플릿 인스턴스화 'Library_Jingyu::CMemoryPool<Test>'에 대한 참조를 확인하세요.
+c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(237): error C2065: 'm_pTop': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(238): error C2065: 'm_pTop': 선언되지 않은 식별자입니다.
+c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(238): error C2227: '->stpNextBlock' 왼쪽은 클래스/구조체/공용 구조체/제네릭 형식을 가리켜야 합니다.
+  c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(238): note: 'unknown-type' 형식입니다.
