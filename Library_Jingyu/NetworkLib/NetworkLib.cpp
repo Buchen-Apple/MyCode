@@ -1365,6 +1365,7 @@ namespace Library_Jingyu
 			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
 				UseSize = dfSENDPOST_MAX_WSABUF * 8;
 
+			// 아래 로직은 혹시나 해서 넣었지만 절대 들어오지 않음.
 			else if (UseSize > 8 && UseSize % 8 != 0)
 				UseSize = (UseSize / 8) * 8;
 

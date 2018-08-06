@@ -217,7 +217,7 @@ namespace Library_Jingyu
 
 	}
 
-	// 인자로 받은 포인터의, 레퍼런스 카운트 1 Add하는 함수
+	// 레퍼런스 카운트 1 Add하는 함수
 	void CProtocolBuff::Add()
 	{
 		// 인터락으로 안전하게 증가
