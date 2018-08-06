@@ -30,7 +30,7 @@ namespace Library_Jingyu
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
 		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
 		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		st_BLOCK_NODE* m_pTop;		// Top 위치를 가리킬 변수
+		st_BLOCK_NODE* m_pTop;		// Top 위치를 가리킬 변수. 배열형태로 2개 사용
 
 		SRWLOCK sl;
 
@@ -267,14 +267,14 @@ namespace Library_Jingyu
 				m_iAllocCount++;
 				m_iUseCount++;
 
-				return (DATA*)&pNode->stData;
+				return &pNode->stData;
 			}
 		}
 
 		//////////////////////////////////
 		// m_pTop가 NULL이 아닐 때 처리
 		//////////////////////////////////
-		st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)m_pTop;
+		st_BLOCK_NODE* pNode = m_pTop;
 		m_pTop = pNode->stpNextBlock;
 
 		// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
@@ -283,7 +283,7 @@ namespace Library_Jingyu
 
 		m_iUseCount++;
 
-		return (DATA*)&pNode->stData;
+		return &pNode->stData;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
