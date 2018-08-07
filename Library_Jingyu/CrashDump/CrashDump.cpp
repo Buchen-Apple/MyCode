@@ -5,6 +5,7 @@
 #include <DbgHelp.h>
 #include <crtdbg.h>
 #include <csignal>
+#include <stdio.h>
 
 namespace Library_Jingyu
 {

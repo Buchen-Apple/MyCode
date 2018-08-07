@@ -1,0 +1,6 @@
+﻿  stdafx.cpp
+  Lock-Free_ObejctPool.cpp
+c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(332): error C3861: 'InterlockedCompareExchange128': 식별자를 찾을 수 없습니다.
+  c:\git_public\library_jingyu\objectpool\object_pool_lockfreeversion.h(284): note: 클래스 템플릿 멤버 함수 'Test *Library_Jingyu::CMemoryPool<Test>::Alloc(void)'을(를) 컴파일하고 있습니다.
+  c:\git_public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\lock-free_obejctpool\lock-free_obejctpool\lock-free_obejctpool.cpp(45): note: 컴파일 중인 함수 템플릿 인스턴스화 'Test *Library_Jingyu::CMemoryPool<Test>::Alloc(void)'에 대한 참조를 확인하십시오.
+  c:\git_public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\lock-free_obejctpool\lock-free_obejctpool\lock-free_obejctpool.cpp(19): note: 컴파일 중인 클래스 템플릿 인스턴스화 'Library_Jingyu::CMemoryPool<Test>'에 대한 참조를 확인하세요.

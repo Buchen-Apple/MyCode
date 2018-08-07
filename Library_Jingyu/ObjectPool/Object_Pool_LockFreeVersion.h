@@ -1,9 +1,10 @@
 #ifndef __OBJECT_POOL_H__
 #define __OBJECT_POOL_H__
 
-#include <new.h>
-#include <stdlib.h>
 #include <Windows.h>
+#include <stdio.h>
+#include <new.h>
+
 
 namespace Library_Jingyu
 {
@@ -28,8 +29,8 @@ namespace Library_Jingyu
 		// Top으로 사용할 구조체
 		struct st_TOP
 		{
-			LONG64 m_ullCount;		// 리틀엔디안이기 때문에, 위에 있는 변수가 하위 주소로 간다. 즉, 현재 순서라면 [0x1457(m_pTop), 0x2314(m_ullCount)] 순서대로 주소가 들어간다
-			st_BLOCK_NODE* m_pTop;			
+			st_BLOCK_NODE* m_pTop;
+			LONG64 m_l64Count;
 		};
 
 	private:
@@ -37,10 +38,10 @@ namespace Library_Jingyu
 		int m_iBlockNum;			// 최대 블럭 개수
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
 		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
-		LONG m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		//st_BLOCK_NODE* m_pTop;		// Top 위치를 가리킬 변수. 배열형태로 2개 사용
+		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
+		//st_BLOCK_NODE* m_pTop;	// Top 위치를 가리킬 변수. 배열형태로 2개 사용
 		LONG64 m_ullCount;
-		st_TOP m_stpTop;
+		__declspec(align(16)) st_TOP m_stpTop;
 
 		SRWLOCK sl;
 
@@ -74,7 +75,7 @@ namespace Library_Jingyu
 
 
 		//////////////////////////////////////////////////////////////////////////
-		// 현재 확보 된 블럭 개수를 얻는다. (메모리풀 내부의 전체 개수)
+		// 할당된 메모리풀의 총 수. 
 		//
 		// Parameters: 없음.
 		// Return: (int) 메모리 풀 내부 전체 개수
@@ -82,7 +83,7 @@ namespace Library_Jingyu
 		int		GetAllocCount(void) { return m_iAllocCount; }
 
 		//////////////////////////////////////////////////////////////////////////
-		// 현재 사용중인 블럭 개수를 얻는다.
+		// 사용자가 사용중인 블럭 개수를 얻는다.
 		//
 		// Parameters: 없음.
 		// Return: (int) 사용중인 블럭 개수.
@@ -92,11 +93,15 @@ namespace Library_Jingyu
 
 		// SRWLock 걸기
 		void EnterLOCK()
-		{	AcquireSRWLockExclusive(&sl);}
+		{
+			AcquireSRWLockExclusive(&sl);
+		}
 
 		// SRWLock 풀기
 		void LeaveLOCK()
-		{	ReleaseSRWLockExclusive(&sl);	}
+		{
+			ReleaseSRWLockExclusive(&sl);
+		}
 
 	};
 
@@ -160,7 +165,7 @@ namespace Library_Jingyu
 			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pMemory;
 			if (bPlacementNew == false)
 				new (&pNode->stData) DATA();
-			pNode->stpNextBlock = NULL;
+			pNode->stpNextBlock = nullptr;
 			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 			pMemory += sizeof(st_BLOCK_NODE);
 
@@ -181,12 +186,12 @@ namespace Library_Jingyu
 
 				/*
 				if (i == 0)
-					pNode->stpNextBlock = NULL;
+				pNode->stpNextBlock = NULL;
 
 				else
 				{
-					pNode->stpNextBlock = m_pTop;
-					m_pTop = pNode;
+				pNode->stpNextBlock = m_pTop;
+				m_pTop = pNode;
 				}*/
 
 				pNode->stMyCode = MEMORYPOOL_ENDCODE;
@@ -203,7 +208,7 @@ namespace Library_Jingyu
 			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
 			if (bPlacementNew == false)
 				new (&pNode->stData) DATA();
-			pNode->stpNextBlock = NULL;
+			pNode->stpNextBlock = nullptr;
 			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
 			m_stpTop.m_pTop = pNode;
@@ -226,23 +231,23 @@ namespace Library_Jingyu
 		//
 		// m_iBlockNum이 0이라면, 낱개로 malloc 한 것이니 낱개로 free 한다. (Alloc시 마다 생성했음. Free()에서는 플레이스먼트 뉴에 따라 소멸자만 호출했었음. 메모리 해제 안했음)
 		// m_iBlockNum이 0보다 크다면, 마지막에 한 번에 메모리 전체 free 한다. 
-		
+
 
 		// 내 메모리풀에 있는 노드를 모두 'free()' 한다.
 		while (1)
 		{
-			if (m_pTop == NULL)
+			if (m_stpTop.m_pTop == NULL)
 				break;
 
-			st_BLOCK_NODE* deleteNode = (st_BLOCK_NODE*)m_pTop;
-			m_pTop = m_pTop->stpNextBlock;
+			st_BLOCK_NODE* deleteNode = m_stpTop.m_pTop;
+			m_stpTop.m_pTop = m_stpTop.m_pTop->stpNextBlock;
 
 			// 플레이스먼트 뉴가 false라면, Free()시 '객체 소멸자'를 호출 안한 것이니 여기서 호출시켜줘야 한다.
 			if (m_bPlacementNew == false)
 				deleteNode->stData.~DATA();
 
 			// m_iBlockNum가 0이라면, 낱개로 Malloc했으니(Alloc시 마다 생성했음. Free()에서는 소멸자만 호출하고, 메모리 해제는 안함.) free한다.
-			if(m_iBlockNum == 0)
+			if (m_iBlockNum == 0)
 				free(deleteNode);
 		}
 
@@ -264,7 +269,6 @@ namespace Library_Jingyu
 		// m_pTop가 NULL일때 처리
 		//////////////////////////////////
 		if (m_stpTop.m_pTop == NULL)
-		//if (m_pTop == NULL)
 		{
 			if (m_iBlockNum > 0)
 				return nullptr;
@@ -280,8 +284,9 @@ namespace Library_Jingyu
 				// 플레이스먼트 뉴 호출
 				new (&pNode->stData) DATA();
 
-				m_iAllocCount++;
-				m_iUseCount++;
+				// alloc카운트, 유저 사용중 카운트 증가
+				InterlockedIncrement((LONG*)&m_iAllocCount);
+				InterlockedIncrement((LONG*)&m_iUseCount);
 
 				return &pNode->stData;
 			}
@@ -290,45 +295,38 @@ namespace Library_Jingyu
 		//////////////////////////////////
 		// m_pTop가 NULL이 아닐 때 처리
 		//////////////////////////////////
-		st_TOP localTop, localNextTop;
+		__declspec(align(16)) st_TOP localTop;
+		__declspec(align(16)) st_TOP localNextTop;
 
 		// ---- 락프리 적용 ----
+
+		// 락프리 로직 시작 전에, 유니크값을 받아둔다. 이 값은 내꺼.
+		LONG64 l64_UniqueValue = InterlockedIncrement64(&m_ullCount);
+
 		do
 		{			
-			ULONGLONG Value = InterlockedIncrement64(&m_ullCount);
-			m_stpTop.m_ullCount = Value;
+			m_stpTop.m_l64Count = l64_UniqueValue;
 
 			// 로컬 Top 셋팅
-			localTop.m_ullCount = Value;
+			localTop.m_l64Count = l64_UniqueValue;
 			localTop.m_pTop = m_stpTop.m_pTop;
 
 			// 로컬 NextTop 셋팅
-			localNextTop.m_ullCount = Value;
-			localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
+			localNextTop.m_l64Count = l64_UniqueValue;
+			localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;			
 
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localNextTop.m_ullCount, (LONG64)localNextTop.m_pTop, (LONG64*)&localNextTop));
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, (LONG64)localNextTop.m_l64Count, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
 
-		
-		// 이 아래에서는 모두 스냅샷으로 찍은 localNextTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
+
+		// 이 아래에서는 모두 스냅샷으로 찍은 localTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
 		// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
 		if (m_bPlacementNew == true)
-			new (&localNextTop.m_pTop->stData) DATA();
+			new (&localTop.m_pTop->stData) DATA();
 
-		InterlockedIncrement(&m_iUseCount);
+		// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
+		InterlockedIncrement((LONG*)&m_iUseCount);
 
-		return &localNextTop.m_pTop->stData;
-
-
-		// st_BLOCK_NODE* pNode = m_pTop;
-		//m_pTop = pNode->stpNextBlock;
-
-		//// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
-		//if (m_bPlacementNew == true)
-		//	new (&pNode->stData) DATA();
-
-		//m_iUseCount++;
-
-		//return &pNode->stData;
+		return &localTop.m_pTop->stData;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -348,20 +346,29 @@ namespace Library_Jingyu
 		st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pData;
 
 		if (pNode->stMyCode != MEMORYPOOL_ENDCODE)
-			return false;
+			return false;		
+		
+		// ---- 락프리 적용 ----
+		st_TOP localTop;	// 64비트 연산이기 때문에 정렬 필요 없음.
+		do
+		{
+			// 로컬 Top 셋팅
+			localTop.m_pTop = m_stpTop.m_pTop;
+
+			// 새로 들어온 노드의 Next를 Top으로 찌름
+			pNode->stpNextBlock = m_stpTop.m_pTop;
+
+			// Top이동 시도
+			// 리턴값 : 1번인자의 초기값. 즉, 1번인자가 3번인자와 같았다면, 3번인자가 리턴된다.
+			// 3번인자가 리턴되지 않으면 다시 do while시도한다.
+		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)pNode, (LONG64)localTop.m_pTop) != (LONG64)localTop.m_pTop);
 
 		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
 		if (m_bPlacementNew == true)
 			pData->~DATA();
 
-		// m_pTop에 연결한다.
-		pNode->stpNextBlock = m_stpTop.m_pTop;
-		m_stpTop.m_pTop = pNode;
-
-		// pNode->stpNextBlock = m_pTop;
-		// m_pTop = pNode;
-
-		m_iUseCount--;
+		// 유저 사용중 카운트 감소
+		InterlockedDecrement((LONG*)&m_iUseCount);
 
 		return true;
 	}

@@ -32,5 +32,8 @@
     <ClCompile Include="Lock-Free_ObejctPool.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
