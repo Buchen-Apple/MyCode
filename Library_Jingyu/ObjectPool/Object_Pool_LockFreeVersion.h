@@ -265,68 +265,85 @@ namespace Library_Jingyu
 	template <typename DATA>
 	DATA*	CMemoryPool<DATA>::Alloc(void)
 	{
-		//////////////////////////////////
-		// m_pTop가 NULL일때 처리
-		//////////////////////////////////
-		if (m_stpTop.m_pTop == NULL)
+		LONG64 l64_UniqueValue = 0;
+		bool bContinueFlag;
+
+		while (1)
 		{
-			if (m_iBlockNum > 0)
-				return nullptr;
+			bContinueFlag = false;
 
-			// m_iBlockNum <= 0 라면, 유저가 갯수 제한을 두지 않은것. 
-			// 새로 생성한다.
-			else
+			//////////////////////////////////
+			// m_pTop가 NULL일때 처리
+			//////////////////////////////////
+			if (m_stpTop.m_pTop == NULL)
 			{
-				st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
-				pNode->stpNextBlock = NULL;
-				pNode->stMyCode = MEMORYPOOL_ENDCODE;
+				if (m_iBlockNum > 0)
+					return nullptr;
 
-				// 플레이스먼트 뉴 호출
-				new (&pNode->stData) DATA();
+				// m_iBlockNum <= 0 라면, 유저가 갯수 제한을 두지 않은것. 
+				// 새로 생성한다.
+				else
+				{
+					st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
+					pNode->stpNextBlock = NULL;
+					pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
-				// alloc카운트, 유저 사용중 카운트 증가
-				InterlockedIncrement((LONG*)&m_iAllocCount);
-				InterlockedIncrement((LONG*)&m_iUseCount);
+					// 플레이스먼트 뉴 호출
+					new (&pNode->stData) DATA();
 
-				return &pNode->stData;
+					// alloc카운트, 유저 사용중 카운트 증가
+					InterlockedIncrement((LONG*)&m_iAllocCount);
+					InterlockedIncrement((LONG*)&m_iUseCount);
+
+					return &pNode->stData;
+				}
 			}
+
+			//////////////////////////////////
+			// m_pTop가 NULL이 아닐 때 처리
+			//////////////////////////////////
+			__declspec(align(16)) st_TOP localTop;
+			__declspec(align(16)) st_TOP localNextTop;
+
+			// ---- 락프리 적용 ----
+
+			// 락프리 로직 시작 전에, 유니크값을 받아둔다. 이 값은 내꺼.
+			l64_UniqueValue = InterlockedIncrement64(&m_ullCount);
+
+			do
+			{
+				m_stpTop.m_l64Count = l64_UniqueValue;
+
+				// 로컬 Top 셋팅
+				localTop.m_l64Count = l64_UniqueValue;
+				localTop.m_pTop = m_stpTop.m_pTop;
+
+				// 로컬 NextTop 셋팅
+				localNextTop.m_l64Count = l64_UniqueValue;
+				if (localTop.m_pTop == NULL)
+				{
+					bContinueFlag = true;
+					break;
+				}
+				localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
+
+			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, (LONG64)localNextTop.m_l64Count, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
+
+			if (bContinueFlag == true)
+				continue;
+
+			// 이 아래에서는 모두 스냅샷으로 찍은 localTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
+			// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
+			if (m_bPlacementNew == true)
+				new (&localTop.m_pTop->stData) DATA();
+
+			// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
+			InterlockedIncrement((LONG*)&m_iUseCount);
+
+			return &localTop.m_pTop->stData;
+
 		}
-
-		//////////////////////////////////
-		// m_pTop가 NULL이 아닐 때 처리
-		//////////////////////////////////
-		__declspec(align(16)) st_TOP localTop;
-		__declspec(align(16)) st_TOP localNextTop;
-
-		// ---- 락프리 적용 ----
-
-		// 락프리 로직 시작 전에, 유니크값을 받아둔다. 이 값은 내꺼.
-		LONG64 l64_UniqueValue = InterlockedIncrement64(&m_ullCount);
-
-		do
-		{			
-			m_stpTop.m_l64Count = l64_UniqueValue;
-
-			// 로컬 Top 셋팅
-			localTop.m_l64Count = l64_UniqueValue;
-			localTop.m_pTop = m_stpTop.m_pTop;
-
-			// 로컬 NextTop 셋팅
-			localNextTop.m_l64Count = l64_UniqueValue;
-			localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;			
-
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, (LONG64)localNextTop.m_l64Count, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
-
-
-		// 이 아래에서는 모두 스냅샷으로 찍은 localTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
-		// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
-		if (m_bPlacementNew == true)
-			new (&localTop.m_pTop->stData) DATA();
-
-		// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
-		InterlockedIncrement((LONG*)&m_iUseCount);
-
-		return &localTop.m_pTop->stData;
+		
 	}
 
 	//////////////////////////////////////////////////////////////////////////
