@@ -41,7 +41,8 @@ namespace Library_Jingyu
 		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
 		//st_BLOCK_NODE* m_pTop;	// Top 위치를 가리킬 변수. 배열형태로 2개 사용
 		LONG64 m_ullCount;
-		__declspec(align(16)) st_TOP m_stpTop;
+		//__declspec(align(16)) st_TOP m_stpTop;
+		alignas(16)	st_TOP m_stpTop;
 
 		SRWLOCK sl;
 
@@ -302,8 +303,10 @@ namespace Library_Jingyu
 			//////////////////////////////////
 			// m_pTop가 NULL이 아닐 때 처리
 			//////////////////////////////////
-			__declspec(align(16)) st_TOP localTop;
-			__declspec(align(16)) st_TOP localNextTop;
+			//__declspec(align(16)) st_TOP localTop;
+			//__declspec(align(16)) st_TOP localNextTop;
+			alignas(16)  st_TOP localTop;
+			alignas(16)  st_TOP localNextTop;
 
 			// ---- 락프리 적용 ----
 

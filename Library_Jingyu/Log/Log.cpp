@@ -3,6 +3,8 @@
 #include <strsafe.h>
 #include <direct.h>		//_mkdir or _wmkdir
 
+#pragma comment(lib, "Mysql/lib/vs14/mysqlclient.lib")
+
 namespace Library_Jingyu
 {
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))

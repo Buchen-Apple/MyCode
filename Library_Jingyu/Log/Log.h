@@ -11,7 +11,7 @@
 #include "Mysql\include\mysql.h"
 #include "Mysql\include\errmsg.h"
 
-#pragma comment(lib, "Mysql/lib/vs14/mysqlclient.lib")
+
 
 
 
