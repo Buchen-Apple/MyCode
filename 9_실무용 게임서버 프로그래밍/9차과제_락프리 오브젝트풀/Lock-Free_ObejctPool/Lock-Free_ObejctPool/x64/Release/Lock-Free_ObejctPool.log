@@ -1,7 +1,7 @@
-﻿  stdafx.cpp
-  CrashDump.cpp
-  Lock-Free_ObejctPool.cpp
+﻿  Lock-Free_ObejctPool.cpp
   코드를 생성하고 있습니다.
-  All 31 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  2 of 38 functions ( 5.3%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
   Lock-Free_ObejctPool.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\Lock-Free_ObejctPool\x64\Release\Lock-Free_ObejctPool.exe
