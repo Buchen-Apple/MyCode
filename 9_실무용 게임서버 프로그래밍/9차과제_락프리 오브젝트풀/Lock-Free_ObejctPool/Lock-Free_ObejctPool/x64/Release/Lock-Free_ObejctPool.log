@@ -1,8 +1,7 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppClean.targets(76,5): warning : 'c:\git_public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\lock-free_obejctpool\lock-free_obejctpool\x64\release\lock-free_obejctpool.pch' 파일은 다른 프로세스에서 사용 중이므로 프로세스에서 액세스할 수 없습니다.
-  stdafx.cpp
+﻿  stdafx.cpp
   CrashDump.cpp
   Lock-Free_ObejctPool.cpp
   코드를 생성하고 있습니다.
-  All 32 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 31 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   Lock-Free_ObejctPool.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\9차과제_락프리 오브젝트풀\Lock-Free_ObejctPool\x64\Release\Lock-Free_ObejctPool.exe
