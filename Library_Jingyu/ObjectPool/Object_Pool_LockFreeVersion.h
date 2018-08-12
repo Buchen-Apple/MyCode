@@ -37,8 +37,8 @@ namespace Library_Jingyu
 		char* m_Memory;				// 나중에 소멸자에서 한 번에 free하기 위한 변수
 		int m_iBlockNum;			// 최대 블럭 개수
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
-		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
-		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
+		LONG m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
+		LONG m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
 		alignas(16)	st_TOP m_stpTop;
 
 		SRWLOCK sl;
@@ -253,12 +253,15 @@ namespace Library_Jingyu
 
 		while (1)
 		{
+			if (m_iAllocCount > 4)
+				int abc = 10;
+
 			bContinueFlag = false;
 
 			//////////////////////////////////
 			// m_pTop가 NULL일때 처리
 			//////////////////////////////////
-			if (m_stpTop.m_pTop == NULL)
+			if (m_stpTop.m_pTop == nullptr)
 			{
 				if (m_iBlockNum > 0)
 					return nullptr;
@@ -275,8 +278,8 @@ namespace Library_Jingyu
 					new (&pNode->stData) DATA();
 
 					// alloc카운트, 유저 사용중 카운트 증가
-					InterlockedIncrement((LONG*)&m_iAllocCount);
-					InterlockedIncrement((LONG*)&m_iUseCount);
+					InterlockedIncrement(&m_iAllocCount);
+					InterlockedIncrement(&m_iUseCount);
 
 					return &pNode->stData;
 				}
@@ -286,7 +289,6 @@ namespace Library_Jingyu
 			// m_pTop가 NULL이 아닐 때 처리
 			//////////////////////////////////
 			alignas(16)  st_TOP localTop;
-			alignas(16)  st_TOP localNextTop;
 
 			// ---- 락프리 적용 ----
 			do
@@ -294,20 +296,17 @@ namespace Library_Jingyu
 				localTop = { 0,0 };
 
 				// 로컬 Top 셋팅	
-				// ※ 여기서 리턴값이 성공일 일이 절대 없음!! 뜨면 이상한것.
+				// ※ 여기서 리턴값이 성공할 일이 절대 없음!! 뜨면 이상한것.
 				InterlockedCompareExchange128((LONG64*)&m_stpTop, 0, 0, (LONG64*)&localTop);
-				
+
 				// 로컬 NextTop 셋팅
-				if (localTop.m_pTop == NULL)
+				if (localTop.m_pTop == nullptr)
 				{
 					bContinueFlag = true;
 					break;
-				}
+				}						
 
-				localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
-				localNextTop.m_l64Count = localTop.m_l64Count;								
-
-			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localNextTop.m_l64Count + 1, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
+			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->stpNextBlock, (LONG64*)&localTop));
 
 
 			if (bContinueFlag == true)
@@ -319,7 +318,7 @@ namespace Library_Jingyu
 				new (&localTop.m_pTop->stData) DATA();
 
 			// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
-			InterlockedIncrement((LONG*)&m_iUseCount);
+			InterlockedIncrement(&m_iUseCount);
 
 			return &localTop.m_pTop->stData;
 
@@ -366,7 +365,7 @@ namespace Library_Jingyu
 		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)pNode, (LONG64)localTop.m_pTop) != (LONG64)localTop.m_pTop);
 		
 		// 유저 사용중 카운트 감소
-		InterlockedDecrement((LONG*)&m_iUseCount);
+		InterlockedDecrement(&m_iUseCount);
 
 		return true;
 	}
