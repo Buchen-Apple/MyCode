@@ -39,7 +39,6 @@ namespace Library_Jingyu
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
 		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
 		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		LONG64 m_ullCount;
 		alignas(16)	st_TOP m_stpTop;
 
 		SRWLOCK sl;
@@ -142,7 +141,6 @@ namespace Library_Jingyu
 		m_iBlockNum = iBlockNum;
 		m_bPlacementNew = bPlacementNew;
 		m_iAllocCount = m_iUseCount = 0;
-		m_ullCount = 0;
 
 		// iBlockNum > 0이라면,
 		if (iBlockNum > 0)
@@ -293,20 +291,23 @@ namespace Library_Jingyu
 			// ---- 락프리 적용 ----
 			do
 			{
-				// 로컬 Top 셋팅
-				localTop.m_l64Count = m_stpTop.m_l64Count;
-				localTop.m_pTop = m_stpTop.m_pTop;
+				localTop = { 0,0 };
 
+				// 로컬 Top 셋팅	
+				// ※ 여기서 리턴값이 성공일 일이 절대 없음!! 뜨면 이상한것.
+				InterlockedCompareExchange128((LONG64*)&m_stpTop, 0, 0, (LONG64*)&localTop);
+				
 				// 로컬 NextTop 셋팅
-				localNextTop.m_l64Count = localTop.m_l64Count;
 				if (localTop.m_pTop == NULL)
 				{
 					bContinueFlag = true;
 					break;
 				}
-				localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
 
-			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, (LONG64)localNextTop.m_l64Count + 1, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
+				localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
+				localNextTop.m_l64Count = localTop.m_l64Count;								
+
+			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localNextTop.m_l64Count + 1, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
 
 
 			if (bContinueFlag == true)
@@ -327,7 +328,7 @@ namespace Library_Jingyu
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	// 사용중이던 블럭을 해제한다.
+	// 사용중이던 블럭을 해제한다. (Push)
 	//
 	// Parameters: (DATA *) 블럭 포인터.
 	// Return: (BOOL) TRUE, FALSE.
@@ -344,13 +345,17 @@ namespace Library_Jingyu
 
 		if (pNode->stMyCode != MEMORYPOOL_ENDCODE)
 			return false;	
+
+		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
+		if (m_bPlacementNew == true)
+			pData->~DATA();
 		
 		// ---- 락프리 적용 ----
 		st_TOP localTop;	// 64비트 연산이기 때문에 정렬 필요 없음.
 		do
 		{
-			// 로컬 Top 셋팅
-			localTop.m_pTop = m_stpTop.m_pTop;
+			// 로컬 Top 셋팅 (Count말고 포인터만 대입)
+			InterlockedExchange64((LONG64*)&localTop.m_pTop, (LONG64)m_stpTop.m_pTop);
 
 			// 새로 들어온 노드의 Next를 Top으로 찌름
 			pNode->stpNextBlock = localTop.m_pTop;
@@ -359,11 +364,7 @@ namespace Library_Jingyu
 			// 리턴값 : 1번인자의 초기값. 즉, 1번인자가 3번인자와 같았다면, 3번인자가 리턴된다.
 			// 3번인자가 리턴되지 않으면 다시 do while시도한다.
 		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)pNode, (LONG64)localTop.m_pTop) != (LONG64)localTop.m_pTop);
-
-		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
-		if (m_bPlacementNew == true)
-			pData->~DATA();
-
+		
 		// 유저 사용중 카운트 감소
 		InterlockedDecrement((LONG*)&m_iUseCount);
 
