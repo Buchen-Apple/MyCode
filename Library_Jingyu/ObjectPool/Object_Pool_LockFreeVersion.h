@@ -39,9 +39,7 @@ namespace Library_Jingyu
 		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
 		int m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
 		int m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		//st_BLOCK_NODE* m_pTop;	// Top 위치를 가리킬 변수. 배열형태로 2개 사용
 		LONG64 m_ullCount;
-		//__declspec(align(16)) st_TOP m_stpTop;
 		alignas(16)	st_TOP m_stpTop;
 
 		SRWLOCK sl;
@@ -160,7 +158,6 @@ namespace Library_Jingyu
 
 			// 첫 위치를 Top으로 가리킨다. 			
 			m_stpTop.m_pTop = (st_BLOCK_NODE*)pMemory;
-			//m_pTop = (st_BLOCK_NODE*)pMemory;
 
 			// 최초 1개의 노드 제작
 			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pMemory;
@@ -181,19 +178,7 @@ namespace Library_Jingyu
 					new (&pNode->stData) DATA();
 
 				pNode->stpNextBlock = m_stpTop.m_pTop;
-				m_stpTop.m_pTop = pNode;
-				// pNode->stpNextBlock = m_pTop;
-				// m_pTop = pNode;
-
-				/*
-				if (i == 0)
-				pNode->stpNextBlock = NULL;
-
-				else
-				{
-				pNode->stpNextBlock = m_pTop;
-				m_pTop = pNode;
-				}*/
+				m_stpTop.m_pTop = pNode;				
 
 				pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
@@ -213,7 +198,6 @@ namespace Library_Jingyu
 			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
 			m_stpTop.m_pTop = pNode;
-			//m_pTop = pNode;
 
 			m_iAllocCount++;
 		}
@@ -303,38 +287,10 @@ namespace Library_Jingyu
 			//////////////////////////////////
 			// m_pTop가 NULL이 아닐 때 처리
 			//////////////////////////////////
-			//__declspec(align(16)) st_TOP localTop;
-			//__declspec(align(16)) st_TOP localNextTop;
 			alignas(16)  st_TOP localTop;
 			alignas(16)  st_TOP localNextTop;
 
 			// ---- 락프리 적용 ----
-
-			// case 1
-			// 락프리 로직 시작 전에, 유니크값을 받아둔다. 이 값은 내꺼.
-			//l64_UniqueValue = InterlockedIncrement64(&m_ullCount);
-
-			//do
-			//{
-			//	m_stpTop.m_l64Count = l64_UniqueValue;
-
-			//	// 로컬 Top 셋팅
-			//	localTop.m_l64Count = l64_UniqueValue;
-			//	localTop.m_pTop = m_stpTop.m_pTop;
-
-			//	// 로컬 NextTop 셋팅
-			//	localNextTop.m_l64Count = l64_UniqueValue;
-			//	if (localTop.m_pTop == NULL)
-			//	{
-			//		bContinueFlag = true;
-			//		break;
-			//	}
-			//	localNextTop.m_pTop = localTop.m_pTop->stpNextBlock;
-
-			//} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, (LONG64)localNextTop.m_l64Count, (LONG64)localNextTop.m_pTop, (LONG64*)&localTop));
-
-
-			// case 2
 			do
 			{
 				// 로컬 Top 셋팅
@@ -362,8 +318,7 @@ namespace Library_Jingyu
 				new (&localTop.m_pTop->stData) DATA();
 
 			// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
-			if (InterlockedIncrement((LONG*)&m_iUseCount) > m_iAllocCount)
-				int abc = 10;
+			InterlockedIncrement((LONG*)&m_iUseCount);
 
 			return &localTop.m_pTop->stData;
 
