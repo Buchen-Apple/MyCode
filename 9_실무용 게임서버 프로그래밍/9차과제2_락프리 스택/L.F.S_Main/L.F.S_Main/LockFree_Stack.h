@@ -2,6 +2,7 @@
 #define __LOCKFREE_STACK_H__
 
 #include <Windows.h>
+#include "ObjectPool\Object_Pool_LockFreeVersion.h"
 #include "CrashDump\CrashDump.h"
 
 namespace Library_Jingyu
@@ -10,123 +11,171 @@ namespace Library_Jingyu
 	class CLF_Stack
 	{
 	private:
+
+		LONG m_NodeCount;		// 리스트 내부의 노드 수
+		LONG m_UseNodeCount;	// 사용 중인 노드의 수
+
 		struct st_LFS_NODE
 		{
 			T m_Data;
 			st_LFS_NODE* m_stpNextBlock;
 		};
 
-		// 스택은 Last-In-First_Out
-		st_LFS_NODE* m_stpTop = nullptr;
+		struct st_TOP
+		{
+			st_LFS_NODE* m_pTop = nullptr;
+			LONG64 m_l64Count = 0;
+		};
+
+		alignas(16)	st_TOP m_stpTop;
 
 		// 에러났을 때 크래시 내는 용도
-		CCrashDump* m_CDump = CCrashDump::GetInstance();
+		CCrashDump* m_CDump;
+
+		// 메모리풀
+		CMemoryPool<st_LFS_NODE>* m_MPool;
+
 
 	public:
 		// 생성자
+		CLF_Stack();
 
 		// 소멸자
-		~CLF_Stack()
-		{
-			// null이 나올때까지 돌면서 삭제.
-			while (1)
-			{
+		~CLF_Stack();
 
-			}
+		// 내부 노드 수 얻기
+		LONG GetInNode();
 
-
-		}
+		// 유저가 사용 중인 노드 수 얻기
+		LONG GetOutNode();
 
 
 		// 인덱스를 스택에 추가
 		//
 		// return : 없음 (void)
-		void Push(T Data)
-		{
-			st_LFS_NODE* NewNode = new st_LFS_NODE;
-			NewNode.m_Data = Data;
-			NewNode.m_stpNextBlock = m_stpTop;
-
-			m_stpTop = NewNode;
-		}
+		void Push(T Data);
 
 
 		// 인덱스 얻기
 		//
 		// 성공 시, T 리턴
 		// 실패시 Crash 발생
-		T Pop()
-		{
-			// 더 이상 pop 할게 없으면 Crash 발생
-			if (m_stpTop == nullptr)
-				m_CDump->Crash();
-
-			T retval = m_stpTop.m_Data;
-			st_LFS_NODE* TempNode = m_stpTop;
-
-			m_stpTop = m_stpTop.m_stpNextBlock;
-
-			delete TempNode;
-
-			return retval;
-		}
-
-
-		// 인덱스 얻기
-		//
-		// 반환값 ULONGLONG ---> 이 반환값으로 시프트 연산 할 수도 있어서, 혹시 모르니 unsigned로 리턴한다.
-		// 0이상(0포함) : 인덱스 정상 반환
-		// 10000000(천만) : 빈 인덱스 없음.
-		ULONGLONG Pop()
-		{
-			// 인덱스 비었나 체크 ----------
-			// 보통 Max로 설정한 유저가 모두 들어왔을 경우, 빈 인덱스가 없다.
-			if (m_iTop == 0)
-				return 10000000;
-
-			// 빈 인덱스가 있으면, m_iTop을 감소 후 인덱스 리턴.
-			m_iTop--;
-
-			return m_iArray[m_iTop];
-		}
-
-		// 인덱스 넣기
-		//
-		// 반환값 bool
-		// true : 인덱스 정상으로 들어감
-		// false : 인덱스 들어가지 않음 (이미 Max만큼 꽉 참)
-		bool Push(ULONGLONG PushIndex)
-		{
-			// 인덱스가 꽉찼나 체크 ---------
-			// 인덱스가 꽉찼으면 false 리턴
-			if (m_iTop == m_iMax)
-				return false;
-
-			// 인덱스가 꽉차지 않았으면, 추가
-			m_iArray[m_iTop] = PushIndex;
-			m_iTop++;
-
-			return true;
-		}
-
-		CLF_Stack(int Max)
-		{
-			m_iTop = Max;
-			m_iMax = Max;
-
-			m_iArray = new ULONGLONG[Max];
-
-			// 최초 생성 시, 모두 빈 인덱스
-			for (int i = 0; i < Max; ++i)
-				m_iArray[i] = i;
-		}
-
-		~CLF_Stack()
-		{
-			delete[] m_iArray;
-		}
-
+		T Pop();
 	};
+
+
+	// 생성자
+	template <typename T>
+	CLF_Stack<T>::CLF_Stack()
+	{
+		m_CDump = CCrashDump::GetInstance();
+		m_MPool = new CMemoryPool<st_LFS_NODE>(0, false);
+	}
+
+	// 소멸자
+	template <typename T>
+	CLF_Stack<T>::~CLF_Stack()
+	{
+		// null이 나올때까지 메모리 모두 반납
+		while (m_stpTop.m_pTop != nullptr)
+		{
+			st_LFS_NODE* deleteNode = m_stpTop.m_pTop;
+			m_stpTop.m_pTop = m_stpTop.m_pTop->m_stpNextBlock;
+
+			m_MPool->Free(deleteNode);
+		}
+
+		delete m_MPool;
+	}
+
+	// 내부 노드 수 얻기
+	template <typename T>
+	LONG CLF_Stack<T>::GetInNode()
+	{
+		return m_NodeCount;
+	}
+
+	// 유저가 사용 중인 노드 수 얻기
+	template <typename T>
+	LONG CLF_Stack<T>::GetOutNode()
+	{
+		return m_UseNodeCount;
+	}
+
+
+	// 인덱스를 스택에 추가
+	//
+	// return : 없음 (void)
+	template <typename T>
+	void CLF_Stack<T>::Push(T Data)
+	{
+		// 새로운 노드 할당받은 후, 데이터 셋팅
+		st_LFS_NODE* NewNode = m_MPool->Alloc();
+		NewNode->m_Data = Data;
+
+		// ---- 락프리 적용 ----
+		alignas(16)  st_TOP localTop;
+		do
+		{
+			// 로컬 Top 셋팅
+			localTop.m_pTop = m_stpTop.m_pTop;
+			localTop.m_l64Count = m_stpTop.m_l64Count;
+
+			// 신 노드의 Next를 Top으로 설정
+			NewNode->m_stpNextBlock = localTop.m_pTop;
+
+			// Top이동 시도
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)NewNode, (LONG64*)&localTop));
+
+		// 리스트 내부 노드 수 증가.
+		InterlockedIncrement(&m_NodeCount);
+	}
+
+
+	// 인덱스 얻기
+	//
+	// 성공 시, T 리턴
+	// 실패시 Crash 발생
+	template <typename T>
+	T CLF_Stack<T>::Pop()
+	{
+		// 더 이상 pop 할게 없으면 Crash 발생
+		if (m_stpTop.m_pTop == nullptr)
+			m_CDump->Crash();
+
+		// ---- 락프리 적용 ----
+		alignas(16)  st_TOP localTop;
+		do
+		{
+			localTop.m_pTop = m_stpTop.m_pTop;
+			localTop.m_l64Count = m_stpTop.m_l64Count;
+
+			// null체크
+			if (localTop.m_pTop == nullptr)
+			{
+				m_CDump->Crash();
+			}
+
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->m_stpNextBlock, (LONG64*)&localTop));
+		
+		// 리스트 내부 노드 수 감소
+		InterlockedDecrement(&m_NodeCount);
+
+		// 유저 사용 중 노드 수 증가.
+		InterlockedIncrement(&m_UseNodeCount);
+
+		// 리턴할 데이터 받아두기
+		T retval = localTop.m_pTop->m_Data;
+
+		// 안쓰는것 Free하기
+		m_MPool->Free(localTop.m_pTop);
+
+		// 리턴
+		return retval;
+	}
+
+
+
 }
 
 

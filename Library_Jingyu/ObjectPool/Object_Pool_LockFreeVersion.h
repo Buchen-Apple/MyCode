@@ -219,7 +219,7 @@ namespace Library_Jingyu
 		// 내 메모리풀에 있는 노드를 모두 'free()' 한다.
 		while (1)
 		{
-			if (m_stpTop.m_pTop == NULL)
+			if (m_stpTop.m_pTop == nullptr)
 				break;
 
 			st_BLOCK_NODE* deleteNode = m_stpTop.m_pTop;
@@ -248,7 +248,6 @@ namespace Library_Jingyu
 	template <typename DATA>
 	DATA*	CMemoryPool<DATA>::Alloc(void)
 	{
-		LONG64 l64_UniqueValue = 0;
 		bool bContinueFlag;		
 
 		while (1)
@@ -293,7 +292,7 @@ namespace Library_Jingyu
 				localTop.m_pTop = m_stpTop.m_pTop;
 				localTop.m_l64Count = m_stpTop.m_l64Count;
 
-				// 로컬 NextTop 셋팅
+				// null체크
 				if (localTop.m_pTop == nullptr)
 				{
 					bContinueFlag = true;
@@ -354,9 +353,7 @@ namespace Library_Jingyu
 			// 새로 들어온 노드의 Next를 Top으로 찌름
 			pNode->stpNextBlock = localTop.m_pTop;
 
-			// Top이동 시도
-			// 리턴값 : 1번인자의 초기값. 즉, 1번인자가 3번인자와 같았다면, 3번인자가 리턴된다.
-			// 3번인자가 리턴되지 않으면 다시 do while시도한다.
+			// Top이동 시도			
 		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)pNode, (LONG64*)&localTop));
 		
 		// 유저 사용중 카운트 감소
