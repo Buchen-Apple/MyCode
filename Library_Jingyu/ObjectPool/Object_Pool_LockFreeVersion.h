@@ -293,11 +293,8 @@ namespace Library_Jingyu
 			// ---- 락프리 적용 ----
 			do
 			{
-				localTop = { 0,0 };
-
-				// 로컬 Top 셋팅	
-				// ※ 여기서 리턴값이 성공할 일이 절대 없음!! 뜨면 이상한것.
-				InterlockedCompareExchange128((LONG64*)&m_stpTop, 0, 0, (LONG64*)&localTop);
+				localTop.m_pTop = m_stpTop.m_pTop;
+				localTop.m_l64Count = m_stpTop.m_l64Count;
 
 				// 로컬 NextTop 셋팅
 				if (localTop.m_pTop == nullptr)
@@ -353,8 +350,9 @@ namespace Library_Jingyu
 		st_TOP localTop;	// 64비트 연산이기 때문에 정렬 필요 없음.
 		do
 		{
-			// 로컬 Top 셋팅 (Count말고 포인터만 대입)
-			InterlockedExchange64((LONG64*)&localTop.m_pTop, (LONG64)m_stpTop.m_pTop);
+			// 로컬 Top 셋팅 
+			localTop.m_pTop = m_stpTop.m_pTop;
+			localTop.m_l64Count = m_stpTop.m_l64Count;
 
 			// 새로 들어온 노드의 Next를 Top으로 찌름
 			pNode->stpNextBlock = localTop.m_pTop;
@@ -362,7 +360,7 @@ namespace Library_Jingyu
 			// Top이동 시도
 			// 리턴값 : 1번인자의 초기값. 즉, 1번인자가 3번인자와 같았다면, 3번인자가 리턴된다.
 			// 3번인자가 리턴되지 않으면 다시 do while시도한다.
-		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)pNode, (LONG64)localTop.m_pTop) != (LONG64)localTop.m_pTop);
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)pNode, (LONG64*)&localTop));
 		
 		// 유저 사용중 카운트 감소
 		InterlockedDecrement(&m_iUseCount);
