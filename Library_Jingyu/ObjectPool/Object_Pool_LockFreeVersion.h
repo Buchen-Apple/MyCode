@@ -253,9 +253,6 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			if (m_iAllocCount > 4)
-				int abc = 10;
-
 			bContinueFlag = false;
 
 			//////////////////////////////////
@@ -347,7 +344,7 @@ namespace Library_Jingyu
 			pData->~DATA();
 		
 		// ---- 락프리 적용 ----
-		st_TOP localTop;	// 64비트 연산이기 때문에 정렬 필요 없음.
+		alignas(16)  st_TOP localTop;
 		do
 		{
 			// 로컬 Top 셋팅 
