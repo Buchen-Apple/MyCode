@@ -1,0 +1,5 @@
+﻿  stdafx.cpp
+  NetworkLib.cpp
+  Netlib.cpp
+CrashDump.obj : error LNK2011: 미리 컴파일된 개체가 링크되지 않았습니다. 이미지가 실행되지 않을 수 있습니다.
+C:\Git_Public\9_실무용 게임서버 프로그래밍\9차과제3_네트워크라이브러리_락프리적용\Netlib\x64\Release\Netlib.exe : fatal error LNK1120: 1개의 확인할 수 없는 외부 참조입니다.

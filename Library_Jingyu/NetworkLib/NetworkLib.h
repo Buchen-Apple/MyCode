@@ -3,6 +3,7 @@
 #define __NETWORK_LIB_H__
 #include <windows.h>
 #include "ProtocolBuff\ProtocolBuff.h"
+#include "LockFree_Stack\LockFree_Stack.h"
 
 using namespace std;
 
@@ -68,7 +69,7 @@ namespace Library_Jingyu
 		stSession* m_stSessionArray;
 
 		// 미사용 인덱스 관리 스택
-		stEmptyStack* m_stEmptyIndexStack;
+		CLF_Stack<ULONGLONG>* m_stEmptyIndexStack;
 
 		// 미세용 세션 관리 스택의 SRWLock
 		SRWLOCK m_srwSession_stack_srwl;
