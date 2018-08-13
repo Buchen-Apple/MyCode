@@ -132,72 +132,6 @@ namespace Library_Jingyu
 
 	};
 
-	// 미사용 인덱스 관리 구조체(스택)
-	//struct CLanServer::stEmptyStack
-	//{
-	//	// 스택은 Last-In-First_Out
-	//	int m_iTop;
-	//	int m_iMax;
-
-	//	ULONGLONG* m_iArray;
-
-	//	// 인덱스 얻기
-	//	//
-	//	// 반환값 ULONGLONG ---> 이 반환값으로 시프트 연산 할 수도 있어서, 혹시 모르니 unsigned로 리턴한다.
-	//	// 0이상(0포함) : 인덱스 정상 반환
-	//	// 10000000(천만) : 빈 인덱스 없음.
-	//	ULONGLONG Pop()
-	//	{
-	//		// 인덱스 비었나 체크 ----------
-	//		// 빈 인덱스가 없으면 18,000,000,000,000,000,000 
-	//		// 보통 Max로 설정한 유저가 모두 들어왔을 경우, 빈 인덱스가 없다.
-	//		if (m_iTop == 0)
-	//			return 10000000;
-
-	//		// 빈 인덱스가 있으면, m_iTop을 감소 후 인덱스 리턴.
-	//		m_iTop--;
-
-	//		return m_iArray[m_iTop];
-	//	}
-
-	//	// 인덱스 넣기
-	//	//
-	//	// 반환값 bool
-	//	// true : 인덱스 정상으로 들어감
-	//	// false : 인덱스 들어가지 않음 (이미 Max만큼 꽉 참)
-	//	bool Push(ULONGLONG PushIndex)
-	//	{
-	//		// 인덱스가 꽉찼나 체크 ---------
-	//		// 인덱스가 꽉찼으면 false 리턴
-	//		if (m_iTop == m_iMax)
-	//			return false;
-
-	//		// 인덱스가 꽉차지 않았으면, 추가
-	//		m_iArray[m_iTop] = PushIndex;
-	//		m_iTop++;
-
-	//		return true;
-	//	}
-
-	//	stEmptyStack(int Max)
-	//	{
-	//		m_iTop = Max;
-	//		m_iMax = Max;
-
-	//		m_iArray = new ULONGLONG[Max];
-
-	//		// 최초 생성 시, 모두 빈 인덱스
-	//		for (int i = 0; i < Max; ++i)
-	//			m_iArray[i] = i;
-	//	}
-
-	//	~stEmptyStack()
-	//	{
-	//		delete[] m_iArray;
-	//	}
-	//};
-
-
 
 	// -----------------------------
 	// 유저가 호출 하는 함수
@@ -390,10 +324,15 @@ namespace Library_Jingyu
 		// 최대 접속 가능 유저 수 셋팅
 		m_iMaxJoinUser = MaxConnect;
 
-		// 세션 배열 동적할당, 미사용 세션 관리 스택 동적할당.
+		// 세션 배열 동적할당
 		m_stSessionArray = new stSession[MaxConnect];
-		//m_stEmptyIndexStack = new stEmptyStack(MaxConnect);
+
+		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 그리고 미리 Max만큼 만들어두기
 		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>();
+		for (int i = 0; i < MaxConnect; ++i)
+		{
+			m_stEmptyIndexStack->Push(i);
+		}
 
 		// 엑셉트 스레드 생성
 		m_iA_ThreadCount = AcceptThreadCount;
@@ -734,15 +673,6 @@ namespace Library_Jingyu
 		m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
 
 
-		//Lock_Exclusive_Stack();
-		//if (m_stEmptyIndexStack->Push(DeleteSession->m_lIndex) == false)
-		//{
-		//	printf("IndexStackFull!!!!!\n");
-		//}
-		//Unlock_Exclusive_Stack();
-
-
-
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
 
@@ -999,23 +929,6 @@ namespace Library_Jingyu
 			// 1) 미사용 인덱스 알아오기
 			ULONGLONG iIndex = g_This->m_stEmptyIndexStack->Pop();		
 
-
-			//g_This->Lock_Exclusive_Stack(); // 미사용 인덱스 스택 락 -----------
-			//ULONGLONG iIndex = g_This->m_stEmptyIndexStack->Pop();
-			//if (iIndex == 10000000)
-			//{
-			//	g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
-
-			//									  // 에러 찍기 (OnError 호출)
-			//	printf("Stack_Index_Full!!\n");
-			//	g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
-
-			//	break;
-			//}
-			//g_This->Unlock_Exclusive_Stack(); // 미사용 인덱스 스택 락 해제 -----------
-
-
-
 			 // 2) 해당 세션 배열, 사용중으로 변경
 			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
 
@@ -1083,28 +996,6 @@ namespace Library_Jingyu
 		}
 
 		return 0;
-	}
-
-	// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
-	void CLanServer::LockStack_Exclusive_Func()
-	{
-		AcquireSRWLockExclusive(&m_srwSession_stack_srwl);
-	}
-
-	void CLanServer::UnlockStack_Exclusive_Func()
-	{
-		ReleaseSRWLockExclusive(&m_srwSession_stack_srwl);
-	}
-
-	// 미사용 세션 관리 스택에 Shared 락 걸기, 락 풀기
-	void CLanServer::LockStack_Shared_Func()
-	{
-		AcquireSRWLockShared(&m_srwSession_stack_srwl);
-	}
-
-	void CLanServer::UnlockStack_Shared_Func()
-	{
-		ReleaseSRWLockShared(&m_srwSession_stack_srwl);
 	}
 
 

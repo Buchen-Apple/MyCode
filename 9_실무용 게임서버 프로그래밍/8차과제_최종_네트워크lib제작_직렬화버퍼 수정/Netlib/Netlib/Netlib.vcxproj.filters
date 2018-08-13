@@ -38,10 +38,10 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_Lock.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

@@ -20,17 +20,6 @@ namespace Library_Jingyu
 	{
 	private:
 
-
-		// 미사용 세션 관리 스택용 Exclusive 락 걸기, 풀기
-#define	Lock_Exclusive_Stack()		LockStack_Exclusive_Func()
-#define Unlock_Exclusive_Stack()	UnlockStack_Exclusive_Func()
-
-
-		// 세션 배열용 Shared  락 걸기, 풀기
-#define	Lock_Shared_Stack()		LockStack_Shared_Func()
-#define Unlock_Shared_Stack()	UnlockStack_Shared_Func()
-
-
 		// ----------------------
 		// private 구조체 or enum 전방선언
 		// ----------------------
@@ -39,10 +28,6 @@ namespace Library_Jingyu
 
 		// Session구조체 전방선언
 		struct stSession;
-
-		// 미사용 인덱스 관리 구조체(스택)
-		struct stEmptyStack;
-
 
 		// ----------------------
 		// private 변수들
@@ -94,15 +79,7 @@ namespace Library_Jingyu
 		// ----------------------
 		// private 함수들
 		// ----------------------
-
-		// 미사용 세션 관리 스택에 Exclusive 락 걸기, 락 풀기
-		void LockStack_Exclusive_Func();
-		void UnlockStack_Exclusive_Func();
-
-		// 미사용 세션 관리 스택에 Shared 락 걸기, 락 풀기
-		void LockStack_Shared_Func();
-		void UnlockStack_Shared_Func();
-
+		
 		// 조합된 키를 입력받으면, Index 리턴하는 함수
 		WORD GetSessionIndex(ULONGLONG MixKey);
 
