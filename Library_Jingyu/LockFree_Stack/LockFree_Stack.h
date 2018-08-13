@@ -13,7 +13,6 @@ namespace Library_Jingyu
 	private:
 
 		LONG m_NodeCount;		// 리스트 내부의 노드 수
-		LONG m_UseNodeCount;	// 사용 중인 노드의 수
 
 		struct st_LFS_NODE
 		{
@@ -38,17 +37,15 @@ namespace Library_Jingyu
 
 	public:
 		// 생성자
-		CLF_Stack();
+		// 내부 메모리풀의 플레이스먼트 뉴 사용여부 인자로 받음. 
+		// 디폴트는 false (플레이스먼트 뉴 사용 안함)
+		CLF_Stack(bool bPlacementNew = false);
 
 		// 소멸자
 		~CLF_Stack();
 
 		// 내부 노드 수 얻기
 		LONG GetInNode();
-
-		// 유저가 사용 중인 노드 수 얻기
-		LONG GetOutNode();
-
 
 		// 인덱스를 스택에 추가
 		//
@@ -65,11 +62,14 @@ namespace Library_Jingyu
 
 
 	// 생성자
+	// 내부 메모리풀의 플레이스먼트 뉴 사용여부 인자로 받음. 
+	// 디폴트는 false (플레이스먼트 뉴 사용 안함)
 	template <typename T>
-	CLF_Stack<T>::CLF_Stack()
+	CLF_Stack<T>::CLF_Stack(bool bPlacementNew)
 	{
+		m_NodeCount = 0;
 		m_CDump = CCrashDump::GetInstance();
-		m_MPool = new CMemoryPool<st_LFS_NODE>(0, false);
+		m_MPool = new CMemoryPool<st_LFS_NODE>(0, bPlacementNew);
 	}
 
 	// 소멸자
@@ -93,13 +93,6 @@ namespace Library_Jingyu
 	LONG CLF_Stack<T>::GetInNode()
 	{
 		return m_NodeCount;
-	}
-
-	// 유저가 사용 중인 노드 수 얻기
-	template <typename T>
-	LONG CLF_Stack<T>::GetOutNode()
-	{
-		return m_UseNodeCount;
 	}
 
 
@@ -127,7 +120,7 @@ namespace Library_Jingyu
 			// Top이동 시도
 		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)NewNode, (LONG64*)&localTop));
 
-		// 리스트 내부 노드 수 증가.
+		// 내부 노드 수 증가.
 		InterlockedIncrement(&m_NodeCount);
 	}
 
@@ -143,6 +136,9 @@ namespace Library_Jingyu
 		if (m_stpTop.m_pTop == nullptr)
 			m_CDump->Crash();
 
+		// 내부 노드 수 감소
+		InterlockedDecrement(&m_NodeCount);
+
 		// ---- 락프리 적용 ----
 		alignas(16)  st_TOP localTop;
 		do
@@ -156,13 +152,7 @@ namespace Library_Jingyu
 				m_CDump->Crash();
 			}
 
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->m_stpNextBlock, (LONG64*)&localTop));
-		
-		// 리스트 내부 노드 수 감소
-		InterlockedDecrement(&m_NodeCount);
-
-		// 유저 사용 중 노드 수 증가.
-		InterlockedIncrement(&m_UseNodeCount);
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->m_stpNextBlock, (LONG64*)&localTop));	
 
 		// 리턴할 데이터 받아두기
 		T retval = localTop.m_pTop->m_Data;

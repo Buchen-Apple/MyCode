@@ -41,8 +41,6 @@ namespace Library_Jingyu
 		LONG m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
 		alignas(16)	st_TOP m_stpTop;
 
-		SRWLOCK sl;
-
 	public:
 		//////////////////////////////////////////////////////////////////////////
 		// 생성자, 파괴자.
@@ -88,19 +86,6 @@ namespace Library_Jingyu
 		//////////////////////////////////////////////////////////////////////////
 		int		GetUseCount(void) { return m_iUseCount; }
 
-
-		// SRWLock 걸기
-		void EnterLOCK()
-		{
-			AcquireSRWLockExclusive(&sl);
-		}
-
-		// SRWLock 풀기
-		void LeaveLOCK()
-		{
-			ReleaseSRWLockExclusive(&sl);
-		}
-
 	};
 
 
@@ -114,9 +99,6 @@ namespace Library_Jingyu
 	template <typename DATA>
 	CMemoryPool<DATA>::CMemoryPool(int iBlockNum, bool bPlacementNew)
 	{
-
-		// SRW Lock 초기화
-		InitializeSRWLock(&sl);
 
 		/////////////////////////////////////
 		// bPlacementNew
@@ -161,6 +143,7 @@ namespace Library_Jingyu
 			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pMemory;
 			if (bPlacementNew == false)
 				new (&pNode->stData) DATA();
+
 			pNode->stpNextBlock = nullptr;
 			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 			pMemory += sizeof(st_BLOCK_NODE);
@@ -338,6 +321,10 @@ namespace Library_Jingyu
 		if (pNode->stMyCode != MEMORYPOOL_ENDCODE)
 			return false;	
 
+		// 유저 사용중 카운트 감소
+		// free(Push) 시에는, 일단 카운트를 먼저 감소시킨다. 그래도 된다! 어차피 락프리는 100%성공 보장.
+		InterlockedDecrement(&m_iUseCount);
+
 		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
 		if (m_bPlacementNew == true)
 			pData->~DATA();
@@ -354,10 +341,7 @@ namespace Library_Jingyu
 			pNode->stpNextBlock = localTop.m_pTop;
 
 			// Top이동 시도			
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)pNode, (LONG64*)&localTop));
-		
-		// 유저 사용중 카운트 감소
-		InterlockedDecrement(&m_iUseCount);
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)pNode, (LONG64*)&localTop));		
 
 		return true;
 	}
