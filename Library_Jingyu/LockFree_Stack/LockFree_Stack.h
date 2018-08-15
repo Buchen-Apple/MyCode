@@ -10,22 +10,26 @@ namespace Library_Jingyu
 	template <typename T>
 	class CLF_Stack
 	{
-	private:
+	private:		
 
-		LONG m_NodeCount;		// 리스트 내부의 노드 수
-
+		// 노드
 		struct st_LFS_NODE
 		{
 			T m_Data;
 			st_LFS_NODE* m_stpNextBlock;
 		};
 
+		// Top 구조체
 		struct st_TOP
 		{
 			st_LFS_NODE* m_pTop = nullptr;
 			LONG64 m_l64Count = 0;
 		};
 
+		// 리스트 내부의 노드 수
+		LONG m_NodeCount;		
+
+		// Top을 가리키는 구조체 변수
 		alignas(16)	st_TOP m_stpTop;
 
 		// 에러났을 때 크래시 내는 용도
