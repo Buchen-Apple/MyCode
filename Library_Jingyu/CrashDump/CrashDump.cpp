@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "CrashDump.h"
 
 #pragma comment(lib, "DbgHelp.lib")
