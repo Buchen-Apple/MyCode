@@ -59,9 +59,9 @@ namespace Library_Jingyu
 		};
 
 		// 추적용
-		list<st_Trace> TraceArray[3];
+		list<st_Trace> TraceArray[5];
 		ULONGLONG TempCount = 0;
-		ULONGLONG Time[3];
+		ULONGLONG Time[5];
 
 		// 내부의 노드 수
 		LONG m_NodeCount;
@@ -128,7 +128,8 @@ namespace Library_Jingyu
 		m_stpTail.m_pPoint = m_stpHead.m_pPoint;
 
 		// 추적용 !!
-		Time[1] = Time[0] = Time[2] = GetTickCount64();
+		for(int i=0; i<5; ++i)
+			Time[i] = GetTickCount64();
 	}
 
 	// 소멸자

@@ -1,9 +1,9 @@
 ﻿  pch.cpp
   CrashDump.cpp
   LFQ_Main.cpp
-c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(52): warning C4312: '형식 캐스트': 'int'에서 더 큰 'void *'(으)로의 변환입니다.
-c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(76): warning C4311: '형식 캐스트': 'LPVOID'에서 'int'(으)로 포인터가 잘립니다.
-c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(76): warning C4302: '형식 캐스트': 'LPVOID'에서 'int'(으)로 잘립니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(54): warning C4312: '형식 캐스트': 'int'에서 더 큰 'void *'(으)로의 변환입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(79): warning C4311: '형식 캐스트': 'LPVOID'에서 'int'(으)로 포인터가 잘립니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\10차과제_락프리 큐 만들기_로그있음\lfq_main\lfq_main\lfq_main.cpp(79): warning C4302: '형식 캐스트': 'LPVOID'에서 'int'(으)로 잘립니다.
   코드를 생성하고 있습니다.
   All 92 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
