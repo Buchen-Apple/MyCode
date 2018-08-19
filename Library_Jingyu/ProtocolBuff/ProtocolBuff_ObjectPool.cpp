@@ -10,21 +10,24 @@ namespace Library_Jingyu
 #define BUFF_SIZE 1024
 
 	// static 메모리풀
-	CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, true);
+	CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
 	CCrashDump* CProtocolBuff::m_Dump = CCrashDump::GetInstance();
 
 	// 사이즈 지정한 생성자
-	CProtocolBuff::CProtocolBuff(int size, bool bPlacementNew)
-	{
-		Init(size, bPlacementNew);
+	CProtocolBuff::CProtocolBuff(int size)
+	{			
+		m_pProtocolBuff = new char[size];
+		Init();	
 	}
 
 	// 사이즈 지정 안한 생성자
-	CProtocolBuff::CProtocolBuff(bool bPlacementNew)
-	{
-		Init(BUFF_SIZE, bPlacementNew);
+	CProtocolBuff::CProtocolBuff()
+	{		
+		m_Size = BUFF_SIZE;
+		m_pProtocolBuff = new char[BUFF_SIZE];
+		Init();		
 	}
 
 	// 소멸자
@@ -34,10 +37,8 @@ namespace Library_Jingyu
 	}
 
 	// 초기화
-	void CProtocolBuff::Init(int size, bool bPlacementNew)
-	{
-		m_Size = size;		
-		m_pProtocolBuff = new char[size];
+	void CProtocolBuff::Init()
+	{					
 		m_Front = 0;
 		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 0;	// 레퍼런스 카운트 0으로 초기화
@@ -207,6 +208,7 @@ namespace Library_Jingyu
 	CProtocolBuff* CProtocolBuff::Alloc()
 	{
 		CProtocolBuff* NewAlloc = m_MPool->Alloc();
+		NewAlloc->Init();	// 할당 후 값들 초기화
 		NewAlloc->m_RefCount++; // 이땐 최초 할당이기때문에 인터락 필요 없음.
 
 		return NewAlloc;
@@ -245,7 +247,7 @@ namespace Library_Jingyu
 	// 생성자
 	CException::CException(const wchar_t* str)
 	{
-		_tcscpy_s(ExceptionText, _countof(ExceptionText), str);
+		_tcscpy_s(ExceptionText, _MyCountof(ExceptionText), str);
 	}
 
 	// 예외 텍스트의 주소 반환

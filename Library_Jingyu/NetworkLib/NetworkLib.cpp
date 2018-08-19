@@ -110,7 +110,7 @@ namespace Library_Jingyu
 		// »ý¼ºÀÚ
 		stSession()
 		{
-			m_SendQueue = new CLF_Queue< CProtocolBuff*>(1024, true);
+			m_SendQueue = new CLF_Queue< CProtocolBuff*>(1024, false);
 			m_lIOCount = 0;
 			m_lUseFlag = FALSE;	
 		}

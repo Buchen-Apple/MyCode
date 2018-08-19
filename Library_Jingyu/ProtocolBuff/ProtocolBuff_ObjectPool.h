@@ -48,12 +48,12 @@ namespace Library_Jingyu
 
 	private:
 		// 초기화
-		void Init(int size, bool bPlacementNew);
+		void Init();
 
 	public:
 		// 생성자, 소멸자
-		CProtocolBuff(int size, bool bPlacementNew = false);
-		CProtocolBuff(bool bPlacementNew = false);
+		CProtocolBuff(int size);
+		CProtocolBuff();
 		~CProtocolBuff();
 
 		// 버퍼 크기 재설정 (만들어는 뒀지만 현재 쓰는곳 없음)
