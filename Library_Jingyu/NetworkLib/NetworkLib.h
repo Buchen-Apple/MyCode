@@ -37,21 +37,20 @@ namespace Library_Jingyu
 		// ----------------------
 		// private 변수들
 		// ----------------------
-		// 엑셉트 스레드 핸들
-		HANDLE*  m_hAcceptHandle;
 
-		// 워커스레드 핸들 배열, 
+		// 리슨소켓
+		SOCKET m_soListen_sock;
+
+		// 워커, 엑셉트 스레드 핸들 배열
+		HANDLE*	m_hAcceptHandle;
 		HANDLE* m_hWorkerHandle;
-
-		// 워커스레드 수, 엑셉트 스레드 수, 라이프 체크 스레드 수
-		int m_iW_ThreadCount;
-		int m_iA_ThreadCount;
 
 		// IOCP 핸들
 		HANDLE m_hIOCPHandle;
 
-		// 리슨소켓
-		SOCKET m_soListen_sock;
+		// 워커스레드 수, 엑셉트 스레드 수
+		int m_iA_ThreadCount;
+		int m_iW_ThreadCount;
 
 
 		// ----- 세션 관리용 -------
@@ -60,9 +59,6 @@ namespace Library_Jingyu
 
 		// 미사용 인덱스 관리 스택
 		CLF_Stack<ULONGLONG>* m_stEmptyIndexStack;
-
-		// 미세용 세션 관리 스택의 SRWLock
-		SRWLOCK m_srwSession_stack_srwl;
 
 		// --------------------------
 
@@ -83,8 +79,7 @@ namespace Library_Jingyu
 	private:
 		// ----------------------
 		// private 함수들
-		// ----------------------
-		
+		// ----------------------		
 		// 조합된 키를 입력받으면, Index 리턴하는 함수
 		WORD GetSessionIndex(ULONGLONG MixKey);
 
@@ -182,6 +177,7 @@ namespace Library_Jingyu
 		// return true : 가동중
 		// return false : 가동중 아님
 		bool GetServerState();
+
 
 	public:
 		// -----------------------

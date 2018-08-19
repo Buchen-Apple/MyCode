@@ -6,6 +6,6 @@
   RingBuff.cpp
   Netlib.cpp
   코드를 생성하고 있습니다.
-  All 130 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 126 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\11차과제_네트워크lib제작_메모리풀,락프리스택,락프리큐 적용\Netlib\x64\Release\Netlib.exe

@@ -40,10 +40,10 @@ namespace Library_Jingyu
 		LONG m_RefCount;
 
 		// CProtocolBuff를 다루는 메모리풀 (락프리)
-		static CMemoryPool<CProtocolBuff>* g_MPool;
+		static CMemoryPool<CProtocolBuff>* m_MPool;
 
 		// 문제 생길 시 Crash 발생시킬 덤프.
-		static CCrashDump* g_Dump;
+		static CCrashDump* m_Dump;
 
 
 	private:

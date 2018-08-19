@@ -10,10 +10,10 @@ namespace Library_Jingyu
 #define BUFF_SIZE 1024
 
 	// static 메모리풀
-	CMemoryPool<CProtocolBuff>* CProtocolBuff::g_MPool = new CMemoryPool<CProtocolBuff>(0, true);
+	CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, true);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
-	CCrashDump* CProtocolBuff::g_Dump = CCrashDump::GetInstance();
+	CCrashDump* CProtocolBuff::m_Dump = CCrashDump::GetInstance();
 
 	// 사이즈 지정한 생성자
 	CProtocolBuff::CProtocolBuff(int size, bool bPlacementNew)
@@ -208,7 +208,7 @@ namespace Library_Jingyu
 	// Alloc. 현재는 이 안에서 new 후 레퍼런스 카운트 1 증가
 	CProtocolBuff* CProtocolBuff::Alloc()
 	{
-		CProtocolBuff* NewAlloc = g_MPool->Alloc();
+		CProtocolBuff* NewAlloc = m_MPool->Alloc();
 
 		//CProtocolBuff* NewAlloc = new CProtocolBuff;
 		NewAlloc->m_RefCount++; // 이땐 최초 할당이기때문에 인터락 필요 없음.
@@ -224,8 +224,8 @@ namespace Library_Jingyu
 		// 만약 감소 후 0이됐다면 delete
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
-			if (g_MPool->Free(pBuff) == false)
-				g_Dump->Crash();
+			if (m_MPool->Free(pBuff) == false)
+				m_Dump->Crash();
 
 			//delete pBuff;
 		}
