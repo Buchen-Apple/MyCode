@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "RingBuff\RingBuff.h"
 
 namespace Library_Jingyu

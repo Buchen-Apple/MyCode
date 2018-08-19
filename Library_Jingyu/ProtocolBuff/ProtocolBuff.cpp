@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "ProtocolBuff.h"
 
 namespace Library_Jingyu

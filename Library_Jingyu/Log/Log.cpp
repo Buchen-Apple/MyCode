@@ -1,4 +1,4 @@
-#include "stdafx.h"
+#include "pch.h"
 #include "Log.h"
 #include <strsafe.h>
 #include <direct.h>		//_mkdir or _wmkdir

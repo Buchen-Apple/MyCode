@@ -1,4 +1,8 @@
-#include "stdafx.h"
+/*
+락프리 적용된 Network Library
+*/
+
+#include "pch.h"
 
 #pragma comment(lib,"ws2_32")
 #include <Ws2tcpip.h>
@@ -327,7 +331,8 @@ namespace Library_Jingyu
 		// 세션 배열 동적할당
 		m_stSessionArray = new stSession[MaxConnect];
 
-		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 그리고 미리 Max만큼 만들어두기
+		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 
+		// 그리고 미리 Max만큼 만들어두기
 		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>();
 		for (int i = 0; i < MaxConnect; ++i)
 		{

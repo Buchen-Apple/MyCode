@@ -1,8 +1,13 @@
+/*
+락프리 적용된 Network Library
+*/
+
+
 #ifndef __NETWORK_LIB_H__
 
 #define __NETWORK_LIB_H__
 #include <windows.h>
-#include "ProtocolBuff\ProtocolBuff.h"
+#include "ProtocolBuff\ProtocolBuff_ObjectPool.h"
 #include "LockFree_Stack\LockFree_Stack.h"
 
 using namespace std;
