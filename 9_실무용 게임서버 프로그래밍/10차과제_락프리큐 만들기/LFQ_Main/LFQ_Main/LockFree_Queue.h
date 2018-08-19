@@ -58,14 +58,14 @@ namespace Library_Jingyu
 		LONG GetInNode();
 
 		// Enqueue
-		void Enqueue(T data, int ID);
+		void Enqueue(T data);
 
 		// Dequeue
 		// out 매개변수. 값을 채워준다.
 		//
 		// return -1 : 큐에 할당된 데이터가 없음.
 		// return 0 : 매개변수에 성공적으로 값을 채움.
-		int Dequeue(T& OutData, int ID);
+		int Dequeue(T& OutData);
 
 	};
 
@@ -119,7 +119,7 @@ namespace Library_Jingyu
 
 	// Enqueue
 	template <typename T>
-	void CLF_Queue<T>::Enqueue(T data, int ID)
+	void CLF_Queue<T>::Enqueue(T data)
 	{
 		st_LFQ_NODE* NewNode = m_MPool->Alloc();
 
@@ -169,7 +169,7 @@ namespace Library_Jingyu
 	// return -1 : 큐에 할당된 데이터가 없음.
 	// return 0 : 매개변수에 성공적으로 값을 채움.
 	template <typename T>
-	int CLF_Queue<T>::Dequeue(T& OutData, int ID)
+	int CLF_Queue<T>::Dequeue(T& OutData)
 	{
 		// 큐 내부의 사이즈 1 감소
 		// 노드가 없으면 -1 리턴
@@ -216,8 +216,17 @@ namespace Library_Jingyu
 				// 헤더와 테일이 다르면 디큐작업 진행
 				else
 				{
+
 					// 헤더 이동 시도
-					InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead.m_pPoint->m_stpNextBlock, (LONG64*)&LocalHead);
+					if (InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead.m_pPoint->m_stpNextBlock, (LONG64*)&LocalHead))
+					{
+						// 성공시 ------
+						OutData = pDeleteHead->m_stpNextBlock->m_Data;
+
+						// 이동 전의 헤더를 메모리풀에 반환
+						m_MPool->Free(pDeleteHead);
+						break;
+					}
 				}
 			}
 		}
