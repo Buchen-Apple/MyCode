@@ -14,6 +14,7 @@
 #include "CrashDump\CrashDump.h"
 #include "RingBuff\RingBuff.h"
 #include "Log\Log.h"
+#include "LockFree_Queue\LockFree_Queue.h"
 
 
 LONG g_lPacketAllocCount = 0;
@@ -98,7 +99,7 @@ namespace Library_Jingyu
 		int m_iWSASendCount;
 
 		CRingBuff m_RecvQueue;
-		CRingBuff m_SendQueue;
+		CLF_Queue< CProtocolBuff*> *m_SendQueue;
 
 		OVERLAPPED m_overRecvOverlapped;
 		OVERLAPPED m_overSendOverlapped;
@@ -109,11 +110,15 @@ namespace Library_Jingyu
 		// 생성자
 		stSession()
 		{
+			m_SendQueue = new CLF_Queue< CProtocolBuff*>(1024, true);
 			m_lIOCount = 0;
-			m_lSendFlag = 0;
-			m_lIndex = 0;
-			m_lUseFlag = FALSE;
-			m_iWSASendCount = 0;
+			m_lUseFlag = FALSE;	
+		}
+
+		// 소멸자
+		~stSession()
+		{
+			delete m_SendQueue;
 		}
 
 		void Reset_Func()
@@ -124,12 +129,7 @@ namespace Library_Jingyu
 
 			// 큐 초기화
 			m_RecvQueue.ClearBuffer();
-			m_SendQueue.ClearBuffer();
 		}
-
-		// 소멸자
-		// 필요없어짐
-		//~stSession() {}
 
 
 	};
@@ -139,11 +139,11 @@ namespace Library_Jingyu
 	// 유저가 호출 하는 함수
 	// -----------------------------
 	// 서버 시작
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
-	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
+	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
 	{
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
@@ -170,7 +170,7 @@ namespace Library_Jingyu
 		}
 
 		// 입출력 완료 포트 생성
-		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
+		m_hIOCPHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, ActiveWThreadCount);
 		if (m_hIOCPHandle == NULL)
 		{
 			// 윈도우 에러, 내 에러 보관
@@ -512,32 +512,13 @@ namespace Library_Jingyu
 		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
 		payloadBuff->Add();
-		int EnqueueCheck = m_stSessionArray[wArrayIndex].m_SendQueue.Enqueue((char*)&payloadBuff, sizeof(void*));
-		if (EnqueueCheck == -1)
-		{
-			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL;
-
-			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"SendPacket() --> Send Queue Full Clinet : [%s : %d] NetError(%d)",
-				m_stSessionArray[wArrayIndex].m_IP, m_stSessionArray[wArrayIndex].m_prot, (int)m_iMyErrorCode);
-
-			// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 삭제도 한다.
-			CProtocolBuff::Free(payloadBuff);
-
-			// 해당 유저는 접속을 끊는다.
-			shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
-
-			return false;
-		}
+		m_stSessionArray[wArrayIndex].m_SendQueue->Enqueue(payloadBuff);
 
 		// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 삭제도 한다.
 		CProtocolBuff::Free(payloadBuff);
 
 		// 4. SendPost시도
-		bool Check = SendPost(&m_stSessionArray[wArrayIndex]);
-
-		return Check;
+		return SendPost(&m_stSessionArray[wArrayIndex]);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
@@ -596,6 +577,12 @@ namespace Library_Jingyu
 		return m_bServerLife;
 	}
 
+	// 미사용 세션 관리 스택의 노드 얻기
+	LONG CLanServer::GetStackNodeCount()
+	{
+		return m_stEmptyIndexStack->GetInNode();
+	}
+
 
 
 
@@ -638,37 +625,21 @@ namespace Library_Jingyu
 		{
 			CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
 			InterlockedDecrement(&g_lPacketAllocCount);
-		}
+		}		
 
+		// ----------- 락프리큐(샌드큐) 적용한 버전
+		int UseSize = DeleteSession->m_SendQueue->GetInNode();
 
-		// 샌드 큐에 데이터가 있으면 동적해제 한다.
-		int UseSize = DeleteSession->m_SendQueue.GetUseSize();
-
-		while (UseSize > 0)
+		CProtocolBuff* Payload;
+		for (int i = 0; i < UseSize; ++i)
 		{
-			int TempSize;
+			// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+			if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
+				cNetDump->Crash();
 
-			if (UseSize > 8000)
-				int TempSize = 8000;
-			else
-				TempSize = UseSize;
-
-			// UseSize 사이즈 만큼 디큐
-			CProtocolBuff* Payload[1000];
-			int DequeueSize = DeleteSession->m_SendQueue.Dequeue((char*)Payload, TempSize);
-
-			// 꺼낸 수 만큼 UseSize 줄임. 다음 절차를 위해.
-			UseSize -= DequeueSize;
-
-			DequeueSize = DequeueSize / 8;
-
-			// 꺼낸 Dequeue만큼 돌면서 삭제한다.
-			for (int i = 0; i < DequeueSize; ++i)
-			{
-				CProtocolBuff::Free(Payload[i]);
-				InterlockedDecrement(&g_lPacketAllocCount);
-			}
-		}
+			CProtocolBuff::Free(Payload);
+			InterlockedDecrement(&g_lPacketAllocCount);
+		}				   		 
 
 		// 클로즈 소켓
 		closesocket(DeleteSession->m_Client_sock);	
@@ -852,6 +823,9 @@ namespace Library_Jingyu
 
 		// 유저가 접속할 때 마다 1씩 증가하는 고유한 키.
 		ULONGLONG ullUniqueSessionID = 0;
+		TCHAR tcTempIP[30];
+		USHORT port;
+		ULONGLONG iIndex;
 
 		while (1)
 		{
@@ -901,9 +875,8 @@ namespace Library_Jingyu
 			// ------------------
 			// IP와 포트 알아오기.
 			// ------------------
-			TCHAR tcTempIP[30];
 			InetNtop(AF_INET, &clientaddr.sin_addr, tcTempIP, 30);
-			USHORT port = ntohs(clientaddr.sin_port);
+			port = ntohs(clientaddr.sin_port);
 
 
 
@@ -923,7 +896,7 @@ namespace Library_Jingyu
 			// 세션 구조체 생성 후 셋팅
 			// ------------------
 			// 1) 미사용 인덱스 알아오기
-			ULONGLONG iIndex = g_This->m_stEmptyIndexStack->Pop();		
+			iIndex = g_This->m_stEmptyIndexStack->Pop();		
 
 			 // 2) 해당 세션 배열, 사용중으로 변경
 			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
@@ -1236,7 +1209,7 @@ namespace Library_Jingyu
 
 			// 2. SendBuff에 데이터가 있는지 확인
 			// 여기서 구한 UseSize는 이제 스냅샷 이다. 
-			int UseSize = NowSession->m_SendQueue.GetUseSize();
+			int UseSize = NowSession->m_SendQueue->GetInNode();
 			if (UseSize == 0)
 			{
 				// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
@@ -1244,7 +1217,7 @@ namespace Library_Jingyu
 
 				// 3. 진짜로 사이즈가 없는지 다시한번 체크. 락 풀고 왔는데, 컨텍스트 스위칭 일어나서 다른 스레드가 건드렸을 가능성
 				// 사이즈 있으면 위로 올라가서 한번 더 시도
-				if (NowSession->m_SendQueue.GetUseSize() > 0)
+				if (NowSession->m_SendQueue->GetInNode() > 0)
 					continue;
 
 				break;
@@ -1254,89 +1227,21 @@ namespace Library_Jingyu
 			// Send 준비하기
 			// ------------------
 			// 1. WSABUF 셋팅.
-			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];			
+			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];	
 
-			// 2. 한 번에 300개의 포인터(총 2400바이트)를 꺼내도록 시도 (디큐 구조)	
-			if (UseSize > dfSENDPOST_MAX_WSABUF * 8)
-				UseSize = dfSENDPOST_MAX_WSABUF * 8;
+			if (UseSize > dfSENDPOST_MAX_WSABUF)
+				UseSize = dfSENDPOST_MAX_WSABUF;
 
-			int wsabufByte = (NowSession->m_SendQueue.Dequeue((char*)NowSession->m_PacketArray, UseSize));
-			if (wsabufByte == -1)
+			for (int i = 0; i < UseSize; ++i)
 			{
-				// 큐가 텅 비어있음. 위에서 있다고 왔는데 여기서 없는것은 진짜 말도안되는 에러!
-				// 내 에러보관
-				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY;
+				if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[i]) == -1)
+					cNetDump->Crash();
 
-				// 에러 스트링 만들고
-				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("QUEUE_PEEK_EMPTY. UserID : %d, [%s:%d]"),
-					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d)",
-					tcErrorString, (int)m_iMyErrorCode);
-
-				// 끊는다.
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-				// 샌드 Flag 0으로 변경 (샌드 가능상태)
-				InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
-
-				// 에러 함수 호출
-				OnError((int)euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY, tcErrorString);
-
-				return false;
-			}
-
-			int Temp = wsabufByte / 8;
-
-			// 4. 실제로 디큐 한 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
-			for (int i = 0; i < Temp; i++)
-			{
 				wsabuf[i].buf = NowSession->m_PacketArray[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_PacketArray[i]->GetUseSize();
 			}
 
-
-			//CProtocolBuff* TempBuff[dfSENDPOST_MAX_WSABUF];
-			//int wsabufByte = (NowSession->m_SendQueue.Peek((char*)TempBuff, UseSize));
-			//if (wsabufByte == -1)
-			//{
-			//	// 큐가 텅 비어있음. 위에서 있다고 왔는데 여기서 없는것은 진짜 말도안되는 에러!
-			//	// 내 에러보관
-			//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY;
-
-			//	// 에러 스트링 만들고
-			//	TCHAR tcErrorString[300];
-			//	StringCchPrintf(tcErrorString, 300, _T("QUEUE_PEEK_EMPTY. UserID : %d, [%s:%d]"),
-			//		NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-			//	// 로그 찍기 (로그 레벨 : 에러)
-			//	cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d)",
-			//		tcErrorString, (int)m_iMyErrorCode);
-
-			//	// 끊는다.
-			//	shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-			//	// 샌드 Flag 0으로 변경 (샌드 가능상태)
-			//	InterlockedExchange(&NowSession->m_lSendFlag, FALSE);
-
-			//	// 에러 함수 호출
-			//	OnError((int)euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY, tcErrorString);
-
-			//	return false;
-			//}
-
-			//int Temp = wsabufByte / 8;
-
-			// 4. 실제로 픽 한 포인트 수(바이트 아님! 주의)만큼 돌면서 WSABUF구조체에 할당
-			/*for (int i = 0; i < Temp; i++)
-			{
-				wsabuf[i].buf = TempBuff[i]->GetBufferPtr();
-				wsabuf[i].len = TempBuff[i]->GetUseSize();
-			}*/
-
-			 NowSession->m_iWSASendCount = Temp;
+			NowSession->m_iWSASendCount = UseSize;
 
 			// 4. Overlapped 구조체 초기화
 			ZeroMemory(&NowSession->m_overSendOverlapped, sizeof(NowSession->m_overSendOverlapped));
@@ -1346,7 +1251,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&NowSession->m_lIOCount);
 
 			// 6. 에러 처리
-			if (WSASend(NowSession->m_Client_sock, wsabuf, Temp, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
+			if (WSASend(NowSession->m_Client_sock, wsabuf, UseSize, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
 			{
 				int Error = WSAGetLastError();
 

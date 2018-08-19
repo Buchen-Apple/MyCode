@@ -137,12 +137,13 @@ namespace Library_Jingyu
 		// -----------------------
 
 		// ----------------------------- 기능 함수들 ---------------------------
+
 		// 서버 시작
-		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
 		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
-		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect);
+		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect);
 
 		// 서버 스탑.
 		void Stop();
@@ -178,6 +179,8 @@ namespace Library_Jingyu
 		// return false : 가동중 아님
 		bool GetServerState();
 
+		// 미사용 세션 관리 스택의 노드 얻기
+		LONG GetStackNodeCount();
 
 	public:
 		// -----------------------

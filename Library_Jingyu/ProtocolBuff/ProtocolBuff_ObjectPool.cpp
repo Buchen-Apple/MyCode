@@ -193,8 +193,6 @@ namespace Library_Jingyu
 	// 현재 사용중인 용량 얻기.
 	int	CProtocolBuff::GetUseSize(void)
 	{
-		//return m_Size - GetFreeSize();
-
 		return m_Rear - m_Front;
 	}
 
@@ -209,8 +207,6 @@ namespace Library_Jingyu
 	CProtocolBuff* CProtocolBuff::Alloc()
 	{
 		CProtocolBuff* NewAlloc = m_MPool->Alloc();
-
-		//CProtocolBuff* NewAlloc = new CProtocolBuff;
 		NewAlloc->m_RefCount++; // 이땐 최초 할당이기때문에 인터락 필요 없음.
 
 		return NewAlloc;

@@ -5,10 +5,6 @@
 #include "ObjectPool\Object_Pool_LockFreeVersion.h"
 #include "CrashDump\CrashDump.h"
 
-#define LOG_COUNT 160000
-#define LOG_CLEAR_TIME	100
-
-
 namespace Library_Jingyu
 {
 	template <typename T>
@@ -49,7 +45,7 @@ namespace Library_Jingyu
 		// 생성자
 		// 내부 메모리풀의 플레이스먼트 뉴 사용여부 인자로 받음. 
 		// 디폴트는 false (플레이스먼트 뉴 사용 안함)
-		CLF_Queue(bool bPlacementNew = false);
+		CLF_Queue(int PoolCount, bool bPlacementNew = false);
 
 		// 소멸자
 		~CLF_Queue();
@@ -70,16 +66,18 @@ namespace Library_Jingyu
 	};
 
 	// 생성자
-	// 내부 메모리풀의 플레이스먼트 뉴 사용여부 인자로 받음. 
-	// 디폴트는 false (플레이스먼트 뉴 사용 안함)
+	// 
+	// [큐 내부 메모리풀의 수, 플레이스먼트뉴 사용여부] 를 인자로 받는다.
+	// 큐 내부 메모리풀의 수 : 0 입력 시, 무제한
+	// 플레이스먼트뉴 사용여부 : 디폴트로 false
 	template <typename T>
-	CLF_Queue<T>::CLF_Queue(bool bPlacementNew)
+	CLF_Queue<T>::CLF_Queue(int PoolCount, bool bPlacementNew)
 	{
 		// 내부 노드 셋팅. 최초는 0개
 		m_NodeCount = 0;
 
 		// 메모리풀 생성자 호출
-		m_MPool = new CMemoryPool<st_LFQ_NODE>(0, bPlacementNew);
+		m_MPool = new CMemoryPool<st_LFQ_NODE>(PoolCount, bPlacementNew);
 
 		// 크래시 내는 용도
 		m_CDump = CCrashDump::GetInstance();
