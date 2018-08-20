@@ -209,8 +209,8 @@ namespace Library_Jingyu
 	CProtocolBuff* CProtocolBuff::Alloc()
 	{
 		CProtocolBuff* NewAlloc = m_MPool->Alloc();
-		NewAlloc->Init();	// 할당 후 값들 초기화
-		NewAlloc->m_RefCount++; // 이땐 최초 할당이기때문에 인터락 필요 없음.
+		NewAlloc->m_Rear = 2;		// rear 값 2로 초기화
+		NewAlloc->m_RefCount = 1;	// ref값 1로 초기화
 
 		return NewAlloc;
 	}
@@ -225,8 +225,6 @@ namespace Library_Jingyu
 		{
 			if (m_MPool->Free(pBuff) == false)
 				m_Dump->Crash();
-
-			//delete pBuff;
 		}
 
 	}
