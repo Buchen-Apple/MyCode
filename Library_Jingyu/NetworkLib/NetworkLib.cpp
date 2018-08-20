@@ -621,29 +621,24 @@ namespace Library_Jingyu
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;		
 
 		// 직렬화 버퍼에 있는 데이터 삭제
-		if (DeleteSession->m_iWSASendCount > 0)
+		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
 		{
-			for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
-				CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
-
-			InterlockedAdd(&g_lPacketAllocCount, -DeleteSession->m_iWSASendCount);
-		}
+			CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
+			InterlockedDecrement(&g_lPacketAllocCount);
+		}			
 
 		// ----------- 락프리큐(샌드큐) 적용한 버전
 		int UseSize = DeleteSession->m_SendQueue->GetInNode();
-		if (UseSize > 0)
+
+		CProtocolBuff* Payload;
+		for (int i = 0; i < UseSize; ++i)
 		{
-			CProtocolBuff* Payload;
-			for (int i = 0; i < UseSize; ++i)
-			{
-				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
-				if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
-					cNetDump->Crash();
+			// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+			if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
+				cNetDump->Crash();
 
-				CProtocolBuff::Free(Payload);
-			}
-
-			InterlockedAdd(&g_lPacketAllocCount, -UseSize);
+			CProtocolBuff::Free(Payload);
+			InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
 		// 클로즈 소켓
@@ -791,10 +786,8 @@ namespace Library_Jingyu
 				for (int i = 0; i < stNowSession->m_iWSASendCount; ++i)
 				{
 					CProtocolBuff::Free(stNowSession->m_PacketArray[i]);
-					//InterlockedDecrement(&g_lPacketAllocCount);
+					InterlockedDecrement(&g_lPacketAllocCount);
 				}
-
-				InterlockedAdd(&g_lPacketAllocCount, -stNowSession->m_iWSASendCount);
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 

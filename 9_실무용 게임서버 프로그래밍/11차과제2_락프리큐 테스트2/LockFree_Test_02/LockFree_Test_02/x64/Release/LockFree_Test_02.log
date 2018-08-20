@@ -1,0 +1,13 @@
+﻿  pch.cpp
+  CrashDump.cpp
+  LockFree_Test_02.cpp
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(70): warning C4312: '형식 캐스트': 'int'에서 더 큰 'void *'(으)로의 변환입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(76): warning C4312: '형식 캐스트': 'int'에서 더 큰 'void *'(으)로의 변환입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(107): warning C4311: '형식 캐스트': 'LPVOID'에서 'int'(으)로 포인터가 잘립니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(107): warning C4302: '형식 캐스트': 'LPVOID'에서 'int'(으)로 잘립니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(184): warning C4311: '형식 캐스트': 'LPVOID'에서 'int'(으)로 포인터가 잘립니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\lockfree_test_02\lockfree_test_02\lockfree_test_02.cpp(184): warning C4302: '형식 캐스트': 'LPVOID'에서 'int'(으)로 잘립니다.
+  코드를 생성하고 있습니다.
+  All 41 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  코드를 생성했습니다.
+  LockFree_Test_02.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\11차과제2_락프리큐 테스트2\LockFree_Test_02\x64\Release\LockFree_Test_02.exe
