@@ -19,7 +19,6 @@
 
 LONG g_lPacketAllocCount = 0;
 
-
 namespace Library_Jingyu
 {
 
@@ -334,6 +333,7 @@ namespace Library_Jingyu
 		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>();
 		for (int i = 0; i < MaxConnect; ++i)
 			m_stEmptyIndexStack->Push(i);
+
 
 		// ¿¢¼ÁÆ® ½º·¹µå »ý¼º
 		m_iA_ThreadCount = AcceptThreadCount;

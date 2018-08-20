@@ -17,7 +17,8 @@ namespace Library_Jingyu
 
 	// 사이즈 지정한 생성자
 	CProtocolBuff::CProtocolBuff(int size)
-	{			
+	{		
+		m_Size = size;
 		m_pProtocolBuff = new char[size];
 		Init();	
 	}
