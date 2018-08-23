@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <new.h>
+#include <nmmintrin.h>
 
 
 namespace Library_Jingyu
@@ -268,12 +269,11 @@ namespace Library_Jingyu
 			// m_pTop가 NULL이 아닐 때 처리
 			//////////////////////////////////
 			alignas(16)  st_TOP localTop;
-
 			// ---- 락프리 적용 ----
 			do
 			{
-				localTop.m_pTop = m_stpTop.m_pTop;
 				localTop.m_l64Count = m_stpTop.m_l64Count;
+				localTop.m_pTop = m_stpTop.m_pTop;				
 
 				// null체크
 				if (localTop.m_pTop == nullptr)
@@ -330,18 +330,18 @@ namespace Library_Jingyu
 			pData->~DATA();
 		
 		// ---- 락프리 적용 ----
-		alignas(16)  st_TOP localTop;
+		st_BLOCK_NODE* localTop;
+
 		do
 		{
 			// 로컬 Top 셋팅 
-			localTop.m_pTop = m_stpTop.m_pTop;
-			localTop.m_l64Count = m_stpTop.m_l64Count;
+			localTop = m_stpTop.m_pTop;
 
 			// 새로 들어온 노드의 Next를 Top으로 찌름
-			pNode->stpNextBlock = localTop.m_pTop;
+			pNode->stpNextBlock = localTop;
 
 			// Top이동 시도			
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)pNode, (LONG64*)&localTop));		
+		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)pNode, (LONG64)localTop) != (LONG64)localTop);
 
 		return true;
 	}

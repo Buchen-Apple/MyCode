@@ -111,18 +111,19 @@ namespace Library_Jingyu
 		NewNode->m_Data = Data;
 
 		// ---- 락프리 적용 ----
-		alignas(16)  st_TOP localTop;
+		//alignas(16)  st_TOP localTop;
+		st_LFS_NODE* localTop;
+
 		do
 		{
 			// 로컬 Top 셋팅
-			localTop.m_pTop = m_stpTop.m_pTop;
-			localTop.m_l64Count = m_stpTop.m_l64Count;
+			localTop = m_stpTop.m_pTop;
 
 			// 신 노드의 Next를 Top으로 설정
-			NewNode->m_stpNextBlock = localTop.m_pTop;
+			NewNode->m_stpNextBlock = localTop;
 
 			// Top이동 시도
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)NewNode, (LONG64*)&localTop));
+		} while (InterlockedCompareExchange64((LONG64*)&m_stpTop.m_pTop, (LONG64)NewNode, (LONG64)localTop) != (LONG64)localTop);
 
 		// 내부 노드 수 증가.
 		InterlockedIncrement(&m_NodeCount);
@@ -147,8 +148,8 @@ namespace Library_Jingyu
 		alignas(16)  st_TOP localTop;
 		do
 		{
-			localTop.m_pTop = m_stpTop.m_pTop;
 			localTop.m_l64Count = m_stpTop.m_l64Count;
+			localTop.m_pTop = m_stpTop.m_pTop;			
 
 			// null체크
 			if (localTop.m_pTop == nullptr)

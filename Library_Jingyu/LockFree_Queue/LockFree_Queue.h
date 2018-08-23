@@ -130,8 +130,8 @@ namespace Library_Jingyu
 		while (true)
 		{
 			// tail 스냅샷
-			LocalTail.m_pPoint = m_stpTail.m_pPoint;
 			LocalTail.m_l64Count = m_stpTail.m_l64Count;
+			LocalTail.m_pPoint = m_stpTail.m_pPoint;			
 
 			// 정말 m_stpTail이 LocalTail와 같다면 로직 진행
 			if (LocalTail.m_pPoint == m_stpTail.m_pPoint)
@@ -183,12 +183,12 @@ namespace Library_Jingyu
 		while (true)
 		{
 			// head 스냅샷
-			pDeleteHead = LocalHead.m_pPoint = m_stpHead.m_pPoint;
 			LocalHead.m_l64Count = m_stpHead.m_l64Count;
+			pDeleteHead = LocalHead.m_pPoint = m_stpHead.m_pPoint;			
 
 			// tail 스냅샷
-			LocalTail.m_pPoint = m_stpTail.m_pPoint;
 			LocalTail.m_l64Count = m_stpTail.m_l64Count;
+			LocalTail.m_pPoint = m_stpTail.m_pPoint;			
 
 			// 정말 m_stpHead이 LocalHead와 같다면 로직 진행
 			if (m_stpHead.m_pPoint == pDeleteHead)

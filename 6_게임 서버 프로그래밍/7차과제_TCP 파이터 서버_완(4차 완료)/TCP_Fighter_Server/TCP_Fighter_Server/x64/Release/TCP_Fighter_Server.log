@@ -1,18 +1,14 @@
 ﻿  stdafx.cpp
   Profiling_Class.cpp
   ProtocolBuff.cpp
-c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-  RingBuff.cpp
+c:\git_public\library_jingyu\protocolbuff\protocolbuff.cpp(246): fatal error C1010: 미리 컴파일된 헤더를 찾는 동안 예기치 않은 파일의 끝이 나타났습니다. '#include "stdafx.h"'을(를) 소스에 추가하시겠습니까?
+  RingBuff_20180611.cpp
+c1xx : fatal error C1083: 소스 파일을 열 수 없습니다. '..\..\..\..\Library_Jingyu\RingBuff\RingBuff_20180611.cpp': No such file or directory
   Network_Func.cpp
 c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-c:\users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\network_func.cpp(513): warning C4244: '초기화 중': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\git_public\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\network_func.cpp(513): warning C4244: '초기화 중': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
   TCP_Fighter_Server.cpp
 c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-c:\users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(140): warning C4018: '>=': signed 또는 unsigned가 일치하지 않습니다.
-c:\users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(191): warning C4244: '=': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-c:\users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(193): warning C4244: '+=': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-  코드를 생성하고 있습니다.
-  All 298 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  코드를 생성했습니다.
-  TCP_Fighter_Server.vcxproj -> C:\Users\procademy\source\repos\6_게임 서버 프로그래밍\7차과제_TCP 파이터 서버_완(4차 완료)\TCP_Fighter_Server\x64\Release\TCP_Fighter_Server.exe
+c:\git_public\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(140): warning C4018: '>=': signed 또는 unsigned가 일치하지 않습니다.
+c:\git_public\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(191): warning C4244: '=': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\git_public\6_게임 서버 프로그래밍\7차과제_tcp 파이터 서버_완(4차 완료)\tcp_fighter_server\tcp_fighter_server\tcp_fighter_server.cpp(193): warning C4244: '+=': 'ULONGLONG'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
