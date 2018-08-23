@@ -10,7 +10,8 @@ namespace Library_Jingyu
 #define BUFF_SIZE 1024
 
 	// static 메모리풀
-	CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, false);
+	// CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, false);
+	CMemoryPoolTLS<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPoolTLS<CProtocolBuff>(100, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
 	CCrashDump* CProtocolBuff::m_Dump = CCrashDump::GetInstance();
@@ -234,6 +235,11 @@ namespace Library_Jingyu
 	{
 		// 인터락으로 안전하게 증가
 		InterlockedIncrement(&m_RefCount);
+	}
+
+	CMemoryPoolTLS< CProtocolBuff>* CProtocolBuff::Test()
+	{
+		return m_MPool;
 	}
 
 

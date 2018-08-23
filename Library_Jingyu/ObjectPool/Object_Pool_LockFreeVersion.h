@@ -4,14 +4,20 @@
 #include <Windows.h>
 #include <stdio.h>
 #include <new.h>
-#include <nmmintrin.h>
+#include "CrashDump\CrashDump.h"
 
+
+extern ULONGLONG g_ullAllocNodeCount;
+extern ULONGLONG g_ullFreeNodeCount;
 
 namespace Library_Jingyu
 {
 
 #define MEMORYPOOL_ENDCODE	890226
 
+	/////////////////////////////////////////////////////
+	// 메모리 풀(오브젝트 풀
+	////////////////////////////////////////////////////
 	template <typename DATA>
 	class CMemoryPool
 	{
@@ -345,6 +351,362 @@ namespace Library_Jingyu
 
 		return true;
 	}
+
+
+
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------
+
+	/////////////////////////////////////////////////////
+	// 메모리 풀 TLS 버전
+	//
+	// 내부에서 청크를 다룸
+	////////////////////////////////////////////////////
+	
+
+	template <typename DATA>
+	class CMemoryPoolTLS
+	{	
+
+	private:			
+		struct stChunk;
+
+		// 청크 내부의 노드
+		struct Node
+		{
+			DATA  m_Data;
+			stChunk* m_pMyChunk;
+			int	stMyCode;
+		};
+
+		// ----------------------------
+		// 청크 구조체
+		// ----------------------------
+		struct stChunk
+		{	
+
+#define NODE_COUNT 200	// 1개의 청크가 다루는 노드의 수
+
+			// 청크 멤버변수
+			Node m_arrayNode[NODE_COUNT];
+			int m_iTop;			// top 겸 Alloc카운트. 0부터 시작
+			int m_iFreeRef;		// Free 카운트. 0부터 시작
+			CCrashDump* m_ChunkDump;
+
+			// 청크 생성자
+			stChunk();
+
+			// 청크 소멸자
+			~stChunk();
+
+			///////////////////////////
+			// 청크 Alloc
+			//
+			// Parameters : 없음
+			// return : (DATA*) 데이터 포인터
+			///////////////////////////
+			bool Alloc(DATA** retData);
+
+			///////////////////////////
+			// 청크 Free
+			//
+			// Parameters : (DATA*) Free 할 데이터
+			// return : FreeRefCount가 0이되면 false, 그 외엔 true
+			///////////////////////////
+			bool Free(DATA* pData);
+
+			// Alloc카운트 얻기
+			int GetAllocCount()
+			{	return m_iTop;	}
+
+			// Free 카운트 얻기
+			int GetFreeCount()
+			{	return m_iFreeRef;	}
+		};	
+
+
+	private:
+		// ------------------
+		// 멤버 변수
+		// ------------------
+		CMemoryPool<stChunk>* m_ChunkPool;
+		DWORD m_dwIndex;
+		static bool m_bPlacementNew;
+		CCrashDump* m_TLSDump;
+
+	public:
+		//////////////////////////////////////////////////////////////////////////
+		// 생성자, 파괴자.
+		//
+		// Parameters:	(int) 최대 블럭 개수. (청크의 수)
+		//				(bool) 생성자 호출 여부. (청크 내부에서 관리되는 DATA들의 생성자 호출 여부. 청크 생성자 호출여부 아님)
+		// Return:
+		//////////////////////////////////////////////////////////////////////////
+		CMemoryPoolTLS(int iBlockNum, bool bPlacementNew);
+
+		virtual ~CMemoryPoolTLS();
+
+		//////////////////////////////////////////////////////////////////////////
+		// 블럭 하나를 할당받는다. (Pop)
+		//
+		// Parameters: 없음.
+		// Return: (DATA *) 데이타 블럭 포인터.
+		//////////////////////////////////////////////////////////////////////////
+		DATA* Alloc();
+
+		//////////////////////////////////////////////////////////////////////////
+		// 사용중이던 블럭을 해제한다. (Push)
+		//
+		// Parameters: (DATA *) 블럭 포인터.
+		// Return: (BOOL) TRUE, FALSE.
+		//////////////////////////////////////////////////////////////////////////
+		bool Free(DATA* pData);
+
+		// 내부에 있는 청크 수 얻기
+		int GetAllocChunkCount()
+		{	
+			return m_ChunkPool->GetAllocCount(); 
+		}
+
+		// 외부에 있는 청크 수 얻기
+		int GetOutChunkCount()
+		{	
+			return m_ChunkPool->GetUseCount();	
+		}
+
+
+
+	};	
+
+	template <typename DATA>
+	bool CMemoryPoolTLS<DATA>::m_bPlacementNew;
+
+	// ----------------------
+	// 
+	// CMemoryPoolTLS 내부의 이너 구조체, stChunk.
+	// 
+	// ----------------------
+
+	// 청크 생성자
+	template <typename DATA>
+	CMemoryPoolTLS<DATA>::stChunk::stChunk()
+	{
+		m_ChunkDump = CCrashDump::GetInstance();
+
+		for (int i = 0; i < NODE_COUNT; ++i)
+		{
+			m_arrayNode[i].m_pMyChunk = this;
+			m_arrayNode[i].stMyCode = MEMORYPOOL_ENDCODE;
+		}
+
+		m_iTop = 0;
+		m_iFreeRef = 0;
+	}
+
+	// 청크 소멸자
+	template <typename DATA>
+	CMemoryPoolTLS<DATA>::stChunk::~stChunk()
+	{
+		// 플레이스먼트 뉴 여부가 false라면, 청크Free 시, 소멸자가 호출 안된것이니 여기서 소멸자 호출시켜줘야 함
+		if (m_bPlacementNew == false)
+		{
+			for (int i = 0; i < NODE_COUNT; ++i)
+			{
+				m_arrayNode[i].m_Data.~DATA();
+			}
+		}
+	}
+
+	///////////////////////////
+	// 청크 Alloc
+	//
+	// Parameters : (out) DATA의 주소
+	// return : 청크의 모든 데이터를 Alloc 시 false, 아니면 true
+	///////////////////////////
+	template <typename DATA>
+	bool CMemoryPoolTLS<DATA>::stChunk::Alloc(DATA** retData)
+	{
+		// 만약, Top이 NODE_COUNT보다 크거나 같다면 뭔가 잘못된것.
+		// 이 전에 이미 CMemoryPoolTLS쪽에서 캐치되었어야 함
+		if (m_iTop >= NODE_COUNT)
+			m_ChunkDump->Crash();
+
+		InterlockedIncrement(&g_ullAllocNodeCount);
+
+		// 현재 Top의 데이터를 가져온다. 그리고 Top을 1 증가
+		*retData = &m_arrayNode[m_iTop++].m_Data;		
+
+		// 플레이스먼트 뉴 여부에 따라 생성자 호출
+		if (m_bPlacementNew == true)
+			new (retData) DATA();		
+
+		// 만약, 청크의 데이터를 모두 Alloc했으면, false 리턴
+		if (m_iTop == NODE_COUNT)
+			return false;
+
+		return true;
+	}
+
+
+	///////////////////////////
+	// 청크 Free
+	//
+	// Parameters : (DATA*) Free 할 데이터
+	// return : 실패시 0, 성공시 1, FreeRefCount가 0이되었다면 2
+	///////////////////////////
+	template <typename DATA>
+	bool CMemoryPoolTLS<DATA>::stChunk::Free(DATA* pData)
+	{
+		InterlockedIncrement(&g_ullFreeNodeCount);
+
+		// FreeRefCount 1감소. 
+		// 만약 0이되면 청크 내부 내용 초기화 후, false 리턴
+		if (InterlockedIncrement((LONG*)&m_iFreeRef) == NODE_COUNT)
+		{
+			// Free하기전에, 플레이스먼트 뉴를 사용한다면 모든 DATA의 소멸자 호출
+			if (m_bPlacementNew == true)
+			{
+				for (int i = 0; i < NODE_COUNT; ++i)
+				{
+					m_arrayNode[i].m_Data.~DATA();
+				}
+			}
+
+			// Top과 RefCount 초기화
+			m_iTop = 0;
+			m_iFreeRef = 0;
+
+			return false;
+		}
+
+		return true;		
+	}
+
+
+	// ----------------------
+	// 
+	// CMemoryPoolTLS 부분
+	// 
+	// ----------------------
+
+	//////////////////////////////////////////////////////////////////////////
+	// 생성자, 파괴자.
+	//
+	// Parameters:	(int) 최대 블럭 개수. (청크의 수)
+	//				(bool) 생성자 호출 여부. (청크 내부에서 관리되는 DATA들의 생성자 호출 여부. 청크 생성자 호출여부 아님)
+	// Return:
+	//////////////////////////////////////////////////////////////////////////
+	template <typename DATA>
+	CMemoryPoolTLS<DATA>::CMemoryPoolTLS(int iBlockNum, bool bPlacementNew)
+	{
+		// 청크 메모리풀 설정 (청크는 무조건 플레이스먼트 뉴 사용 안함)
+		m_ChunkPool = new CMemoryPool<stChunk>(iBlockNum, false);
+
+		// 덤프 셋팅
+		m_TLSDump = CCrashDump::GetInstance();
+
+		// 데이터의 플레이스먼트 뉴 여부 저장(청크 아님. 청크 내부에서 관리되는 데이터의 플레이스먼트 뉴 호출 여부)
+		m_bPlacementNew = bPlacementNew;
+
+		// TLSIndex 알아오기
+		// 앞으로 모든 스레드는 이 인덱스를 사용해 청크 관리.
+		// 리턴값이 인덱스 아웃이면 Crash
+		m_dwIndex = TlsAlloc();
+		if (m_dwIndex == TLS_OUT_OF_INDEXES)
+			m_TLSDump->Crash();
+	}
+	
+	template <typename DATA>
+	CMemoryPoolTLS<DATA>::~CMemoryPoolTLS()
+	{
+		// 청크 관리 메모리풀 해제
+		delete m_ChunkPool;
+
+		// TLS 인덱스 반환
+		if (TlsFree(m_dwIndex) == FALSE)
+		{
+			DWORD Error = GetLastError();
+			m_TLSDump->Crash();
+		}
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// 블럭 하나를 할당받는다. (Pop)
+	//
+	// Parameters: 없음.
+	// Return: (DATA *) 데이타 블럭 포인터.
+	//////////////////////////////////////////////////////////////////////////
+	template <typename DATA>
+	DATA* CMemoryPoolTLS<DATA>::Alloc()
+	{
+		// 현재 이 함수를 호출한 스레드의 TLS 인덱스에 청크가 있는지 확인
+		void* pChunk = TlsGetValue(m_dwIndex);
+
+		// TLS에 청크가 없으면 청크 새로 할당함.
+		if (pChunk == nullptr)
+		{
+			pChunk = m_ChunkPool->Alloc();			
+			if (TlsSetValue(m_dwIndex, pChunk) == FALSE)
+			{
+				DWORD Error = GetLastError();
+				m_TLSDump->Crash();
+			}
+		}
+
+		// TLS에 있는 청크에서 노드 하나 빼옴
+		DATA* retData = nullptr;
+		
+		// 청크의 데이터를 모두 Alloc했으면, TLS 인덱스의 값을 nullptr로 만든다.
+		if (((stChunk*)pChunk)->Alloc(&retData) == false)
+		{			
+			if (TlsSetValue(m_dwIndex, nullptr) == FALSE)
+			{
+				DWORD Error = GetLastError();
+				m_TLSDump->Crash();
+			}
+		}				
+
+		// 노드를 리턴
+		return retData;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// 사용중이던 블럭을 해제한다. (Push)
+	//
+	// Parameters: (DATA *) 블럭 포인터.
+	// Return: (BOOL) TRUE, FALSE.
+	//////////////////////////////////////////////////////////////////////////
+	template <typename DATA>
+	bool CMemoryPoolTLS<DATA>::Free(DATA* pData)
+	{
+		// 안전성 검사 -------
+		// 이상한 포인터가 오면 그냥 리턴
+		if (pData == NULL)
+			return false;
+
+		// 내가 할당한 블럭이 맞는지 확인
+		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
+			return false;
+
+		// 해당 데이터의 청크 알아온다.
+		stChunk* pChunk = ((Node*)pData)->m_pMyChunk;
+			   
+		// 청크 Free에서 false가 리턴될 경우, 청크 관리 메모리풀로 청크를 Free 한다.
+		if (pChunk->Free(pData) == false)
+			m_ChunkPool->Free(pChunk);
+
+
+		return true;
+	}
+
+
+
+
 }
 
 #endif // !__OBJECT_POOL_H__

@@ -17,7 +17,7 @@
 #include "LockFree_Queue\LockFree_Queue.h"
 
 
-LONG g_lPacketAllocCount = 0;
+extern LONG g_lPacketAllocCount;
 
 namespace Library_Jingyu
 {
