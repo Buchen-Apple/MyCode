@@ -131,13 +131,17 @@ namespace Library_Jingyu
 		{
 			// tail 스냅샷
 			LocalTail.m_l64Count = m_stpTail.m_l64Count;
-			LocalTail.m_pPoint = m_stpTail.m_pPoint;			
+			LocalTail.m_pPoint = m_stpTail.m_pPoint;		
+
+			// LocalTail의 Next 스냅샷
+			st_LFQ_NODE* LocalNext = LocalTail.m_pPoint->m_stpNextBlock;
 
 			// 정말 m_stpTail이 LocalTail와 같다면 로직 진행
-			if (LocalTail.m_pPoint == m_stpTail.m_pPoint)
+			if (LocalTail.m_pPoint == m_stpTail.m_pPoint && 
+				LocalTail.m_l64Count == m_stpTail.m_l64Count)
 			{
 				// Next가 Null이면 로직 진행
-				if (LocalTail.m_pPoint->m_stpNextBlock == nullptr)
+				if (LocalNext == nullptr)
 				{
 					// 라인 연결 시도
 					if (InterlockedCompareExchange64((LONG64*)&m_stpTail.m_pPoint->m_stpNextBlock, (LONG64)NewNode, (LONG64)nullptr) == (LONG64)nullptr)
@@ -151,7 +155,7 @@ namespace Library_Jingyu
 				else
 				{
 					// null이 아니라면 Tail이동작업 시도				
-					InterlockedCompareExchange128((LONG64*)&m_stpTail, LocalTail.m_l64Count + 1, (LONG64)LocalTail.m_pPoint->m_stpNextBlock, (LONG64*)&LocalTail);
+					InterlockedCompareExchange128((LONG64*)&m_stpTail, LocalTail.m_l64Count + 1, (LONG64)LocalNext, (LONG64*)&LocalTail);
 				}
 			}
 
@@ -178,30 +182,31 @@ namespace Library_Jingyu
 		// 디큐는, 기본적으로 현재 헤드가 가리키고 있는 노드의, 다음 노드의 값을 리턴한다.
 		// 헤드는 무조건 더미를 가리키는 것이다.
 		alignas(16) st_NODE_POINT LocalHead, LocalTail;
-		st_LFQ_NODE *pDeleteHead;
 
 		while (true)
 		{
 			// head 스냅샷
 			LocalHead.m_l64Count = m_stpHead.m_l64Count;
-			pDeleteHead = LocalHead.m_pPoint = m_stpHead.m_pPoint;			
+			LocalHead.m_pPoint = m_stpHead.m_pPoint;			
 
 			// tail 스냅샷
 			LocalTail.m_l64Count = m_stpTail.m_l64Count;
-			LocalTail.m_pPoint = m_stpTail.m_pPoint;			
+			LocalTail.m_pPoint = m_stpTail.m_pPoint;	
+
+			// LocalHead의 Next 스냅샷
+			st_LFQ_NODE* LocalHead_Next = LocalHead.m_pPoint->m_stpNextBlock;	
 
 			// 정말 m_stpHead이 LocalHead와 같다면 로직 진행
-			if (m_stpHead.m_pPoint == pDeleteHead)
+			if (m_stpHead.m_pPoint == LocalHead.m_pPoint &&
+				m_stpHead.m_l64Count == LocalHead.m_l64Count)
 			{
 				// 헤더와 테일이 같으면서
-				if (pDeleteHead == LocalTail.m_pPoint)
+				if (LocalHead.m_pPoint == LocalTail.m_pPoint)
 				{
-					// pLocalNext가 null인지 체크
-					if (pDeleteHead->m_stpNextBlock == nullptr)
+					// LocalHead->Next가 null인지 체크
+					if (LocalHead_Next == nullptr)
 					{
 						continue;
-						//m_CDump->Crash();
-						//return - 1;
 					}
 
 					else
@@ -216,13 +221,13 @@ namespace Library_Jingyu
 				{
 
 					// 헤더 이동 시도
-					if (InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead.m_pPoint->m_stpNextBlock, (LONG64*)&LocalHead))
+					if (InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead_Next, (LONG64*)&LocalHead))
 					{
 						// 성공시 ------
-						OutData = pDeleteHead->m_stpNextBlock->m_Data;
+						OutData = LocalHead_Next->m_Data;
 
 						// 이동 전의 헤더를 메모리풀에 반환
-						m_MPool->Free(pDeleteHead);
+						m_MPool->Free(LocalHead.m_pPoint);
 						break;
 					}
 				}

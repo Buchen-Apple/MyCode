@@ -66,11 +66,11 @@ namespace Library_Jingyu
 		int m_iOSErrorCode;
 		euError m_iMyErrorCode;
 
-		// 현재 접속중인 유저 수
-		ULONGLONG m_ullJoinUserCount;
-
 		// 최대 접속 가능 유저 수
 		int m_iMaxJoinUser;
+
+		// 현재 접속중인 유저 수
+		ULONGLONG m_ullJoinUserCount;		
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
@@ -80,9 +80,6 @@ namespace Library_Jingyu
 		// ----------------------
 		// private 함수들
 		// ----------------------		
-		// 조합된 키를 입력받으면, Index 리턴하는 함수
-		WORD GetSessionIndex(ULONGLONG MixKey);
-
 		// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
 		ULONGLONG GetRealSessionKey(ULONGLONG MixKey);
 

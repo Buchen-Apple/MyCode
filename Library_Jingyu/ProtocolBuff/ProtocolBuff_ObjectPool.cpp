@@ -7,10 +7,9 @@ namespace Library_Jingyu
 
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
-#define BUFF_SIZE 1024
+#define BUFF_SIZE 256
 
 	// static 메모리풀
-	// CMemoryPool<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPool<CProtocolBuff>(0, false);
 	CMemoryPoolTLS<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPoolTLS<CProtocolBuff>(100, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
@@ -43,7 +42,7 @@ namespace Library_Jingyu
 	{					
 		m_Front = 0;
 		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
-		m_RefCount = 0;	// 레퍼런스 카운트 0으로 초기화
+		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)
 	}
 
 	// 버퍼 크기 재설정
@@ -206,26 +205,23 @@ namespace Library_Jingyu
 	}
 
 
-	// Alloc. 현재는 이 안에서 new 후 레퍼런스 카운트 1 증가
+	// 메모리풀에서 직렬화버퍼 1개 Alloc
 	CProtocolBuff* CProtocolBuff::Alloc()
 	{
-		CProtocolBuff* NewAlloc = m_MPool->Alloc();
-		NewAlloc->m_Rear = 2;		// rear 값 2로 초기화
-		NewAlloc->m_RefCount = 1;	// ref값 1로 초기화
-
-		return NewAlloc;
+		return  m_MPool->Alloc();;
 	}
 
-	// Free. 현재는 이 안에서 레퍼런스 카운트 1 감소.
-	// 만약, 레퍼런스 카운트가 0이라면 삭제함. delete 함
+	// Free. 레퍼런스 카운트 1 감소.
+	// 만약, 레퍼런스 카운트가 0이라면 메모리풀에 Free함
 	void CProtocolBuff::Free(CProtocolBuff* pBuff)
 	{
 		// 인터락으로 안전하게 감소.
 		// 만약 감소 후 0이됐다면 delete
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
-			if (m_MPool->Free(pBuff) == false)
-				m_Dump->Crash();
+			pBuff->m_Rear = 2;		// rear 값 2로 초기화
+			pBuff->m_RefCount = 1;	// ref값 1로 초기화
+			m_MPool->Free(pBuff);
 		}
 
 	}

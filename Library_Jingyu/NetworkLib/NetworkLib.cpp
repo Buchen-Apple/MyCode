@@ -34,7 +34,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
-#define dfSENDPOST_MAX_WSABUF			300
+#define dfSENDPOST_MAX_WSABUF			200
 
 
 
@@ -75,14 +75,17 @@ namespace Library_Jingyu
 	// 세션 구조체
 	struct CLanServer::stSession
 	{
+		// 세션과 연결된 소켓
 		SOCKET m_Client_sock;
 
-		// 해당 배열의 현재 인덱스
+		// 해당 세션이 들어있는 배열 인덱스
 		ULONGLONG m_lIndex;		
 
+		// 연결된 세션의 IP와 Port
 		TCHAR m_IP[30];
 		USHORT m_prot;
 
+		// 세션 ID. 컨텐츠와 통신 시 사용.
 		ULONGLONG m_ullSessionID;
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
@@ -91,6 +94,9 @@ namespace Library_Jingyu
 		// Send한 직렬화 버퍼들 저장할 포인터 변수
 		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
 			   
+		// I/O 카운트. WSASend, WSARecv시 1씩 증가.
+		// 0이되면 접속 종료된 유저로 판단.
+		// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
 		LONG	m_lIOCount;
 
 		// 해당 인덱스 배열이 사용중인지 체크
@@ -100,18 +106,24 @@ namespace Library_Jingyu
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;		
 
-		CLF_Queue< CProtocolBuff*> *m_SendQueue;		
+		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
+		CLF_Queue<CProtocolBuff*>* m_SendQueue;
 
+		// Send, Recv overlapped구조체
 		OVERLAPPED m_overSendOverlapped;
 		OVERLAPPED m_overRecvOverlapped;
+
+		// Recv버퍼. 일반 링버퍼. 
 		CRingBuff m_RecvQueue;			
 
-		// 생성자
+		// 생성자 
 		stSession()
 		{
-			m_SendQueue = new CLF_Queue< CProtocolBuff*>(1024, false);
+			m_SendQueue = new CLF_Queue<CProtocolBuff*>(1024, false);
 			m_lIOCount = 0;
 			m_lUseFlag = FALSE;	
+			m_lSendFlag = FALSE;
+			m_iWSASendCount = 0;
 		}
 
 		// 소멸자
@@ -119,17 +131,6 @@ namespace Library_Jingyu
 		{
 			delete m_SendQueue;
 		}
-
-		void Reset_Func()
-		{
-			// -- SendFlag, SendCount 초기화
-			m_lSendFlag = 0;
-			m_iWSASendCount = 0;
-
-			// 큐 초기화
-			m_RecvQueue.ClearBuffer();
-		}
-
 
 	};
 
@@ -330,7 +331,7 @@ namespace Library_Jingyu
 
 		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 
 		// 그리고 미리 Max만큼 만들어두기
-		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>();
+		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>;
 		for (int i = 0; i < MaxConnect; ++i)
 			m_stEmptyIndexStack->Push(i);
 
@@ -492,7 +493,6 @@ namespace Library_Jingyu
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
 		// 1. ClinetID로 세션의 Index 알아오기
-		//ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 		ULONGLONG wArrayIndex = ClinetID >> 48;
 
 		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
@@ -530,7 +530,6 @@ namespace Library_Jingyu
 	bool CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
 		// 1. ClinetID로 세션의 Index 알아오기
-		//ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
 		ULONGLONG wArrayIndex = ClinetID >> 48;
 
 		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
@@ -629,7 +628,7 @@ namespace Library_Jingyu
 			//InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
-		// ----------- 락프리큐(샌드큐) 적용한 버전
+		// 샌드 링버퍼 비우기
 		int UseSize = DeleteSession->m_SendQueue->GetInNode();
 
 		CProtocolBuff* Payload;
@@ -643,16 +642,24 @@ namespace Library_Jingyu
 			//InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
+		// SendFlag, SendCount 초기화
+		DeleteSession->m_lSendFlag = FALSE;
+		DeleteSession->m_iWSASendCount = 0;
+
+		// 큐 초기화
+		DeleteSession->m_RecvQueue.ClearBuffer();
+
 		// 클로즈 소켓
 		closesocket(DeleteSession->m_Client_sock);	
 
 		// 미사용 인덱스 스택에 반납
 		m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
-
-
+		
 		// 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
 
+		// 컨텐츠 쪽에 종료된 유저 알려줌 
+		// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 		OnClientLeave(sessionID);
 		return;
 	}
@@ -821,7 +828,7 @@ namespace Library_Jingyu
 		// --------------------------
 		SOCKET client_sock;
 		SOCKADDR_IN	clientaddr;
-		int addrlen;
+		int addrlen = sizeof(clientaddr);
 
 		CLanServer* g_This = (CLanServer*)lParam;
 
@@ -834,7 +841,6 @@ namespace Library_Jingyu
 		while (1)
 		{
 			ZeroMemory(&clientaddr, sizeof(clientaddr));
-			addrlen = sizeof(clientaddr);
 			client_sock = accept(g_This->m_soListen_sock, (SOCKADDR*)&clientaddr, &addrlen);
 			if (client_sock == INVALID_SOCKET)
 			{
@@ -905,7 +911,7 @@ namespace Library_Jingyu
 			 // 2) 해당 세션 배열, 사용중으로 변경
 			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
 
-			// 3) 초기화하기
+			// 3) 정보 셋팅하기
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
 
@@ -915,17 +921,7 @@ namespace Library_Jingyu
 
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
-			g_This->m_stSessionArray[iIndex].m_prot = port;
-
-			// -- SendFlag, 큐, Send했던 카운트 초기화
-			//g_This->m_stSessionArray[iIndex].Reset_Func();
-
-			// -- SendFlag, SendCount 초기화
-			g_This->m_stSessionArray[iIndex].m_lSendFlag = 0;
-			g_This->m_stSessionArray[iIndex].m_iWSASendCount = 0;
-
-			// 큐 초기화
-			g_This->m_stSessionArray[iIndex].m_RecvQueue.ClearBuffer();
+			g_This->m_stSessionArray[iIndex].m_prot = port;		
 
 
 
@@ -978,13 +974,6 @@ namespace Library_Jingyu
 	}
 
 
-
-	// 조합된 키를 입력받으면, Index 리턴하는 함수
-	WORD CLanServer::GetSessionIndex(ULONGLONG MixKey)
-	{
-		return MixKey >> 48;
-	}
-
 	// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
 	ULONGLONG CLanServer::GetRealSessionKey(ULONGLONG MixKey)
 	{
@@ -994,6 +983,7 @@ namespace Library_Jingyu
 	// CProtocolBuff에 헤더 넣는 함수
 	void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
 	{
+		// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
 		WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
 		memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
 	}
@@ -1001,6 +991,7 @@ namespace Library_Jingyu
 
 
 	// 각종 변수들을 리셋시킨다.
+	// Stop() 함수에서 사용.
 	void CLanServer::Reset()
 	{
 		m_iW_ThreadCount = 0;
@@ -1112,8 +1103,8 @@ namespace Library_Jingyu
 
 	// RecvPost 함수. 비동기 입출력 시작
 	//
-	// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
-	// return false : I/O카운트가 0이되어서 종료된 유저임
+	// return true : 성공적으로 WSARecv() 완료 or WSARecv가 실패했지만 종료된 유저는 아님.
+	// return false : I/O카운트가 0이되어서 종료된 유저
 	bool CLanServer::RecvPost(stSession* NowSession)
 	{
 		// ------------------
@@ -1204,8 +1195,8 @@ namespace Library_Jingyu
 	// ------------
 	// 샌드 버퍼의 데이터 WSASend() 하기
 	//
-	// return true : 성공적으로 WSASend() 완료 or 어쨋든 종료된 유저는 아님
-	// return false : I/O카운트가 0이되어서 종료된 유저임
+	// return true : 성공적으로 WSASend() 완료 or WSASend가 실패했지만 종료된 유저는 아님.
+	// return false : I/O카운트가 0이되어서 종료된 유저
 	bool CLanServer::SendPost(stSession* NowSession)
 	{
 		while (1)

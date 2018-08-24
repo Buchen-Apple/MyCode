@@ -111,7 +111,6 @@ namespace Library_Jingyu
 		NewNode->m_Data = Data;
 
 		// ---- 락프리 적용 ----
-		//alignas(16)  st_TOP localTop;
 		st_LFS_NODE* localTop;
 
 		do
@@ -146,10 +145,11 @@ namespace Library_Jingyu
 
 		// ---- 락프리 적용 ----
 		alignas(16)  st_TOP localTop;
+
 		do
 		{
 			localTop.m_l64Count = m_stpTop.m_l64Count;
-			localTop.m_pTop = m_stpTop.m_pTop;			
+			localTop.m_pTop = m_stpTop.m_pTop;	
 
 			// null체크
 			if (localTop.m_pTop == nullptr)
@@ -157,7 +157,7 @@ namespace Library_Jingyu
 				m_CDump->Crash();
 			}
 
-		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->m_stpNextBlock, (LONG64*)&localTop));	
+		} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->m_stpNextBlock, (LONG64*)&localTop));
 
 		// 리턴할 데이터 받아두기
 		T retval = localTop.m_pTop->m_Data;
