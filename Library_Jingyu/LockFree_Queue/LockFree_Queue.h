@@ -137,8 +137,7 @@ namespace Library_Jingyu
 			st_LFQ_NODE* LocalNext = LocalTail.m_pPoint->m_stpNextBlock;
 
 			// 정말 m_stpTail이 LocalTail와 같다면 로직 진행
-			if (LocalTail.m_pPoint == m_stpTail.m_pPoint && 
-				LocalTail.m_l64Count == m_stpTail.m_l64Count)
+			if (LocalTail.m_l64Count == m_stpTail.m_l64Count)
 			{
 				// Next가 Null이면 로직 진행
 				if (LocalNext == nullptr)
@@ -197,8 +196,7 @@ namespace Library_Jingyu
 			st_LFQ_NODE* LocalHead_Next = LocalHead.m_pPoint->m_stpNextBlock;	
 
 			// 정말 m_stpHead이 LocalHead와 같다면 로직 진행
-			if (m_stpHead.m_pPoint == LocalHead.m_pPoint &&
-				m_stpHead.m_l64Count == LocalHead.m_l64Count)
+			if (m_stpHead.m_l64Count == LocalHead.m_l64Count)
 			{
 				// 헤더와 테일이 같으면서
 				if (LocalHead.m_pPoint == LocalTail.m_pPoint)
