@@ -7,8 +7,8 @@
 #include "CrashDump\CrashDump.h"
 
 
-extern ULONGLONG g_ullAllocNodeCount;
-extern ULONGLONG g_ullFreeNodeCount;
+//extern ULONGLONG g_ullAllocNodeCount;
+//extern ULONGLONG g_ullFreeNodeCount;
 
 namespace Library_Jingyu
 {
@@ -393,9 +393,10 @@ namespace Library_Jingyu
 #define NODE_COUNT 200	// 1개의 청크가 다루는 노드의 수
 
 			// 청크 멤버변수
-			Node m_arrayNode[NODE_COUNT];
-			int m_iTop;			// top 겸 Alloc카운트. 0부터 시작
-			int m_iFreeRef;		// Free 카운트. 0부터 시작
+			LONG m_iTop;			// top 겸 Alloc카운트. 0부터 시작
+			LONG m_iFreeRef;		// Free 카운트. 0부터 시작
+			static bool m_bPlacementNew;
+			Node m_arrayNode[NODE_COUNT];				
 			CCrashDump* m_ChunkDump;
 
 			// 청크 생성자
@@ -407,25 +408,25 @@ namespace Library_Jingyu
 			///////////////////////////
 			// 청크 Alloc
 			//
-			// Parameters : 없음
+			// Parameters : TLSIndex
 			// return : (DATA*) 데이터 포인터
 			///////////////////////////
-			bool Alloc(DATA** retData);
+			DATA* Alloc(int TLSIndex);
 
 			///////////////////////////
 			// 청크 Free
 			//
 			// Parameters : (DATA*) Free 할 데이터
-			// return : FreeRefCount가 0이되면 false, 그 외엔 true
+			// return : 없음
 			///////////////////////////
-			bool Free(DATA* pData);
+			void Free(DATA* pData, CMemoryPool<stChunk>* pPool);
 
 			// Alloc카운트 얻기
 			int GetAllocCount()
 			{	return m_iTop;	}
 
 			// Free 카운트 얻기
-			int GetFreeCount()
+			LONG GetFreeCount()
 			{	return m_iFreeRef;	}
 		};	
 
@@ -435,8 +436,7 @@ namespace Library_Jingyu
 		// 멤버 변수
 		// ------------------
 		CMemoryPool<stChunk>* m_ChunkPool;
-		DWORD m_dwIndex;
-		static bool m_bPlacementNew;
+		DWORD m_dwIndex;		
 		CCrashDump* m_TLSDump;
 
 	public:
@@ -484,7 +484,7 @@ namespace Library_Jingyu
 	};	
 
 	template <typename DATA>
-	bool CMemoryPoolTLS<DATA>::m_bPlacementNew;
+	bool CMemoryPoolTLS<DATA>::stChunk::m_bPlacementNew;
 
 	// ----------------------
 	// 
@@ -525,31 +525,37 @@ namespace Library_Jingyu
 	///////////////////////////
 	// 청크 Alloc
 	//
-	// Parameters : (out) DATA의 주소
-	// return : 청크의 모든 데이터를 Alloc 시 false, 아니면 true
+	// Parameters : TLSIndex
+	// return : (DATA*) 데이터 포인터
 	///////////////////////////
 	template <typename DATA>
-	bool CMemoryPoolTLS<DATA>::stChunk::Alloc(DATA** retData)
+	DATA* CMemoryPoolTLS<DATA>::stChunk::Alloc(int TLSIndex)
 	{
 		// 만약, Top이 NODE_COUNT보다 크거나 같다면 뭔가 잘못된것.
 		// 이 전에 이미 CMemoryPoolTLS쪽에서 캐치되었어야 함
 		if (m_iTop >= NODE_COUNT)
 			m_ChunkDump->Crash();
 
-		InterlockedIncrement(&g_ullAllocNodeCount);
+		//InterlockedIncrement(&g_ullAllocNodeCount);
 
 		// 현재 Top의 데이터를 가져온다. 그리고 Top을 1 증가
-		*retData = &m_arrayNode[m_iTop++].m_Data;		
+		DATA* retData = &m_arrayNode[m_iTop++].m_Data;		
+
+		// 만약, 청크의 데이터를 모두 Alloc했으면, TLS 청크를 NULL로 만든다.
+		if (m_iTop == NODE_COUNT)
+		{
+			if (TlsSetValue(TLSIndex, nullptr) == FALSE)
+			{
+				DWORD Error = GetLastError();
+				m_ChunkDump->Crash();
+			}
+		}
 
 		// 플레이스먼트 뉴 여부에 따라 생성자 호출
 		if (m_bPlacementNew == true)
-			new (retData) DATA();		
+			new (retData) DATA();	
 
-		// 만약, 청크의 데이터를 모두 Alloc했으면, false 리턴
-		if (m_iTop == NODE_COUNT)
-			return false;
-
-		return true;
+		return retData;
 	}
 
 
@@ -557,16 +563,25 @@ namespace Library_Jingyu
 	// 청크 Free
 	//
 	// Parameters : (DATA*) Free 할 데이터
-	// return : 실패시 0, 성공시 1, FreeRefCount가 0이되었다면 2
+	// return : 없음
 	///////////////////////////
 	template <typename DATA>
-	bool CMemoryPoolTLS<DATA>::stChunk::Free(DATA* pData)
-	{
-		InterlockedIncrement(&g_ullFreeNodeCount);
+	void CMemoryPoolTLS<DATA>::stChunk::Free(DATA* pData, CMemoryPool<stChunk>* pPool)
+	{		
+		// 안전성 검사 -------
+		// 이상한 포인터가 오면 그냥 리턴
+		if (pData == NULL)
+			m_ChunkDump->Crash();
 
-		// FreeRefCount 1감소. 
-		// 만약 0이되면 청크 내부 내용 초기화 후, false 리턴
-		if (InterlockedIncrement((LONG*)&m_iFreeRef) == NODE_COUNT)
+		// 내가 할당한 블럭이 맞는지 확인
+		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
+			m_ChunkDump->Crash();
+
+		//InterlockedIncrement(&g_ullFreeNodeCount);
+
+		// FreeRefCount 1 증가
+		// 만약 NODE_COUNT가 되면 청크 내부 내용 초기화 후 청크 관리 메모리풀로 Free
+		if (InterlockedIncrement(&m_iFreeRef) == NODE_COUNT)
 		{
 			// Free하기전에, 플레이스먼트 뉴를 사용한다면 모든 DATA의 소멸자 호출
 			if (m_bPlacementNew == true)
@@ -581,10 +596,10 @@ namespace Library_Jingyu
 			m_iTop = 0;
 			m_iFreeRef = 0;
 
-			return false;
-		}
-
-		return true;		
+			// 청크 관리 메모리풀로 청크 Free
+			if (pPool->Free(this) == false)
+				m_ChunkDump->Crash();
+		}	
 	}
 
 
@@ -611,7 +626,7 @@ namespace Library_Jingyu
 		m_TLSDump = CCrashDump::GetInstance();
 
 		// 데이터의 플레이스먼트 뉴 여부 저장(청크 아님. 청크 내부에서 관리되는 데이터의 플레이스먼트 뉴 호출 여부)
-		m_bPlacementNew = bPlacementNew;
+		stChunk::m_bPlacementNew = bPlacementNew;
 
 		// TLSIndex 알아오기
 		// 앞으로 모든 스레드는 이 인덱스를 사용해 청크 관리.
@@ -645,7 +660,7 @@ namespace Library_Jingyu
 	DATA* CMemoryPoolTLS<DATA>::Alloc()
 	{
 		// 현재 이 함수를 호출한 스레드의 TLS 인덱스에 청크가 있는지 확인
-		void* pChunk = TlsGetValue(m_dwIndex);
+		stChunk* pChunk = (stChunk*)TlsGetValue(m_dwIndex);
 
 		// TLS에 청크가 없으면 청크 새로 할당함.
 		if (pChunk == nullptr)
@@ -658,21 +673,8 @@ namespace Library_Jingyu
 			}
 		}
 
-		// TLS에 있는 청크에서 노드 하나 빼옴
-		DATA* retData = nullptr;
-		
-		// 청크의 데이터를 모두 Alloc했으면, TLS 인덱스의 값을 nullptr로 만든다.
-		if (((stChunk*)pChunk)->Alloc(&retData) == false)
-		{			
-			if (TlsSetValue(m_dwIndex, nullptr) == FALSE)
-			{
-				DWORD Error = GetLastError();
-				m_TLSDump->Crash();
-			}
-		}				
-
-		// 노드를 리턴
-		return retData;
+		// TLS에 있는 청크에서 노드 하나 빼와서 리턴			
+		return pChunk->Alloc(m_dwIndex);;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -684,22 +686,7 @@ namespace Library_Jingyu
 	template <typename DATA>
 	bool CMemoryPoolTLS<DATA>::Free(DATA* pData)
 	{
-		// 안전성 검사 -------
-		// 이상한 포인터가 오면 그냥 리턴
-		if (pData == NULL)
-			return false;
-
-		// 내가 할당한 블럭이 맞는지 확인
-		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
-			return false;
-
-		// 해당 데이터의 청크 알아온다.
-		stChunk* pChunk = ((Node*)pData)->m_pMyChunk;
-			   
-		// 청크 Free에서 false가 리턴될 경우, 청크 관리 메모리풀로 청크를 Free 한다.
-		if (pChunk->Free(pData) == false)
-			m_ChunkPool->Free(pChunk);
-
+		((Node*)pData)->m_pMyChunk->Free(pData, m_ChunkPool);	
 
 		return true;
 	}

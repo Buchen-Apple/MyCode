@@ -163,6 +163,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
     <ClCompile Include="MPool_TLS.cpp" />
     <ClCompile Include="pch.cpp">

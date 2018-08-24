@@ -17,7 +17,7 @@
 #include "LockFree_Queue\LockFree_Queue.h"
 
 
-extern LONG g_lPacketAllocCount;
+//extern LONG g_lPacketAllocCount;
 
 namespace Library_Jingyu
 {
@@ -77,34 +77,34 @@ namespace Library_Jingyu
 	{
 		SOCKET m_Client_sock;
 
+		// 해당 배열의 현재 인덱스
+		ULONGLONG m_lIndex;		
+
 		TCHAR m_IP[30];
 		USHORT m_prot;
 
 		ULONGLONG m_ullSessionID;
 
-		LONG	m_lIOCount;
+		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
+		int m_iWSASendCount;
 
-		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
-		LONG	m_lSendFlag;
+		// Send한 직렬화 버퍼들 저장할 포인터 변수
+		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
+			   
+		LONG	m_lIOCount;
 
 		// 해당 인덱스 배열이 사용중인지 체크
 		// 1이면 사용중, 0이면 사용중 아님
 		LONG m_lUseFlag;
 
-		// 해당 배열의 현재 인덱스
-		ULONGLONG m_lIndex;
+		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
+		LONG	m_lSendFlag;		
 
-		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
-		int m_iWSASendCount;
+		CLF_Queue< CProtocolBuff*> *m_SendQueue;		
 
-		CRingBuff m_RecvQueue;
-		CLF_Queue< CProtocolBuff*> *m_SendQueue;
-
-		OVERLAPPED m_overRecvOverlapped;
 		OVERLAPPED m_overSendOverlapped;
-
-		// Send한 직렬화 버퍼들 저장할 포인터 변수
-		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
+		OVERLAPPED m_overRecvOverlapped;
+		CRingBuff m_RecvQueue;			
 
 		// 생성자
 		stSession()
@@ -479,7 +479,7 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. 서버 종료 로그 찍기		
-		_tprintf_s(L"PacketCount : [%d]\n", g_lPacketAllocCount);
+		//_tprintf_s(L"PacketCount : [%d]\n", g_lPacketAllocCount);
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
@@ -492,7 +492,8 @@ namespace Library_Jingyu
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
 		// 1. ClinetID로 세션의 Index 알아오기
-		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
+		//ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
+		ULONGLONG wArrayIndex = ClinetID >> 48;
 
 		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
 		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
@@ -529,7 +530,8 @@ namespace Library_Jingyu
 	bool CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
 		// 1. ClinetID로 세션의 Index 알아오기
-		ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
+		//ULONGLONG wArrayIndex = GetSessionIndex(ClinetID);
+		ULONGLONG wArrayIndex = ClinetID >> 48;
 
 		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
 		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
@@ -624,7 +626,7 @@ namespace Library_Jingyu
 		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
 		{
 			CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
-			InterlockedDecrement(&g_lPacketAllocCount);
+			//InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
 		// ----------- 락프리큐(샌드큐) 적용한 버전
@@ -638,7 +640,7 @@ namespace Library_Jingyu
 				cNetDump->Crash();
 
 			CProtocolBuff::Free(Payload);
-			InterlockedDecrement(&g_lPacketAllocCount);
+			//InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
 		// 클로즈 소켓
@@ -789,7 +791,7 @@ namespace Library_Jingyu
 					//InterlockedDecrement(&g_lPacketAllocCount);
 				}
 				
-				InterlockedAdd(&g_lPacketAllocCount, -stNowSession->m_iWSASendCount);
+				//InterlockedAdd(&g_lPacketAllocCount, -stNowSession->m_iWSASendCount);
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
@@ -916,7 +918,14 @@ namespace Library_Jingyu
 			g_This->m_stSessionArray[iIndex].m_prot = port;
 
 			// -- SendFlag, 큐, Send했던 카운트 초기화
-			g_This->m_stSessionArray[iIndex].Reset_Func();
+			//g_This->m_stSessionArray[iIndex].Reset_Func();
+
+			// -- SendFlag, SendCount 초기화
+			g_This->m_stSessionArray[iIndex].m_lSendFlag = 0;
+			g_This->m_stSessionArray[iIndex].m_iWSASendCount = 0;
+
+			// 큐 초기화
+			g_This->m_stSessionArray[iIndex].m_RecvQueue.ClearBuffer();
 
 
 
