@@ -16,7 +16,7 @@ namespace Library_Jingyu
 #define MEMORYPOOL_ENDCODE	890226
 
 	/////////////////////////////////////////////////////
-	// 메모리 풀(오브젝트 풀
+	// 메모리 풀(오브젝트 풀)
 	////////////////////////////////////////////////////
 	template <typename DATA>
 	class CMemoryPool
@@ -32,8 +32,9 @@ namespace Library_Jingyu
 			int			  stMyCode;
 		};
 
-		// -------------
+		/* **************************************************************** */
 		// Top으로 사용할 구조체
+		/* **************************************************************** */
 		struct st_TOP
 		{
 			st_BLOCK_NODE* m_pTop;
@@ -41,22 +42,30 @@ namespace Library_Jingyu
 		};
 
 	private:
-		char* m_Memory;				// 나중에 소멸자에서 한 번에 free하기 위한 변수
-		int m_iBlockNum;			// 최대 블럭 개수
-		bool m_bPlacementNew;		// 플레이스먼트 뉴 여부
-		LONG m_iAllocCount;			// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
-		LONG m_iUseCount;			// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
-		alignas(16)	st_TOP m_stpTop;
+		// ----------- 멤버변수 위치를 잡을 때, '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
+		// 이 class에서 핵심 함수는 Alloc, Free. 해당 함수의 코드에 맞춰서 멤버변수 배치
+
+		char* m_Memory;					// 나중에 소멸자에서 한 번에 free하기 위한 변수		
+		alignas(16)	st_TOP m_stpTop;	// Top. 메모리풀은 스택 구조이다.
+		int m_iBlockNum;				// 최대 블럭 개수		
+		bool m_bPlacementNew;			// 플레이스먼트 뉴 여부
+		LONG m_iAllocCount;				// 확보된 블럭 개수. 새로운 블럭을 할당할 때 마다 1씩 증가. 해당 메모리풀이 할당한 메모리 블럭 수
+		LONG m_iUseCount;				// 유저가 사용 중인 블럭 수. Alloc시 1 증가 / free시 1 감소
 
 	public:
 		//////////////////////////////////////////////////////////////////////////
-		// 생성자, 파괴자.
+		// 생성자
 		//
 		// Parameters:	(int) 최대 블럭 개수.
 		//				(bool) 생성자 호출 여부.
-		// Return:
 		//////////////////////////////////////////////////////////////////////////
 		CMemoryPool(int iBlockNum, bool bPlacementNew = false);
+
+		//////////////////////////////////////////////////////////////////////////
+		// 파괴자
+		//
+		// 내부에 있는 모든 노드를 동적해제
+		//////////////////////////////////////////////////////////////////////////
 		virtual	~CMemoryPool();
 
 
@@ -97,35 +106,14 @@ namespace Library_Jingyu
 
 
 	//////////////////////////////////////////////////////////////////////////
-	// 생성자, 파괴자.
+	// 생성자
 	//
 	// Parameters:	(int) 최대 블럭 개수.
 	//				(bool) 생성자 호출 여부.
-	// Return:
 	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	CMemoryPool<DATA>::CMemoryPool(int iBlockNum, bool bPlacementNew)
-	{
-
-		/////////////////////////////////////
-		// bPlacementNew
-		// 최초 신규 생성(공통) 1. 메모리 공간 할당(malloc, 생성자 호출 안함). 그 외 노드의 기본 정보 셋팅(next, 내코드)
-		// 최초 신규 생성 2. true 시, '객체 생성자' 호출하지 않음.
-		// 최초 신규 생성 2. false 시, '객체 생성자' 호출
-		// 
-		// 이후 Alloc, Free
-		// true 1. 유저에게 전달 시, '객체 생성자' 호출 후 전달
-		// true 2. 유저에게 받을 시, '객체 소멸자' 호출 후 메모리 풀에 추가
-		// true 3. 프로그램 종료 시, 메모리풀 소멸자에서 모든 노드를 돌며 노드의 메모리를 'free()' 시킨다.
-		//
-		// false 1. 유저에게 전달 시, 그대로 전달
-		// false 2. 유저에게 받을 시, 그대로 메모리풀에 추가
-		// false 3. 프로그램 종료 시, 메모리풀 소멸자에서 모든 노드를 돌며 노드 DATA의 '객체 소멸자' 호출. 그리고 노드를 'free()' 시킨다.
-		//
-		// bPlacementNew가 TRUE : Alloc() 시, DATA의 Placement new로 생성자 호출 후 넘김, Free() 시, DATA의 Placement new로 소멸자 호출 후 내 메모리 풀에 넣는다. CMemoryPool소멸자에서, 해당 노드 free
-		// bPlacementNew가 FALSE : Alloc() 시, DATA의 생성자 호출 안함. Free()시 소멸자 호출 안함. CMemoryPool소멸자에서, 해당 노드 free
-		/////////////////////////////////////
-
+	{		
 		// 멤버 변수 셋팅	
 		m_iBlockNum = iBlockNum;
 		m_bPlacementNew = bPlacementNew;
@@ -192,6 +180,11 @@ namespace Library_Jingyu
 
 	}
 
+	//////////////////////////////////////////////////////////////////////////
+	// 파괴자
+	//
+	// 내부에 있는 모든 노드를 동적해제
+	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	CMemoryPool<DATA>::~CMemoryPool()
 	{
@@ -209,9 +202,11 @@ namespace Library_Jingyu
 		// 내 메모리풀에 있는 노드를 모두 'free()' 한다.
 		while (1)
 		{
+			// 현재 탑이 nullptr이 될때까지 반복.
 			if (m_stpTop.m_pTop == nullptr)
 				break;
 
+			// 삭제할 노드를 받아두고, Top을 한칸 이동.
 			st_BLOCK_NODE* deleteNode = m_stpTop.m_pTop;
 			m_stpTop.m_pTop = m_stpTop.m_pTop->stpNextBlock;
 
@@ -279,12 +274,17 @@ namespace Library_Jingyu
 			// ---- 락프리 적용 ----
 			do
 			{
+				// 락프리에서 유니크함을 보장하는 값은 Count값.
+				// 때문에, 루프 시작 전에 무조건 Count를 먼저 받아온다. 
+				// top을 먼저 받아올 경우, 컨텍스트 스위칭으로 인해 다른 스레드에서 Count값 변조 후, 변조된 값을 받아올 수도 있다.
 				localTop.m_l64Count = m_stpTop.m_l64Count;
 				localTop.m_pTop = m_stpTop.m_pTop;	
 
 				// null체크
 				if (localTop.m_pTop == nullptr)
 				{
+					// null이라면, 처음부터 다시 로직을 돌린다.
+					// flag를 true로 바꾸면, do while문 밖에서 체크 후 continue 실행
 					bContinueFlag = true;
 					break;
 				}						
@@ -313,7 +313,7 @@ namespace Library_Jingyu
 	// 사용중이던 블럭을 해제한다. (Push)
 	//
 	// Parameters: (DATA *) 블럭 포인터.
-	// Return: (BOOL) TRUE, FALSE.
+	// Return: (bool) true, false.
 	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	bool	CMemoryPool<DATA>::Free(DATA *pData)
@@ -328,13 +328,13 @@ namespace Library_Jingyu
 		if (pNode->stMyCode != MEMORYPOOL_ENDCODE)
 			return false;	
 
-		// 유저 사용중 카운트 감소
-		// free(Push) 시에는, 일단 카운트를 먼저 감소시킨다. 그래도 된다! 어차피 락프리는 100%성공 보장.
-		InterlockedDecrement(&m_iUseCount);
-
 		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
 		if (m_bPlacementNew == true)
 			pData->~DATA();
+
+		// 유저 사용중 카운트 감소
+		// free(Push) 시에는, 일단 카운트를 먼저 감소시킨다. 그래도 된다! 어차피 락프리는 100%성공 보장.
+		InterlockedDecrement(&m_iUseCount);		
 		
 		// ---- 락프리 적용 ----
 		st_BLOCK_NODE* localTop;
@@ -342,6 +342,7 @@ namespace Library_Jingyu
 		do
 		{
 			// 로컬 Top 셋팅 
+			// Push는 딱히 카운트가 필요 없다.
 			localTop = m_stpTop.m_pTop;
 
 			// 새로 들어온 노드의 Next를 Top으로 찌름
@@ -368,16 +369,12 @@ namespace Library_Jingyu
 	//
 	// 내부에서 청크를 다룸
 	////////////////////////////////////////////////////
-	
-
 	template <typename DATA>
 	class CMemoryPoolTLS
 	{	
-
-	private:			
 		struct stChunk;
 
-		// 청크 내부의 노드
+		// 실제 청크 내에서 관리되는 노드.
 		struct Node
 		{
 			DATA  m_Data;
@@ -385,19 +382,24 @@ namespace Library_Jingyu
 			int	stMyCode;
 		};
 
+	private:	
 		// ----------------------------
 		// 청크 구조체
 		// ----------------------------
 		struct stChunk
 		{	
 
-#define NODE_COUNT 1000	// 1개의 청크가 다루는 노드의 수
+#define NODE_COUNT 1000	// 1개의 청크가 다루는 노드의 수			
 
 			// 청크 멤버변수
-			LONG m_iTop;			// top 겸 Alloc카운트. 0부터 시작
-			LONG m_iFreeRef;		// Free 카운트. 0부터 시작
-			Node m_arrayNode[NODE_COUNT];				
-			CCrashDump* m_ChunkDump;
+			// ----------- 멤버변수 위치를 잡을 때, '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
+			// 이 struct에서는 상위 클래스인  CMemoryPoolTLS의 Alloc, Free가 핵심 함수. 
+			// 해당 함수의 코드에 맞춰서 멤버변수 배치
+
+			LONG m_iTop;					// top 겸 Alloc카운트. 0부터 시작
+			LONG m_iFreeRef;				// Free 카운트. 0부터 시작
+			Node m_arrayNode[NODE_COUNT];	// 실제 다루는 청크 내부 노드. 정적 배열			
+			CCrashDump* m_ChunkDump;		// 에러 발생 시 덤프를 남길 덤프변수.
 
 			// 청크 생성자
 			stChunk();
@@ -419,21 +421,28 @@ namespace Library_Jingyu
 		// ------------------
 		// 멤버 변수
 		// ------------------
-		CMemoryPool<stChunk>* m_ChunkPool;
-		static bool m_bPlacementNew;
-		DWORD m_dwIndex;		
-		CCrashDump* m_TLSDump;
+		// ----------- 멤버변수 위치를 잡을 때, '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
+		// 이 class에서 핵심 함수는 Alloc, Free. 해당 함수의 코드에 맞춰서 멤버변수 배치
+
+		DWORD m_dwIndex;					// 각 스레드가 사용하는 TLS의 Index
+		CMemoryPool<stChunk>* m_ChunkPool;	// TLSPool 내부에서 청크를 다루는 메모리풀 (락프리 구조)
+		static bool m_bPlacementNew;		// 청크 내부에서 다루는 노드 안의 데이터의 플레이스먼트 뉴 호출 여부(청크 아님. 청크 내부안의 노드의 데이터에 대해 플레이스먼트 뉴 호출 여부)		
+		CCrashDump* m_TLSDump;				// 에러 발생시 덤프를 남길 덤프 변수
 
 	public:
 		//////////////////////////////////////////////////////////////////////////
-		// 생성자, 파괴자.
+		// 생성자
 		//
 		// Parameters:	(int) 최대 블럭 개수. (청크의 수)
 		//				(bool) 생성자 호출 여부. (청크 내부에서 관리되는 DATA들의 생성자 호출 여부. 청크 생성자 호출여부 아님)
-		// Return:
 		//////////////////////////////////////////////////////////////////////////
 		CMemoryPoolTLS(int iBlockNum, bool bPlacementNew);
 
+		//////////////////////////////////////////////////////////////////////////
+		// 파괴자
+		// 
+		// 청크 메모리풀 해제, TLSIndex 반환.
+		//////////////////////////////////////////////////////////////////////////
 		virtual ~CMemoryPoolTLS();
 
 		//////////////////////////////////////////////////////////////////////////
@@ -458,7 +467,7 @@ namespace Library_Jingyu
 			return m_ChunkPool->GetAllocCount(); 
 		}
 
-		// 외부에 있는 청크 수 얻기
+		// 외부에서 사용 중인 청크 수 얻기
 		int GetOutChunkCount()
 		{	
 			return m_ChunkPool->GetUseCount();	
@@ -514,11 +523,10 @@ namespace Library_Jingyu
 	// ----------------------
 
 	//////////////////////////////////////////////////////////////////////////
-	// 생성자, 파괴자.
+	// 생성자
 	//
 	// Parameters:	(int) 최대 블럭 개수. (청크의 수)
 	//				(bool) 생성자 호출 여부. (청크 내부에서 관리되는 DATA들의 생성자 호출 여부. 청크 생성자 호출여부 아님)
-	// Return:
 	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	CMemoryPoolTLS<DATA>::CMemoryPoolTLS(int iBlockNum, bool bPlacementNew)
@@ -540,6 +548,11 @@ namespace Library_Jingyu
 			m_TLSDump->Crash();
 	}
 	
+	//////////////////////////////////////////////////////////////////////////
+	// 파괴자
+	// 
+	// 청크 메모리풀 해제, TLSIndex 반환.
+	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	CMemoryPoolTLS<DATA>::~CMemoryPoolTLS()
 	{

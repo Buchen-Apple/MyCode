@@ -20,7 +20,9 @@ namespace Library_Jingyu
 	{		
 		m_Size = size;
 		m_pProtocolBuff = new char[size];
-		Init();	
+		m_Front = 0;
+		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
+		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)
 	}
 
 	// 사이즈 지정 안한 생성자
@@ -28,21 +30,15 @@ namespace Library_Jingyu
 	{		
 		m_Size = BUFF_SIZE;
 		m_pProtocolBuff = new char[BUFF_SIZE];
-		Init();		
+		m_Front = 0;
+		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
+		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)	
 	}
 
 	// 소멸자
 	CProtocolBuff::~CProtocolBuff()
 	{
 		delete[] m_pProtocolBuff;
-	}
-
-	// 초기화
-	void CProtocolBuff::Init()
-	{					
-		m_Front = 0;
-		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
-		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)
 	}
 
 	// 버퍼 크기 재설정
@@ -79,16 +75,49 @@ namespace Library_Jingyu
 	// 데이터 넣기
 	int CProtocolBuff::PutData(const char* pSrc, int size)
 	{
-		// 큐 꽉찼는지 체크
-		if (m_Rear == m_Size)
+		// 큐 꽉찼거나 rear가 Size를 앞질렀는지 체크
+		if (m_Rear >= m_Size)
 			throw CException(_T("ProtocalBuff(). PutData중 버퍼가 꽉참."));
 
-		// 매개변수 size가 0이면 리턴
-		if (size == 0)
-			return 0;
-
 		// 메모리 복사
-		memcpy(&m_pProtocolBuff[m_Rear], pSrc, size);
+		// 1~8바이트 까지는 memcpy보다 대입연산으로 처리한다.
+		// 커널모드 전환을 줄여, 속도 증가 기대.
+		switch (size)
+		{
+		case 1:
+			*(char *)&m_pProtocolBuff[m_Rear] = *(char *)pSrc;
+			break;
+		case 2:
+			*(short *)&m_pProtocolBuff[m_Rear] = *(short *)pSrc;
+			break;
+		case 3:
+			*(short *)&m_pProtocolBuff[m_Rear] = *(short *)pSrc;
+			*(char *)&m_pProtocolBuff[m_Rear + sizeof(short)] = *(char *)&pSrc[sizeof(short)];
+			break;
+		case 4:
+			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
+			break;
+		case 5:
+			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
+			*(char *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(char *)&pSrc[sizeof(int)];
+			break;
+		case 6:
+			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
+			*(short *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(short *)&pSrc[sizeof(int)];
+			break;
+		case 7:
+			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
+			*(short *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(short *)&pSrc[sizeof(int)];
+			*(char *)&m_pProtocolBuff[m_Rear + sizeof(int) + sizeof(short)] = *(char *)&pSrc[sizeof(int) + sizeof(short)];
+			break;
+		case 8:
+			*((__int64 *)&m_pProtocolBuff[m_Rear]) = *((__int64 *)pSrc);
+			break;
+
+		default:
+			memcpy_s(&m_pProtocolBuff[m_Rear], size, pSrc, size);
+			break;
+		}
 
 		// rear의 위치 이동
 		m_Rear += size;
@@ -103,16 +132,49 @@ namespace Library_Jingyu
 		if (m_Front == m_Rear)
 			throw CException(_T("ProtocalBuff(). GetData중 큐가 비어있음."));
 
-		// 매개변수 size가 0이면 리턴
-		if (size == 0)
-			return 0;
-
 		// front가 큐의 끝에 도착하면 더 이상 읽기 불가능. 그냥 종료시킨다.
 		if (m_Front >= m_Size)
 			throw CException(_T("ProtocalBuff(). GetData중 front가 버퍼의 끝에 도착."));
 		
 		// 메모리 복사
-		memcpy(pSrc, &m_pProtocolBuff[m_Front], size);
+		// 1~8바이트 까지는 memcpy보다 대입연산으로 처리한다.
+		// 커널모드 전환을 줄여, 속도 증가 기대.
+		switch (size)
+		{
+		case 1:
+			*(char *)pSrc = *(char *)&m_pProtocolBuff[m_Front];
+			break;
+		case 2:
+			*(short *)pSrc = *(short *)&m_pProtocolBuff[m_Front];
+			break;
+		case 3:
+			*(short *)pSrc = *(short *)&m_pProtocolBuff[m_Front];
+			*(char *)&pSrc[sizeof(short)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(short)];
+			break;
+		case 4:
+			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
+			break;
+		case 5:
+			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
+			*(char *)&pSrc[sizeof(int)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(int)];
+			break;
+		case 6:
+			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
+			*(short *)&pSrc[sizeof(int)] = *(short *)&m_pProtocolBuff[m_Front + sizeof(int)];
+			break;
+		case 7:
+			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
+			*(short *)&pSrc[sizeof(int)] = *(short *)&m_pProtocolBuff[m_Front + sizeof(int)];
+			*(char *)&pSrc[sizeof(int) + sizeof(short)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(int) + sizeof(short)];
+			break;
+		case 8:
+			*((__int64 *)pSrc) = *((__int64 *)&m_pProtocolBuff[m_Front]);
+			break;
+
+		default:
+			memcpy_s(pSrc, size, &m_pProtocolBuff[m_Front], size);
+			break;
+		}
 
 		// 디큐한 만큼 m_Front이동
 		m_Front += size;
@@ -129,14 +191,10 @@ namespace Library_Jingyu
 	// Rear 움직이기
 	int CProtocolBuff::MoveWritePos(int size)
 	{
-		// 0사이즈를 이동하려고 하면 리턴
-		if (size == 0)
-			return 0;
-
 		// 현재 Rear의 위치가 버퍼의 끝이면 더 이상 이동 불가
 		if (m_Rear == m_Size)
-			return -1;
-
+			return -1;		
+		
 		// 매개변수로 받은 iSize가 한 번에 이동할 수 있는 크기를 벗어나는지 체크
 		int iRealMoveSize;
 
@@ -151,21 +209,12 @@ namespace Library_Jingyu
 
 		return iRealMoveSize;
 		
-	}
-	
-	// Rear를 인자로 받은 값으로 강제로 변경시키기
-	int CProtocolBuff::CompulsionMoveWritePos(int size)
-	{
-		return m_Rear = size;
+		
 	}
 
 	// Front 움직이기
 	int CProtocolBuff::MoveReadPos(int size)
 	{
-		// 0사이즈를 삭제하려고 하면 리턴
-		if (size == 0)
-			return 0;
-
 		// 버퍼가 빈 상태면 0 리턴
 		if (m_Front == m_Rear)
 			return 0;
@@ -180,16 +229,9 @@ namespace Library_Jingyu
 		else
 			iRealRemoveSize = size;
 
-
 		m_Front += iRealRemoveSize;
 
 		return iRealRemoveSize;		
-	}
-	
-	// Front를 인자로 받은 값으로 강제로 변경시키기
-	int CProtocolBuff::CompulsionMoveReadPos(int size)
-	{
-		m_Front = size;
 	}
 
 	// 현재 사용중인 용량 얻기.
@@ -232,14 +274,6 @@ namespace Library_Jingyu
 		// 인터락으로 안전하게 증가
 		InterlockedIncrement(&m_RefCount);
 	}
-
-	CMemoryPoolTLS< CProtocolBuff>* CProtocolBuff::Test()
-	{
-		return m_MPool;
-	}
-
-
-
 
 
 

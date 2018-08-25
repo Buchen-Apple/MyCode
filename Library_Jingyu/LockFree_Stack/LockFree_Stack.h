@@ -26,17 +26,22 @@ namespace Library_Jingyu
 			LONG64 m_l64Count = 0;
 		};
 
-		// 리스트 내부의 노드 수
-		LONG m_NodeCount;		
+		// ----------- 멤버변수 위치를 잡을 때 '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
+		// 이 class에서 핵심 함수는 Push, Pop. 해당 함수의 코드에 맞춰서 멤버변수 배치
+
+		// 메모리풀
+		CMemoryPool<st_LFS_NODE>* m_MPool;
 
 		// Top을 가리키는 구조체 변수
 		alignas(16)	st_TOP m_stpTop;
 
+		// 리스트 내부의 노드 수
+		LONG m_NodeCount;			
+
 		// 에러났을 때 크래시 내는 용도
 		CCrashDump* m_CDump;
 
-		// 메모리풀
-		CMemoryPool<st_LFS_NODE>* m_MPool;
+		
 
 
 	public:
@@ -55,7 +60,6 @@ namespace Library_Jingyu
 		//
 		// return : 없음 (void)
 		void Push(T Data);
-
 
 		// 인덱스 얻기
 		//

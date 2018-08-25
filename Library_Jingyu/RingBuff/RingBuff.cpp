@@ -271,54 +271,6 @@ namespace Library_Jingyu
 		m_Rear = TempRear;
 
 		return iSize;
-
-
-
-		// ----------- 과거
-		//int TempRear = m_Rear;
-		//int TempFront = m_Front;
-
-		//// 매개변수 size가 0이면 리턴
-		//if (iSize == 0)
-		//	return 0;
-
-		//// 실제 인큐 사이즈를 저장할 변수
-		//int iRealEnqueueSize = 0;
-
-		//// 인큐 한 사이즈를 저장할 변수 iRealCpySize.
-		//int iRealCpySize = 0;
-
-		//while (iSize > 0)
-		//{
-		//	// Rear 1칸 이동
-		//	TempRear = NextIndex(TempRear, 1);		
-
-		//	// 큐 꽉찼는지 체크
-		//	if (TempRear == TempFront)
-		//		return -1;
-
-		//	// 실제 넣을 수 있는 사이즈를 찾는다.
-		//	if (TempRear >= TempFront)
-		//		iRealEnqueueSize = m_BuffSize - TempRear;
-		//	else
-		//		iRealEnqueueSize = TempFront - TempRear;
-
-		//	if (iRealEnqueueSize > iSize)
-		//		iRealEnqueueSize = iSize;
-
-		//	// 메모리 복사
-		//	memcpy(&m_Buff[TempRear], chpData + iRealCpySize, iRealEnqueueSize);
-
-		//	// rear의 위치 이동
-		//	TempRear = NextIndex(TempRear, iRealEnqueueSize - 1);
-
-		//	iRealCpySize += iRealEnqueueSize;
-		//	iSize -= iRealEnqueueSize;			
-		//}
-
-		//m_Rear = TempRear;
-
-		//return iRealCpySize;
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -451,63 +403,6 @@ namespace Library_Jingyu
 		m_Front = TempFront;
 
 		return iSize;
-
-
-
-
-
-		// -------------- 과거
-		//int TempFront = m_Front;
-		//int TempRear = m_Rear;
-
-		//// 매개변수 size가 0이면 리턴
-		//if (iSize == 0)
-		//	return 0;
-
-		//// 실제 Dequeue 할 사이즈
-		//int iRealDequeueSIze = 0;
-
-		//// Dequeue 한 사이즈를 저장할 변수 iRealCpySize.
-		//int iRealCpySize = 0;
-
-		//while (iSize > 0)
-		//{
-		//	// 큐 비었나 체크
-		//	if (TempFront == TempRear)
-		//		return -1;
-
-		//	// 이번에 Dequeue할 수 있는 사이즈를 찾는다.
-		//	// rear가 더 크다면.
-		//	if (TempRear > TempFront)
-		//		iRealDequeueSIze = TempRear - TempFront;
-
-		//	// front가 더 크다면
-		//	else
-		//		iRealDequeueSIze = m_BuffSize - (TempFront + 1);
-
-		//	if (iRealDequeueSIze > iSize)
-		//		iRealDequeueSIze = iSize;
-
-		//	// Front 1칸 앞으로 이동
-		//	TempFront = NextIndex(TempFront, 1);
-
-		//	// 메모리 복사
-		//	if (iRealDequeueSIze == 0)
-		//		iRealDequeueSIze = 1;
-
-		//	memcpy_s(chpDest + iRealCpySize, GetFreeSize(), &m_Buff[TempFront], iRealDequeueSIze);
-		//	//memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealDequeueSIze);
-
-		//	// 디큐한 만큼 m_Front이동
-		//	TempFront = NextIndex(TempFront, iRealDequeueSIze - 1);
-
-		//	iRealCpySize += iRealDequeueSIze;
-		//	iSize -= iRealDequeueSIze;
-		//}
-
-		//m_Front = TempFront;
-
-		//return iRealCpySize;
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -639,61 +534,6 @@ namespace Library_Jingyu
 		// --------------------
 
 		return iSize;
-
-
-
-
-
-
-
-		// ------------ 과거
-		//// Peek 한 사이즈를 저장할 변수 iRealCpySize.
-		//int TempFront = m_Front;
-		//int TempRear = m_Rear;
-		//int iRealCpySize = 0;
-
-		//// 매개변수 size가 0이면 리턴
-		//if (iSize == 0)
-		//	return 0;
-
-		//// 실제 Peek 할 사이즈
-		//int iRealPeekSIze = 0;		
-
-		//while (iSize > 0)
-		//{
-		//	// 큐 비었나 체크
-		//	if (TempFront == TempRear)
-		//		return -1;
-
-		//	// 이번에 Peek할 수 있는 사이즈를 찾는다.
-		//	// rear가 더 크다면.
-		//	if (TempRear > TempFront)
-		//		iRealPeekSIze = TempRear - TempFront;
-
-		//	// front가 더 크다면
-		//	else
-		//		iRealPeekSIze = m_BuffSize - (TempFront + 1);
-
-		//	if (iRealPeekSIze > iSize)
-		//		iRealPeekSIze = iSize;
-
-		//	// 임시 Front 1칸 앞으로 이동
-		//	TempFront = NextIndex(TempFront, 1);
-		//	
-		//	// 메모리 복사
-		//	if (iRealPeekSIze == 0)
-		//		iRealPeekSIze = 1;
-
-		//	memcpy(chpDest + iRealCpySize, &m_Buff[TempFront], iRealPeekSIze);
-
-		//	// 디큐한 만큼 임시 m_Front이동
-		//	TempFront = NextIndex(TempFront, iRealPeekSIze - 1);
-		//	
-		//	iRealCpySize += iRealPeekSIze;
-		//	iSize -= iRealPeekSIze;
-		//}
-
-		//return iRealCpySize;
 	}
 
 
@@ -733,9 +573,6 @@ namespace Library_Jingyu
 		// 0사이즈를 이동하려고 하면 리턴
 		if (iSize == 0)
 			return 0;
-
-		if (iSize < 0)
-			int abc = 10;
 
 		// 매개변수로 받은 iSize가 한 번에 이동할 수 있는 크기를 벗어나는지 체크
 		int iRealMoveSize;

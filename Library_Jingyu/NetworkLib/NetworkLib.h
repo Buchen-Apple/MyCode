@@ -186,31 +186,54 @@ namespace Library_Jingyu
 
 		// Accept 직후, 호출된다.
 		//
+		// parameter : 접속한 유저의 IP, Port
 		// return false : 클라이언트 접속 거부
 		// return true : 접속 허용
 		virtual bool OnConnectionRequest(TCHAR* IP, USHORT port) = 0;
 
-		// Accept 후, 접속처리까지 다 완료된 후 호출된다
+		// 연결 후 호출되는 함수 (AcceptThread에서 Accept 후 호출)
+		//
+		// parameter : 접속한 유저에게 할당된 세션키
+		// return : 없음
 		virtual void OnClientJoin(ULONGLONG ClinetID) = 0;
 
-		// InDisconnect 후 호출된다. (실제 내부에서 디스커넥트 후 호출)
+		// 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		//
+		// parameter : 유저 세션키
+		// return : 없음
 		virtual void OnClientLeave(ULONGLONG ClinetID) = 0;
 
 		// 패킷 수신 완료 후 호출되는 함수.
-		// 완성된 패킷 1개가 생기면 호출됨. PacketProc으로 생각하면 된다.
+		//
+		// parameter : 유저 세션키, 받은 패킷
+		// return : 없음
 		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff* Payload) = 0;
 
 		// 패킷 송신 완료 후 호출되는 함수
-		// 샌드 완료통지를 받았을 때, 링버퍼 이동 등 다 하고 호출된다.
+		//
+		// parameter : 유저 세션키, Send 한 사이즈
+		// return : 없음
 		virtual void OnSend(ULONGLONG ClinetID, DWORD SendSize) = 0;
 
-		// 워커 스레드 GQCS 바로 하단에서 호출
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
 		virtual void OnWorkerThreadBegin() = 0;
 
-		// 워커스레드 1루프 종료 후 호출되는 함수.
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
 		virtual void OnWorkerThreadEnd() = 0;
-
+		
 		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
 		virtual void OnError(int error, const TCHAR* errorStr) = 0;
 
 	};

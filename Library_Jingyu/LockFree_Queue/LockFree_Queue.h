@@ -22,22 +22,22 @@ namespace Library_Jingyu
 		{
 			st_LFQ_NODE* m_pPoint = nullptr;
 			LONG64 m_l64Count = 0;
-		};
+		};		
 
 		// 내부의 노드 수
 		LONG m_NodeCount;
 
 		// 메모리풀
-		CMemoryPool<st_LFQ_NODE>* m_MPool;
-
-		// 에러났을 때 크래시 내는 용도
-		CCrashDump* m_CDump;
+		CMemoryPool<st_LFQ_NODE>* m_MPool;		
 
 		// 시작 노드 가리키는 포인터
 		alignas(16) st_NODE_POINT m_stpHead;
 
 		// 마지막 노드 가리키는 포인터
 		alignas(16) st_NODE_POINT m_stpTail;
+
+		// 에러났을 때 크래시 내는 용도
+		CCrashDump* m_CDump;
 
 
 

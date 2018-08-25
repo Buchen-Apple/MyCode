@@ -23,9 +23,10 @@ namespace Library_Jingyu
 
 	class CProtocolBuff
 	{
-	private:
-		// 직렬화 버퍼
-		char* m_pProtocolBuff;
+	private:	
+		// ----------- 멤버변수 위치를 잡을 때 '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
+		// 이 class에서 핵심 함수는 PutData, GetData, MoveWritePos, MoveReadPos. 
+		// 해당 함수의 코드에 맞춰서 멤버변수 배치
 
 		// 버퍼 사이즈
 		int m_Size;
@@ -33,22 +34,20 @@ namespace Library_Jingyu
 		// Front
 		int m_Front;
 
+		// 레퍼런스 카운트. 소멸 체크하는 카운트
+		LONG m_RefCount;
+
 		// Rear
 		int m_Rear;
 
-		// 레퍼런스 카운트. 소멸 체크하는 카운트
-		LONG m_RefCount;
+		// 직렬화 버퍼
+		char* m_pProtocolBuff;		
 
 		// CProtocolBuff를 다루는 메모리풀 (락프리)
 		static CMemoryPoolTLS< CProtocolBuff>* m_MPool;
 
 		// 문제 생길 시 Crash 발생시킬 덤프.
 		static CCrashDump* m_Dump;
-
-
-	private:
-		// 초기화
-		void Init();
 
 	public:
 		// 생성자, 소멸자
@@ -74,14 +73,8 @@ namespace Library_Jingyu
 		// Rear 움직이기
 		int MoveWritePos(int size);
 
-		// Rear를 인자로 받은 값으로 강제로 변경시키기
-		int CompulsionMoveWritePos(int size);
-
 		// Front 움직이기
 		int MoveReadPos(int size);
-
-		// Front를 인자로 받은 값으로 강제로 변경시키기
-		int CompulsionMoveReadPos(int size);
 
 		// 현재 사용중인 용량 얻기.
 		int GetUseSize(void);
@@ -121,8 +114,6 @@ namespace Library_Jingyu
 		// 일반 함수 -----------
 		// 레퍼런스 카운트 1 Add하는 함수
 		void Add();
-
-		static CMemoryPoolTLS< CProtocolBuff>* Test();
 	};
 
 

@@ -17,8 +17,6 @@
 #include "LockFree_Queue\LockFree_Queue.h"
 
 
-//extern LONG g_lPacketAllocCount;
-
 namespace Library_Jingyu
 {
 
@@ -75,42 +73,44 @@ namespace Library_Jingyu
 	// 세션 구조체
 	struct CLanServer::stSession
 	{
+		// 해당 인덱스 배열이 사용중인지 체크
+		// 1이면 사용중, 0이면 사용중 아님
+		LONG m_lUseFlag;
+
 		// 세션과 연결된 소켓
 		SOCKET m_Client_sock;
+
+		// 세션 ID. 컨텐츠와 통신 시 사용.
+		ULONGLONG m_ullSessionID;
 
 		// 해당 세션이 들어있는 배열 인덱스
 		ULONGLONG m_lIndex;		
 
 		// 연결된 세션의 IP와 Port
 		TCHAR m_IP[30];
-		USHORT m_prot;
+		USHORT m_prot;			
+			   
+		// I/O 카운트. WSASend, WSARecv시 1씩 증가.
+		// 0이되면 접속 종료된 유저로 판단.
+		// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
+		LONG	m_lIOCount;		
 
-		// 세션 ID. 컨텐츠와 통신 시 사용.
-		ULONGLONG m_ullSessionID;
+		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
+		LONG	m_lSendFlag;			
+
+		// Send overlapped구조체
+		OVERLAPPED m_overSendOverlapped;
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
 		int m_iWSASendCount;
 
 		// Send한 직렬화 버퍼들 저장할 포인터 변수
 		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
-			   
-		// I/O 카운트. WSASend, WSARecv시 1씩 증가.
-		// 0이되면 접속 종료된 유저로 판단.
-		// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
-		LONG	m_lIOCount;
-
-		// 해당 인덱스 배열이 사용중인지 체크
-		// 1이면 사용중, 0이면 사용중 아님
-		LONG m_lUseFlag;
-
-		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
-		LONG	m_lSendFlag;		
 
 		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
 		CLF_Queue<CProtocolBuff*>* m_SendQueue;
 
-		// Send, Recv overlapped구조체
-		OVERLAPPED m_overSendOverlapped;
+		// Recv overlapped구조체
 		OVERLAPPED m_overRecvOverlapped;
 
 		// Recv버퍼. 일반 링버퍼. 
@@ -480,12 +480,10 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. 서버 종료 로그 찍기		
-		//_tprintf_s(L"PacketCount : [%d]\n", g_lPacketAllocCount);
 		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
-	// SendPacket은 그냥 아무때나 하면 된다.
 	// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 	//
 	// return true : SendQ에 성공적으로 데이터 넣음.
@@ -515,7 +513,7 @@ namespace Library_Jingyu
 		payloadBuff->Add();
 		m_stSessionArray[wArrayIndex].m_SendQueue->Enqueue(payloadBuff);
 
-		// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 삭제도 한다.
+		// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff::Free(payloadBuff);
 
 		// 4. SendPost시도
@@ -617,16 +615,16 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
+		// 배열 사용 플래그를 '사용 안함'으로 변경
 		DeleteSession->m_lUseFlag = FALSE;
 
+		// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
+		// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
 		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 
-		// 직렬화 버퍼에 있는 데이터 삭제
+		// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
 		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
-		{
 			CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
-			//InterlockedDecrement(&g_lPacketAllocCount);
-		}
 
 		// 샌드 링버퍼 비우기
 		int UseSize = DeleteSession->m_SendQueue->GetInNode();
@@ -639,7 +637,6 @@ namespace Library_Jingyu
 				cNetDump->Crash();
 
 			CProtocolBuff::Free(Payload);
-			//InterlockedDecrement(&g_lPacketAllocCount);
 		}
 
 		// SendFlag, SendCount 초기화
@@ -655,7 +652,7 @@ namespace Library_Jingyu
 		// 미사용 인덱스 스택에 반납
 		m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
 		
-		// 유저 수 감소
+		// 접속 중 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
 
 		// 컨텐츠 쪽에 종료된 유저 알려줌 
@@ -793,12 +790,7 @@ namespace Library_Jingyu
 
 				// 2. 보냈던 직렬화버퍼 삭제
 				for (int i = 0; i < stNowSession->m_iWSASendCount; ++i)
-				{
 					CProtocolBuff::Free(stNowSession->m_PacketArray[i]);
-					//InterlockedDecrement(&g_lPacketAllocCount);
-				}
-				
-				//InterlockedAdd(&g_lPacketAllocCount, -stNowSession->m_iWSASendCount);
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
@@ -1066,11 +1058,14 @@ namespace Library_Jingyu
 			// 4. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
 			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE);
 
-			// 5. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
+			// 5. 직렬화 버퍼의 rear는 무조건 2부터(앞에 2바이트는 헤더공간)부터 시작한다.
+			// 때문에 front를 2바이트 이동시켜놔야 Size가 0이된다.
 			CProtocolBuff PayloadBuff;
-			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);
-
+			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);	
+			
+			// 6. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
 			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
+
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
 			{
@@ -1091,9 +1086,12 @@ namespace Library_Jingyu
 				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
 				return;
 			}
+
+			// 7. 읽어온 만큼 rear를 이동시킨다. 
+			// 참고로, rear는 시작부터 2이다
 			PayloadBuff.MoveWritePos(DequeueSize);
 
-			// 9. 헤더에 들어있는 타입에 따라 분기처리.
+			// 8. Recv받은 데이터의 헤더 타입에 따라 분기처리.
 			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
 
 		}

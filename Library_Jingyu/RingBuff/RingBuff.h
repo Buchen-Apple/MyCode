@@ -10,10 +10,12 @@ namespace Library_Jingyu
 	#define BUF_SIZE 8192
 
 	private:
-		char* m_Buff;
-		int m_Front;
+		// ------------- 멤버 변수 위치 잡을 때, 캐시 친화적 코드(Cache Friendly Code) 고려.
+		// Enqueue, Dequeue가 핵심 함수. 이 함수 내부 구현에 따라서 멤버변수 배치.
 		int m_Rear;
+		int m_Front;
 		int m_BuffSize;
+		char* m_Buff;			
 
 		//CRITICAL_SECTION cs;
 		SRWLOCK	sl;
