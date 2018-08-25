@@ -389,7 +389,7 @@ namespace Library_Jingyu
 		struct stChunk
 		{	
 
-#define NODE_COUNT 1000	// 1개의 청크가 다루는 노드의 수			
+#define NODE_COUNT 200	// 1개의 청크가 다루는 노드의 수			
 
 			// 청크 멤버변수
 			// ----------- 멤버변수 위치를 잡을 때, '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려

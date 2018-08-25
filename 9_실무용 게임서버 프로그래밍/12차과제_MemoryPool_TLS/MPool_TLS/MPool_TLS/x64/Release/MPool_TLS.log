@@ -1,9 +1,8 @@
-﻿  pch.cpp
-  CrashDump.cpp
-  Profiling_Class.cpp
-  ProtocolBuff_ObjectPool.cpp
-  MPool_TLS.cpp
+﻿  MPool_TLS.cpp
+c:\git_public\9_실무용 게임서버 프로그래밍\12차과제_memorypool_tls\mpool_tls\mpool_tls\mpool_tls.cpp(36): warning C4101: 'Test1' :참조되지 않은 지역 변수입니다.
   코드를 생성하고 있습니다.
-  All 65 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
+  5 of 64 functions ( 7.8%) were compiled, the rest were copied from previous compilation.
+    4 functions were new in current compilation
+    10 functions had inline decision re-evaluated but remain unchanged
   MPool_TLS.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\12차과제_MemoryPool_TLS\MPool_TLS\x64\Release\MPool_TLS.exe
