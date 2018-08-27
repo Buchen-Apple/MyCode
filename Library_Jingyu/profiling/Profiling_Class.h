@@ -2,12 +2,10 @@
 #ifndef __PROFILING_CLASS_H__
 #define __PROFILING_CLASS_H__
 
-#include <iostream>
+#include <Windows.h>
 
 namespace Library_Jingyu
 {
-#define PROFILING_SIZE 50
-
 	class Profiling
 	{
 	private:
@@ -20,13 +18,16 @@ namespace Library_Jingyu
 		double m_MaxTime[2];
 		double m_MInTime[2];
 
+		LARGE_INTEGER m_StartCount;						// BEGIN에서 사용. QueryPerformanceCounter로 시작시간을 구할 때 사용
+		LARGE_INTEGER m_EndCount;						// END에서 사용. QueryPerformanceCounter로 시작시간을 구할 때 사용
+
 	public:
 		Profiling();
 		friend void BEGIN(const char*);
 		friend void END(const char*);
 		friend void RESET();
 		friend void PROFILING_SHOW();
-		friend void PROFILING_FILE_SAVE();
+		friend void PROFILING_FILE_SAVE();	// 인자로, 스레드들의 ID가 저장된 배열과 Count받아옴.
 	};
 
 	// 주파수 구하기	
