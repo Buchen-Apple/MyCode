@@ -73,39 +73,39 @@ namespace Library_Jingyu
 	// 세션 구조체
 	struct CLanServer::stSession
 	{
-		// 해당 인덱스 배열이 사용중인지 체크
-		// 1이면 사용중, 0이면 사용중 아님
-		LONG m_lUseFlag;
-
 		// 세션과 연결된 소켓
 		SOCKET m_Client_sock;
-
-		// 세션 ID. 컨텐츠와 통신 시 사용.
-		ULONGLONG m_ullSessionID;
 
 		// 해당 세션이 들어있는 배열 인덱스
 		ULONGLONG m_lIndex;		
 
 		// 연결된 세션의 IP와 Port
 		TCHAR m_IP[30];
-		USHORT m_prot;			
-			   
+		USHORT m_prot;
+
+		// Send overlapped구조체
+		OVERLAPPED m_overSendOverlapped;		
+
+		// 세션 ID. 컨텐츠와 통신 시 사용.
+		ULONGLONG m_ullSessionID;	
+
+		// 해당 인덱스 배열이 릴리즈 되었는지 체크
+		// TRUE이면 릴리즈 되었음.(사용중 아님), FALSE이면 릴리즈 안됐음.(사용중)
+		LONG m_lReleaseFlag;
+
 		// I/O 카운트. WSASend, WSARecv시 1씩 증가.
 		// 0이되면 접속 종료된 유저로 판단.
 		// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
 		LONG	m_lIOCount;		
-
-		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
-		LONG	m_lSendFlag;			
-
-		// Send overlapped구조체
-		OVERLAPPED m_overSendOverlapped;
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
 		int m_iWSASendCount;
 
 		// Send한 직렬화 버퍼들 저장할 포인터 변수
 		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
+
+		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
+		LONG	m_lSendFlag;
 
 		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
 		CLF_Queue<CProtocolBuff*>* m_SendQueue;
@@ -121,7 +121,7 @@ namespace Library_Jingyu
 		{
 			m_SendQueue = new CLF_Queue<CProtocolBuff*>(1024, false);
 			m_lIOCount = 0;
-			m_lUseFlag = FALSE;	
+			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
 			m_iWSASendCount = 0;
 		}
@@ -407,7 +407,7 @@ namespace Library_Jingyu
 		// 모든 유저에게 셧다운 날림
 		for (int i = 0; i < m_iMaxJoinUser; ++i)
 		{
-			if (m_stSessionArray[i].m_lUseFlag == TRUE)
+			if (m_stSessionArray[i].m_lReleaseFlag == FALSE)
 				shutdown(m_stSessionArray[i].m_Client_sock, SD_BOTH);
 		}
 
@@ -480,71 +480,65 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. 서버 종료 로그 찍기		
-		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerClose...");
+		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
 	// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 	//
-	// return true : SendQ에 성공적으로 데이터 넣음.
+	// return true : SendQ에 성공적으로 데이터 넣고 SendPost까지 성공.
 	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
 	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
 	{
-		// 1. ClinetID로 세션의 Index 알아오기
-		ULONGLONG wArrayIndex = ClinetID >> 48;
-
-		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
-		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
+		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
+		stSession* NowSession = GetSessionLOCK(ClinetID);
+		if (NowSession == nullptr)
 		{
-			// 유저가 호출한 함수는, 에러 확인이 가능하기 때문에 OnError함수 호출 안함.
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
-
-			// 로그 찍기 (로그 레벨 : 디버그)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet :  NetError(%d)", (int)m_iMyErrorCode);
-
+			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
+			// ref 카운트가 0이 되면 메모리풀에 반환
+			CProtocolBuff::Free(payloadBuff);
 			return false;
 		}
 
-		// 3. 헤더를 넣어서, 패킷 완성하기
+		// 2. 헤더를 넣어서, 패킷 완성하기
 		SetProtocolBuff_HeaderSet(payloadBuff);
 
-		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
+		// 3. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
 		payloadBuff->Add();
-		m_stSessionArray[wArrayIndex].m_SendQueue->Enqueue(payloadBuff);
+		NowSession->m_SendQueue->Enqueue(payloadBuff);
 
-		// 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
+		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff::Free(payloadBuff);
 
-		// 4. SendPost시도
-		return SendPost(&m_stSessionArray[wArrayIndex]);
+		// 5. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
+		if (GetSessionUnLOCK(NowSession) == false)
+			return false;
+
+		// 6. SendPost시도
+		return SendPost(NowSession);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 	// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 	//
 	// return true : 해당 유저에게 셧다운 잘 날림.
-	// return false : 접속중이지 않은 유저를 접속해제하려고 함.
+	// return false : 접속중이지 않은 유저를 접속해제하려고 함. 즉 이미 삭제된 유저!
 	bool CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
-		// 1. ClinetID로 세션의 Index 알아오기
-		ULONGLONG wArrayIndex = ClinetID >> 48;
-
-		// 2. 미사용 배열이면 뭔가 잘못된 것이니 false 리턴
-		if (m_stSessionArray[wArrayIndex].m_lUseFlag == FALSE)
-		{
-			// 내 에러 남김. (윈도우 에러는 없음)
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET;
-
-			// 로그 찍기 (로그 레벨 : 디버그)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"SendPacket() --> Not Fine Clinet : NetError(%d)", (int)m_iMyErrorCode);
-
+		// 1. 세션 락 
+		stSession* DeleteSession =  GetSessionLOCK(ClinetID);
+		if (DeleteSession == nullptr)
 			return false;
-		}
 
-		// 끊어야하는 유저는 셧다운 날린다.
+		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
-		shutdown(m_stSessionArray[wArrayIndex].m_Client_sock, SD_BOTH);
+		shutdown(DeleteSession->m_Client_sock, SD_BOTH);
+
+		// 3. 세션 락 해제
+		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
+		GetSessionUnLOCK(DeleteSession);
 
 		return true;
 	}
@@ -615,8 +609,12 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
-		// 배열 사용 플래그를 '사용 안함'으로 변경
-		DeleteSession->m_lUseFlag = FALSE;
+		// ReleaseFlag와 I/O카운트 둘 다 0이라면 'ReleaseFlag만 TRUE로 바꾼다!! 
+		// I/O카운트는 안바꾼다.
+		// 
+		// TRUE가 리턴되는 것은, 이미 DeleteSession->m_lReleaseFlag가 true였다는 것. 
+		if (InterlockedCompareExchange64((LONG64*)&DeleteSession->m_lReleaseFlag, TRUE, FALSE) == TRUE)
+			return;
 
 		// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
 		// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
@@ -901,13 +899,13 @@ namespace Library_Jingyu
 			iIndex = g_This->m_stEmptyIndexStack->Pop();		
 
 			 // 2) 해당 세션 배열, 사용중으로 변경
-			g_This->m_stSessionArray[iIndex].m_lUseFlag = TRUE;
+			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
 			// 3) 정보 셋팅하기
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
 
-			// -- 세션키(믹스 키)와 인덱스
+			// -- 세션 ID(믹스 키)와 인덱스 할당
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = (++ullUniqueSessionID) | (iIndex << 48);
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
 
@@ -965,12 +963,65 @@ namespace Library_Jingyu
 		return 0;
 	}
 
-
-	// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
-	ULONGLONG CLanServer::GetRealSessionKey(ULONGLONG MixKey)
+	// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락거는 함수.
+		// 실제 락은 아니지만 락처럼 사용.
+		//
+		// Parameter : SessionID
+		// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
+		//			실패 시 nullptr
+	CLanServer::stSession* 	CLanServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
-		return MixKey & 0x0000ffffffffffff;
+		// 1. ClinetID로 세션 알아오기
+		stSession* retSession = &m_stSessionArray[SessionID >> 48];
+
+		// 2. I/O 카운트 1 증가.	
+		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
+		{
+			// 증가한 값이 1이면, 이미 종료되어야 하는 유저였다는 것.
+			// 다시 1 감소시키고, 감소한 값이 0이라면 inDIsconnect 호출
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			return nullptr;
+		}
+
+		// 3. 세션키 검사. 정말 내가 알고있는 그 세션키가 아니거나, 배열이 미사용 배열이라면
+		/*if (m_stSessionArray[wArrayIndex].m_ullSessionKey != (ClinetID & 0x0000ffffffffffff) ||
+			m_stSessionArray[wArrayIndex].m_lReleaseFlag == TRUE)*/
+		if (retSession->m_ullSessionID != SessionID || retSession->m_lReleaseFlag == TRUE)
+		{
+			// 내가 SendPacket을 하고자 했던 유저가 아님.
+			// I/O카운트 1 감소시킨다.
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			return nullptr;
+		}
+
+		// 4. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
+		return retSession;
+
 	}
+
+	// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락 해제하는 함수
+	// 실제 락은 아니지만 락처럼 사용.
+	//
+	// parameter : 세션 포인터
+	// return : 성공적으로 해제 시, true
+	//		  : I/O카운트가 0이되어 삭제된 유저는, false
+	bool 	CLanServer::GetSessionUnLOCK(stSession* NowSession)
+	{
+		// 1. I/O 카운트 1 감소
+		if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+		{
+			// 감소 시 0이면 삭제로직
+			InDisconnect(NowSession);
+			return false;
+		}
+
+		return true;
+	}
+
 
 	// CProtocolBuff에 헤더 넣는 함수
 	void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)

@@ -79,9 +79,22 @@ namespace Library_Jingyu
 	private:
 		// ----------------------
 		// private 함수들
-		// ----------------------		
-		// 조합된 키를 입력받으면, 진짜 세션키를 리턴하는 함수.
-		ULONGLONG GetRealSessionKey(ULONGLONG MixKey);
+		// ----------------------	
+		// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락거는 함수.
+		// 실제 락은 아니지만 락처럼 사용.
+		//
+		// Parameter : SessionID
+		// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
+		//			실패 시 nullptr
+		stSession* GetSessionLOCK(ULONGLONG SessionID);
+
+		// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락 해제하는 함수
+		// 실제 락은 아니지만 락처럼 사용.
+		//
+		// parameter : 세션 포인터
+		// return : 성공적으로 해제 시, true
+		//		  : I/O카운트가 0이되어 삭제된 유저는, false
+		bool GetSessionUnLOCK(stSession* NowSession);
 
 		// CProtocolBuff에 헤더 넣는 함수
 		void SetProtocolBuff_HeaderSet(CProtocolBuff* Packet);

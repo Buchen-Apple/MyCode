@@ -1,11 +1,7 @@
-﻿  pch.cpp
-  CrashDump.cpp
-  Log.cpp
-  NetworkLib.cpp
-  ProtocolBuff_ObjectPool.cpp
-  RingBuff.cpp
-  Netlib.cpp
+﻿  Netlib.cpp
   코드를 생성하고 있습니다.
-  All 150 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  1 of 152 functions ( 0.7%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    4 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
   Netlib.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\11차과제_네트워크lib제작_메모리풀,락프리스택,락프리큐 적용\Netlib\x64\Release\Netlib.exe
