@@ -165,6 +165,7 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
     <ClCompile Include="Netlib.cpp" />

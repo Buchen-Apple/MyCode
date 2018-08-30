@@ -24,7 +24,7 @@ namespace Library_Jingyu
 	class CLanServer
 	{
 	private:
-
+	
 		// ----------------------
 		// private 구조체 or enum 전방선언
 		// ----------------------
@@ -95,9 +95,6 @@ namespace Library_Jingyu
 		// return : 성공적으로 해제 시, true
 		//		  : I/O카운트가 0이되어 삭제된 유저는, false
 		bool GetSessionUnLOCK(stSession* NowSession);
-
-		// CProtocolBuff에 헤더 넣는 함수
-		void SetProtocolBuff_HeaderSet(CProtocolBuff* Packet);
 
 		// 워커 스레드
 		static UINT	WINAPI	WorkerThread(LPVOID lParam);
@@ -171,7 +168,7 @@ namespace Library_Jingyu
 		//
 		// return true : SendQ에 성공적으로 데이터 넣음.
 		// return true : SendQ에 데이터 넣기 실패.
-		bool SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff);
+		bool SendPacket(ULONGLONG ClinetID, CProtocolBuff_Lan* payloadBuff);
 
 
 		// ----------------------------- 게터 함수들 ---------------------------
@@ -220,7 +217,7 @@ namespace Library_Jingyu
 		//
 		// parameter : 유저 세션키, 받은 패킷
 		// return : 없음
-		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff* Payload) = 0;
+		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload) = 0;
 
 		// 패킷 송신 완료 후 호출되는 함수
 		//

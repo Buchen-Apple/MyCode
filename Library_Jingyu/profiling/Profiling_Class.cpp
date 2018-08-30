@@ -54,10 +54,6 @@ namespace Library_Jingyu
 	// 프로파일링 시작
 	void BEGIN(const char* str)
 	{
-		// 카운트 값 구해두기.
-		LARGE_INTEGER TempStartCount;
-		QueryPerformanceCounter(&TempStartCount);
-
 		// 스레드의 TLS 가져오기
 		stThread_Profile* MyProfile = (stThread_Profile*)TlsGetValue(g_TLSIndex);
 
@@ -98,12 +94,11 @@ namespace Library_Jingyu
 		{
 			int NowSize = ++MyProfile->m_NowProfiling_Size;
 			Profiling* safe_Profile = &MyProfile->m_Profile[NowSize];
-
-			safe_Profile->m_StartCount = TempStartCount;
+			
 			strcpy_s(safe_Profile->m_Name, sizeof(safe_Profile->m_Name), str);			// 이름 저장
 			safe_Profile->m_CallCount = 1;												// BGEIN 호출 횟수 저장
+			QueryPerformanceCounter(&safe_Profile->m_StartCount);
 			safe_Profile->m_StartTime = (double)safe_Profile->m_StartCount.QuadPart;	// 시작 시간 저장.		
-
 		}
 
 		// 검색된 이름이 있다면, 해당 프로파일링에 시작 시간 저장
@@ -111,9 +106,8 @@ namespace Library_Jingyu
 		{
 			Profiling* safe_Profile = &MyProfile->m_Profile[i];
 
-			safe_Profile->m_StartCount = TempStartCount;
-
 			safe_Profile->m_CallCount++;												// BEGIN 호출 횟수 저장
+			QueryPerformanceCounter(&safe_Profile->m_StartCount);
 			safe_Profile->m_StartTime = (double)safe_Profile->m_StartCount.QuadPart;	// 시작 시간 저장		
 		}
 	}

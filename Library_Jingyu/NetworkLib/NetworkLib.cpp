@@ -35,12 +35,6 @@ namespace Library_Jingyu
 #define dfSENDPOST_MAX_WSABUF			200
 
 
-
-
-
-
-
-
 	// ------------------------------
 	// enum과 구조체
 	// ------------------------------
@@ -102,13 +96,13 @@ namespace Library_Jingyu
 		int m_iWSASendCount;
 
 		// Send한 직렬화 버퍼들 저장할 포인터 변수
-		CProtocolBuff* m_PacketArray[dfSENDPOST_MAX_WSABUF];
+		CProtocolBuff_Lan* m_PacketArray[dfSENDPOST_MAX_WSABUF];
 
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
 
 		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
-		CLF_Queue<CProtocolBuff*>* m_SendQueue;
+		CLF_Queue<CProtocolBuff_Lan*>* m_SendQueue;
 
 		// Recv overlapped구조체
 		OVERLAPPED m_overRecvOverlapped;
@@ -119,7 +113,7 @@ namespace Library_Jingyu
 		// 생성자 
 		stSession()
 		{
-			m_SendQueue = new CLF_Queue<CProtocolBuff*>(1024, false);
+			m_SendQueue = new CLF_Queue<CProtocolBuff_Lan*>(1024, false);
 			m_lIOCount = 0;
 			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
@@ -488,7 +482,7 @@ namespace Library_Jingyu
 	//
 	// return true : SendQ에 성공적으로 데이터 넣고 SendPost까지 성공.
 	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
-	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff* payloadBuff)
+	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff_Lan* payloadBuff)
 	{
 		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
 		stSession* NowSession = GetSessionLOCK(ClinetID);
@@ -496,12 +490,12 @@ namespace Library_Jingyu
 		{
 			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
 			// ref 카운트가 0이 되면 메모리풀에 반환
-			CProtocolBuff::Free(payloadBuff);
+			CProtocolBuff_Lan::Free(payloadBuff);
 			return false;
 		}
 
 		// 2. 헤더를 넣어서, 패킷 완성하기
-		SetProtocolBuff_HeaderSet(payloadBuff);
+		payloadBuff->SetProtocolBuff_HeaderSet();
 
 		// 3. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
@@ -509,7 +503,7 @@ namespace Library_Jingyu
 		NowSession->m_SendQueue->Enqueue(payloadBuff);
 
 		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
-		CProtocolBuff::Free(payloadBuff);
+		CProtocolBuff_Lan::Free(payloadBuff);
 
 		// 5. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
@@ -622,19 +616,19 @@ namespace Library_Jingyu
 
 		// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
 		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
-			CProtocolBuff::Free(DeleteSession->m_PacketArray[i]);
+			CProtocolBuff_Lan::Free(DeleteSession->m_PacketArray[i]);
 
 		// 샌드 링버퍼 비우기
 		int UseSize = DeleteSession->m_SendQueue->GetInNode();
 
-		CProtocolBuff* Payload;
+		CProtocolBuff_Lan* Payload;
 		for (int i = 0; i < UseSize; ++i)
 		{
 			// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
 			if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
 				cNetDump->Crash();
 
-			CProtocolBuff::Free(Payload);
+			CProtocolBuff_Lan::Free(Payload);
 		}
 
 		// SendFlag, SendCount 초기화
@@ -788,7 +782,7 @@ namespace Library_Jingyu
 
 				// 2. 보냈던 직렬화버퍼 삭제
 				for (int i = 0; i < stNowSession->m_iWSASendCount; ++i)
-					CProtocolBuff::Free(stNowSession->m_PacketArray[i]);
+					CProtocolBuff_Lan::Free(stNowSession->m_PacketArray[i]);
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
@@ -1024,12 +1018,12 @@ namespace Library_Jingyu
 
 
 	// CProtocolBuff에 헤더 넣는 함수
-	void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
-	{
-		// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
-		WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
-		memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
-	}
+	//void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
+	//{
+	//	// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
+	//	WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
+	//	memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
+	//}
 
 
 
@@ -1111,7 +1105,7 @@ namespace Library_Jingyu
 
 			// 5. 직렬화 버퍼의 rear는 무조건 2부터(앞에 2바이트는 헤더공간)부터 시작한다.
 			// 때문에 front를 2바이트 이동시켜놔야 Size가 0이된다.
-			CProtocolBuff PayloadBuff;
+			CProtocolBuff_Lan PayloadBuff;
 			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);	
 			
 			// 6. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)

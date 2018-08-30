@@ -7,42 +7,56 @@ namespace Library_Jingyu
 
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
-#define BUFF_SIZE 256
+	// 직렬화 버퍼 1개의 크기
+#define BUFF_SIZE 512
+
+	// LanServer Packet 헤더 사이즈.
+#define dfNETWORK_PACKET_HEADER_SIZE 2
 
 	// static 메모리풀
-	CMemoryPoolTLS<CProtocolBuff>* CProtocolBuff::m_MPool = new CMemoryPoolTLS<CProtocolBuff>(100, false);
+	CMemoryPoolTLS<CProtocolBuff_Lan>* CProtocolBuff_Lan::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Lan>(100, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
-	CCrashDump* CProtocolBuff::m_Dump = CCrashDump::GetInstance();
-
+	CCrashDump* CProtocolBuff_Lan::m_Dump = CCrashDump::GetInstance();
+	   	 
 	// 사이즈 지정한 생성자
-	CProtocolBuff::CProtocolBuff(int size)
+	CProtocolBuff_Lan::CProtocolBuff_Lan(int size)
 	{		
 		m_Size = size;
 		m_pProtocolBuff = new char[size];
 		m_Front = 0;
-		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
+		m_Rear = dfNETWORK_PACKET_HEADER_SIZE; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)
 	}
 
 	// 사이즈 지정 안한 생성자
-	CProtocolBuff::CProtocolBuff()
+	CProtocolBuff_Lan::CProtocolBuff_Lan()
 	{		
 		m_Size = BUFF_SIZE;
 		m_pProtocolBuff = new char[BUFF_SIZE];
 		m_Front = 0;
-		m_Rear = 2; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
+		m_Rear = dfNETWORK_PACKET_HEADER_SIZE; // 처음 앞에 2바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)	
 	}
 
 	// 소멸자
-	CProtocolBuff::~CProtocolBuff()
+	CProtocolBuff_Lan::~CProtocolBuff_Lan()
 	{
 		delete[] m_pProtocolBuff;
 	}
 
+	// 헤더를 채우는 함수. Lan서버 전용
+	void CProtocolBuff_Lan::SetProtocolBuff_HeaderSet()
+	{
+		// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
+		WORD wHeader = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
+		memcpy_s(&GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
+	}
+
+
 	// 버퍼 크기 재설정
-	int CProtocolBuff::ReAlloc(int size)
+	// 만들어뒀지만 현재 안쓰는중.. 사용하려면 손 좀 더 봐야함.
+	int CProtocolBuff_Lan::ReAlloc(int size)
 	{
 		// 기존 데이터를 temp에 보관시킨 후 m_pProtocolBuff 해제
 		char* temp = new char[m_Size];
@@ -67,13 +81,13 @@ namespace Library_Jingyu
 	}
 
 	// 버퍼 클리어
-	void CProtocolBuff::Clear()
+	void CProtocolBuff_Lan::Clear()
 	{
 		m_Front = m_Rear = 0;
 	}
 
 	// 데이터 넣기
-	int CProtocolBuff::PutData(const char* pSrc, int size)
+	int CProtocolBuff_Lan::PutData(const char* pSrc, int size)
 	{
 		// 큐 꽉찼거나 rear가 Size를 앞질렀는지 체크
 		if (m_Rear >= m_Size)
@@ -92,23 +106,23 @@ namespace Library_Jingyu
 			break;
 		case 3:
 			*(short *)&m_pProtocolBuff[m_Rear] = *(short *)pSrc;
-			*(char *)&m_pProtocolBuff[m_Rear + sizeof(short)] = *(char *)&pSrc[sizeof(short)];
+			*(char *)&m_pProtocolBuff[m_Rear + 2] = *(char *)&pSrc[2];
 			break;
 		case 4:
 			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
 			break;
 		case 5:
 			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
-			*(char *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(char *)&pSrc[sizeof(int)];
+			*(char *)&m_pProtocolBuff[m_Rear + 4] = *(char *)&pSrc[4];
 			break;
 		case 6:
 			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
-			*(short *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(short *)&pSrc[sizeof(int)];
+			*(short *)&m_pProtocolBuff[m_Rear + 4] = *(short *)&pSrc[4];
 			break;
 		case 7:
 			*(int *)&m_pProtocolBuff[m_Rear] = *(int *)pSrc;
-			*(short *)&m_pProtocolBuff[m_Rear + sizeof(int)] = *(short *)&pSrc[sizeof(int)];
-			*(char *)&m_pProtocolBuff[m_Rear + sizeof(int) + sizeof(short)] = *(char *)&pSrc[sizeof(int) + sizeof(short)];
+			*(short *)&m_pProtocolBuff[m_Rear + 4] = *(short *)&pSrc[4];
+			*(char *)&m_pProtocolBuff[m_Rear + 6] = *(char *)&pSrc[6];
 			break;
 		case 8:
 			*((__int64 *)&m_pProtocolBuff[m_Rear]) = *((__int64 *)pSrc);
@@ -126,7 +140,7 @@ namespace Library_Jingyu
 	}
 
 	// 데이터 빼기
-	int CProtocolBuff::GetData(char* pSrc, int size)
+	int CProtocolBuff_Lan::GetData(char* pSrc, int size)
 	{
 		// 큐 비었나 체크
 		if (m_Front == m_Rear)
@@ -149,23 +163,23 @@ namespace Library_Jingyu
 			break;
 		case 3:
 			*(short *)pSrc = *(short *)&m_pProtocolBuff[m_Front];
-			*(char *)&pSrc[sizeof(short)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(short)];
+			*(char *)&pSrc[2] = *(char *)&m_pProtocolBuff[m_Front + 2];
 			break;
 		case 4:
 			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
 			break;
 		case 5:
 			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
-			*(char *)&pSrc[sizeof(int)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(int)];
+			*(char *)&pSrc[4] = *(char *)&m_pProtocolBuff[m_Front + 4];
 			break;
 		case 6:
 			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
-			*(short *)&pSrc[sizeof(int)] = *(short *)&m_pProtocolBuff[m_Front + sizeof(int)];
+			*(short *)&pSrc[4] = *(short *)&m_pProtocolBuff[m_Front + 4];
 			break;
 		case 7:
 			*(int *)pSrc = *(int *)&m_pProtocolBuff[m_Front];
-			*(short *)&pSrc[sizeof(int)] = *(short *)&m_pProtocolBuff[m_Front + sizeof(int)];
-			*(char *)&pSrc[sizeof(int) + sizeof(short)] = *(char *)&m_pProtocolBuff[m_Front + sizeof(int) + sizeof(short)];
+			*(short *)&pSrc[4] = *(short *)&m_pProtocolBuff[m_Front + 4];
+			*(char *)&pSrc[6] = *(char *)&m_pProtocolBuff[m_Front + 6];
 			break;
 		case 8:
 			*((__int64 *)pSrc) = *((__int64 *)&m_pProtocolBuff[m_Front]);
@@ -183,13 +197,13 @@ namespace Library_Jingyu
 	}
 
 	// 버퍼의 포인터 얻음.
-	char* CProtocolBuff::GetBufferPtr(void)
+	char* CProtocolBuff_Lan::GetBufferPtr(void)
 	{
 		return m_pProtocolBuff;
 	}
 
 	// Rear 움직이기
-	int CProtocolBuff::MoveWritePos(int size)
+	int CProtocolBuff_Lan::MoveWritePos(int size)
 	{
 		// 현재 Rear의 위치가 버퍼의 끝이면 더 이상 이동 불가
 		if (m_Rear == m_Size)
@@ -213,7 +227,7 @@ namespace Library_Jingyu
 	}
 
 	// Front 움직이기
-	int CProtocolBuff::MoveReadPos(int size)
+	int CProtocolBuff_Lan::MoveReadPos(int size)
 	{
 		// 버퍼가 빈 상태면 0 리턴
 		if (m_Front == m_Rear)
@@ -235,33 +249,33 @@ namespace Library_Jingyu
 	}
 
 	// 현재 사용중인 용량 얻기.
-	int	CProtocolBuff::GetUseSize(void)
+	int	CProtocolBuff_Lan::GetUseSize(void)
 	{
 		return m_Rear - m_Front;
 	}
 
 	// 현재 버퍼에 남은 용량 얻기.
-	int	CProtocolBuff::GetFreeSize(void)
+	int	CProtocolBuff_Lan::GetFreeSize(void)
 	{
 		return m_Size - m_Rear;
 	}
 
 
 	// 메모리풀에서 직렬화버퍼 1개 Alloc
-	CProtocolBuff* CProtocolBuff::Alloc()
+	CProtocolBuff_Lan* CProtocolBuff_Lan::Alloc()
 	{
-		return  m_MPool->Alloc();;
+		return  m_MPool->Alloc();
 	}
 
 	// Free. 레퍼런스 카운트 1 감소.
 	// 만약, 레퍼런스 카운트가 0이라면 메모리풀에 Free함
-	void CProtocolBuff::Free(CProtocolBuff* pBuff)
+	void CProtocolBuff_Lan::Free(CProtocolBuff_Lan* pBuff)
 	{
 		// 인터락으로 안전하게 감소.
 		// 만약 감소 후 0이됐다면 delete
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
-			pBuff->m_Rear = 2;		// rear 값 2로 초기화
+			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE;		// rear 값 2로 초기화. 헤더 영역 확보
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
 			m_MPool->Free(pBuff);
 		}
@@ -269,15 +283,17 @@ namespace Library_Jingyu
 	}
 
 	// 레퍼런스 카운트 1 Add하는 함수
-	void CProtocolBuff::Add()
+	void CProtocolBuff_Lan::Add()
 	{
 		// 인터락으로 안전하게 증가
 		InterlockedIncrement(&m_RefCount);
 	}
 
-
-
-
+	// ------------------------------------
+	// ------------------------------------
+	// ------------------------------------
+	// ------------------------------------
+	// 예외용
 
 	// 생성자
 	CException::CException(const wchar_t* str)

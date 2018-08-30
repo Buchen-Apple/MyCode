@@ -594,8 +594,6 @@ namespace Library_Jingyu
 			
 		// 만약, Top이 NODE_COUNT보다 크거나 같다면 뭔가 잘못된것.
 		// 이 전에 이미 캐치되었어야 함
-		if (pChunk == nullptr)
-			int abc = 10;
 		if (pChunk->m_iTop >= NODE_COUNT)
 			pChunk->m_ChunkDump->Crash();	
 

@@ -213,23 +213,23 @@ namespace Library_Jingyu
 					break;
 				case 3:
 					*(short *)&m_Buff[TempRear] = *(short *)chpData;
-					*(char *)&m_Buff[TempRear + sizeof(short)] = *(char *)&chpData[sizeof(short)];
+					*(char *)&m_Buff[TempRear + 2] = *(char *)&chpData[2];
 					break;
 				case 4:
 					*(int *)&m_Buff[TempRear] = *(int *)chpData;
 					break;
 				case 5:
 					*(int *)&m_Buff[TempRear] = *(int *)chpData;
-					*(char *)&m_Buff[TempRear + sizeof(int)] = *(char *)&chpData[sizeof(int)];
+					*(char *)&m_Buff[TempRear + 4] = *(char *)&chpData[4];
 					break;
 				case 6:
 					*(int *)&m_Buff[TempRear] = *(int *)chpData;
-					*(short *)&m_Buff[TempRear + sizeof(int)] = *(short *)&chpData[sizeof(int)];
+					*(short *)&m_Buff[TempRear + 4] = *(short *)&chpData[4];
 					break;
 				case 7:
 					*(int *)&m_Buff[TempRear] = *(int *)chpData;
-					*(short *)&m_Buff[TempRear + sizeof(int)] = *(short *)&chpData[sizeof(int)];
-					*(char *)&m_Buff[TempRear + sizeof(int) + sizeof(short)] = *(char *)&chpData[sizeof(int) + sizeof(short)];
+					*(short *)&m_Buff[TempRear + 4] = *(short *)&chpData[4];
+					*(char *)&m_Buff[TempRear + 6] = *(char *)&chpData[6];
 					break;
 				case 8:
 					*((__int64 *)&m_Buff[TempRear]) = *((__int64 *)chpData);
@@ -345,23 +345,23 @@ namespace Library_Jingyu
 					break;
 				case 3:
 					*(short *)chpDest = *(short *)&m_Buff[TempFront];
-					*(char *)&chpDest[sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(short)];
+					*(char *)&chpDest[2] = *(char *)&m_Buff[TempFront + 2];
 					break;
 				case 4:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
 					break;
 				case 5:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(char *)&chpDest[sizeof(int)] = *(char *)&m_Buff[TempFront + sizeof(int)];
+					*(char *)&chpDest[4] = *(char *)&m_Buff[TempFront + 4];
 					break;
 				case 6:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					*(short *)&chpDest[4] = *(short *)&m_Buff[TempFront + 4];
 					break;
 				case 7:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
-					*(char *)&chpDest[sizeof(int) + sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(int) + sizeof(short)];
+					*(short *)&chpDest[4] = *(short *)&m_Buff[TempFront + 4];
+					*(char *)&chpDest[6] = *(char *)&m_Buff[TempFront + 6];
 					break;
 				case 8:
 					*((__int64 *)chpDest) = *((__int64 *)&m_Buff[TempFront]);
@@ -477,23 +477,23 @@ namespace Library_Jingyu
 					break;
 				case 3:
 					*(short *)chpDest = *(short *)&m_Buff[TempFront];
-					*(char *)&chpDest[sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(short)];
+					*(char *)&chpDest[2] = *(char *)&m_Buff[TempFront + 2];
 					break;
 				case 4:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
 					break;
 				case 5:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(char *)&chpDest[sizeof(int)] = *(char *)&m_Buff[TempFront + sizeof(int)];
+					*(char *)&chpDest[4] = *(char *)&m_Buff[TempFront + 4];
 					break;
 				case 6:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
+					*(short *)&chpDest[4] = *(short *)&m_Buff[TempFront + 4];
 					break;
 				case 7:
 					*(int *)chpDest = *(int *)&m_Buff[TempFront];
-					*(short *)&chpDest[sizeof(int)] = *(short *)&m_Buff[TempFront + sizeof(int)];
-					*(char *)&chpDest[sizeof(int) + sizeof(short)] = *(char *)&m_Buff[TempFront + sizeof(int) + sizeof(short)];
+					*(short *)&chpDest[4] = *(short *)&m_Buff[TempFront + 4];
+					*(char *)&chpDest[6] = *(char *)&m_Buff[TempFront + 6];
 					break;
 				case 8:
 					*((__int64 *)chpDest) = *((__int64 *)&m_Buff[TempFront]);
