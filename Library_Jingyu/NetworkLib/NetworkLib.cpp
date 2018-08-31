@@ -706,7 +706,7 @@ namespace Library_Jingyu
 		stSession* stNowSession;
 		OVERLAPPED* overlapped;
 
-		CLanServer* g_This = (CLanServer*)lParam;
+		CLanServer* g_This = (CLanServer*)lParam;		
 
 		while (1)
 		{
@@ -721,10 +721,7 @@ namespace Library_Jingyu
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
 			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
-
-			// GQCS 깨어날 시 함수호출
-			g_This->OnWorkerThreadBegin();
-
+			
 			// --------------
 			// 완료 체크
 			// --------------
@@ -754,6 +751,9 @@ namespace Library_Jingyu
 
 				break;
 			}
+
+			// GQCS 깨어날 시 함수호출
+			g_This->OnWorkerThreadBegin();
 
 			// -----------------
 			// Recv 로직
@@ -1015,17 +1015,7 @@ namespace Library_Jingyu
 
 		return true;
 	}
-
-
-	// CProtocolBuff에 헤더 넣는 함수
-	//void CLanServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
-	//{
-	//	// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
-	//	WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
-	//	memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
-	//}
-
-
+	   	 
 
 	// 각종 변수들을 리셋시킨다.
 	// Stop() 함수에서 사용.
@@ -1070,9 +1060,7 @@ namespace Library_Jingyu
 			// 2. 헤더를 Peek으로 확인한다.  Peek 안에서는, 어떻게 해서든지 len만큼 읽는다. 
 			// 버퍼가 비어있으면 접속 끊음.
 			if (NowSession->m_RecvQueue.Peek((char*)&Header_PaylaodSize, dfNETWORK_PACKET_HEADER_SIZE) == -1)
-			{
-				// 일단 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
+			{			
 
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
@@ -1085,6 +1073,9 @@ namespace Library_Jingyu
 				// 로그 찍기 (로그 레벨 : 에러)
 				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 				// 에러 함수 호출
 				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
@@ -1114,9 +1105,6 @@ namespace Library_Jingyu
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
 			{
-				// 일단 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
 
@@ -1124,6 +1112,9 @@ namespace Library_Jingyu
 				TCHAR tcErrorString[300];
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 				// 에러 함수 호출
 				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
@@ -1203,9 +1194,6 @@ namespace Library_Jingyu
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
 				if (Error == WSAENOBUFS)
 				{
-					// 일단 끊어야하니 셧다운 호출
-					shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 					// 내 에러, 윈도우에러 보관
 					m_iOSErrorCode = Error;
 					m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSAENOBUFS;
@@ -1218,6 +1206,9 @@ namespace Library_Jingyu
 					// 로그 찍기 (로그 레벨 : 에러)
 					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
+
+					// 끊어야하니 셧다운 호출
+					shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 					// 에러 함수 호출
 					OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);

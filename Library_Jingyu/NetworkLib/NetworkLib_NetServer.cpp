@@ -733,10 +733,7 @@ namespace Library_Jingyu
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
 			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
-
-			// GQCS 깨어날 시 함수호출
-			g_This->OnWorkerThreadBegin();
-
+					
 			// --------------
 			// 완료 체크
 			// --------------
@@ -766,6 +763,9 @@ namespace Library_Jingyu
 
 				break;
 			}
+
+			// GQCS 깨어날 시 함수호출
+			g_This->OnWorkerThreadBegin();
 
 			// -----------------
 			// Recv 로직
@@ -970,11 +970,11 @@ namespace Library_Jingyu
 	}
 
 	// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락거는 함수.
-		// 실제 락은 아니지만 락처럼 사용.
-		//
-		// Parameter : SessionID
-		// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
-		//			실패 시 nullptr
+	// 실제 락은 아니지만 락처럼 사용.
+	//
+	// Parameter : SessionID
+	// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
+	//			실패 시 nullptr
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
 		// 1. ClinetID로 세션 알아오기
@@ -1096,7 +1096,7 @@ namespace Library_Jingyu
 				return;
 			}
 
-			// 3. 헤더 가장 앞 1바이트(코드) 확인. 내 것이 맞는지
+			// 3. 헤더의 코드 확인. 내 것이 맞는지
 			if(Header[0] != m_bCode)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
@@ -1170,7 +1170,7 @@ namespace Library_Jingyu
 			// 참고로, rear는 시작부터 5이다
 			PayloadBuff.MoveWritePos(DequeueSize);
 
-			// 9. 헤더 검증
+			// 9. 헤더 Decode
 			if (PayloadBuff.Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
