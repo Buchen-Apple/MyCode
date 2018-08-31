@@ -28,9 +28,7 @@ namespace Library_Jingyu
 		m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; // 처음 앞에 5바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)
 
-		m_bCode = 40;
-		m_bXORCode_1 = 124;
-		m_bXORCode_2 = 11;
+		m_bHeadCheck = false;
 	}
 
 	// 사이즈 지정 안한 생성자
@@ -42,9 +40,7 @@ namespace Library_Jingyu
 		m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; // 처음 앞에 5바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)	
 
-		m_bCode = 40;
-		m_bXORCode_1 = 124;
-		m_bXORCode_2 = 11;
+		m_bHeadCheck = false;
 	}
 
 	// 소멸자
@@ -54,11 +50,142 @@ namespace Library_Jingyu
 	}
 
 	// 인코딩
-	//
 	// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
-	void CProtocolBuff_Net::Encode()
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CProtocolBuff_Net::Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2)
 	{
+		// 1. 들어가기전에 헤더가 채워졌는지 체크
+		// 채워졌으면 그냥 return
+		if (m_bHeadCheck == true)
+			return;
+
+		// 채워져 있지 않다면 true로 바꾼다.
+		m_bHeadCheck = true;
+
+
+		// --------------------------- 한번에 암호화
 		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
+		BYTE RandXORCode;
+		WORD PayloadLen;
+		BYTE CheckSum;
+
+		// 1. Rand XOR Code 생성
+		RandXORCode = rand();
+
+		// 2. RandXORCode, 고정 XOR1, 고정 XOR2로 Payload를 바이트단위 xor
+		// 동시에 Total도 구함.
+		PayloadLen = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		int Total = 0;
+
+		int LoopCount = 0;
+		int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		while (LoopCount < PayloadLen)
+		{
+			Total += m_pProtocolBuff[i];
+			m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ RandXORCode ^ bXORCode_1 ^ bXORCode_2;
+			i++;
+			LoopCount++;
+		}
+
+		// 3. Checksum 구한 후 RandXORCode와 Xor
+		CheckSum = Total % 256;
+		CheckSum = RandXORCode ^ CheckSum;
+
+		// 4. 고정 XOR1, 2 로 RandXORCode와 CheckSum  XOR
+		RandXORCode = RandXORCode ^ bXORCode_1 ^ bXORCode_2;
+		CheckSum = CheckSum ^ bXORCode_1 ^ bXORCode_2;
+
+		// 5. 헤더에 Copy(대입)
+		*(char *)&m_pProtocolBuff[0] = bCode;
+		*(short *)&m_pProtocolBuff[1] = PayloadLen;
+		*(char *)&m_pProtocolBuff[3] = RandXORCode;
+		*(char *)&m_pProtocolBuff[4] = CheckSum;
+
+
+
+
+		//// --------------------------- 하나하나 암호화
+		//// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
+
+		//WORD PayloadLen = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//BYTE RandXORCode;
+		//BYTE CheckSum;
+
+		//// 보내기 암호화 과정
+		//// 1. Rand XOR Code 생성
+		//RandXORCode = rand();
+
+		//// 2. Payload 의 checksum 계산
+		//int Total = 0;
+		//int LoopCount = 0;
+		//int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	Total += m_pProtocolBuff[i];
+		//	i++;
+		//	LoopCount++;
+		//}
+
+		//CheckSum = Total % 256;
+
+		//// 3. Rand XOR Code 로[CheckSum, Payload] 바이트 단위 xor
+		//CheckSum = CheckSum ^ RandXORCode;
+
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ RandXORCode;
+		//	i++;
+		//	LoopCount++;
+		//}		
+
+		//// 4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+		//RandXORCode = RandXORCode ^ bXORCode_1;
+		//CheckSum = CheckSum ^ bXORCode_1;
+
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_1;
+		//	i++;
+		//	LoopCount++;
+		//}	
+
+		//// 5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+		//RandXORCode = RandXORCode ^ bXORCode_2;
+		//CheckSum = CheckSum ^ bXORCode_2;
+
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_2;
+		//	i++;
+		//	LoopCount++;
+		//}		
+
+		//// 6. 헤더에 Copy(대입)
+		//*(char *)&m_pProtocolBuff[0] = bCode;
+		//*(short *)&m_pProtocolBuff[1] = PayloadLen;
+		//*(char *)&m_pProtocolBuff[3] = RandXORCode;
+		//*(char *)&m_pProtocolBuff[4] = CheckSum;	
+	}
+
+	// 디코딩
+	// 네트워크로 받은 패킷 중, 헤더를 해석한다.
+	//
+	// Parameter : 헤더 배열
+	// return : CheckSum이 다를 시 false
+	bool CProtocolBuff_Net::Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2)
+	{		
+
+		// -------------------------------------- 한번에 풀기
+		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
+
 		/*
 		Head[0] : Code
 		Head[1~2] : Len
@@ -66,79 +193,117 @@ namespace Library_Jingyu
 		Head[4] = CheckSum
 		*/
 
-		BYTE Head[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER];	
+		WORD PayloadLen = (WORD)Header[1];
+		BYTE RandXORCode = Header[3];
+		BYTE CheckSum = Header[4];
 
-		// 보내기 암호화 과정
-		// 1. Rand XOR Code 생성
-		Head[3] = rand();
+		// 1. 고정 XOR Code2, 1로 [Rand XOR Code] XOR (RandXORCode 복호화 완료)
+		RandXORCode = RandXORCode ^ bXORCode_1 ^ bXORCode_2;
 
-		// 2. Payload 의 checksum 계산
-		int Total = 0;
-		int GetSize = GetUseSize();
-		for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-			Total += m_pProtocolBuff[i];
+		// 2. 고정 XOR Code2, 1, RandXORCode로 [CheckSum] XOR (CheckSum 복호화 완료)
+		CheckSum = CheckSum ^ bXORCode_1 ^ bXORCode_2 ^ RandXORCode;
 
-		Head[4] = Total % 256;
+		// 3. 고정 XOR Code2, 1, RandXORCode로 [Payload]를 XOR (페이로드 복호화 완료 + 4번절차를 위한 Total 구하기)
+		int RecvTotal = 0;
+		BYTE CompareChecksum = 0;
 
-		// 3. Rand XOR Code 로[CheckSum, Payload] 바이트 단위 xor
-		Head[4] = Head[4] ^ Head[3];
-		for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-			m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ Head[3];
+		int LoopCount = 0;
+		int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		while (LoopCount < PayloadLen)
+		{
+			RecvTotal += m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_1 ^ bXORCode_2 ^ RandXORCode;
+			i++;
+			LoopCount++;
+		}
 
-		// 4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-		Head[3] = Head[3] ^ m_bXORCode_1;
-		Head[4] = Head[4] ^ m_bXORCode_1;
-		for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-			m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ m_bXORCode_1;
+		// 4. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
+		CompareChecksum = RecvTotal % 256;
+		if (CompareChecksum != CheckSum)
+			return false;
 
-		// 5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-		Head[3] = Head[3] ^ m_bXORCode_2;
-		Head[4] = Head[4] ^ m_bXORCode_2;
-		for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-			m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ m_bXORCode_2;
+		return true;
 
-		// 6. 헤더에 Copy(대입)
-		// 무조건 5바이트라는 가정. 헤더 크기 변경되면 이부분 수정해야 함
-		*(int *)&m_pProtocolBuff[0] = *(int *)Head;
-		*(char *)&m_pProtocolBuff[4] = *(char *)&Head[4];
+
+			   
+		// -------------------------------------- 하나하나 풀기
+		
+		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
+
+		/*
+		Head[0] : Code
+		Head[1~2] : Len
+		Head[3] : Rand XOR Code
+		Head[4] = CheckSum
+		*/
 
 		
+		//WORD PayloadLen = (WORD)Header[1];
+		//BYTE RandXORCode = Header[3];
+		//BYTE CheckSum = Header[4];
 
+		//// 받은 후 복호화 과정
+		//// 1. 고정 XOR Code 2 로 [ Rand XOR Code , CheckSum , Payload ] 를 XOR
+		//RandXORCode = RandXORCode ^ bXORCode_2;
+		//CheckSum = CheckSum ^ bXORCode_2;
 
-		//// 보내기 암호화 과정
-		//// 1. Rand XOR Code 생성
-		//BYTE bRandXORCode = rand();
+		//int LoopCount = 0;
+		//int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_2;
+		//	i++;
+		//	LoopCount++;
+		//}
 
-		//// 2. Payload 의 checksum 계산
-		//int Total = 0;
-		//int GetSize = GetUseSize();
-		//for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-		//	Total += m_pProtocolBuff[i];
+		//// 2. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+		//RandXORCode = RandXORCode ^ bXORCode_1;
+		//CheckSum = CheckSum ^ bXORCode_1;
 
-		//BYTE bCheckSum = Total % 256;
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_1;
+		//	i++;
+		//	LoopCount++;
+		//}
 
-		//// 3. Rand XOR Code 로[CheckSum, Payload] 바이트 단위 xor
-		//bCheckSum = bCheckSum ^ bRandXORCode;
-		//for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bRandXORCode;
+		//// 3. Rand XOR Code 를 파악.
+		//// 이거 뭐하는거지?
 
-		//// 4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-		//bRandXORCode = bRandXORCode ^ m_bXORCode_1;
-		//bCheckSum = bCheckSum ^ m_bXORCode_1;
-		//for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ m_bXORCode_1;
+		//// 4. Rand XOR Code 로[CheckSum, Payload] 바이트 단위 xor
+		//CheckSum = CheckSum ^ RandXORCode;
 
-		//// 5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-		//bRandXORCode = bRandXORCode ^ m_bXORCode_2;
-		//bCheckSum = bCheckSum ^ m_bXORCode_2;
-		//for (int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; i < GetSize; ++i)
-		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ m_bXORCode_2;
-	}
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ RandXORCode;
+		//	i++;
+		//	LoopCount++;
+		//}
+	
 
-	// 디코딩
-	void CProtocolBuff_Net::Decode()
-	{
+		//// 5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
+		//int RecvTotal = 0;
+		//BYTE CompareChecksum = 0;
 
+		//LoopCount = 0;
+		//i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
+		//while (LoopCount < PayloadLen)
+		//{
+		//	RecvTotal += m_pProtocolBuff[i];
+		//	i++;
+		//	LoopCount++;
+		//}	
+
+		//CompareChecksum = RecvTotal % 256;
+
+		//if (CompareChecksum != CheckSum)
+		//	return false;
+
+		//return true;
+		
 	}
 
 	// 버퍼 크기 재설정 (만들어는 뒀지만 현재 쓰는곳 없음)
@@ -361,6 +526,7 @@ namespace Library_Jingyu
 		{
 			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;		// rear 값 2로 초기화. 헤더 영역 확보
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
+			pBuff->m_bHeadCheck = false;	// 헤더 채움 여부 false로 변경
 			m_MPool->Free(pBuff);
 		}
 	}

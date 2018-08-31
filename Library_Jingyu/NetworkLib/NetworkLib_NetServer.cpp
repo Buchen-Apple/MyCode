@@ -29,7 +29,7 @@ namespace Library_Jingyu
 	CCrashDump* cNetDump = CCrashDump::GetInstance();
 
 	// 헤더 사이즈
-#define dfNETWORK_PACKET_HEADER_SIZE	2
+#define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER	5
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
 #define dfSENDPOST_MAX_WSABUF			200
@@ -61,7 +61,9 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// 워커 스레드 비정상 종료. 
 		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
 		NETWORK_LIB_ERROR__IOCP_IO_FAIL,				// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
-		NETWORK_LIB_ERROR__JOIN_USER_FULL				// 유저가 풀이라서 더 이상 접속 못받음
+		NETWORK_LIB_ERROR__JOIN_USER_FULL,				// 유저가 풀이라서 더 이상 접속 못받음
+		NETWORK_LIB_ERROR__RECV_CODE_ERROR,				// RecvPost에서 헤더 코드가 다른 데이터일 경우.
+		NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR			// RecvPost에서 Decode 중 체크섬이 다름
 	};
 
 	// 세션 구조체
@@ -128,19 +130,26 @@ namespace Library_Jingyu
 
 	};
 
+	
 
 	// -----------------------------
 	// 유저가 호출 하는 함수
 	// -----------------------------
 	// 서버 시작
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수] 입력받음.
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
-	bool CNetServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
+	bool CNetServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
+							BYTE Code, BYTE XORCode1, BYTE XORCode2)
 	{
 		// rand설정
 		srand((UINT)time(NULL));
+
+		// Config 데이터 셋팅
+		m_bCode = Code;
+		m_bXORCode_1 = XORCode1;
+		m_bXORCode_2 = XORCode2;
 
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
@@ -159,7 +168,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -178,7 +187,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -202,7 +211,7 @@ namespace Library_Jingyu
 				ExitFunc(i);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -222,7 +231,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> socket() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> socket() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -248,7 +257,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> bind() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> bind() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -267,7 +276,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> listen() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> listen() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -288,7 +297,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -312,7 +321,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -349,7 +358,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -363,7 +372,7 @@ namespace Library_Jingyu
 		m_bServerLife = true;
 
 		// 서버 오픈 로그 찍기		
-		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -393,7 +402,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -440,7 +449,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -477,7 +486,7 @@ namespace Library_Jingyu
 		Reset();
 
 		// 7. 서버 종료 로그 찍기		
-		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
+		cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
@@ -498,7 +507,7 @@ namespace Library_Jingyu
 		}
 
 		// 2. 헤더를 넣어서, 패킷 완성하기
-		//payloadBuff->SetProtocolBuff_HeaderSet();
+		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
 
 		// 3. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
@@ -585,7 +594,7 @@ namespace Library_Jingyu
 	CNetServer::CNetServer()
 	{
 		// 로그 초기화
-		cNetLibLog->SetDirectory(L"LanServer");
+		cNetLibLog->SetDirectory(L"NetServer");
 		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_ERROR);
 
 		// 서버 가동상태 false로 시작 
@@ -748,7 +757,7 @@ namespace Library_Jingyu
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__IOCP_ERROR;
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"IOCP_Error --> GQCS return Error : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"IOCP_Error --> GQCS return Error : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 
@@ -846,7 +855,7 @@ namespace Library_Jingyu
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
@@ -863,7 +872,7 @@ namespace Library_Jingyu
 				closesocket(client_sock);
 
 				// 로그 찍기(로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User Full!!!!");
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User Full!!!!");
 				continue;
 			}
 
@@ -923,7 +932,7 @@ namespace Library_Jingyu
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
@@ -1018,17 +1027,7 @@ namespace Library_Jingyu
 
 		return true;
 	}
-
-
-	// CProtocolBuff에 헤더 넣는 함수
-	//void CNetServer::SetProtocolBuff_HeaderSet(CProtocolBuff* Packet)
-	//{
-	//	// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
-	//	WORD wHeader = Packet->GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
-	//	memcpy_s(&Packet->GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
-	//}
-
-
+	   
 
 	// 각종 변수들을 리셋시킨다.
 	// Stop() 함수에서 사용.
@@ -1061,22 +1060,20 @@ namespace Library_Jingyu
 		while (1)
 		{
 			// 1. RecvBuff에 최소한의 사이즈가 있는지 체크. (조건 = 헤더 사이즈와 같거나 초과. 즉, 일단 헤더만큼의 크기가 있는지 체크)	
-			WORD Header_PaylaodSize;
+			// 헤더의 구조 -----------> [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] 
+			BYTE Header[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER];
 
 			// RecvBuff의 사용 중인 버퍼 크기가 헤더 크기보다 작다면, 완료 패킷이 없다는 것이니 while문 종료.
 			int UseSize = NowSession->m_RecvQueue.GetUseSize();
-			if (UseSize < dfNETWORK_PACKET_HEADER_SIZE)
+			if (UseSize < dfNETWORK_PACKET_HEADER_SIZE_NETSERVER)
 			{
 				break;
 			}
 
 			// 2. 헤더를 Peek으로 확인한다.  Peek 안에서는, 어떻게 해서든지 len만큼 읽는다. 
 			// 버퍼가 비어있으면 접속 끊음.
-			if (NowSession->m_RecvQueue.Peek((char*)&Header_PaylaodSize, dfNETWORK_PACKET_HEADER_SIZE) == -1)
+			if (NowSession->m_RecvQueue.Peek((char*)Header, dfNETWORK_PACKET_HEADER_SIZE_NETSERVER) == -1)
 			{
-				// 일단 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
 
@@ -1086,8 +1083,11 @@ namespace Library_Jingyu
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);						
 
 				// 에러 함수 호출
 				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
@@ -1096,30 +1096,54 @@ namespace Library_Jingyu
 				return;
 			}
 
-			// 3. 완성된 패킷이 있는지 확인. (완성 패킷 사이즈 = 헤더 사이즈 + 페이로드 Size)
+			// 3. 헤더 가장 앞 1바이트(코드) 확인. 내 것이 맞는지
+			if(Header[0] != m_bCode)
+			{
+				// 내 에러 보관. 윈도우 에러는 없음.
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CODE_ERROR;
+
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_CodeError.UserID : %d, [%s:%d]"),
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);
+
+				// 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);					
+
+				// 에러 함수 호출
+				OnError((int)euError::NETWORK_LIB_ERROR__RECV_CODE_ERROR, tcErrorString);
+
+				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
+				return;
+			}
+
+
+			// 4. 완성된 패킷이 있는지 확인. (완성 패킷 사이즈 = 헤더 사이즈 + 페이로드 Size)
 			// 계산 결과, 완성 패킷 사이즈가 안되면 while문 종료.
-			if (UseSize < (dfNETWORK_PACKET_HEADER_SIZE + Header_PaylaodSize))
+			WORD PayloadLen = (WORD)Header[1];
+			if (UseSize < (dfNETWORK_PACKET_HEADER_SIZE_NETSERVER + PayloadLen))
 			{
 				break;
 			}
 
-			// 4. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
-			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE);
+			// 5. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
+			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE_NETSERVER);
 
-			// 5. 직렬화 버퍼의 rear는 무조건 2부터(앞에 2바이트는 헤더공간)부터 시작한다.
-			// 때문에 front를 2바이트 이동시켜놔야 Size가 0이된다.
+			// 6. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
+			// 때문에 front를 5바이트 이동시켜놔야 Size가 0이된다.
 			CProtocolBuff_Net PayloadBuff;
-			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);
+			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE_NETSERVER);
 
-			// 6. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
+			// 7. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER], PayloadLen);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
 			{
-				// 일단 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
 
@@ -1128,6 +1152,13 @@ namespace Library_Jingyu
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);					
+
 				// 에러 함수 호출
 				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
 
@@ -1135,11 +1166,36 @@ namespace Library_Jingyu
 				return;
 			}
 
-			// 7. 읽어온 만큼 rear를 이동시킨다. 
-			// 참고로, rear는 시작부터 2이다
+			// 8. 읽어온 만큼 rear를 이동시킨다. 
+			// 참고로, rear는 시작부터 5이다
 			PayloadBuff.MoveWritePos(DequeueSize);
 
-			// 8. Recv받은 데이터의 헤더 타입에 따라 분기처리.
+			// 9. 헤더 검증
+			if (PayloadBuff.Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
+			{
+				// 내 에러 보관. 윈도우 에러는 없음.
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;
+
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// 로그 찍기 (로그 레벨 : 에러)
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+				// 에러 함수 호출
+				OnError((int)euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR, tcErrorString);
+
+				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
+				return;
+			}
+
+			// 10. Recv받은 데이터의 헤더 타입에 따라 분기처리.
 			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
 
 		}
@@ -1206,9 +1262,6 @@ namespace Library_Jingyu
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
 				if (Error == WSAENOBUFS)
 				{
-					// 일단 끊어야하니 셧다운 호출
-					shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 					// 내 에러, 윈도우에러 보관
 					m_iOSErrorCode = Error;
 					m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSAENOBUFS;
@@ -1219,8 +1272,11 @@ namespace Library_Jingyu
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 					// 로그 찍기 (로그 레벨 : 에러)
-					cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
+
+					// 끊어야하니 셧다운 호출
+					shutdown(NowSession->m_Client_sock, SD_BOTH);
 
 					// 에러 함수 호출
 					OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
@@ -1326,7 +1382,7 @@ namespace Library_Jingyu
 							NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 						// 로그 찍기 (로그 레벨 : 에러)
-						cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
+						cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 							tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 						// 끊는다.

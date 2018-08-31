@@ -13,8 +13,6 @@ NetServer 용 직렬화 버퍼
 
 namespace Library_Jingyu
 {
-
-
 	// Recv()패킷 처리 중, 예외 발생 시 던지는 예외클래스이다.
 	class CException
 	{
@@ -54,9 +52,8 @@ namespace Library_Jingyu
 		// 직렬화 버퍼
 		char* m_pProtocolBuff;
 
-		BYTE m_bCode;
-		BYTE m_bXORCode_1;
-		BYTE m_bXORCode_2;
+		// 헤더가 채워졌는지 체크하는 Flag
+		bool m_bHeadCheck;
 
 		// CProtocolBuff를 다루는 메모리풀 (락프리)
 		static CMemoryPoolTLS< CProtocolBuff_Net>* m_MPool;
@@ -64,14 +61,20 @@ namespace Library_Jingyu
 		// 문제 생길 시 Crash 발생시킬 덤프.
 		static CCrashDump* m_Dump;
 
-	private:
+	public:
 		// 인코딩
-		//
 		// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
-		void Encode();
+		//
+		// Parameter : 없음
+		// return : 없음
+		void Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2);
 
 		// 디코딩
-		void Decode();
+		// 네트워크로 받은 패킷 중, 헤더를 해석한다.
+		//
+		// Parameter : 헤더 배열
+		// return : CheckSum이 다를 시 false
+		bool Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2);
 
 	public:
 		// 생성자 , 소멸자

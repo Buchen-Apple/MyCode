@@ -50,7 +50,8 @@ namespace Library_Jingyu
 	{
 		// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
 		WORD wHeader = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
-		memcpy_s(&GetBufferPtr()[0], dfNETWORK_PACKET_HEADER_SIZE, &wHeader, dfNETWORK_PACKET_HEADER_SIZE);
+
+		*(short *)m_pProtocolBuff = *(short *)&wHeader;	
 	}
 
 
