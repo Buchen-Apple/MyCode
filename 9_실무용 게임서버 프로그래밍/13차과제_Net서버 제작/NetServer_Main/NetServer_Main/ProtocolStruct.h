@@ -12,12 +12,14 @@
 // 유저 접속 (OnClientJoin)
 struct st_Protocol_NetChat_OnClientJoin
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 };
 
 // 유저 종료 (OnClientLeave)
 struct st_Protocol_NetChat_OnClientLeave
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 };
 
@@ -32,6 +34,7 @@ struct st_Protocol_NetChat_OnClientLeave
 #pragma pack(push, 1)
 struct st_Protocol_CS_CHAT_REQ_SECTOR_MOVE
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 
 	INT64		AccountNo;
@@ -45,6 +48,7 @@ struct st_Protocol_CS_CHAT_REQ_SECTOR_MOVE
 #pragma pack(push, 1)
 struct st_Protocol_CS_CHAT_RES_SECTOR_MOVE
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 
 	INT64		AccountNo;
@@ -59,6 +63,7 @@ struct st_Protocol_CS_CHAT_RES_SECTOR_MOVE
 #pragma pack(push, 1)
 struct st_Protocol_CS_CHAT_REQ_MESSAGE
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 
 	INT64		AccountNo;
@@ -69,9 +74,11 @@ struct st_Protocol_CS_CHAT_REQ_MESSAGE
 
 
 // 채팅서버 채팅 보내기 응답
+// 현재 메모리풀에서 다루는 구조체.
 #pragma pack(push, 1)
 struct st_Protocol_CS_CHAT_RES_MESSAGE
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 
 	INT64		AccountNo;
@@ -88,6 +95,7 @@ struct st_Protocol_CS_CHAT_RES_MESSAGE
 #pragma pack(push, 1)
 struct st_Protocol_CS_CHAT_REQ_HEARTBEAT
 {
+	ULONGLONG	SessionID;
 	WORD		Type;
 };
 #pragma pack(pop)

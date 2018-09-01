@@ -90,7 +90,7 @@ namespace Library_Jingyu
 		//
 		// Parameter : SessionID
 		// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
-		//			실패 시 nullptr
+		//		  : I/O카운트가 0이되어 삭제된 유저는, nullptr
 		stSession* GetSessionLOCK(ULONGLONG SessionID);
 
 		// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락 해제하는 함수
@@ -172,9 +172,9 @@ namespace Library_Jingyu
 		// SendPacket은 그냥 아무때나 하면 된다.
 		// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 		//
-		// return true : SendQ에 성공적으로 데이터 넣음.
-		// return true : SendQ에 데이터 넣기 실패.
-		bool SendPacket(ULONGLONG ClinetID, CProtocolBuff_Net* payloadBuff);
+		// Parameter : SessionID, SendBuff
+		// return : 없음
+		void SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff);
 
 
 		// ----------------------------- 게터 함수들 ---------------------------
@@ -211,25 +211,25 @@ namespace Library_Jingyu
 		//
 		// parameter : 접속한 유저에게 할당된 세션키
 		// return : 없음
-		virtual void OnClientJoin(ULONGLONG ClinetID) = 0;
+		virtual void OnClientJoin(ULONGLONG SessionID) = 0;
 
 		// 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
 		//
 		// parameter : 유저 세션키
 		// return : 없음
-		virtual void OnClientLeave(ULONGLONG ClinetID) = 0;
+		virtual void OnClientLeave(ULONGLONG SessionID) = 0;
 
 		// 패킷 수신 완료 후 호출되는 함수.
 		//
 		// parameter : 유저 세션키, 받은 패킷
 		// return : 없음
-		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Net* Payload) = 0;
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload) = 0;
 
 		// 패킷 송신 완료 후 호출되는 함수
 		//
 		// parameter : 유저 세션키, Send 한 사이즈
 		// return : 없음
-		virtual void OnSend(ULONGLONG ClinetID, DWORD SendSize) = 0;
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize) = 0;
 
 		// 워커 스레드가 깨어날 시 호출되는 함수.
 		// GQCS 바로 하단에서 호출

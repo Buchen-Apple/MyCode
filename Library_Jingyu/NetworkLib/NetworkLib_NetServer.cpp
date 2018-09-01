@@ -490,20 +490,21 @@ namespace Library_Jingyu
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
+	// SendPacket은 그냥 아무때나 하면 된다.
 	// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 	//
-	// return true : SendQ에 성공적으로 데이터 넣고 SendPost까지 성공.
-	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
-	bool CNetServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff_Net* payloadBuff)
+	// Parameter : SessionID, SendBuff
+	// return : 없음
+	void CNetServer::SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff)
 	{
 		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
-		stSession* NowSession = GetSessionLOCK(ClinetID);
+		stSession* NowSession = GetSessionLOCK(SessionID);
 		if (NowSession == nullptr)
 		{
 			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
 			// ref 카운트가 0이 되면 메모리풀에 반환
 			CProtocolBuff_Net::Free(payloadBuff);
-			return false;
+			return;
 		}
 
 		// 2. 헤더를 넣어서, 패킷 완성하기
@@ -520,10 +521,10 @@ namespace Library_Jingyu
 		// 5. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		if (GetSessionUnLOCK(NowSession) == false)
-			return false;
+			return;
 
 		// 6. SendPost시도
-		return SendPost(NowSession);
+		SendPost(NowSession);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
@@ -974,7 +975,7 @@ namespace Library_Jingyu
 	//
 	// Parameter : SessionID
 	// return : 성공적으로 세션 찾았을 시, 해당 세션 포인터
-	//			실패 시 nullptr
+	//		  : I/O카운트가 0이되어 삭제된 유저는, nullptr
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
 		// 1. ClinetID로 세션 알아오기
@@ -1135,12 +1136,12 @@ namespace Library_Jingyu
 
 			// 6. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
 			// 때문에 clear()를 이용해 rear를 0으로 만들어둔다.
-			CProtocolBuff_Net* PayloadBuff = CProtocolBuff_Net::Alloc();
+			CProtocolBuff_Net PayloadBuff;
 
-			PayloadBuff->Clear();
+			PayloadBuff.Clear();
 
 			// 7. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff->GetBufferPtr(), PayloadLen);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff.GetBufferPtr(), PayloadLen);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
@@ -1168,10 +1169,10 @@ namespace Library_Jingyu
 			}
 
 			// 8. 읽어온 만큼 rear를 이동시킨다. 
-			PayloadBuff->MoveWritePos(DequeueSize);
+			PayloadBuff.MoveWritePos(DequeueSize);
 
 			// 9. 헤더 Decode
-			if (PayloadBuff->Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff.Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;
@@ -1196,10 +1197,7 @@ namespace Library_Jingyu
 			}
 
 			// 10. Recv받은 데이터의 헤더 타입에 따라 분기처리.
-			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
-
-			// 11. 증가시켰던 것 Free
-			CProtocolBuff_Net::Free(PayloadBuff);
+			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
 		}
 
 		return;

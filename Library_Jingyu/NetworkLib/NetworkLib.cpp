@@ -1097,10 +1097,12 @@ namespace Library_Jingyu
 			// 5. 직렬화 버퍼의 rear는 무조건 2부터(앞에 2바이트는 헤더공간)부터 시작한다.
 			// 때문에 front를 2바이트 이동시켜놔야 Size가 0이된다.
 			CProtocolBuff_Lan PayloadBuff;
-			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);	
+			PayloadBuff.Clear();
+			//PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);	
 			
 			// 6. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
+			//int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff.GetBufferPtr(), Header_PaylaodSize);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
