@@ -4,8 +4,9 @@
   NetworkLib_NetServer.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
   RingBuff.cpp
+  ChatServer.cpp
   NetServer_Main.cpp
   코드를 생성하고 있습니다.
-  All 150 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 341 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   NetServer_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\13차과제_Net서버 제작\NetServer_Main\x64\Release\NetServer_Main.exe

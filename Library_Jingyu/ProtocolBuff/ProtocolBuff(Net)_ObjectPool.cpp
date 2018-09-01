@@ -52,7 +52,7 @@ namespace Library_Jingyu
 	// 인코딩
 	// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
 	//
-	// Parameter : 없음
+	// Parameter : 헤더 코드, XORCode1, XORCode2
 	// return : 없음
 	void CProtocolBuff_Net::Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2)
 	{
@@ -106,8 +106,8 @@ namespace Library_Jingyu
 
 
 
-		//// --------------------------- 하나하나 암호화
-		//// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
+		// --------------------------- 하나하나 암호화
+		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
 
 		//WORD PayloadLen = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
 		//BYTE RandXORCode;
@@ -178,7 +178,7 @@ namespace Library_Jingyu
 	// 디코딩
 	// 네트워크로 받은 패킷 중, 헤더를 해석한다.
 	//
-	// Parameter : 헤더 배열
+	// Parameter : 헤더 배열, XORCode1, XORCode2
 	// return : CheckSum이 다를 시 false
 	bool CProtocolBuff_Net::Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2)
 	{		
@@ -207,12 +207,19 @@ namespace Library_Jingyu
 		int RecvTotal = 0;
 		BYTE CompareChecksum = 0;
 
-		int LoopCount = 0;
+		/*int LoopCount = 0;
 		int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
 		while (LoopCount < PayloadLen)
 		{
 			RecvTotal += m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_1 ^ bXORCode_2 ^ RandXORCode;
 			i++;
+			LoopCount++;
+		}*/
+
+		int LoopCount = 0;
+		while (LoopCount < PayloadLen)
+		{
+			RecvTotal += m_pProtocolBuff[LoopCount] = m_pProtocolBuff[LoopCount] ^ bXORCode_1 ^ bXORCode_2 ^ RandXORCode;
 			LoopCount++;
 		}
 
@@ -236,7 +243,7 @@ namespace Library_Jingyu
 		Head[4] = CheckSum
 		*/
 
-		
+		//
 		//WORD PayloadLen = (WORD)Header[1];
 		//BYTE RandXORCode = Header[3];
 		//BYTE CheckSum = Header[4];

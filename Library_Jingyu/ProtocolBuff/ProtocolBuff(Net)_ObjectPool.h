@@ -65,14 +65,14 @@ namespace Library_Jingyu
 		// 인코딩
 		// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
 		//
-		// Parameter : 없음
+		// Parameter : 헤더 코드, XORCode1, XORCode2
 		// return : 없음
 		void Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2);
 
 		// 디코딩
 		// 네트워크로 받은 패킷 중, 헤더를 해석한다.
 		//
-		// Parameter : 헤더 배열
+		// Parameter : 헤더 배열, XORCode1, XORCode2
 		// return : CheckSum이 다를 시 false
 		bool Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2);
 

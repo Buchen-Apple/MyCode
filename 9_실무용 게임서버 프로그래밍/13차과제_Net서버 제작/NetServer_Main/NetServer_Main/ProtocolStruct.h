@@ -1,0 +1,98 @@
+#ifndef  __PROTOCOL_STRUCT_H__
+#define __PROTOCOL_STRUCT_H__
+
+#include <windows.h>
+
+////////////////////////////////////////////////////////
+//
+//	NetServer & ChatServer
+//
+////////////////////////////////////////////////////////
+
+// 유저 접속 (OnClientJoin)
+struct st_Protocol_NetChat_OnClientJoin
+{
+	WORD		Type;
+};
+
+// 유저 종료 (OnClientLeave)
+struct st_Protocol_NetChat_OnClientLeave
+{
+	WORD		Type;
+};
+
+
+////////////////////////////////////////////////////////
+//
+//	Client & Server Protocol
+//
+////////////////////////////////////////////////////////
+
+// 채팅서버 섹터 이동 요청
+#pragma pack(push, 1)
+struct st_Protocol_CS_CHAT_REQ_SECTOR_MOVE
+{
+	WORD		Type;
+
+	INT64		AccountNo;
+	WORD		SectorX;
+	WORD		SectorY;
+};
+#pragma pack(pop)
+
+
+// 채팅서버 섹터 이동 결과
+#pragma pack(push, 1)
+struct st_Protocol_CS_CHAT_RES_SECTOR_MOVE
+{
+	WORD		Type;
+
+	INT64		AccountNo;
+	WORD		SectorX;
+	WORD		SectorY;
+};
+#pragma pack(pop)
+
+
+// 채팅서버 채팅 보내기 요청
+#define CHAT_MAX_SIZE	512
+#pragma pack(push, 1)
+struct st_Protocol_CS_CHAT_REQ_MESSAGE
+{
+	WORD		Type;
+
+	INT64		AccountNo;
+	WORD		MessageLen;
+	WCHAR		Message[CHAT_MAX_SIZE+2];	// null 미포함
+};
+#pragma pack(pop)
+
+
+// 채팅서버 채팅 보내기 응답
+#pragma pack(push, 1)
+struct st_Protocol_CS_CHAT_RES_MESSAGE
+{
+	WORD		Type;
+
+	INT64		AccountNo;
+
+	WCHAR		ID[20];						// null 포함
+	WCHAR		Nickname[20];				// null 포함
+	WORD		MessageLen;
+	WCHAR		Message[CHAT_MAX_SIZE + 2];	// null 미포함
+};
+#pragma pack(pop)
+
+
+// 하트비트
+#pragma pack(push, 1)
+struct st_Protocol_CS_CHAT_REQ_HEARTBEAT
+{
+	WORD		Type;
+};
+#pragma pack(pop)
+
+
+
+
+#endif // ! __PROTOCOL_STRUCT_H__

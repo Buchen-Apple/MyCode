@@ -1134,12 +1134,13 @@ namespace Library_Jingyu
 			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE_NETSERVER);
 
 			// 6. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
-			// 때문에 front를 5바이트 이동시켜놔야 Size가 0이된다.
-			CProtocolBuff_Net PayloadBuff;
-			PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE_NETSERVER);
+			// 때문에 clear()를 이용해 rear를 0으로 만들어둔다.
+			CProtocolBuff_Net* PayloadBuff = CProtocolBuff_Net::Alloc();
+
+			PayloadBuff->Clear();
 
 			// 7. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER], PayloadLen);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff->GetBufferPtr(), PayloadLen);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
@@ -1167,11 +1168,10 @@ namespace Library_Jingyu
 			}
 
 			// 8. 읽어온 만큼 rear를 이동시킨다. 
-			// 참고로, rear는 시작부터 5이다
-			PayloadBuff.MoveWritePos(DequeueSize);
+			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 9. 헤더 Decode
-			if (PayloadBuff.Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;
@@ -1196,8 +1196,10 @@ namespace Library_Jingyu
 			}
 
 			// 10. Recv받은 데이터의 헤더 타입에 따라 분기처리.
-			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
+			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
+			// 11. 증가시켰던 것 Free
+			CProtocolBuff_Net::Free(PayloadBuff);
 		}
 
 		return;
