@@ -72,11 +72,11 @@ private:
 
 	// 메시지 구조체를 다룰 TLS메모리풀
 	// 가장 큰 메시지 구조체를 다룬다.
-	CMemoryPoolTLS<st_Protocol_CS_CHAT_RES_MESSAGE>* m_MessagePool;	
+	CMemoryPoolTLS<BINGNODE>* m_MessagePool;	
 
 	// 메시지를 받을 락프리 큐
 	// 주소(8바이트)를 다룬다.
-	CLF_Queue<st_Protocol_CS_CHAT_RES_MESSAGE*>* m_LFQueue;
+	CLF_Queue<BINGNODE*>* m_LFQueue;
 
 	// 업데이트 스레드 깨우기 용도 이벤트
 	// !!!! 외부에서 전달받는다 (생성자에서) !!!!
@@ -146,14 +146,14 @@ private:
 	// Parameter : SessionID, Packet
 	// return : 성공 시 true
 	//		  : 접속중이지 않은 유저알 시 false
-	bool Packet_Sector_Move(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet);
+	bool Packet_Sector_Move(ULONGLONG SessionID, BINGNODE* Packet);
 
 	// 채팅 보내기 요청
 	//
 	// Parameter : SessionID, Packet
 	// return : 성공 시 true
 	//		  : 접속중이지 않은 유저일 시 false
-	bool Packet_Chat_Message(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet);
+	bool Packet_Chat_Message(ULONGLONG SessionID, BINGNODE* Packet);
 	
 	// Accept 성공 (채팅 서버에 입장)
 	// 네트워크 통신은 아니며, Net서버에서 Chat 서버로 알려준다.
@@ -161,14 +161,14 @@ private:
 	// Parameter : SessionID, Packet
 	// return : 성공 시 true
 	//		  : 이미 접속중인 유저라면 false
-	bool Packet_Chat_Join(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet);
+	bool Packet_Chat_Join(ULONGLONG SessionID, BINGNODE* Packet);
 
 	// 유저 종료 (채팅 서버에서 나감)
 	// 네트워크 통신은 아니며, Net서버에서 Chat 서버로 알려준다.
 	// 
 	// Parameter : SessionID, Packet
 	// return : 이미 나간유저일 시 false
-	bool Packet_Chat_Leave(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet);
+	bool Packet_Chat_Leave(ULONGLONG SessionID, BINGNODE* Packet);
 
 private:
 	// -------------------------------------

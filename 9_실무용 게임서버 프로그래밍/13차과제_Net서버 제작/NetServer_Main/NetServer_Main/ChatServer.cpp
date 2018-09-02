@@ -140,7 +140,7 @@ void CChatServer::SendPacket_Sector(ULONGLONG SessionID, CProtocolBuff_Net* Send
 // Parameter : SessionID, Packet
 // return : 성공 시 true
 //		  : 접속중이지 않은 유저알 시 false
-bool CChatServer::Packet_Sector_Move(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet)
+bool CChatServer::Packet_Sector_Move(ULONGLONG SessionID, BINGNODE* Packet)
 {
 	// 1) 내가 필요한 형으로 형변환
 	st_Protocol_CS_CHAT_REQ_SECTOR_MOVE* NowPacket = (st_Protocol_CS_CHAT_REQ_SECTOR_MOVE*)Packet;
@@ -192,7 +192,7 @@ bool CChatServer::Packet_Sector_Move(ULONGLONG SessionID, st_Protocol_CS_CHAT_RE
 // Parameter : SessionID, Packet
 // return : 성공 시 true
 //		  : 접속중이지 않은 유저일 시 false
-bool CChatServer::Packet_Chat_Message(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet)
+bool CChatServer::Packet_Chat_Message(ULONGLONG SessionID, BINGNODE* Packet)
 {
 	// 1) 내가 필요한 형으로 형변환
 	st_Protocol_CS_CHAT_REQ_MESSAGE* NowPacket = (st_Protocol_CS_CHAT_REQ_MESSAGE*)Packet;
@@ -209,7 +209,7 @@ bool CChatServer::Packet_Chat_Message(ULONGLONG SessionID, st_Protocol_CS_CHAT_R
 	}
 
 	// 4) 클라이언트에게 보낼 패킷 조립. (채팅보내기 응답)
-	st_Protocol_CS_CHAT_RES_MESSAGE stSend;
+	BINGNODE stSend;
 	CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 	// 타입, AccountNo, ID, Nickname, MessageLen, Message
@@ -222,7 +222,7 @@ bool CChatServer::Packet_Chat_Message(ULONGLONG SessionID, st_Protocol_CS_CHAT_R
 	stSend.MessageLen = NowPacket->MessageLen;
 	StringCbCopy(stSend.Message, NowPacket->MessageLen, NowPacket->Message);
 
-	SendBuff->PutData((const char*)&stSend, sizeof(st_Protocol_CS_CHAT_RES_MESSAGE));
+	SendBuff->PutData((const char*)&stSend, sizeof(BINGNODE));
 
 	// 5) 해당 유저의 주변 9개 섹터 구함.
 	stSectorCheck SecCheck;
@@ -241,7 +241,7 @@ bool CChatServer::Packet_Chat_Message(ULONGLONG SessionID, st_Protocol_CS_CHAT_R
 // Parameter : SessionID, Packet
 // return : 성공 시 true
 //		  : 이미 접속중인 유저라면 false
-bool CChatServer::Packet_Chat_Join(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet)
+bool CChatServer::Packet_Chat_Join(ULONGLONG SessionID, BINGNODE* Packet)
 {
 	// 1) 내가 원하는 형으로 형변환
 	st_Protocol_NetChat_OnClientJoin* NowPacket = (st_Protocol_NetChat_OnClientJoin*)Packet;
@@ -267,7 +267,7 @@ bool CChatServer::Packet_Chat_Join(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_
 // 
 // Parameter : SessionID, Packet
 // return : 이미 나간유저일 시 false
-bool CChatServer::Packet_Chat_Leave(ULONGLONG SessionID, st_Protocol_CS_CHAT_RES_MESSAGE* Packet)
+bool CChatServer::Packet_Chat_Leave(ULONGLONG SessionID, BINGNODE* Packet)
 {
 	// 1) 내가 원하는 형으로 형변환
 	st_Protocol_NetChat_OnClientLeave* NowPacket = (st_Protocol_NetChat_OnClientLeave*)Packet;
@@ -301,7 +301,7 @@ CChatServer::CChatServer(HANDLE* UpdateThreadEvent)
 {
 	// 구조체 메시지 TLS 메모리풀 동적할당
 	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*100 = 20000. 총 20000개의 구조체 메시지 사용 가능)
-	m_MessagePool = new CMemoryPoolTLS<st_Protocol_CS_CHAT_RES_MESSAGE>(100, false);
+	m_MessagePool = new CMemoryPoolTLS<BINGNODE>(100, false);
 
 	// 플레이어 구조체 TLS 메모리풀 동적할당
 	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*100 = 20000. 총 20000개의 플레이어 구조체 사용 가능)
@@ -309,7 +309,7 @@ CChatServer::CChatServer(HANDLE* UpdateThreadEvent)
 
 	// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
 	// 사이즈가 0인 이유는, UpdateThread에서 큐가 비었는지 체크하고 쉬러 가야하기 때문에.
-	m_LFQueue = new CLF_Queue<st_Protocol_CS_CHAT_RES_MESSAGE*>(0);
+	m_LFQueue = new CLF_Queue<BINGNODE*>(0);
 
 	// 업데이트스레드 깨우기 용도 이벤트 생성 후 멤버로 셋팅
 	// 
@@ -346,7 +346,7 @@ CChatServer::~CChatServer()
 void CChatServer::PacketHandling()
 {
 	// 1. 큐에서 일감 1개 빼오기
-	st_Protocol_CS_CHAT_RES_MESSAGE* NowWork;
+	BINGNODE* NowWork;
 
 	if (m_LFQueue->Dequeue(NowWork) == -1)
 		m_ChatDump->Crash();
@@ -434,7 +434,7 @@ void CChatServer::OnClientJoin(ULONGLONG SessionID)
 	NowMessage->Type = JOIN_USER_PROTOCOL_TYPE;
 
 	// 4. 메시지를 큐에 넣는다.
-	m_LFQueue->Enqueue((st_Protocol_CS_CHAT_RES_MESSAGE*)NowMessage);
+	m_LFQueue->Enqueue((BINGNODE*)NowMessage);
 
 	// 5. 자고있는 Update스레드를 깨운다.
 	SetEvent(*m_UpdateThreadEvent);
@@ -458,7 +458,7 @@ void CChatServer::OnClientLeave(ULONGLONG SessionID)
 	NowMessage->Type = LEAVE_USER_PROTOCOL_TYPE;
 
 	// 4. 메시지를 큐에 넣는다.
-	m_LFQueue->Enqueue((st_Protocol_CS_CHAT_RES_MESSAGE*)NowMessage);
+	m_LFQueue->Enqueue((BINGNODE*)NowMessage);
 
 	// 5. 자고있는 Update스레드를 깨운다.
 	SetEvent(*m_UpdateThreadEvent);
@@ -473,7 +473,7 @@ void CChatServer::OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
 	// 하는 행동 : 컨텐츠가 들고있는 메시지 큐에, 데이터를 넣는다.	
 
 	// 1. 일감 Alloc
-	st_Protocol_CS_CHAT_RES_MESSAGE* NowMessage = m_MessagePool->Alloc();
+	BINGNODE* NowMessage = m_MessagePool->Alloc();
 
 	// 2. 세션 ID 채우기
 	NowMessage->SessionID = SessionID;

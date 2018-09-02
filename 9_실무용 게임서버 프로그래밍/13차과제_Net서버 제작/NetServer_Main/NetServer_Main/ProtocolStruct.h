@@ -101,6 +101,8 @@ struct st_Protocol_CS_CHAT_REQ_HEARTBEAT
 #pragma pack(pop)
 
 
+// 메시지 중 가장 큰 메시지 구조체. define 되어있음
+#define BINGNODE	st_Protocol_CS_CHAT_RES_MESSAGE
 
 
 #endif // ! __PROTOCOL_STRUCT_H__
