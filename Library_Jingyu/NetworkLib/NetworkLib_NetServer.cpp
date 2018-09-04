@@ -16,6 +16,9 @@
 #include "Log\Log.h"
 #include "LockFree_Queue\LockFree_Queue.h"
 
+extern ULONGLONG g_ullAcceptTotal;
+extern LONG	  g_lAcceptTPS;
+
 
 namespace Library_Jingyu
 {
@@ -135,6 +138,7 @@ namespace Library_Jingyu
 	// -----------------------------
 	// 유저가 호출 하는 함수
 	// -----------------------------
+
 	// 서버 시작
 	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
 	//
@@ -605,12 +609,9 @@ namespace Library_Jingyu
 	// 소멸자
 	CNetServer::~CNetServer()
 	{
-		// 서버가 가동중이었으면, 상태를 false 로 바꾸고, 서버 종료절차 진행
+		// 서버가 가동중이었으면, 서버 종료절차 진행
 		if (m_bServerLife == true)
-		{
-			m_bServerLife = false;
 			Stop();
-		}
 	}
 
 	// 실제로 접속종료 시키는 함수
@@ -619,51 +620,53 @@ namespace Library_Jingyu
 		// ReleaseFlag와 I/O카운트 둘 다 0이라면 'ReleaseFlag만 TRUE로 바꾼다!! 
 		// I/O카운트는 안바꾼다.
 		// 
-		// TRUE가 리턴되는 것은, 이미 DeleteSession->m_lReleaseFlag가 true였다는 것. 
-		if (InterlockedCompareExchange64((LONG64*)&DeleteSession->m_lReleaseFlag, TRUE, FALSE) == TRUE)
-			return;
-
-		// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
-		// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
-		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
-
-		// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
-		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
-			CProtocolBuff_Net::Free(DeleteSession->m_PacketArray[i]);
-
-		// 샌드 링버퍼 비우기
-		int UseSize = DeleteSession->m_SendQueue->GetInNode();
-
-		CProtocolBuff_Net* Payload;
-		for (int i = 0; i < UseSize; ++i)
+		// FALSE가 리턴되는 것은, 이미 DeleteSession->m_lReleaseFlag와 I/OCount가 0이었다는 의미. 
+		// 로직을 타야한다.
+		if (InterlockedCompareExchange64((LONG64*)&DeleteSession->m_lReleaseFlag, TRUE, FALSE) == FALSE)
 		{
-			// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
-			if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
-				cNetDump->Crash();
+			// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
+			// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
+			ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 
-			CProtocolBuff_Net::Free(Payload);
+			// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
+			for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
+				CProtocolBuff_Net::Free(DeleteSession->m_PacketArray[i]);
+
+			// 샌드 링버퍼 비우기
+			int UseSize = DeleteSession->m_SendQueue->GetInNode();
+
+			CProtocolBuff_Net* Payload;
+			for (int i = 0; i < UseSize; ++i)
+			{
+				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+				if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
+					cNetDump->Crash();
+
+				CProtocolBuff_Net::Free(Payload);
+			}
+
+			// SendFlag, SendCount 초기화
+			DeleteSession->m_lSendFlag = FALSE;
+			DeleteSession->m_iWSASendCount = 0;
+
+			// 큐 초기화
+			DeleteSession->m_RecvQueue.ClearBuffer();
+
+			// 클로즈 소켓
+			closesocket(DeleteSession->m_Client_sock);
+
+			// 미사용 인덱스 스택에 반납
+			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
+
+			// 접속 중 유저 수 감소
+			InterlockedDecrement(&m_ullJoinUserCount);
+
+			// 컨텐츠 쪽에 종료된 유저 알려줌 
+			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
+			OnClientLeave(sessionID);
 		}
 
-		// SendFlag, SendCount 초기화
-		DeleteSession->m_lSendFlag = FALSE;
-		DeleteSession->m_iWSASendCount = 0;
-
-		// 큐 초기화
-		DeleteSession->m_RecvQueue.ClearBuffer();
-
-		// 클로즈 소켓
-		closesocket(DeleteSession->m_Client_sock);
-
-		// 미사용 인덱스 스택에 반납
-		m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
-
-		// 접속 중 유저 수 감소
-		InterlockedDecrement(&m_ullJoinUserCount);
-
-		// 컨텐츠 쪽에 종료된 유저 알려줌 
-		// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
-		OnClientLeave(sessionID);
-		return;
+		return;	
 	}
 
 	// Start에서 에러가 날 시 호출하는 함수.
@@ -896,19 +899,17 @@ namespace Library_Jingyu
 			if (g_This->OnConnectionRequest(tcTempIP, port) == false)
 				continue;
 
-
+			g_ullAcceptTotal++; // 테스트용!!
+			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
 
 
 			// ------------------
 			// 세션 구조체 생성 후 셋팅
 			// ------------------
 			// 1) 미사용 인덱스 알아오기
-			iIndex = g_This->m_stEmptyIndexStack->Pop();
+			iIndex = g_This->m_stEmptyIndexStack->Pop();			
 
-			// 2) 해당 세션 배열, 사용중으로 변경
-			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
-
-			// 3) 정보 셋팅하기
+			// 2) 정보 셋팅하기
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
 
@@ -919,6 +920,12 @@ namespace Library_Jingyu
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
+
+			// 3) 해당 세션 배열, 사용중으로 변경
+			//g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
+			InterlockedCompareExchange(&g_This->m_stSessionArray[iIndex].m_lReleaseFlag, FALSE, TRUE);
+			
+
 
 
 
@@ -964,7 +971,6 @@ namespace Library_Jingyu
 			// I/O카운트 --. 0이라면 삭제처리
 			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
-
 		}
 
 		return 0;
@@ -978,34 +984,37 @@ namespace Library_Jingyu
 	//		  : I/O카운트가 0이되어 삭제된 유저는, nullptr
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
-		// 1. ClinetID로 세션 알아오기
+		// 1. SessionID로 세션 알아오기
 		stSession* retSession = &m_stSessionArray[SessionID >> 48];
 
+		// 컨텍스트 스위칭
+
 		// 2. I/O 카운트 1 증가.	
-		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
+		InterlockedIncrement(&retSession->m_lIOCount);		
+
+		// 3. Release Flag 체크
+		// 이미 Release된 유저라면, I/O카운트만 감소시키고 나간다.
+		if (InterlockedCompareExchange(&retSession->m_lReleaseFlag, TRUE, TRUE) == TRUE)
 		{
-			// 증가한 값이 1이면, 이미 종료되어야 하는 유저였다는 것.
-			// 다시 1 감소시키고, 감소한 값이 0이라면 inDIsconnect 호출
+			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			//InterlockedDecrement(&retSession->m_lIOCount);
+			return nullptr;
+		}
+
+		// 4. 내가 원하던 세션이 맞는지 체크
+		if (retSession->m_ullSessionID != SessionID)
+		{
+			// 아니라면 I/O 카운트 1 감소
+			// 감소한 값이 0이면서, inDIsconnect 호출
 			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
-		}
+		}		
 
-		// 3. 세션키 검사. 정말 내가 알고있는 그 세션키가 아니거나, 배열이 미사용 배열이라면
-		/*if (m_stSessionArray[wArrayIndex].m_ullSessionKey != (ClinetID & 0x0000ffffffffffff) ||
-			m_stSessionArray[wArrayIndex].m_lReleaseFlag == TRUE)*/
-		if (retSession->m_ullSessionID != SessionID || retSession->m_lReleaseFlag == TRUE)
-		{
-			// 내가 SendPacket을 하고자 했던 유저가 아님.
-			// I/O카운트 1 감소시킨다.
-			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
-				InDisconnect(retSession);
-
-			return nullptr;
-		}
-
-		// 4. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
+		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;
 
 	}
@@ -1136,12 +1145,11 @@ namespace Library_Jingyu
 
 			// 6. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
 			// 때문에 clear()를 이용해 rear를 0으로 만들어둔다.
-			CProtocolBuff_Net PayloadBuff;
-
-			PayloadBuff.Clear();
+			CProtocolBuff_Net* PayloadBuff = CProtocolBuff_Net::Alloc();
+			PayloadBuff->Clear();
 
 			// 7. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff.GetBufferPtr(), PayloadLen);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff->GetBufferPtr(), PayloadLen);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
@@ -1169,10 +1177,10 @@ namespace Library_Jingyu
 			}
 
 			// 8. 읽어온 만큼 rear를 이동시킨다. 
-			PayloadBuff.MoveWritePos(DequeueSize);
+			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 9. 헤더 Decode
-			if (PayloadBuff.Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;
@@ -1197,7 +1205,9 @@ namespace Library_Jingyu
 			}
 
 			// 10. Recv받은 데이터의 헤더 타입에 따라 분기처리.
-			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
+			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
+
+			CProtocolBuff_Net::Free(PayloadBuff);
 		}
 
 		return;

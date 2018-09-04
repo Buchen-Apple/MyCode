@@ -7,8 +7,8 @@
 #include "CrashDump\CrashDump.h"
 
 
-//extern ULONGLONG g_ullAllocNodeCount;
-//extern ULONGLONG g_ullFreeNodeCount;
+extern LONG g_lAllocNodeCount;
+extern LONG g_lFreeNodeCount;
 
 namespace Library_Jingyu
 {
@@ -392,6 +392,7 @@ namespace Library_Jingyu
 #define NODE_COUNT 200	// 1개의 청크가 다루는 노드의 수			
 
 			// 청크 멤버변수
+
 			// ----------- 멤버변수 위치를 잡을 때, '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
 			// 이 struct에서는 상위 클래스인  CMemoryPoolTLS의 Alloc, Free가 핵심 함수. 
 			// 해당 함수의 코드에 맞춰서 멤버변수 배치
@@ -428,6 +429,8 @@ namespace Library_Jingyu
 		CMemoryPool<stChunk>* m_ChunkPool;	// TLSPool 내부에서 청크를 다루는 메모리풀 (락프리 구조)
 		static bool m_bPlacementNew;		// 청크 내부에서 다루는 노드 안의 데이터의 플레이스먼트 뉴 호출 여부(청크 아님. 청크 내부안의 노드의 데이터에 대해 플레이스먼트 뉴 호출 여부)		
 		CCrashDump* m_TLSDump;				// 에러 발생시 덤프를 남길 덤프 변수
+
+
 
 	public:
 		//////////////////////////////////////////////////////////////////////////
@@ -576,6 +579,10 @@ namespace Library_Jingyu
 	template <typename DATA>
 	DATA* CMemoryPoolTLS<DATA>::Alloc()
 	{
+
+		int abc = 0;
+		int abcdef = 0;
+
 		// 현재 이 함수를 호출한 스레드의 TLS 인덱스에 청크가 있는지 확인
 		stChunk* pChunk = (stChunk*)TlsGetValue(m_dwIndex);
 
@@ -588,9 +595,13 @@ namespace Library_Jingyu
 				DWORD Error = GetLastError();
 				m_TLSDump->Crash();
 			}
-		}
+			abc = 10;
 
-		//InterlockedIncrement(&g_ullAllocNodeCount);
+			if (pChunk->m_iTop != 0 || pChunk->m_iFreeRef != 0)
+				abcdef = 10;
+		}	
+
+		InterlockedIncrement(&g_lAllocNodeCount);
 			
 		// 만약, Top이 NODE_COUNT보다 크거나 같다면 뭔가 잘못된것.
 		// 이 전에 이미 캐치되었어야 함
@@ -598,7 +609,8 @@ namespace Library_Jingyu
 			pChunk->m_ChunkDump->Crash();	
 
 		// 현재 Top의 데이터를 가져온다. 그리고 Top을 1 증가
-		DATA* retData = &pChunk->m_arrayNode[pChunk->m_iTop++].m_Data;
+		DATA* retData = &pChunk->m_arrayNode[pChunk->m_iTop].m_Data;
+		pChunk->m_iTop++;
 
 		// 만약, 청크의 데이터를 모두 Alloc했으면, TLS 청크를 NULL로 만든다.
 		if (pChunk->m_iTop == NODE_COUNT)
@@ -638,7 +650,8 @@ namespace Library_Jingyu
 		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
 			m_TLSDump->Crash();
 
-		//InterlockedIncrement(&g_ullFreeNodeCount);
+		InterlockedDecrement(&g_lAllocNodeCount);
+		//InterlockedIncrement(&g_lFreeNodeCount);
 
 		// FreeRefCount 1 증가
 		// 만약 NODE_COUNT가 되면 청크 내부 내용 초기화 후 청크 관리 메모리풀로 Free

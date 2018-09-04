@@ -277,6 +277,7 @@ namespace Library_Jingyu
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
 			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE;		// rear 값 2로 초기화. 헤더 영역 확보
+			pBuff->m_Front = 0;
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
 			m_MPool->Free(pBuff);
 		}

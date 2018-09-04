@@ -14,6 +14,7 @@ using namespace std;
 
 
 
+
 namespace Library_Jingyu
 {
 	// --------------
@@ -24,7 +25,6 @@ namespace Library_Jingyu
 	class CNetServer
 	{
 	private:
-
 		// ----------------------
 		// private 구조체 or enum 전방선언
 		// ----------------------
@@ -143,23 +143,29 @@ namespace Library_Jingyu
 		CNetServer();
 		~CNetServer();
 
-	public:
-		// -----------------------
-		// 외부에서 호출 가능한 함수
-		// -----------------------
 
-		// ----------------------------- 기능 함수들 ---------------------------
+	protected:
+		// -----------------------
+		// 상속에서만 호출 가능한 함수
+		// -----------------------
 
 		// 서버 시작
 		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
 		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
-		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect, 
-					BYTE Code, BYTE XORCode1, BYTE XORCode2);
+		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
+			BYTE Code, BYTE XORCode1, BYTE XORCode2);
 
 		// 서버 스탑.
 		void Stop();
+
+	public:
+		// -----------------------
+		// 외부에서 호출 가능한 함수
+		// -----------------------
+
+		// ----------------------------- 기능 함수들 ---------------------------		
 
 		// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 		// 라이브러리한테 끊어줘!라고 요청하는 것 뿐

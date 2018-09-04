@@ -6,7 +6,7 @@
 #include "CrashDump\CrashDump.h"
 
 #include "LockFree_Queue\LockFree_Queue.h"
-#include "ProtocolStruct.h"
+//#include "ProtocolStruct.h"
 
 #include <map>
 #include <list>
@@ -15,6 +15,10 @@
 // 1개 맵의 섹터 수
 #define SECTOR_X_COUNT	50
 #define SECTOR_Y_COUNT	50
+
+// 최초 입장 시, 임의로 셋팅해두는 섹터 X,Y 값
+#define TEMP_SECTOR_POS	12345
+
 
 using namespace Library_Jingyu;
 
@@ -26,6 +30,14 @@ class CChatServer :public CNetServer
 	// -------------------------------------
 	// inner 구조체
 	// -------------------------------------
+
+	// 일감 구조체
+	struct st_WorkNode
+	{
+		WORD m_wType;
+		ULONGLONG m_ullSessionID;
+		CProtocolBuff_Net* m_pPacket;
+	};
 
 	// 섹터 정보를 담는 구조체
 	struct stSectorCheck
@@ -44,14 +56,15 @@ class CChatServer :public CNetServer
 		INT64 m_i64AccountNo;
 
 		// 유저 ID (로그인 시 사용하는 ID)
-		TCHAR m_tLoginID[20];
+		WCHAR m_tLoginID[20];
 
 		// 닉네임
-		TCHAR m_tNickName[20];
+		WCHAR m_tNickName[20];
 
 		// 섹터 좌표 X,Y
-		WORD m_wSectorX;
-		WORD m_wSectorY;
+		// 최초에는 모두 12345
+		WORD m_wSectorX = TEMP_SECTOR_POS;
+		WORD m_wSectorY = TEMP_SECTOR_POS;
 
 		// 토큰 (세션 키)
 		char m_cToken[64];
@@ -71,16 +84,12 @@ private:
 	CCrashDump* m_ChatDump = CCrashDump::GetInstance();
 
 	// 메시지 구조체를 다룰 TLS메모리풀
-	// 가장 큰 메시지 구조체를 다룬다.
-	CMemoryPoolTLS<BINGNODE>* m_MessagePool;	
+	// 일감 구조체를 다룬다.
+	CMemoryPoolTLS<st_WorkNode>* m_MessagePool;
 
 	// 메시지를 받을 락프리 큐
 	// 주소(8바이트)를 다룬다.
-	CLF_Queue<BINGNODE*>* m_LFQueue;
-
-	// 업데이트 스레드 깨우기 용도 이벤트
-	// !!!! 외부에서 전달받는다 (생성자에서) !!!!
-	HANDLE* m_UpdateThreadEvent;
+	CLF_Queue<st_WorkNode*>* m_LFQueue;
 
 	// 플레이어 구조체를 다룰 TLS메모리풀
 	CMemoryPoolTLS<stPlayer>* m_PlayerPool;
@@ -93,6 +102,14 @@ private:
 	// 섹터 리스트
 	list< stPlayer*> m_listSecotr[SECTOR_Y_COUNT][SECTOR_X_COUNT];	
 	
+	// 업데이트 스레드 핸들
+	HANDLE hUpdateThraed;
+
+	// 업데이트 스레드 깨우기 용도 Event
+	HANDLE UpdateThreadEvent;
+
+	// 업데이트 스레드 종료 용도 Event
+	HANDLE UpdateThreadEXITEvent;
 
 private:
 	// -------------------------------------
@@ -132,43 +149,63 @@ private:
 
 	// 인자로 받은 9개 섹터의 모든 유저(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 	//
-	// parameter : SessionID, 보낼 버퍼, 섹터 9개
+	// parameter : 보낼 버퍼, 섹터 9개
 	// return : 없음
-	void SendPacket_Sector(ULONGLONG SessionID, CProtocolBuff_Net* SendBuff, stSectorCheck* Sector);
+	void SendPacket_Sector(CProtocolBuff_Net* SendBuff, stSectorCheck* Sector);
+
+	// 업데이트 스레드
+	static UINT	WINAPI	UpdateThread(LPVOID lParam);
+
 
 
 	// -------------------------------------
 	// 클래스 내부에서만 사용하는 패킷 처리 함수
 	// -------------------------------------
 
+	// 접속 패킷처리 함수
+	// OnClientJoin에서 호출
+	// 
+	// Parameter : SessionID
+	// return : 없음
+	void Packet_Join(ULONGLONG SessionID);
+
+	// 종료 패킷처리 함수
+	// OnClientLeave에서 호출
+	// 
+	// Parameter : SessionID
+	// return : 없음
+	void Packet_Leave(ULONGLONG SessionID);
+
+	// 일반 패킷처리 함수
+	// 
+	// Parameter : SessionID, CProtocolBuff_Net*
+	// return : 없음
+	void Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
+		
+
+
+	// -------------------------------------
+	// '일반 패킷 처리 함수'에서 처리되는 일반 패킷들
+	// -------------------------------------
+
 	// 섹터 이동요청 패킷 처리
 	//
-	// Parameter : SessionID, Packet
-	// return : 성공 시 true
-	//		  : 접속중이지 않은 유저알 시 false
-	bool Packet_Sector_Move(ULONGLONG SessionID, BINGNODE* Packet);
+	// Parameter : SessionID, CProtocolBuff_Net*
+	// return : 없음
+	void Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
 
 	// 채팅 보내기 요청
 	//
-	// Parameter : SessionID, Packet
-	// return : 성공 시 true
-	//		  : 접속중이지 않은 유저일 시 false
-	bool Packet_Chat_Message(ULONGLONG SessionID, BINGNODE* Packet);
-	
-	// Accept 성공 (채팅 서버에 입장)
-	// 네트워크 통신은 아니며, Net서버에서 Chat 서버로 알려준다.
-	// 
-	// Parameter : SessionID, Packet
-	// return : 성공 시 true
-	//		  : 이미 접속중인 유저라면 false
-	bool Packet_Chat_Join(ULONGLONG SessionID, BINGNODE* Packet);
+	// Parameter : SessionID, CProtocolBuff_Net*
+	// return : 없음
+	void Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
 
-	// 유저 종료 (채팅 서버에서 나감)
-	// 네트워크 통신은 아니며, Net서버에서 Chat 서버로 알려준다.
-	// 
-	// Parameter : SessionID, Packet
-	// return : 이미 나간유저일 시 false
-	bool Packet_Chat_Leave(ULONGLONG SessionID, BINGNODE* Packet);
+	// 로그인 요청
+	//
+	// Parameter : SessionID, CProtocolBuff_Net*
+	// return : 없음
+	void Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
+
 
 private:
 	// -------------------------------------
@@ -197,19 +234,35 @@ public:
 	// -------------------------------------
 
 	// 생성자
-	//
-	// Parameter : 업데이트 스레드를 깨울 때 사용할 이벤트
-	CChatServer(HANDLE* UpdateThreadEvent);
+	CChatServer();
 
 	//소멸자
 	~CChatServer();
 
-	// 패킷 처리 함수
-	void PacketHandling();
+	// 채팅 서버 시작 함수
+	// 내부적으로 NetServer의 Start도 같이 호출
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
+	//
+	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
+	// return true : 성공
+	bool ServerStart(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
+		BYTE Code, BYTE XORCode1, BYTE XORCode2);
 
-	// 처리할 일감이 있는지 체크하는 함수
-	// 내부적으로는 QueueSize를 체크하는 것.
-	LONG WorkCheck();
+	// 채팅 서버 종료 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void ServerStop();
+
+	// 테스트용. 큐 노드 수 얻기
+	LONG GetQueueInNode()
+	{	return m_LFQueue->GetInNode();	}
+
+	// 테스트용. 맵 안의 플레이어 수 얻기
+	LONG JoinPlayerCount()
+	{
+		return m_mapPlayer.size();
+	}
 
 };
 

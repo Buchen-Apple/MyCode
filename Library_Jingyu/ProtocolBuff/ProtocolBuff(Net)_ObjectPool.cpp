@@ -14,7 +14,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER 5
 
 	// static 메모리풀
-	CMemoryPoolTLS<CProtocolBuff_Net>* CProtocolBuff_Net::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Net>(100, false);
+	CMemoryPoolTLS<CProtocolBuff_Net>* CProtocolBuff_Net::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Net>(200, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
 	CCrashDump* CProtocolBuff_Net::m_Dump = CCrashDump::GetInstance();
@@ -531,7 +531,8 @@ namespace Library_Jingyu
 		// 만약 감소 후 0이됐다면 delete
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
-			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;		// rear 값 2로 초기화. 헤더 영역 확보
+			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;		// rear 값 5로 초기화. 헤더 영역 확보
+			pBuff->m_Front = 0;		// Front 초기화
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
 			pBuff->m_bHeadCheck = false;	// 헤더 채움 여부 false로 변경
 			m_MPool->Free(pBuff);
