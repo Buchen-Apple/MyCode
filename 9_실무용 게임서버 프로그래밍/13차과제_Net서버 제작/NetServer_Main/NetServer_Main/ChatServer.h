@@ -6,7 +6,8 @@
 #include "CrashDump\CrashDump.h"
 
 #include "LockFree_Queue\LockFree_Queue.h"
-//#include "ProtocolStruct.h"
+#include "Parser\Parser_Class.h"
+
 
 #include <map>
 #include <list>
@@ -34,6 +35,22 @@ class CChatServer :public CNetServer
 		ULONGLONG m_ullSessionID;
 		CProtocolBuff_Net* m_pPacket;
 	};
+
+	// 파일에서 읽어오기 용 구조체
+	struct stConfigFile
+	{
+		TCHAR BindIP[20];
+		int Port;
+		int CreateWorker;
+		int ActiveWorker;
+		int CreateAccept;
+		int HeadCode;
+		int XORCode1;
+		int XORCode2;
+		int Nodelay;
+		int MaxJoinUser;
+	};
+
 
 	// 섹터 정보를 담는 구조체
 	struct stSectorCheck
@@ -113,6 +130,14 @@ private:
 	// 클래스 내부에서만 사용하는 기능 함수
 	// -------------------------------------
 	
+	// 파일에서 Config 정보 읽어오기
+	// 
+	// 
+	// Parameter : config 구조체
+	// return : 정상적으로 셋팅 시 true
+	//		  : 그 외에는 false
+	bool SetFile(stConfigFile* pConfig);	
+
 	// Player 관리 자료구조에, 유저 추가
 	// 현재 map으로 관리중
 	// 
@@ -238,12 +263,10 @@ public:
 
 	// 채팅 서버 시작 함수
 	// 내부적으로 NetServer의 Start도 같이 호출
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
-	bool ServerStart(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
-		BYTE Code, BYTE XORCode1, BYTE XORCode2);
+	bool ServerStart();
 
 	// 채팅 서버 종료 함수
 	//

@@ -49,6 +49,84 @@ extern int m_PayloadQueError;
 // 클래스 내부에서 사용하는 함수
 // -------------------------------------
 
+// 파일에서 Config 정보 읽어오기
+// 
+// 
+// Parameter : config 구조체
+// return : 정상적으로 셋팅 시 true
+//		  : 그 외에는 false
+bool CChatServer::SetFile(stConfigFile* pConfig)
+{
+	Parser Parser;
+
+	// 파일 로드
+	try
+	{
+		Parser.LoadFile(_T("ChatServer_Config.ini"));
+	}
+	catch (int expn)
+	{
+		if (expn == 1)
+		{
+			printf("File Open Fail...\n");
+			return false;
+		}
+		else if (expn == 2)
+		{
+			printf("FileR ead Fail...\n");
+			return false;
+		}
+	}
+
+	// 구역 지정
+	if (Parser.AreaCheck(_T("CHATSERVER")) == false)
+		return false;
+
+	// ------------ 읽어오기
+	// IP
+	if (Parser.GetValue_String(_T("BindIP"), pConfig->BindIP) == false)
+		return false;
+
+	// Port
+	if (Parser.GetValue_Int(_T("Port"), &pConfig->Port) == false)
+		return false;
+
+	// 생성 워커 수
+	if (Parser.GetValue_Int(_T("CreateWorker"), &pConfig->CreateWorker) == false)
+		return false;
+
+	// 활성화 워커 수
+	if (Parser.GetValue_Int(_T("ActiveWorker"), &pConfig->ActiveWorker) == false)
+		return false;
+
+	// 생성 엑셉트
+	if (Parser.GetValue_Int(_T("CreateAccept"), &pConfig->CreateAccept) == false)
+		return false;
+
+	// 헤더 코드
+	if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->HeadCode) == false)
+		return false;
+
+	// xorcode1
+	if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode1) == false)
+		return false;
+
+	// xorcode2
+	if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->XORCode2) == false)
+		return false;
+
+	// Nodelay
+	if (Parser.GetValue_Int(_T("Nodelay"), &pConfig->Nodelay) == false)
+		return false;
+
+	// 최대 접속 가능 유저 수
+	if (Parser.GetValue_Int(_T("MaxJoinUser"), &pConfig->MaxJoinUser) == false)
+		return false;
+
+	return true;
+}
+
+
 // Player 관리 자료구조에, 유저 추가
 // 현재 map으로 관리중
 // 
@@ -573,12 +651,10 @@ CChatServer::~CChatServer()
 
 // 채팅 서버 시작 함수
 // 내부적으로 NetServer의 Start도 같이 호출
-// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
 //
 // return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 // return true : 성공
-bool CChatServer::ServerStart(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
-	BYTE Code, BYTE XORCode1, BYTE XORCode2)
+bool CChatServer::ServerStart()
 {
 	// ------------------- 각종 리소스 할당
 	// 구조체 메시지 TLS 메모리풀 동적할당
@@ -605,9 +681,14 @@ bool CChatServer::ServerStart(const TCHAR* bindIP, USHORT port, int WorkerThread
 	hUpdateThraed = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, 0, 0);
 
 
+	// ------------------- Config정보 셋팅
+	stConfigFile config;
+	if (SetFile(&config) == false)
+		return false;
+
 	// ------------------- 넷서버 가동
-	if (Start(bindIP, port, WorkerThreadCount, ActiveWThreadCount, AcceptThreadCount, Nodelay, MaxConnect, 
-		Code, XORCode1, XORCode2) == false)
+	if (Start(config.BindIP, config.Port, config.CreateWorker, config.ActiveWorker, config.ActiveWorker, config.Nodelay, config.MaxJoinUser,
+		config.HeadCode, config.XORCode1, config.XORCode2) == false)
 		return false;			
 
 	return true;
