@@ -16,10 +16,6 @@
 #define SECTOR_X_COUNT	50
 #define SECTOR_Y_COUNT	50
 
-// 최초 입장 시, 임의로 셋팅해두는 섹터 X,Y 값
-#define TEMP_SECTOR_POS	12345
-
-
 using namespace Library_Jingyu;
 
 ////////////////////////////////////////////
@@ -63,8 +59,8 @@ class CChatServer :public CNetServer
 
 		// 섹터 좌표 X,Y
 		// 최초에는 모두 12345
-		WORD m_wSectorX = TEMP_SECTOR_POS;
-		WORD m_wSectorY = TEMP_SECTOR_POS;
+		WORD m_wSectorX;
+		WORD m_wSectorY;
 
 		// 토큰 (세션 키)
 		char m_cToken[64];

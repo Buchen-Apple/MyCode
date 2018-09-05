@@ -178,24 +178,13 @@ namespace Library_Jingyu
 	// 디코딩
 	// 네트워크로 받은 패킷 중, 헤더를 해석한다.
 	//
-	// Parameter : 헤더 배열, XORCode1, XORCode2
+	// Parameter : 페이로드 길이, 랜덤xor코드, 체크썸, XORCode1, XORCode2
 	// return : CheckSum이 다를 시 false
-	bool CProtocolBuff_Net::Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2)
+	bool CProtocolBuff_Net::Decode(WORD PayloadLen, BYTE RandXORCode, BYTE CheckSum, BYTE bXORCode_1, BYTE bXORCode_2)
 	{		
 
 		// -------------------------------------- 한번에 풀기
-		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)
-
-		/*
-		Head[0] : Code
-		Head[1~2] : Len
-		Head[3] : Rand XOR Code
-		Head[4] = CheckSum
-		*/
-
-		WORD PayloadLen = (WORD)Header[1];
-		BYTE RandXORCode = Header[3];
-		BYTE CheckSum = Header[4];
+		// [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] <<여기까지 헤더   - Payload(Len byte)		
 
 		// 1. 고정 XOR Code2, 1로 [Rand XOR Code] XOR (RandXORCode 복호화 완료)
 		RandXORCode = RandXORCode ^ bXORCode_1 ^ bXORCode_2;
@@ -205,16 +194,7 @@ namespace Library_Jingyu
 
 		// 3. 고정 XOR Code2, 1, RandXORCode로 [Payload]를 XOR (페이로드 복호화 완료 + 4번절차를 위한 Total 구하기)
 		int RecvTotal = 0;
-		BYTE CompareChecksum = 0;
-
-		/*int LoopCount = 0;
-		int i = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER;
-		while (LoopCount < PayloadLen)
-		{
-			RecvTotal += m_pProtocolBuff[i] = m_pProtocolBuff[i] ^ bXORCode_1 ^ bXORCode_2 ^ RandXORCode;
-			i++;
-			LoopCount++;
-		}*/
+		BYTE CompareChecksum = 0;		
 
 		int LoopCount = 0;
 		while (LoopCount < PayloadLen)
@@ -400,13 +380,17 @@ namespace Library_Jingyu
 	// 데이터 빼기
 	int CProtocolBuff_Net::GetData(char* pSrc, int size)
 	{
-		// 큐 비었나 체크
+		// 큐 비었나 체크. 비었다면 예외 리턴
 		if (m_Front == m_Rear)
 			throw CException(_T("ProtocalBuff. GetData -> Queue Empty."));
 
-		// front가 큐의 끝에 도착하면 더 이상 읽기 불가능. 그냥 종료시킨다.
-		if (m_Front >= m_Size)
+		// front가 큐의 끝에 도착하면 더 이상 읽기 불가능. 예외 리턴
+		else if (m_Front >= m_Size)
 			throw CException(_T("ProtocalBuff. GetData -> Not Data."));
+
+		// front + Size가 Rear를 앞지른다면 예외 리턴
+		else if (m_Front + size > m_Rear)
+			throw CException(_T("ProtocalBuff. GetData -> SizeError"));
 
 		// 메모리 복사
 		// 1~8바이트 까지는 memcpy보다 대입연산으로 처리한다.

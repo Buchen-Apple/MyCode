@@ -5,11 +5,11 @@
   ProtocolBuff(Net)_ObjectPool.cpp
   RingBuff.cpp
   ChatServer.cpp
-c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.h(265): warning C4267: 'return': 'size_t'에서 'LONG'(으)로 변환하면서 데이터가 손실될 수 있습니다.
-c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.cpp(337): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.h(261): warning C4267: 'return': 'size_t'에서 'LONG'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.cpp(349): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   NetServer_Main.cpp
-c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.h(265): warning C4267: 'return': 'size_t'에서 'LONG'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\13차과제_net서버 제작\netserver_main\netserver_main\chatserver.h(261): warning C4267: 'return': 'size_t'에서 'LONG'(으)로 변환하면서 데이터가 손실될 수 있습니다.
   코드를 생성하고 있습니다.
-  All 408 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 405 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   NetServer_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\13차과제_Net서버 제작\NetServer_Main\x64\Release\NetServer_Main.exe

@@ -25,9 +25,24 @@ CSystemLog* cChatLibLog = CSystemLog::GetInstance();
 
 // ------------- 공격 테스트용
 extern int m_SectorPosError;
-extern int m_SectorByteError;
+
+extern int m_SizeError;
+
 extern int m_SectorNoError;
+extern int m_ChatNoError;
+
+extern int m_TypeError;
+
 extern int m_HeadCodeError;
+
+extern int m_ChackSumError;
+extern int m_NotPayloadDeq;
+extern int m_HeaderLenBig;
+extern int m_PayloadQueError;
+
+
+// 최초 입장 시, 임의로 셋팅해두는 섹터 X,Y 값
+#define TEMP_SECTOR_POS	12345
 
 
 // -------------------------------------
@@ -249,13 +264,14 @@ void CChatServer::Packet_Join(ULONGLONG SessionID)
 
 	// 2) SessionID 셋팅
 	JoinPlayer->m_ullSessionID = SessionID;
+	JoinPlayer->m_wSectorY = JoinPlayer->m_wSectorX = TEMP_SECTOR_POS;
 
 	// 3) Player 관리 자료구조에 유저 추가
 	if (InsertPlayerFunc(SessionID, JoinPlayer) == false)
 	{
 		printf("duplication SessionID!!\n");
 		m_ChatDump->Crash();
-	}
+	}	
 }
 
 // 종료 패킷처리 함수
@@ -273,17 +289,11 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 		m_ChatDump->Crash();
 	}
 
-	// 2) 최초 위치가 아니라면, 섹터에서 제거 후, 섹터 위치를 최초 위치로 셋팅
-	if (ErasePlayer->m_wSectorY != TEMP_SECTOR_POS)
-	{
+	// 2) 최초 할당이 아니면, 섹터에서 제거
+	if(ErasePlayer->m_wSectorY != TEMP_SECTOR_POS)
 		m_listSecotr[ErasePlayer->m_wSectorY][ErasePlayer->m_wSectorX].remove(ErasePlayer);
 
-		ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
-		ErasePlayer->m_wSectorY = TEMP_SECTOR_POS;
-	}
-
-
-	// 2) Player Free()
+	// 3) Player Free()
 	m_PlayerPool->Free(ErasePlayer);
 	InterlockedDecrement(&g_ullUpdateStruct_PlayerCount);
 
@@ -328,15 +338,16 @@ void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 			break;
 
 		default:
-			// 이상한 타입의 패킷은 그냥 무시
-			// printf("Type Error!!! (%d)\n", Type);
+			// 이상한 타입의 패킷이 오면 끊는다.
+			m_TypeError++;
+
+			throw CException(_T("Packet_Normal(). TypeError"));			
 			break;
 		}
 
 	}
 	catch (CException& exc)
 	{	
-
 		// char* pExc = exc.GetExceptionText();		
 
 		//// 로그 찍기 (로그 레벨 : 에러)
@@ -364,8 +375,13 @@ void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 //		  : 접속중이지 않은 유저거나 비정상 섹터 이동 시 false
 void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 {	
-	if (Packet->GetUseSize() != 12)
-		m_SectorByteError++;
+	//if (Packet->GetUseSize() != 12)
+	//{
+	//	m_SizeError++;
+
+	//	// 비정상이면 밖으로 예외 던진다
+	//	throw CException(_T("Packet_Sector_Move(). Size Error"));
+	//}
 
 	// 1) map에서 유저 검색
 	stPlayer* FindPlayer = FindPlayerFunc(SessionID);
@@ -456,7 +472,17 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	*Packet >> MessageLen;
 
 	WCHAR Message[512];
-	Packet->GetData((char*)Message, MessageLen*2);
+	Packet->GetData((char*)Message, MessageLen);
+
+	// ------------------- 검증
+	// 4) AccountNo 체크
+	if (AccountNo != FindPlayer->m_i64AccountNo)
+	{
+		m_ChatNoError++;
+
+		// 비정상이면 밖으로 예외 던진다
+		throw CException(_T("Packet_Chat_Message(). AccountNo Error"));
+	}
 	
 	// 3) 클라이언트에게 보낼 패킷 조립 (채팅 보내기 응답)
 	CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -467,7 +493,7 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	SendBuff->PutData((char*)FindPlayer->m_tLoginID, 40);
 	SendBuff->PutData((char*)FindPlayer->m_tNickName, 40);
 	*SendBuff << MessageLen;
-	SendBuff->PutData((char*)Message, MessageLen * 2);
+	SendBuff->PutData((char*)Message, MessageLen);
 	
 	// 4) 해당 유저의 주변 9개 섹터 구함.
 	stSectorCheck SecCheck;
@@ -776,8 +802,25 @@ void CChatServer::OnWorkerThreadEnd()
 
 void CChatServer::OnError(int error, const TCHAR* errorStr)
 {
-	if (error == 21)
+	// (네트워크) 페이로드만큼 디큐 실패
+	if (error == 15)
+		m_NotPayloadDeq++;
+
+	// (네트워크) 헤더 코드 에러
+	else if (error == 21)
 		m_HeadCodeError++;
+
+	// (네트워크) 체크썸 에러
+	else if (error == 22)
+		m_ChackSumError++;
+
+	// (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
+	else if (error == 23)
+		m_HeaderLenBig++;
+
+	// (네트워크) 헤더의 Len만큼 디큐 실패
+	else if (error == 24)
+		m_PayloadQueError++;
 
 	// 로그 찍기 (로그 레벨 : 에러)
 	/*cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",

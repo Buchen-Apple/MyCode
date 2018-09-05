@@ -34,6 +34,9 @@ namespace Library_Jingyu
 		// Session구조체 전방선언
 		struct stSession;
 
+		// 헤더 구조체
+		struct stProtocolHead;
+
 		// ----------------------
 		// private 변수들
 		// ----------------------

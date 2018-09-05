@@ -72,9 +72,9 @@ namespace Library_Jingyu
 		// 디코딩
 		// 네트워크로 받은 패킷 중, 헤더를 해석한다.
 		//
-		// Parameter : 헤더 배열, XORCode1, XORCode2
+		// Parameter : 페이로드 길이, 랜덤xor코드, 체크썸, XORCode1, XORCode2
 		// return : CheckSum이 다를 시 false
-		bool Decode(BYTE* Header, BYTE bXORCode_1, BYTE bXORCode_2);
+		bool Decode(WORD PayloadLen, BYTE RandXORCode, BYTE CheckSum, BYTE bXORCode_1, BYTE bXORCode_2);
 
 	public:
 		// 생성자 , 소멸자

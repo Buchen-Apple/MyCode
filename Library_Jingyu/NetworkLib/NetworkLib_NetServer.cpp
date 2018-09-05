@@ -41,6 +41,17 @@ namespace Library_Jingyu
 	// ------------------------------
 	// enum과 구조체
 	// ------------------------------
+	// 헤더 구조체
+#pragma pack(push, 1)
+	struct CNetServer::stProtocolHead
+	{
+		BYTE	m_Code;
+		WORD	m_Len;
+		BYTE	m_RandXORCode;
+		BYTE	m_Checksum;
+	};
+#pragma pack(pop)
+
 	// enum class
 	enum class CNetServer::euError : int
 	{
@@ -66,7 +77,9 @@ namespace Library_Jingyu
 		NETWORK_LIB_ERROR__IOCP_IO_FAIL,				// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
 		NETWORK_LIB_ERROR__JOIN_USER_FULL,				// 유저가 풀이라서 더 이상 접속 못받음
 		NETWORK_LIB_ERROR__RECV_CODE_ERROR,				// RecvPost에서 헤더 코드가 다른 데이터일 경우.
-		NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR			// RecvPost에서 Decode 중 체크섬이 다름
+		NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR,			// RecvPost에서 Decode 중 체크섬이 다름
+		NETWORK_LIB_ERROR__RECV_LENBIG_ERROR,			// RecvPost에서 헤더 안에 Len이 비정상적으로 큼.
+		NETWORK_LIB_ERROR__RECV_PAYLOAD_ERROR			// RecvPost에서 원하는 만큼 페이로드를 읽어오지 못함
 	};
 
 	// 세션 구조체
@@ -1083,7 +1096,9 @@ namespace Library_Jingyu
 		{
 			// 1. RecvBuff에 최소한의 사이즈가 있는지 체크. (조건 = 헤더 사이즈와 같거나 초과. 즉, 일단 헤더만큼의 크기가 있는지 체크)	
 			// 헤더의 구조 -----------> [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] 
-			BYTE Header[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER];
+			//BYTE Header[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER];
+
+			stProtocolHead Header;
 
 			// RecvBuff의 사용 중인 버퍼 크기가 헤더 크기보다 작다면, 완료 패킷이 없다는 것이니 while문 종료.
 			int UseSize = NowSession->m_RecvQueue.GetUseSize();
@@ -1094,7 +1109,7 @@ namespace Library_Jingyu
 
 			// 2. 헤더를 Peek으로 확인한다.  Peek 안에서는, 어떻게 해서든지 len만큼 읽는다. 
 			// 버퍼가 비어있으면 접속 끊음.
-			if (NowSession->m_RecvQueue.Peek((char*)Header, dfNETWORK_PACKET_HEADER_SIZE_NETSERVER) == -1)
+			if (NowSession->m_RecvQueue.Peek((char*)&Header, dfNETWORK_PACKET_HEADER_SIZE_NETSERVER) == -1)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
@@ -1117,9 +1132,12 @@ namespace Library_Jingyu
 				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
 				return;
 			}
-
+			/*if ((WORD)Header[1] == 0xffff)
+			{
+				cNetDump->Crash();
+			}*/
 			// 3. 헤더의 코드 확인. 내 것이 맞는지
-			if(Header[0] != m_bCode)
+			if(Header.m_Code != m_bCode)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CODE_ERROR;
@@ -1139,30 +1157,52 @@ namespace Library_Jingyu
 				return;
 			}
 
+			// 4. 헤더 안에 들어있는 Len(페이로드 길이)가 너무 크진 않은지
+			WORD PayloadLen = Header.m_Len;
+			if (PayloadLen > 512)
+			{
+				// 내 에러 보관. 윈도우 에러는 없음.
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_LENBIG_ERROR;
 
-			// 4. 완성된 패킷이 있는지 확인. (완성 패킷 사이즈 = 헤더 사이즈 + 페이로드 Size)
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_LenBig.UserID : %d, [%s:%d]"),
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// 에러 함수 호출
+				OnError((int)euError::NETWORK_LIB_ERROR__RECV_LENBIG_ERROR, tcErrorString);
+
+				// 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
+				return;
+
+			}
+
+
+			// 5. 완성된 패킷이 있는지 확인. (완성 패킷 사이즈 = 헤더 사이즈 + 페이로드 Size)
 			// 계산 결과, 완성 패킷 사이즈가 안되면 while문 종료.
-			WORD PayloadLen = (WORD)Header[1];
+			
 			if (UseSize < (dfNETWORK_PACKET_HEADER_SIZE_NETSERVER + PayloadLen))
 			{
 				break;
 			}
 
-			// 5. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
+			// 6. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
 			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE_NETSERVER);
 
-			// 6. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
+			// 7. 직렬화 버퍼의 rear는 무조건 5부터(앞에 5바이트는 헤더공간)부터 시작한다.
 			// 때문에 clear()를 이용해 rear를 0으로 만들어둔다.
 			CProtocolBuff_Net* PayloadBuff = CProtocolBuff_Net::Alloc();
 			PayloadBuff->Clear();
 
-			// 7. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
+			// 8. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
 			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff->GetBufferPtr(), PayloadLen);
 
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
-			{
-				
+			{				
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
 
@@ -1176,6 +1216,9 @@ namespace Library_Jingyu
 				/*cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
 					tcErrorString, (int)m_iMyErrorCode);*/
 
+				// 할당받은 패킷 Free
+				CProtocolBuff_Net::Free(PayloadBuff);
+
 				// 끊어야하니 셧다운 호출
 				shutdown(NowSession->m_Client_sock, SD_BOTH);					
 
@@ -1186,11 +1229,41 @@ namespace Library_Jingyu
 				return;
 			}
 
+			// 내가 원하는만큼 데이터가 없었다면 접속 끊음.
+			if (DequeueSize != PayloadLen)
+			{
+				// 내 에러 보관. 윈도우 에러는 없음.
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_PAYLOAD_ERROR;
+
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
+
+				// ------------ 일단 로그 저장 안함
+				// 로그 찍기 (로그 레벨 : 에러)
+				/*cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);*/
+
+					// 할당받은 패킷 Free
+				CProtocolBuff_Net::Free(PayloadBuff);
+
+				// 끊어야하니 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);
+
+				// 에러 함수 호출
+				OnError((int)euError::NETWORK_LIB_ERROR__RECV_PAYLOAD_ERROR, tcErrorString);
+
+				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
+				return;
+
+			}
+
 			// 8. 읽어온 만큼 rear를 이동시킨다. 
 			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 9. 헤더 Decode
-			if (PayloadBuff->Decode(Header, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode(Header.m_Len, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;
@@ -1204,6 +1277,9 @@ namespace Library_Jingyu
 				//// 로그 찍기 (로그 레벨 : 에러)
 				//cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
 				//	tcErrorString, (int)m_iMyErrorCode);
+
+				// 할당받은 패킷 Free
+				CProtocolBuff_Net::Free(PayloadBuff);
 
 				// 끊어야하니 셧다운 호출
 				shutdown(NowSession->m_Client_sock, SD_BOTH);
