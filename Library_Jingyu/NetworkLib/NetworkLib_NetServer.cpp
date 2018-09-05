@@ -520,15 +520,15 @@ namespace Library_Jingyu
 		NowSession->m_SendQueue->Enqueue(payloadBuff);
 
 		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
-		CProtocolBuff_Net::Free(payloadBuff);
+		CProtocolBuff_Net::Free(payloadBuff);	
 
-		// 5. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 5. SendPost시도
+		SendPost(NowSession);
+
+		// 6. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		if (GetSessionUnLOCK(NowSession) == false)
 			return;
-
-		// 6. SendPost시도
-		SendPost(NowSession);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
@@ -546,6 +546,7 @@ namespace Library_Jingyu
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
 		shutdown(DeleteSession->m_Client_sock, SD_BOTH);
+		CancelIoEx((HANDLE)DeleteSession->m_Client_sock, NULL);
 
 		// 3. 세션 락 해제
 		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
@@ -632,25 +633,29 @@ namespace Library_Jingyu
 			for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
 				CProtocolBuff_Net::Free(DeleteSession->m_PacketArray[i]);
 
-			// 샌드 링버퍼 비우기
+			// SendCount 초기화
+			DeleteSession->m_iWSASendCount = 0;			
+
 			int UseSize = DeleteSession->m_SendQueue->GetInNode();
 
 			CProtocolBuff_Net* Payload;
-			for (int i = 0; i < UseSize; ++i)
+			int i = 0;
+			while (i < UseSize)
 			{
 				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
 				if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
 					cNetDump->Crash();
 
 				CProtocolBuff_Net::Free(Payload);
-			}
 
-			// SendFlag, SendCount 초기화
-			DeleteSession->m_lSendFlag = FALSE;
-			DeleteSession->m_iWSASendCount = 0;
+				i++;
+			}			
 
 			// 큐 초기화
 			DeleteSession->m_RecvQueue.ClearBuffer();
+
+			// SendFlag 초기화
+			DeleteSession->m_lSendFlag = FALSE;
 
 			// 클로즈 소켓
 			closesocket(DeleteSession->m_Client_sock);
@@ -665,7 +670,7 @@ namespace Library_Jingyu
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 			OnClientLeave(sessionID);
 		}
-
+		
 		return;	
 	}
 
@@ -797,8 +802,12 @@ namespace Library_Jingyu
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
 				// 2. 보냈던 직렬화버퍼 삭제
-				for (int i = 0; i < stNowSession->m_iWSASendCount; ++i)
+				int i = 0;
+				while (i < stNowSession->m_iWSASendCount)
+				{
 					CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
+					i++;
+				}				
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
@@ -907,26 +916,27 @@ namespace Library_Jingyu
 			// 세션 구조체 생성 후 셋팅
 			// ------------------
 			// 1) 미사용 인덱스 알아오기
-			iIndex = g_This->m_stEmptyIndexStack->Pop();			
+			iIndex = g_This->m_stEmptyIndexStack->Pop();	
 
-			// 2) 정보 셋팅하기
-			// -- 소켓
-			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
+			// 2) I/O 카운트 증가
+			// 삭제 방어
+			InterlockedIncrement(&g_This->m_stSessionArray[iIndex].m_lIOCount);
 
+			// 3) 정보 셋팅하기
 			// -- 세션 ID(믹스 키)와 인덱스 할당
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = (++ullUniqueSessionID) | (iIndex << 48);
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
+			
+			// -- 소켓
+			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;						
 
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
 
 			// 3) 해당 세션 배열, 사용중으로 변경
-			//g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
-			InterlockedCompareExchange(&g_This->m_stSessionArray[iIndex].m_lReleaseFlag, FALSE, TRUE);
-			
-
-
+			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
+			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
 
 			// ------------------
@@ -957,7 +967,6 @@ namespace Library_Jingyu
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
 			// ------------------
-			g_This->m_stSessionArray[iIndex].m_lIOCount++; // I/O카운트 ++. 들어가기전에 1에서 시작. 아직 recv,send 그 어떤것도 안걸었기 때문에 그냥 ++해도 안전!
 			g_This->OnClientJoin(g_This->m_stSessionArray[iIndex].m_ullSessionID);
 
 
@@ -968,7 +977,7 @@ namespace Library_Jingyu
 			// 반환값이 false라면, 이 안에서 종료된 유저임. 근데 안받음
 			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
-			// I/O카운트 --. 0이라면 삭제처리
+			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
 			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
 		}
@@ -987,19 +996,23 @@ namespace Library_Jingyu
 		// 1. SessionID로 세션 알아오기
 		stSession* retSession = &m_stSessionArray[SessionID >> 48];
 
-		// 컨텍스트 스위칭
-
 		// 2. I/O 카운트 1 증가.	
-		InterlockedIncrement(&retSession->m_lIOCount);		
+		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
+		{
+			// 감소한 값이 0이면서, inDIsconnect 호출
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			return nullptr;
+		}			
 
 		// 3. Release Flag 체크
 		// 이미 Release된 유저라면, I/O카운트만 감소시키고 나간다.
-		if (InterlockedCompareExchange(&retSession->m_lReleaseFlag, TRUE, TRUE) == TRUE)
+		if (retSession->m_lReleaseFlag == TRUE)
 		{
-			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
 				InDisconnect(retSession);
 
-			//InterlockedDecrement(&retSession->m_lIOCount);
 			return nullptr;
 		}
 
@@ -1012,11 +1025,10 @@ namespace Library_Jingyu
 				InDisconnect(retSession);
 
 			return nullptr;
-		}		
+		}	
 
 		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;
-
 	}
 
 	// SendPacket, Disconnect 등 외부에서 호출하는 함수에서, 락 해제하는 함수
@@ -1115,17 +1127,13 @@ namespace Library_Jingyu
 				// 에러 스트링 만들고
 				TCHAR tcErrorString[300];
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_CodeError.UserID : %d, [%s:%d]"),
-					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
-					tcErrorString, (int)m_iMyErrorCode);
-
-				// 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);					
+					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);				
 
 				// 에러 함수 호출
 				OnError((int)euError::NETWORK_LIB_ERROR__RECV_CODE_ERROR, tcErrorString);
+
+				// 셧다운 호출
+				shutdown(NowSession->m_Client_sock, SD_BOTH);						
 
 				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
 				return;
@@ -1154,6 +1162,7 @@ namespace Library_Jingyu
 			// 버퍼가 비어있으면 접속 끊음
 			if (DequeueSize == -1)
 			{
+				
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
 
@@ -1162,9 +1171,10 @@ namespace Library_Jingyu
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
+				// ------------ 일단 로그 저장 안함
 				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
-					tcErrorString, (int)m_iMyErrorCode);
+				/*cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+					tcErrorString, (int)m_iMyErrorCode);*/
 
 				// 끊어야하니 셧다운 호출
 				shutdown(NowSession->m_Client_sock, SD_BOTH);					
@@ -1190,9 +1200,10 @@ namespace Library_Jingyu
 				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
-					tcErrorString, (int)m_iMyErrorCode);
+				// ------------ 일단 로그 저장 안함
+				//// 로그 찍기 (로그 레벨 : 에러)
+				//cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
+				//	tcErrorString, (int)m_iMyErrorCode);
 
 				// 끊어야하니 셧다운 호출
 				shutdown(NowSession->m_Client_sock, SD_BOTH);
@@ -1312,22 +1323,22 @@ namespace Library_Jingyu
 	bool CNetServer::SendPost(stSession* NowSession)
 	{
 		while (1)
-		{
+		{	
 			// ------------------
 			// send 가능 상태인지 체크
 			// ------------------
 			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
 			if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-				return true;
-
+				break;				
+			
 			// 2. SendBuff에 데이터가 있는지 확인
 			// 여기서 구한 UseSize는 이제 스냅샷 이다. 
 			int UseSize = NowSession->m_SendQueue->GetInNode();
 			if (UseSize == 0)
 			{
 				// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
-				NowSession->m_lSendFlag = 0;
+				NowSession->m_lSendFlag = FALSE;
 
 				// 3. 진짜로 사이즈가 없는지 다시한번 체크. 락 풀고 왔는데, 컨텍스트 스위칭 일어나서 다른 스레드가 건드렸을 가능성
 				// 사이즈 있으면 위로 올라가서 한번 더 시도
@@ -1335,7 +1346,8 @@ namespace Library_Jingyu
 					continue;
 
 				break;
-			}
+			}			
+
 
 			// ------------------
 			// Send 준비하기
@@ -1346,14 +1358,17 @@ namespace Library_Jingyu
 			if (UseSize > dfSENDPOST_MAX_WSABUF)
 				UseSize = dfSENDPOST_MAX_WSABUF;
 
-			for (int i = 0; i < UseSize; ++i)
+			int i = 0;
+			while (i < UseSize)
 			{
 				if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[i]) == -1)
 					cNetDump->Crash();
 
 				wsabuf[i].buf = NowSession->m_PacketArray[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_PacketArray[i]->GetUseSize();
-			}
+
+				i++;
+			}			
 
 			NowSession->m_iWSASendCount = UseSize;
 

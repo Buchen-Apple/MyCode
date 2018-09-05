@@ -14,7 +14,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER 5
 
 	// static 메모리풀
-	CMemoryPoolTLS<CProtocolBuff_Net>* CProtocolBuff_Net::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Net>(200, false);
+	CMemoryPoolTLS<CProtocolBuff_Net>* CProtocolBuff_Net::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Net>(0, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
 	CCrashDump* CProtocolBuff_Net::m_Dump = CCrashDump::GetInstance();
@@ -349,7 +349,7 @@ namespace Library_Jingyu
 	{
 		// 큐 꽉찼거나 rear가 Size를 앞질렀는지 체크
 		if (m_Rear >= m_Size)
-			throw CException(_T("ProtocalBuff(). PutData중 버퍼가 꽉참."));
+			throw CException(_T("ProtocalBuff(). PutData --> Buff Full!!"));
 
 		// 메모리 복사
 		// 1~8바이트 까지는 memcpy보다 대입연산으로 처리한다.
@@ -402,11 +402,11 @@ namespace Library_Jingyu
 	{
 		// 큐 비었나 체크
 		if (m_Front == m_Rear)
-			throw CException(_T("ProtocalBuff(). GetData중 큐가 비어있음."));
+			throw CException(_T("ProtocalBuff. GetData -> Queue Empty."));
 
 		// front가 큐의 끝에 도착하면 더 이상 읽기 불가능. 그냥 종료시킨다.
 		if (m_Front >= m_Size)
-			throw CException(_T("ProtocalBuff(). GetData중 front가 버퍼의 끝에 도착."));
+			throw CException(_T("ProtocalBuff. GetData -> Not Data."));
 
 		// 메모리 복사
 		// 1~8바이트 까지는 memcpy보다 대입연산으로 처리한다.

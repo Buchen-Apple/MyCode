@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "ChatServer.h"
-#include "Log\Log.h"
 
 #include "CommonProtocol.h"
 
@@ -8,6 +7,7 @@
 
 #include <time.h>
 #include <process.h>
+#include <Log\Log.h>
 
 
 // 패킷의 타입
@@ -19,9 +19,15 @@ extern ULONGLONG g_ullUpdateStructCount;
 extern ULONGLONG g_ullUpdateStruct_PlayerCount;
 extern LONG		 g_lUpdateTPS;
 
-
 // 로그 찍을 전역변수 하나 받기.
 CSystemLog* cChatLibLog = CSystemLog::GetInstance();
+
+
+// ------------- 공격 테스트용
+extern int m_SectorPosError;
+extern int m_SectorByteError;
+extern int m_SectorNoError;
+extern int m_HeadCodeError;
 
 
 // -------------------------------------
@@ -263,11 +269,8 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 	stPlayer* ErasePlayer = ErasePlayerFunc(SessionID);
 	if (ErasePlayer == nullptr)
 	{
-		// 로그 찍기 (로그 레벨 : 에러)
-		cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Packet_Leave() -->  Not Find Player (AccountNo : %d)",
-			ErasePlayer->m_i64AccountNo);
-
 		printf("Not Find Player!!\n");
+		m_ChatDump->Crash();
 	}
 
 	// 2) 최초 위치가 아니라면, 섹터에서 제거 후, 섹터 위치를 최초 위치로 셋팅
@@ -295,39 +298,55 @@ void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 	// 1. 패킷 타입 확인
 	WORD Type;
 	*Packet >> Type;
-
-	//printf("Type : %d\n", Type);
 	
 	// 2. 타입에 따라 switch case
 	// 분기 예측 성공률 증가를 위해 가장 많이 올 법한 일감을 상단에 배치 (현재는 채팅 메시지)
-	switch (Type)
+	try
 	{
-		// 채팅서버 채팅보내기 요청
-	case en_PACKET_CS_CHAT_REQ_MESSAGE:
-		Packet_Chat_Message(SessionID, Packet);
+		switch (Type)
+		{
+			// 채팅서버 채팅보내기 요청
+		case en_PACKET_CS_CHAT_REQ_MESSAGE:
+			Packet_Chat_Message(SessionID, Packet);
 
-		break;
+			break;
 
-		// 채팅서버 섹터 이동 요청
-	case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
-		Packet_Sector_Move(SessionID, Packet);
+			// 채팅서버 섹터 이동 요청
+		case en_PACKET_CS_CHAT_REQ_SECTOR_MOVE:
+			Packet_Sector_Move(SessionID, Packet);
 
-		break;
+			break;
 
-		// 하트비트
-	case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
-		// 하는거 없음
-		break;
+			// 하트비트
+		case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+			// 하는거 없음
+			break;
 
-		// 로그인 요청
-	case en_PACKET_CS_CHAT_REQ_LOGIN:
-		Packet_Chat_Login(SessionID, Packet);
-		break;
+			// 로그인 요청
+		case en_PACKET_CS_CHAT_REQ_LOGIN:
+			Packet_Chat_Login(SessionID, Packet);
+			break;
 
-	default:
-		printf("Type Error!!! (%d)\n", Type);
-		break;
-	}	
+		default:
+			// 이상한 타입의 패킷은 그냥 무시
+			// printf("Type Error!!! (%d)\n", Type);
+			break;
+		}
+
+	}
+	catch (CException& exc)
+	{	
+
+		// char* pExc = exc.GetExceptionText();		
+
+		//// 로그 찍기 (로그 레벨 : 에러)
+		//cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+		//	(TCHAR*)pExc);	
+
+		// 접속 끊기 요청
+		Disconnect(SessionID);
+	}
+	
 }
 
 
@@ -344,7 +363,10 @@ void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 // return : 성공 시 true
 //		  : 접속중이지 않은 유저거나 비정상 섹터 이동 시 false
 void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
-{
+{	
+	if (Packet->GetUseSize() != 12)
+		m_SectorByteError++;
+
 	// 1) map에서 유저 검색
 	stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 	if (FindPlayer == nullptr)
@@ -360,14 +382,25 @@ void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Pac
 	WORD wSectorX, wSectorY;
 	*Packet >> wSectorX;
 	*Packet >> wSectorY;
-
+	
+	// 패킷 검증 -----------------------------
 	// 3) 이동하고자 하는 섹터가 정상인지 체크
 	if (wSectorX < 0 || wSectorX > SECTOR_X_COUNT ||
 		wSectorY < 0 || wSectorY > SECTOR_Y_COUNT)
 	{
-		// 비정상이면 끊기 요청.
-		Disconnect(SessionID);
-		return;
+		m_SectorPosError++;
+
+		// 비정상이면 밖으로 예외 던진다
+		throw CException(_T("Packet_Sector_Move(). Sector pos Error"));
+	}
+
+	// 4) AccountNo 체크
+	if (AccountNo != FindPlayer->m_i64AccountNo)
+	{
+		m_SectorNoError++;
+
+		// 비정상이면 밖으로 예외 던진다
+		throw CException(_T("Packet_Sector_Move(). AccountNo Error"));
 	}
 	
 	// 4) 유저의 섹터 정보 갱신
@@ -524,11 +557,11 @@ bool CChatServer::ServerStart(const TCHAR* bindIP, USHORT port, int WorkerThread
 	// ------------------- 각종 리소스 할당
 	// 구조체 메시지 TLS 메모리풀 동적할당
 	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*200 = 40000. 총 40000개의 구조체 메시지 사용 가능)
-	m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(200, false);
+	m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(0, false);
 
 	// 플레이어 구조체 TLS 메모리풀 동적할당
 	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*200 = 40000. 총 40000개의 플레이어 구조체 사용 가능)
-	m_PlayerPool = new CMemoryPoolTLS<stPlayer>(200, false);
+	m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
 
 	// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
 	// 사이즈가 0인 이유는, UpdateThread에서 큐가 비었는지 체크하고 쉬러 가야하기 때문에.
@@ -742,4 +775,11 @@ void CChatServer::OnWorkerThreadEnd()
 {}
 
 void CChatServer::OnError(int error, const TCHAR* errorStr)
-{}
+{
+	if (error == 21)
+		m_HeadCodeError++;
+
+	// 로그 찍기 (로그 레벨 : 에러)
+	/*cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+		errorStr, error);*/
+}

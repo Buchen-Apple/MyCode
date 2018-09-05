@@ -110,6 +110,7 @@ private:
 
 	// 업데이트 스레드 종료 용도 Event
 	HANDLE UpdateThreadEXITEvent;
+	   	  
 
 private:
 	// -------------------------------------
