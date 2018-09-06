@@ -283,7 +283,7 @@ public:
 	// 테스트용. 맵 안의 플레이어 수 얻기
 	LONG JoinPlayerCount()
 	{
-		return m_mapPlayer.size();
+		return (LONG)m_mapPlayer.size();
 	}
 
 	// !! 테스트용 !!

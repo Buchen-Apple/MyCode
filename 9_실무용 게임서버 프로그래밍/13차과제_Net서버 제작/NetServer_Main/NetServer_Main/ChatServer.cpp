@@ -377,11 +377,10 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 		m_ChatDump->Crash();
 	}	
 
-	// 2) 최초 할당이 아닐 경우
+	// 2) 최초 할당이 아닐 경우, 섹터에서 제거
 	if (ErasePlayer->m_wSectorY != TEMP_SECTOR_POS &&
 		ErasePlayer->m_wSectorX != TEMP_SECTOR_POS)
 	{
-		// 최초 할당이 아닌데, X,Y가 범위를 벗어나면 끊어야 할 유저
 		m_listSecotr[ErasePlayer->m_wSectorY][ErasePlayer->m_wSectorX].remove(ErasePlayer);
 	}
 
@@ -549,10 +548,7 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	// 1) map에서 유저 검색
 	stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 	if (FindPlayer == nullptr)
-	{
-		printf("Not Find Player!!\n");
-		return;
-	}	
+		m_ChatDump->Crash();	
 
 	// 2) 마샬링
 	INT64 AccountNo;
@@ -608,10 +604,7 @@ void CChatServer::Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Pack
 	// 1) map에서 유저 검색
 	stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 	if (FindPlayer == nullptr)
-	{
-		printf("Not Find Player!!\n");
-		return;
-	}	
+		m_ChatDump->Crash();
 
 	// 2) 마샬링
 	INT64	AccountNo;
@@ -676,13 +669,9 @@ bool CChatServer::ServerStart()
 
 	// ------------------- 각종 리소스 할당
 	// 일감 TLS 메모리풀 동적할당
-	// 총 100개의 청크. (1개당 1000개의 데이터를 다루니, 1000*100 = 100000. 총 100000개의 일감 사용 가능)
 	m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(0, false);
 
-	// 플레이어 구조체 TLS 메모리풀 동적할당
-	// 최대 접속자 수 + 1000개만큼 만들어둔다.
-	// 1개의 청크가 1000개의 데이터
-	
+	// 플레이어 구조체 TLS 메모리풀 동적할당	
 	m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
 
 	// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)

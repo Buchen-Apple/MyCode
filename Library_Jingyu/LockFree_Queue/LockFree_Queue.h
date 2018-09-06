@@ -175,8 +175,7 @@ namespace Library_Jingyu
 		// 큐 내부의 사이즈 1 감소
 		// 노드가 없으면 -1 리턴
 		if (InterlockedDecrement(&m_NodeCount) < 0)
-			m_CDump->Crash();
-			//return -1;
+			return -1;
 
 		// 락프리 구조 --------------------------
 		// 디큐는, 기본적으로 현재 헤드가 가리키고 있는 노드의, 다음 노드의 값을 리턴한다.

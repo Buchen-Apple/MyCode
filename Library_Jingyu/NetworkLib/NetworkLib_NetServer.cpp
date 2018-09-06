@@ -941,8 +941,7 @@ namespace Library_Jingyu
 
 			// 3) 정보 셋팅하기
 			// -- 세션 ID(믹스 키)와 인덱스 할당
-			ULONGLONG MixKey = (ullUniqueSessionID << 16);
-			MixKey = (MixKey | iIndex);	
+			ULONGLONG MixKey = ((ullUniqueSessionID << 16) | iIndex);
 			ullUniqueSessionID++;
 
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
@@ -1015,8 +1014,7 @@ namespace Library_Jingyu
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
 		// 1. SessionID로 세션 알아오기	
-		WORD Index = (WORD)SessionID;
-		stSession* retSession = &m_stSessionArray[Index];
+		stSession* retSession = &m_stSessionArray[(WORD)SessionID];
 
 		// 2. I/O 카운트 1 증가.	
 		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
