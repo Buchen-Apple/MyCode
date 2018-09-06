@@ -794,8 +794,6 @@ void CChatServer::OnClientJoin(ULONGLONG SessionID)
 
 	InterlockedIncrement(&g_ullUpdateStructCount);
 
-	NowMessage->m_pPacket = nullptr;
-
 	// 2.  세션 ID 채우기
 	NowMessage->m_ullSessionID = SessionID;
 
@@ -821,8 +819,6 @@ void CChatServer::OnClientLeave(ULONGLONG SessionID)
 	st_WorkNode* NowMessage = m_MessagePool->Alloc();
 
 	InterlockedIncrement(&g_ullUpdateStructCount);
-
-	NowMessage->m_pPacket = nullptr;
 
 	// 2. Type채우기
 	// 여기 타입은 [접속, 종료, 패킷] 총 3 개 중 하나이다.

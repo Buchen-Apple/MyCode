@@ -921,7 +921,8 @@ namespace Library_Jingyu
 			if (g_This->OnConnectionRequest(tcTempIP, port) == false)
 				continue;
 
-			g_ullAcceptTotal++; // 테스트용!!
+			g_ullAcceptTotal++;
+			//InterlockedIncrement(&g_ullAcceptTotal); // 테스트용!!
 			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
 
 
@@ -949,7 +950,8 @@ namespace Library_Jingyu
 
 			// 3) 해당 세션 배열, 사용중으로 변경
 			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
-			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
+			InterlockedCompareExchange(&g_This->m_stSessionArray[iIndex].m_lReleaseFlag, FALSE, TRUE);
+			//g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
 
 			// ------------------
