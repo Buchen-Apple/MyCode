@@ -389,7 +389,7 @@ namespace Library_Jingyu
 		struct stChunk
 		{	
 
-#define NODE_COUNT 200	// 1개의 청크가 다루는 노드의 수			
+#define NODE_COUNT 1000	// 1개의 청크가 다루는 노드의 수			
 
 			// 청크 멤버변수
 
@@ -579,10 +579,6 @@ namespace Library_Jingyu
 	template <typename DATA>
 	DATA* CMemoryPoolTLS<DATA>::Alloc()
 	{
-
-		int abc = 0;
-		int abcdef = 0;
-
 		// 현재 이 함수를 호출한 스레드의 TLS 인덱스에 청크가 있는지 확인
 		stChunk* pChunk = (stChunk*)TlsGetValue(m_dwIndex);
 
@@ -595,10 +591,6 @@ namespace Library_Jingyu
 				DWORD Error = GetLastError();
 				m_TLSDump->Crash();
 			}
-			abc = 10;
-
-			if (pChunk->m_iTop != 0 || pChunk->m_iFreeRef != 0)
-				abcdef = 10;
 		}	
 
 		InterlockedIncrement(&g_lAllocNodeCount);
@@ -624,7 +616,7 @@ namespace Library_Jingyu
 
 		// 플레이스먼트 뉴 여부에 따라 생성자 호출
 		if (m_bPlacementNew == true)
-			new (retData) DATA();
+			new (retData) DATA();	
 
 		return retData;		
 	}
@@ -648,7 +640,11 @@ namespace Library_Jingyu
 
 		// 내가 할당한 블럭이 맞는지 확인
 		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
+		{
+			
+
 			m_TLSDump->Crash();
+		}
 
 		InterlockedDecrement(&g_lAllocNodeCount);
 		//InterlockedIncrement(&g_lFreeNodeCount);

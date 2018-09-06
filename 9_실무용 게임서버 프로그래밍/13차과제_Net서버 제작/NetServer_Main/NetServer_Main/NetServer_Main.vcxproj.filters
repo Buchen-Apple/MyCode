@@ -21,9 +21,6 @@
     <ClInclude Include="CommonProtocol.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="ProtocolStruct.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="ChatServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>

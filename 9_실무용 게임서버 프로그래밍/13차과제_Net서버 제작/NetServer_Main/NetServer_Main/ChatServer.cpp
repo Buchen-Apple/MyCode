@@ -9,11 +9,18 @@
 #include <process.h>
 #include <Log\Log.h>
 
+#include <map>
+
+using namespace std;
+
 
 // 패킷의 타입
 #define TYPE_JOIN	0
 #define TYPE_LEAVE	1
 #define TYPE_PACKET	2
+
+// 최초 입장 시, 임의로 셋팅해두는 섹터 X,Y 값
+#define TEMP_SECTOR_POS	12345
 
 extern ULONGLONG g_ullUpdateStructCount;
 extern ULONGLONG g_ullUpdateStruct_PlayerCount;
@@ -39,10 +46,6 @@ extern int m_ChackSumError;
 extern int m_NotPayloadDeq;
 extern int m_HeaderLenBig;
 extern int m_PayloadQueError;
-
-
-// 최초 입장 시, 임의로 셋팅해두는 섹터 X,Y 값
-#define TEMP_SECTOR_POS	12345
 
 
 // -------------------------------------
@@ -136,7 +139,7 @@ bool CChatServer::SetFile(stConfigFile* pConfig)
 bool CChatServer::InsertPlayerFunc(ULONGLONG SessionID, stPlayer* insertPlayer)
 {
 	// map에 추가
-	auto ret = m_mapPlayer.insert(pair<ULONGLONG, stPlayer*>(SessionID, insertPlayer));
+	auto ret = m_mapPlayer.insert(make_pair(SessionID, insertPlayer));
 
 	// 중복된 키일 시 false 리턴.
 	if (ret.second == false)
@@ -155,7 +158,7 @@ CChatServer::stPlayer* CChatServer::FindPlayerFunc(ULONGLONG SessionID)
 {
 	auto FindPlayer = m_mapPlayer.find(SessionID);
 	if (FindPlayer == m_mapPlayer.end())
-		return nullptr;
+		return nullptr;	
 
 	return FindPlayer->second;
 }
@@ -171,12 +174,14 @@ CChatServer::stPlayer* CChatServer::ErasePlayerFunc(ULONGLONG SessionID)
 	// 1) map에서 유저 검색
 	auto FindPlayer = m_mapPlayer.find(SessionID);
 	if (FindPlayer == m_mapPlayer.end())	
-		return nullptr;
+		return nullptr;	
+
+	stPlayer* ret = FindPlayer->second;
 
 	// 2) 맵에서 제거
 	m_mapPlayer.erase(FindPlayer);
 
-	return FindPlayer->second;
+	return ret;
 }
 
 // 섹터 기준 9방향 구하기
@@ -338,11 +343,14 @@ void CChatServer::Packet_Join(ULONGLONG SessionID)
 {
 	// 1) Player Alloc()
 	stPlayer* JoinPlayer = m_PlayerPool->Alloc();
+
 	InterlockedIncrement(&g_ullUpdateStruct_PlayerCount);
 
 	// 2) SessionID 셋팅
-	JoinPlayer->m_ullSessionID = SessionID;
-	JoinPlayer->m_wSectorY = JoinPlayer->m_wSectorX = TEMP_SECTOR_POS;
+	JoinPlayer->m_ullSessionID = SessionID;	
+
+	JoinPlayer->m_wSectorY = TEMP_SECTOR_POS;
+	JoinPlayer->m_wSectorX = TEMP_SECTOR_POS;	
 
 	// 3) Player 관리 자료구조에 유저 추가
 	if (InsertPlayerFunc(SessionID, JoinPlayer) == false)
@@ -359,22 +367,33 @@ void CChatServer::Packet_Join(ULONGLONG SessionID)
 // return : 없음
 void CChatServer::Packet_Leave(ULONGLONG SessionID)
 {
+	ULONGLONG TempID = SessionID;	
+
 	// 1) Player 자료구조에서 제거
 	stPlayer* ErasePlayer = ErasePlayerFunc(SessionID);
 	if (ErasePlayer == nullptr)
 	{
 		printf("Not Find Player!!\n");
 		m_ChatDump->Crash();
+	}	
+
+	// 2) 최초 할당이 아닐 경우
+	if (ErasePlayer->m_wSectorY != TEMP_SECTOR_POS &&
+		ErasePlayer->m_wSectorX != TEMP_SECTOR_POS)
+	{
+		// 최초 할당이 아닌데, X,Y가 범위를 벗어나면 끊어야 할 유저
+		m_listSecotr[ErasePlayer->m_wSectorY][ErasePlayer->m_wSectorX].remove(ErasePlayer);
 	}
 
-	// 2) 최초 할당이 아니면, 섹터에서 제거
-	if(ErasePlayer->m_wSectorY != TEMP_SECTOR_POS)
-		m_listSecotr[ErasePlayer->m_wSectorY][ErasePlayer->m_wSectorX].remove(ErasePlayer);
+	// 3) 초기화 ------------------
+	// SectorPos를 초기 위치로 설정
+	ErasePlayer->m_wSectorY = TEMP_SECTOR_POS;
+	ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
 
-	// 3) Player Free()
+	// 4) Player Free()
 	m_PlayerPool->Free(ErasePlayer);
-	InterlockedDecrement(&g_ullUpdateStruct_PlayerCount);
 
+	InterlockedDecrement(&g_ullUpdateStruct_PlayerCount);
 }
 
 // 일반 패킷처리 함수
@@ -453,14 +472,6 @@ void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 //		  : 접속중이지 않은 유저거나 비정상 섹터 이동 시 false
 void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 {	
-	//if (Packet->GetUseSize() != 12)
-	//{
-	//	m_SizeError++;
-
-	//	// 비정상이면 밖으로 예외 던진다
-	//	throw CException(_T("Packet_Sector_Move(). Size Error"));
-	//}
-
 	// 1) map에서 유저 검색
 	stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 	if (FindPlayer == nullptr)
@@ -500,7 +511,8 @@ void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Pac
 	// 4) 유저의 섹터 정보 갱신
 	// 최초 섹터 패킷이 아니라면, 기존 섹터에서 뺀다.
 	// 똑같은 값이기 때문에, 하나만 체크해도 된다.
-	if (FindPlayer->m_wSectorY != TEMP_SECTOR_POS)
+	if (FindPlayer->m_wSectorY != TEMP_SECTOR_POS &&
+		FindPlayer->m_wSectorX != TEMP_SECTOR_POS)
 	{
 		// 현재 섹터에서 유저 제거
 		m_listSecotr[FindPlayer->m_wSectorY][FindPlayer->m_wSectorX].remove(FindPlayer);
@@ -540,7 +552,7 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	{
 		printf("Not Find Player!!\n");
 		return;
-	}
+	}	
 
 	// 2) 마샬링
 	INT64 AccountNo;
@@ -579,7 +591,7 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 
 	// 5) 주변 유저에게 채팅 메시지 보냄
 	// 모든 유저에게 보낸다 (채팅을 보낸 유저 포함)
-	SendPacket_Sector(SendBuff, &SecCheck);
+	SendPacket_Sector(SendBuff, &SecCheck);	
 
 	// 6) 패킷 Free
 	// !! Net서버쪽 완통에서 Free 하지만, SendPacket_Sector이 안에서 하나씩 증가시키면서 보냈기 때문에 1개가 더 증가한 상태. !!	
@@ -599,7 +611,7 @@ void CChatServer::Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Pack
 	{
 		printf("Not Find Player!!\n");
 		return;
-	}
+	}	
 
 	// 2) 마샬링
 	INT64	AccountNo;
@@ -656,13 +668,21 @@ CChatServer::~CChatServer()
 // return true : 성공
 bool CChatServer::ServerStart()
 {
+	//// ------------------- Config정보 셋팅
+	stConfigFile config;
+	if (SetFile(&config) == false)
+		return false;
+
+
 	// ------------------- 각종 리소스 할당
-	// 구조체 메시지 TLS 메모리풀 동적할당
-	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*200 = 40000. 총 40000개의 구조체 메시지 사용 가능)
+	// 일감 TLS 메모리풀 동적할당
+	// 총 100개의 청크. (1개당 1000개의 데이터를 다루니, 1000*100 = 100000. 총 100000개의 일감 사용 가능)
 	m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(0, false);
 
 	// 플레이어 구조체 TLS 메모리풀 동적할당
-	// 총 100개의 청크. (1개당 200개의 데이터를 다루니, 200*200 = 40000. 총 40000개의 플레이어 구조체 사용 가능)
+	// 최대 접속자 수 + 1000개만큼 만들어둔다.
+	// 1개의 청크가 1000개의 데이터
+	
 	m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
 
 	// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
@@ -679,15 +699,10 @@ bool CChatServer::ServerStart()
 
 	// ------------------- 업데이트 스레드 생성
 	hUpdateThraed = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, 0, 0);
-
-
-	// ------------------- Config정보 셋팅
-	stConfigFile config;
-	if (SetFile(&config) == false)
-		return false;
+	   	
 
 	// ------------------- 넷서버 가동
-	if (Start(config.BindIP, config.Port, config.CreateWorker, config.ActiveWorker, config.ActiveWorker, config.Nodelay, config.MaxJoinUser,
+	if (Start(config.BindIP, config.Port, config.CreateWorker, config.ActiveWorker, config.CreateAccept, config.Nodelay, config.MaxJoinUser,
 		config.HeadCode, config.XORCode1, config.XORCode2) == false)
 		return false;			
 

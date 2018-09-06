@@ -89,7 +89,7 @@ namespace Library_Jingyu
 		SOCKET m_Client_sock;
 
 		// 해당 세션이 들어있는 배열 인덱스
-		ULONGLONG m_lIndex;
+		WORD m_lIndex;
 
 		// 연결된 세션의 IP와 Port
 		TCHAR m_IP[30];
@@ -108,7 +108,7 @@ namespace Library_Jingyu
 		// I/O 카운트. WSASend, WSARecv시 1씩 증가.
 		// 0이되면 접속 종료된 유저로 판단.
 		// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
-		LONG	m_lIOCount;
+		LONG	m_lIOCount;				
 
 		// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
 		int m_iWSASendCount;
@@ -159,7 +159,8 @@ namespace Library_Jingyu
 	// return true : 성공
 	bool CNetServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
 							BYTE Code, BYTE XORCode1, BYTE XORCode2)
-	{
+	{		
+
 		// rand설정
 		srand((UINT)time(NULL));
 
@@ -354,10 +355,9 @@ namespace Library_Jingyu
 
 		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 
 		// 그리고 미리 Max만큼 만들어두기
-		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>;
+		m_stEmptyIndexStack = new CLF_Stack<WORD>;
 		for (int i = 0; i < MaxConnect; ++i)
 			m_stEmptyIndexStack->Push(i);
-
 
 		// 엑셉트 스레드 생성
 		m_iA_ThreadCount = AcceptThreadCount;
@@ -642,6 +642,8 @@ namespace Library_Jingyu
 			// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
 			ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 
+			DeleteSession->m_ullSessionID = 0xffffffffffffffff;
+
 			// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
 			for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
 				CProtocolBuff_Net::Free(DeleteSession->m_PacketArray[i]);
@@ -858,7 +860,7 @@ namespace Library_Jingyu
 		ULONGLONG ullUniqueSessionID = 0;
 		TCHAR tcTempIP[30];
 		USHORT port;
-		ULONGLONG iIndex;
+		WORD iIndex;
 
 		while (1)
 		{
@@ -890,6 +892,9 @@ namespace Library_Jingyu
 				break;
 			}
 
+			g_ullAcceptTotal++;	// 테스트용!!
+			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
+
 			// ------------------
 			// 최대 접속자 수 이상 접속 불가
 			// ------------------
@@ -898,7 +903,7 @@ namespace Library_Jingyu
 				closesocket(client_sock);
 
 				// 로그 찍기(로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User Full!!!!");
+				cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). User Full!!!! (%d)", g_This->m_ullJoinUserCount);
 				continue;
 			}
 
@@ -921,9 +926,7 @@ namespace Library_Jingyu
 			if (g_This->OnConnectionRequest(tcTempIP, port) == false)
 				continue;
 
-			g_ullAcceptTotal++;
-			//InterlockedIncrement(&g_ullAcceptTotal); // 테스트용!!
-			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
+
 
 
 			// ------------------
@@ -938,7 +941,11 @@ namespace Library_Jingyu
 
 			// 3) 정보 셋팅하기
 			// -- 세션 ID(믹스 키)와 인덱스 할당
-			g_This->m_stSessionArray[iIndex].m_ullSessionID = (++ullUniqueSessionID) | (iIndex << 48);
+			ULONGLONG MixKey = (ullUniqueSessionID << 16);
+			MixKey = (MixKey | iIndex);	
+			ullUniqueSessionID++;
+
+			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
 			
 			// -- 소켓
@@ -950,8 +957,7 @@ namespace Library_Jingyu
 
 			// 3) 해당 세션 배열, 사용중으로 변경
 			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
-			InterlockedCompareExchange(&g_This->m_stSessionArray[iIndex].m_lReleaseFlag, FALSE, TRUE);
-			//g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
+			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
 
 			// ------------------
@@ -982,7 +988,7 @@ namespace Library_Jingyu
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
 			// ------------------
-			g_This->OnClientJoin(g_This->m_stSessionArray[iIndex].m_ullSessionID);
+			g_This->OnClientJoin(MixKey);
 
 
 
@@ -1008,8 +1014,9 @@ namespace Library_Jingyu
 	//		  : I/O카운트가 0이되어 삭제된 유저는, nullptr
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
-		// 1. SessionID로 세션 알아오기
-		stSession* retSession = &m_stSessionArray[SessionID >> 48];
+		// 1. SessionID로 세션 알아오기	
+		WORD Index = (WORD)SessionID;
+		stSession* retSession = &m_stSessionArray[Index];
 
 		// 2. I/O 카운트 1 증가.	
 		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
@@ -1019,19 +1026,9 @@ namespace Library_Jingyu
 				InDisconnect(retSession);
 
 			return nullptr;
-		}			
+		}	
 
-		// 3. Release Flag 체크
-		// 이미 Release된 유저라면, I/O카운트만 감소시키고 나간다.
-		if (retSession->m_lReleaseFlag == TRUE)
-		{
-			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
-				InDisconnect(retSession);
-
-			return nullptr;
-		}
-
-		// 4. 내가 원하던 세션이 맞는지 체크
+		// 3. 내가 원하던 세션이 맞는지 체크
 		if (retSession->m_ullSessionID != SessionID)
 		{
 			// 아니라면 I/O 카운트 1 감소
@@ -1040,7 +1037,18 @@ namespace Library_Jingyu
 				InDisconnect(retSession);
 
 			return nullptr;
-		}	
+		}
+
+		// 4. Release Flag 체크
+		if (retSession->m_lReleaseFlag == TRUE)
+		{
+			// 이미 Release된 유저라면, I/O 카운트 1 감소
+			// 감소한 값이 0이면서, inDIsconnect 호출
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			return nullptr;
+		}					
 
 		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;
@@ -1098,8 +1106,6 @@ namespace Library_Jingyu
 		{
 			// 1. RecvBuff에 최소한의 사이즈가 있는지 체크. (조건 = 헤더 사이즈와 같거나 초과. 즉, 일단 헤더만큼의 크기가 있는지 체크)	
 			// 헤더의 구조 -----------> [Code(1byte) - Len(2byte) - Rand XOR Code(1byte) - CheckSum(1byte)] 
-			//BYTE Header[dfNETWORK_PACKET_HEADER_SIZE_NETSERVER];
-
 			stProtocolHead Header;
 
 			// RecvBuff의 사용 중인 버퍼 크기가 헤더 크기보다 작다면, 완료 패킷이 없다는 것이니 while문 종료.
@@ -1134,10 +1140,7 @@ namespace Library_Jingyu
 				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
 				return;
 			}
-			/*if ((WORD)Header[1] == 0xffff)
-			{
-				cNetDump->Crash();
-			}*/
+
 			// 3. 헤더의 코드 확인. 내 것이 맞는지
 			if(Header.m_Code != m_bCode)
 			{
@@ -1265,7 +1268,7 @@ namespace Library_Jingyu
 			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 9. 헤더 Decode
-			if (PayloadBuff->Decode(Header.m_Len, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
 			{
 				// 내 에러 보관. 윈도우 에러는 없음.
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR;

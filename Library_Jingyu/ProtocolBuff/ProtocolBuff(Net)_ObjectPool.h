@@ -142,6 +142,17 @@ namespace Library_Jingyu
 		// 레퍼런스 카운트 1 Add하는 함수
 		void Add();
 
+		static LONG GetChunkCount()
+		{
+			return m_MPool->GetAllocChunkCount();
+		}
+
+		static LONG GetOutChunkCount()
+		{
+			return m_MPool->GetOutChunkCount();
+		}
+
+
 	};
 
 }

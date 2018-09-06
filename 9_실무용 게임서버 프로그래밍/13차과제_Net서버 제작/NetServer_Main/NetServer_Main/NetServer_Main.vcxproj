@@ -162,7 +162,6 @@
     <ClInclude Include="ChatServer.h" />
     <ClInclude Include="CommonProtocol.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="ProtocolStruct.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />

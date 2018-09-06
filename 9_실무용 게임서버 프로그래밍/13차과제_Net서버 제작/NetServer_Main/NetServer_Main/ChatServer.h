@@ -17,7 +17,10 @@
 #define SECTOR_X_COUNT	50
 #define SECTOR_Y_COUNT	50
 
+
+
 using namespace Library_Jingyu;
+using namespace std;
 
 ////////////////////////////////////////////
 // !! 채팅서버 !!
@@ -65,25 +68,24 @@ class CChatServer :public CNetServer
 	// 플레이어 구조체
 	struct stPlayer
 	{
+		// 섹터 좌표 X,Y
+		WORD m_wSectorX;
+		WORD m_wSectorY;
+
 		// 유저 고유 값
 		INT64 m_i64AccountNo;
+
+		// 세션 ID (네트워크와 통신 시 사용하는 키값)
+		ULONGLONG m_ullSessionID;
 
 		// 유저 ID (로그인 시 사용하는 ID)
 		WCHAR m_tLoginID[20];
 
 		// 닉네임
-		WCHAR m_tNickName[20];
-
-		// 섹터 좌표 X,Y
-		// 최초에는 모두 12345
-		WORD m_wSectorX;
-		WORD m_wSectorY;
+		WCHAR m_tNickName[20];		
 
 		// 토큰 (세션 키)
-		char m_cToken[64];
-
-		// 세션 ID (네트워크와 통신 시 사용하는 키값)
-		ULONGLONG m_ullSessionID;
+		char m_cToken[64];		
 	};
 
 private:
@@ -98,14 +100,14 @@ private:
 
 	// 메시지 구조체를 다룰 TLS메모리풀
 	// 일감 구조체를 다룬다.
-	CMemoryPoolTLS<st_WorkNode>* m_MessagePool;
+	CMemoryPoolTLS<st_WorkNode> *m_MessagePool;
 
 	// 메시지를 받을 락프리 큐
 	// 주소(8바이트)를 다룬다.
-	CLF_Queue<st_WorkNode*>* m_LFQueue;
+	CLF_Queue<st_WorkNode*> *m_LFQueue;
 
 	// 플레이어 구조체를 다룰 TLS메모리풀
-	CMemoryPoolTLS<stPlayer>* m_PlayerPool;
+	CMemoryPoolTLS<stPlayer> *m_PlayerPool;
 
 	// 플레이어 구조체를 다루는 map
 	// Key : SessionID
@@ -282,6 +284,36 @@ public:
 	LONG JoinPlayerCount()
 	{
 		return m_mapPlayer.size();
+	}
+
+	// !! 테스트용 !!
+	// 일감 TLS의 총 할당된 청크 수 반환
+	LONG GetWorkChunkCount()
+	{
+		return m_MessagePool->GetAllocChunkCount();
+	}
+
+	// !! 테스트용 !!
+	// 일감 TLS의 현재 밖에서 사용중인 청크 수 반환
+	LONG GetWorkOutChunkCount()
+	{
+		return m_MessagePool->GetOutChunkCount();
+	}
+
+
+
+	// !! 테스트용 !!
+	// 플레이어 TLS의 총 할당된 청크 수 반환
+	LONG GetPlayerChunkCount()
+	{
+		return m_PlayerPool->GetAllocChunkCount();
+	}
+
+	// !! 테스트용 !!
+	// 플레이어 TLS의 현재 밖에서 사용중인 청크 수 반환
+	LONG GetPlayerOutChunkCount()
+	{
+		return m_PlayerPool->GetOutChunkCount();
 	}
 
 };

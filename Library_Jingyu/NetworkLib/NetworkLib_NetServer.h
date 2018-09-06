@@ -10,9 +10,6 @@
 #include "ProtocolBuff\ProtocolBuff(Net)_ObjectPool.h"
 #include "LockFree_Stack\LockFree_Stack.h"
 
-using namespace std;
-
-
 
 
 namespace Library_Jingyu
@@ -66,7 +63,7 @@ namespace Library_Jingyu
 		stSession* m_stSessionArray;
 
 		// 미사용 인덱스 관리 스택
-		CLF_Stack<ULONGLONG>* m_stEmptyIndexStack;
+		CLF_Stack<WORD>* m_stEmptyIndexStack;
 
 		// --------------------------
 
