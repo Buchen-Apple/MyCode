@@ -8,7 +8,6 @@
 
 
 extern LONG g_lAllocNodeCount;
-extern LONG g_lFreeNodeCount;
 
 namespace Library_Jingyu
 {
@@ -647,7 +646,6 @@ namespace Library_Jingyu
 		}
 
 		InterlockedDecrement(&g_lAllocNodeCount);
-		//InterlockedIncrement(&g_lFreeNodeCount);
 
 		// FreeRefCount 1 증가
 		// 만약 NODE_COUNT가 되면 청크 내부 내용 초기화 후 청크 관리 메모리풀로 Free

@@ -38,31 +38,6 @@ namespace Library_Jingyu
 	// ------------------------------
 	// enum과 구조체
 	// ------------------------------
-	// enum class
-	enum class CLanServer::euError : int
-	{
-		NETWORK_LIB_ERROR__NORMAL = 0,					// 에러 없는 기본 상태
-		NETWORK_LIB_ERROR__WINSTARTUP_FAIL,				// 윈속 초기화 하다가 에러남
-		NETWORK_LIB_ERROR__CREATE_IOCP_PORT,			// IPCP 만들다가 에러남
-		NETWORK_LIB_ERROR__W_THREAD_CREATE_FAIL,		// 워커스레드 만들다가 실패 
-		NETWORK_LIB_ERROR__A_THREAD_CREATE_FAIL,		// 엑셉트 스레드 만들다가 실패 
-		NETWORK_LIB_ERROR__CREATE_SOCKET_FAIL,			// 소켓 생성 실패 
-		NETWORK_LIB_ERROR__BINDING_FAIL,				// 바인딩 실패
-		NETWORK_LIB_ERROR__LISTEN_FAIL,					// 리슨 실패
-		NETWORK_LIB_ERROR__SOCKOPT_FAIL,				// 소켓 옵션 변경 실패
-		NETWORK_LIB_ERROR__IOCP_ERROR,					// IOCP 자체 에러
-		NETWORK_LIB_ERROR__NOT_FIND_CLINET,				// map 검색 등을 할때 클라이언트를 못찾은경우.
-		NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL,		// Enqueue사이즈가 꽉찬 유저
-		NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY,			// Dequeue 시, 큐가 비어있는 유저. Peek을 시도하는데 큐가 비었을 상황은 없음
-		NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패
-		NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
-		NETWORK_LIB_ERROR__EMPTY_RECV_BUFF,				// Recv 완료통지가 왔는데, 리시브 버퍼가 비어있다고 나오는 유저.
-		NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
-		NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// 워커 스레드 비정상 종료. 
-		NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
-		NETWORK_LIB_ERROR__IOCP_IO_FAIL,				// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
-		NETWORK_LIB_ERROR__JOIN_USER_FULL				// 유저가 풀이라서 더 이상 접속 못받음
-	};
 
 	// 세션 구조체
 	struct CLanServer::stSession
@@ -71,7 +46,7 @@ namespace Library_Jingyu
 		SOCKET m_Client_sock;
 
 		// 해당 세션이 들어있는 배열 인덱스
-		ULONGLONG m_lIndex;		
+		WORD m_lIndex;		
 
 		// 연결된 세션의 IP와 Port
 		TCHAR m_IP[30];
@@ -156,7 +131,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
+			cNetLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -325,7 +300,7 @@ namespace Library_Jingyu
 
 		// 미사용 세션 관리 스택 동적할당. (락프리 스택) 
 		// 그리고 미리 Max만큼 만들어두기
-		m_stEmptyIndexStack = new CLF_Stack<ULONGLONG>;
+		m_stEmptyIndexStack = new CLF_Stack<WORD>;
 		for (int i = 0; i < MaxConnect; ++i)
 			m_stEmptyIndexStack->Push(i);
 
@@ -360,7 +335,8 @@ namespace Library_Jingyu
 		m_bServerLife = true;
 
 		// 서버 오픈 로그 찍기		
-		cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		// 이건, 상속받는 쪽에서 찍는걸로 수정. 랜서버 자체는 독립적으로 작동하지 않음.
+		// cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -482,7 +458,7 @@ namespace Library_Jingyu
 	//
 	// return true : SendQ에 성공적으로 데이터 넣고 SendPost까지 성공.
 	// return false : SendQ에 데이터 넣기 실패 or 원하던 유저 못찾음
-	bool CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff_Lan* payloadBuff)
+	void CLanServer::SendPacket(ULONGLONG ClinetID, CProtocolBuff_Lan* payloadBuff)
 	{
 		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
 		stSession* NowSession = GetSessionLOCK(ClinetID);
@@ -491,7 +467,7 @@ namespace Library_Jingyu
 			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
 			// ref 카운트가 0이 되면 메모리풀에 반환
 			CProtocolBuff_Lan::Free(payloadBuff);
-			return false;
+			return;
 		}
 
 		// 2. 헤더를 넣어서, 패킷 완성하기
@@ -503,38 +479,36 @@ namespace Library_Jingyu
 		NowSession->m_SendQueue->Enqueue(payloadBuff);
 
 		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
-		CProtocolBuff_Lan::Free(payloadBuff);
+		CProtocolBuff_Lan::Free(payloadBuff);		
 
-		// 5. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 5. SendPost시도
+		SendPost(NowSession);
+
+		// 6. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
-		if (GetSessionUnLOCK(NowSession) == false)
-			return false;
-
-		// 6. SendPost시도
-		return SendPost(NowSession);
+		// 근데 따로 리턴값 받지 않고 있음
+		GetSessionUnLOCK(NowSession);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 	// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 	//
-	// return true : 해당 유저에게 셧다운 잘 날림.
-	// return false : 접속중이지 않은 유저를 접속해제하려고 함. 즉 이미 삭제된 유저!
-	bool CLanServer::Disconnect(ULONGLONG ClinetID)
+	// return : 없음
+	void CLanServer::Disconnect(ULONGLONG ClinetID)
 	{
 		// 1. 세션 락 
 		stSession* DeleteSession =  GetSessionLOCK(ClinetID);
 		if (DeleteSession == nullptr)
-			return false;
+			return;
 
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
 		shutdown(DeleteSession->m_Client_sock, SD_BOTH);
+		CancelIoEx((HANDLE)DeleteSession->m_Client_sock, NULL);
 
 		// 3. 세션 락 해제
 		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
 		GetSessionUnLOCK(DeleteSession);
-
-		return true;
 	}
 
 	///// 각종 게터함수들 /////
@@ -603,54 +577,62 @@ namespace Library_Jingyu
 	// 실제로 접속종료 시키는 함수
 	void CLanServer::InDisconnect(stSession* DeleteSession)
 	{
-		// ReleaseFlag와 I/O카운트 둘 다 0이라면 'ReleaseFlag만 TRUE로 바꾼다!! 
+		// ReleaseFlag와 I/O카운트 둘 다 0이라면 'ReleaseFlag'만 TRUE로 바꾼다!
 		// I/O카운트는 안바꾼다.
 		// 
-		// TRUE가 리턴되는 것은, 이미 DeleteSession->m_lReleaseFlag가 true였다는 것. 
-		if (InterlockedCompareExchange64((LONG64*)&DeleteSession->m_lReleaseFlag, TRUE, FALSE) == TRUE)
-			return;
-
-		// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
-		// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
-		ULONGLONG sessionID = DeleteSession->m_ullSessionID;
-
-		// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
-		for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
-			CProtocolBuff_Lan::Free(DeleteSession->m_PacketArray[i]);
-
-		// 샌드 링버퍼 비우기
-		int UseSize = DeleteSession->m_SendQueue->GetInNode();
-
-		CProtocolBuff_Lan* Payload;
-		for (int i = 0; i < UseSize; ++i)
+		// FALSE가 리턴되는 것은, 이미 DeleteSession->m_lReleaseFlag와 I/OCount가 0이었다는 의미. 
+		// 로직을 타야한다.
+		if (InterlockedCompareExchange64((LONG64*)&DeleteSession->m_lReleaseFlag, TRUE, FALSE) == FALSE)
 		{
-			// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
-			if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
-				cNetDump->Crash();
+			// 컨텐츠쪽에 알려주기 위한 세션 ID 받아둠.
+			// 해당 세션을 스택에 반납한 다음에 유저에게 알려주기 때문에 미리 받아둔다.
+			ULONGLONG sessionID = DeleteSession->m_ullSessionID;
 
-			CProtocolBuff_Lan::Free(Payload);
+			DeleteSession->m_ullSessionID = 0xffffffffffffffff;
+
+			// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
+			for (int i = 0; i < DeleteSession->m_iWSASendCount; ++i)
+				CProtocolBuff_Lan::Free(DeleteSession->m_PacketArray[i]);
+
+			// SendCount 초기화
+			DeleteSession->m_iWSASendCount = 0;			
+
+			int UseSize = DeleteSession->m_SendQueue->GetInNode();
+
+			CProtocolBuff_Lan* Payload;
+			int i = 0;
+			while (i < UseSize)
+			{
+				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+				if (DeleteSession->m_SendQueue->Dequeue(Payload) == -1)
+					cNetDump->Crash();
+
+				CProtocolBuff_Lan::Free(Payload);
+
+				i++;
+			}			
+
+			// 큐 초기화
+			DeleteSession->m_RecvQueue.ClearBuffer();
+
+			// SendFlag 초기화
+			DeleteSession->m_lSendFlag = FALSE;
+
+			// 클로즈 소켓
+			closesocket(DeleteSession->m_Client_sock);
+
+			// 미사용 인덱스 스택에 반납
+			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
+
+			// 접속 중 유저 수 감소
+			InterlockedDecrement(&m_ullJoinUserCount);
+
+			// 컨텐츠 쪽에 종료된 유저 알려줌 
+			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
+			OnClientLeave(sessionID);
 		}
-
-		// SendFlag, SendCount 초기화
-		DeleteSession->m_lSendFlag = FALSE;
-		DeleteSession->m_iWSASendCount = 0;
-
-		// 큐 초기화
-		DeleteSession->m_RecvQueue.ClearBuffer();
-
-		// 클로즈 소켓
-		closesocket(DeleteSession->m_Client_sock);	
-
-		// 미사용 인덱스 스택에 반납
-		m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
 		
-		// 접속 중 유저 수 감소
-		InterlockedDecrement(&m_ullJoinUserCount);
-
-		// 컨텐츠 쪽에 종료된 유저 알려줌 
-		// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
-		OnClientLeave(sessionID);
-		return;
+		return;	
 	}
 
 	// Start에서 에러가 날 시 호출하는 함수.
@@ -741,13 +723,13 @@ namespace Library_Jingyu
 				g_This->m_iOSErrorCode = GetLastError();
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__IOCP_ERROR;
 
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"IOCP_Error --> GQCS return Error : NetError(%d), OSError(%d)",
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, L"IOCP_Error --> GQCS return Error : NetError(%d), OSError(%d)",
 					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
-
-				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_ERROR, L"IOCP_Error");
+				// OnError 호출
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__IOCP_ERROR, tcErrorString);
 
 				break;
 			}
@@ -781,8 +763,12 @@ namespace Library_Jingyu
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
 				// 2. 보냈던 직렬화버퍼 삭제
-				for (int i = 0; i < stNowSession->m_iWSASendCount; ++i)
+				int i = 0;
+				while (i < stNowSession->m_iWSASendCount)
+				{
 					CProtocolBuff_Lan::Free(stNowSession->m_PacketArray[i]);
+					i++;
+				}	
 
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
@@ -820,7 +806,7 @@ namespace Library_Jingyu
 		ULONGLONG ullUniqueSessionID = 0;
 		TCHAR tcTempIP[30];
 		USHORT port;
-		ULONGLONG iIndex;
+		WORD iIndex;
 
 		while (1)
 		{
@@ -859,8 +845,19 @@ namespace Library_Jingyu
 			{
 				closesocket(client_sock);
 
-				// 로그 찍기(로그 레벨 : 디버그)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"accpet(). User Full!!!!");
+				// 그게 아니라면 OnError 함수 호출
+				// 내 에러 보관
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__JOIN_USER_FULL;
+
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, L"accpet(). User Full!!!! (%d)",
+					g_This->m_ullJoinUserCount);
+
+				// 에러 발생 함수 호출
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__JOIN_USER_FULL, tcErrorString);
+
+				// continue
 				continue;
 			}
 
@@ -892,20 +889,28 @@ namespace Library_Jingyu
 			// 1) 미사용 인덱스 알아오기
 			iIndex = g_This->m_stEmptyIndexStack->Pop();		
 
-			 // 2) 해당 세션 배열, 사용중으로 변경
-			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
+			// 2) I/O 카운트 증가
+			// 삭제 방어
+			InterlockedIncrement(&g_This->m_stSessionArray[iIndex].m_lIOCount);
 
 			// 3) 정보 셋팅하기
+			// -- 세션 ID(믹스 키)와 인덱스 할당
+			ULONGLONG MixKey = ((ullUniqueSessionID << 16) | iIndex);
+			ullUniqueSessionID++;
+
+			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
+			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
+
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
 
-			// -- 세션 ID(믹스 키)와 인덱스 할당
-			g_This->m_stSessionArray[iIndex].m_ullSessionID = (++ullUniqueSessionID) | (iIndex << 48);
-			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
-
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
-			g_This->m_stSessionArray[iIndex].m_prot = port;		
+			g_This->m_stSessionArray[iIndex].m_prot = port;
+
+			// 3) 해당 세션 배열, 사용중으로 변경
+			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
+			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
 
 
@@ -936,8 +941,7 @@ namespace Library_Jingyu
 
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
-			// ------------------
-			g_This->m_stSessionArray[iIndex].m_lIOCount++; // I/O카운트 ++. 들어가기전에 1에서 시작. 아직 recv,send 그 어떤것도 안걸었기 때문에 그냥 ++해도 안전!
+			// ------------------			
 			g_This->OnClientJoin(g_This->m_stSessionArray[iIndex].m_ullSessionID);
 
 
@@ -948,7 +952,7 @@ namespace Library_Jingyu
 			// 반환값이 false라면, 이 안에서 종료된 유저임. 근데 안받음
 			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
-			// I/O카운트 --. 0이라면 삭제처리
+			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
 			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
 
@@ -965,34 +969,42 @@ namespace Library_Jingyu
 		//			실패 시 nullptr
 	CLanServer::stSession* 	CLanServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
-		// 1. ClinetID로 세션 알아오기
-		stSession* retSession = &m_stSessionArray[SessionID >> 48];
+		// 1. SessionID로 세션 알아오기	
+		stSession* retSession = &m_stSessionArray[(WORD)SessionID];
 
 		// 2. I/O 카운트 1 증가.	
 		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
 		{
-			// 증가한 값이 1이면, 이미 종료되어야 하는 유저였다는 것.
-			// 다시 1 감소시키고, 감소한 값이 0이라면 inDIsconnect 호출
+			// 감소한 값이 0이면서, inDIsconnect 호출
 			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
 		}
 
-		// 3. 세션키 검사. 정말 내가 알고있는 그 세션키가 아니거나, 배열이 미사용 배열이라면
-		/*if (m_stSessionArray[wArrayIndex].m_ullSessionKey != (ClinetID & 0x0000ffffffffffff) ||
-			m_stSessionArray[wArrayIndex].m_lReleaseFlag == TRUE)*/
-		if (retSession->m_ullSessionID != SessionID || retSession->m_lReleaseFlag == TRUE)
+		// 3. 내가 원하던 세션이 맞는지 체크
+		if (retSession->m_ullSessionID != SessionID)
 		{
-			// 내가 SendPacket을 하고자 했던 유저가 아님.
-			// I/O카운트 1 감소시킨다.
+			// 아니라면 I/O 카운트 1 감소
+			// 감소한 값이 0이면서, inDIsconnect 호출
 			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
 		}
 
-		// 4. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
+		// 4. Release Flag 체크
+		if (retSession->m_lReleaseFlag == TRUE)
+		{
+			// 이미 Release된 유저라면, I/O 카운트 1 감소
+			// 감소한 값이 0이면서, inDIsconnect 호출
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
+
+			return nullptr;
+		}
+
+		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;
 
 	}
@@ -1057,81 +1069,41 @@ namespace Library_Jingyu
 				break;
 			}
 
-			// 2. 헤더를 Peek으로 확인한다.  Peek 안에서는, 어떻게 해서든지 len만큼 읽는다. 
-			// 버퍼가 비어있으면 접속 끊음.
+			// 2. 헤더를 Peek으로 확인한다. 
+			// 버퍼가 비어있는건 말이 안된다. 이미 위에서 있다고 검사했기 때문에. Crash 남김
 			if (NowSession->m_RecvQueue.Peek((char*)&Header_PaylaodSize, dfNETWORK_PACKET_HEADER_SIZE) == -1)
-			{			
-
-				// 내 에러 보관. 윈도우 에러는 없음.
-				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
-
-				// 에러 스트링 만들고
-				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
-					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-				// 로그 찍기 (로그 레벨 : 에러)
-				cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s, NetError(%d)",
-					tcErrorString, (int)m_iMyErrorCode);
-
-				// 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-				// 에러 함수 호출
-				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
-
-				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
-				return;
-			}
+				cNetDump->Crash();
+			
 
 			// 3. 완성된 패킷이 있는지 확인. (완성 패킷 사이즈 = 헤더 사이즈 + 페이로드 Size)
 			// 계산 결과, 완성 패킷 사이즈가 안되면 while문 종료.
 			if (UseSize < (dfNETWORK_PACKET_HEADER_SIZE + Header_PaylaodSize))
-			{
 				break;
-			}
 
 			// 4. RecvBuff에서 Peek했던 헤더를 지우고 (이미 Peek했으니, 그냥 Remove한다)
 			NowSession->m_RecvQueue.RemoveData(dfNETWORK_PACKET_HEADER_SIZE);
 
 			// 5. 직렬화 버퍼의 rear는 무조건 2부터(앞에 2바이트는 헤더공간)부터 시작한다.
 			// 때문에 front를 2바이트 이동시켜놔야 Size가 0이된다.
-			CProtocolBuff_Lan PayloadBuff;
-			PayloadBuff.Clear();
-			//PayloadBuff.MoveReadPos(dfNETWORK_PACKET_HEADER_SIZE);	
+			CProtocolBuff_Lan* PayloadBuff = CProtocolBuff_Lan::Alloc();
+			PayloadBuff->Clear();
 			
 			// 6. RecvBuff에서 페이로드 Size 만큼 페이로드 직렬화 버퍼로 뽑는다. (디큐이다. Peek 아님)
-			//int DequeueSize = NowSession->m_RecvQueue.Dequeue(&PayloadBuff.GetBufferPtr()[dfNETWORK_PACKET_HEADER_SIZE], Header_PaylaodSize);
-			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff.GetBufferPtr(), Header_PaylaodSize);
+			int DequeueSize = NowSession->m_RecvQueue.Dequeue(PayloadBuff->GetBufferPtr(), Header_PaylaodSize);
 
-			// 버퍼가 비어있으면 접속 끊음
-			if (DequeueSize == -1)
-			{
-				// 내 에러 보관. 윈도우 에러는 없음.
-				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF;
-
-				// 에러 스트링 만들고
-				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
-					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-				// 끊어야하니 셧다운 호출
-				shutdown(NowSession->m_Client_sock, SD_BOTH);
-
-				// 에러 함수 호출
-				OnError((int)euError::NETWORK_LIB_ERROR__EMPTY_RECV_BUFF, tcErrorString);
-
-				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
-				return;
-			}
+			// 버퍼가 비어있거나, 내가 원하는만큼 데이터가 없었다면, 말이안됨. (위 if문에서는 있다고 했는데 여기오니 없다는것)
+			// 로직문제로 보고 서버 종료.
+			if ((DequeueSize == -1) || (DequeueSize != Header_PaylaodSize))
+				cNetDump->Crash();			
 
 			// 7. 읽어온 만큼 rear를 이동시킨다. 
 			// 참고로, rear는 시작부터 2이다
-			PayloadBuff.MoveWritePos(DequeueSize);
+			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 8. Recv받은 데이터의 헤더 타입에 따라 분기처리.
-			OnRecv(NowSession->m_ullSessionID, &PayloadBuff);
+			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
+			CProtocolBuff_Lan::Free(PayloadBuff);
 		}
 
 		return;
@@ -1265,18 +1237,21 @@ namespace Library_Jingyu
 			// Send 준비하기
 			// ------------------
 			// 1. WSABUF 셋팅.
-			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];	
+			WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];
 
 			if (UseSize > dfSENDPOST_MAX_WSABUF)
 				UseSize = dfSENDPOST_MAX_WSABUF;
 
-			for (int i = 0; i < UseSize; ++i)
+			int i = 0;
+			while (i < UseSize)
 			{
 				if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[i]) == -1)
 					cNetDump->Crash();
 
 				wsabuf[i].buf = NowSession->m_PacketArray[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_PacketArray[i]->GetUseSize();
+
+				i++;
 			}
 
 			NowSession->m_iWSASendCount = UseSize;

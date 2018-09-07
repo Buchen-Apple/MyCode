@@ -199,9 +199,9 @@ namespace Library_Jingyu
 		// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 		// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 		//
-		// return true : 해당 유저에게 셧다운 잘 날림.
-		// return false : 접속중이지 않은 유저를 접속해제하려고 함.
-		bool Disconnect(ULONGLONG ClinetID);
+		// Parameter : SessionID
+		// return : 없음
+		void Disconnect(ULONGLONG SessionID);
 
 		// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
 		// SendPacket은 그냥 아무때나 하면 된다.

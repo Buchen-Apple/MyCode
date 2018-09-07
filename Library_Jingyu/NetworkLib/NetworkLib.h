@@ -23,13 +23,46 @@ namespace Library_Jingyu
 	// --------------
 	class CLanServer
 	{
+	protected:
+		// ----------------------
+		// 에러 enum값들
+		// ----------------------
+		enum class euError : int
+		{
+			NETWORK_LIB_ERROR__NORMAL = 0,					// 에러 없는 기본 상태
+			NETWORK_LIB_ERROR__WINSTARTUP_FAIL,				// 윈속 초기화 하다가 에러남
+			NETWORK_LIB_ERROR__CREATE_IOCP_PORT,			// IPCP 만들다가 에러남
+			NETWORK_LIB_ERROR__W_THREAD_CREATE_FAIL,		// 워커스레드 만들다가 실패 
+			NETWORK_LIB_ERROR__A_THREAD_CREATE_FAIL,		// 엑셉트 스레드 만들다가 실패 
+			NETWORK_LIB_ERROR__CREATE_SOCKET_FAIL,			// 소켓 생성 실패 
+			NETWORK_LIB_ERROR__BINDING_FAIL,				// 바인딩 실패
+			NETWORK_LIB_ERROR__LISTEN_FAIL,					// 리슨 실패
+			NETWORK_LIB_ERROR__SOCKOPT_FAIL,				// 소켓 옵션 변경 실패
+			NETWORK_LIB_ERROR__WSAENOBUFS,					// WSASend, WSARecv시 버퍼사이즈 부족
+			// ------------ 여기까지는 NetServer 자체적으로 남기는 에러. 밖에서 신경 쓸 필요 없음
+
+			NETWORK_LIB_ERROR__IOCP_ERROR,					// IOCP 자체 에러
+			NETWORK_LIB_ERROR__NOT_FIND_CLINET,				// map 검색 등을 할때 클라이언트를 못찾은경우.
+			NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL,		// Enqueue사이즈가 꽉찬 유저
+			NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY,			// Dequeue 시, 큐가 비어있는 유저. Peek을 시도하는데 큐가 비었을 상황은 없음
+			NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패			
+			NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
+			NETWORK_LIB_ERROR__A_THREAD_IOCPCONNECT_FAIL,	// 엑셉트 스레드에서 IOCP 연결 실패
+			NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT,		// 워커 스레드 비정상 종료. 
+			NETWORK_LIB_ERROR__WFSO_ERROR,					// WaitForSingleObject 에러.
+			NETWORK_LIB_ERROR__IOCP_IO_FAIL,				// IOCP에서 I/O 실패 에러. 이 때는, 일정 횟수는 I/O를 재시도한다.
+			NETWORK_LIB_ERROR__JOIN_USER_FULL,				// 유저가 풀이라서 더 이상 접속 못받음
+			NETWORK_LIB_ERROR__RECV_CODE_ERROR,				// RecvPost에서 헤더 코드가 다른 데이터일 경우.
+			NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR,			// RecvPost에서 Decode 중 체크섬이 다름
+			NETWORK_LIB_ERROR__RECV_LENBIG_ERROR,			// RecvPost에서 헤더 안에 Len이 비정상적으로 큼.
+		};
+
 	private:
 	
 		// ----------------------
-		// private 구조체 or enum 전방선언
-		// ----------------------
-		// 에러 enum값들
-		enum class euError : int;
+		// private 구조체 
+		// ----------------------	
+		
 
 		// Session구조체 전방선언
 		struct stSession;
@@ -58,7 +91,7 @@ namespace Library_Jingyu
 		stSession* m_stSessionArray;
 
 		// 미사용 인덱스 관리 스택
-		CLF_Stack<ULONGLONG>* m_stEmptyIndexStack;
+		CLF_Stack<WORD>* m_stEmptyIndexStack;
 
 		// --------------------------
 
@@ -136,7 +169,7 @@ namespace Library_Jingyu
 		// 생성자와 소멸자
 		// -----------------------
 		CLanServer();
-		~CLanServer();
+		virtual ~CLanServer();
 
 	public:
 		// -----------------------
@@ -158,9 +191,8 @@ namespace Library_Jingyu
 		// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 		// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 		//
-		// return true : 해당 유저에게 셧다운 잘 날림.
-		// return false : 접속중이지 않은 유저를 접속해제하려고 함.
-		bool Disconnect(ULONGLONG ClinetID);
+		// return : 없음
+		void Disconnect(ULONGLONG SessionID);
 
 		// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
 		// SendPacket은 그냥 아무때나 하면 된다.
@@ -168,7 +200,7 @@ namespace Library_Jingyu
 		//
 		// return true : SendQ에 성공적으로 데이터 넣음.
 		// return true : SendQ에 데이터 넣기 실패.
-		bool SendPacket(ULONGLONG ClinetID, CProtocolBuff_Lan* payloadBuff);
+		void SendPacket(ULONGLONG SessionID, CProtocolBuff_Lan* payloadBuff);
 
 
 		// ----------------------------- 게터 함수들 ---------------------------

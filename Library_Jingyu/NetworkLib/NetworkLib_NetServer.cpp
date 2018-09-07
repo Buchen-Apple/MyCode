@@ -515,21 +515,21 @@ namespace Library_Jingyu
 
 		// 6. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
-		if (GetSessionUnLOCK(NowSession) == false)
-			return;
+		// 근데 따로 리턴값 받지 않고 있음
+		GetSessionUnLOCK(NowSession);
 	}
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 	// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 	//
-	// return true : 해당 유저에게 셧다운 잘 날림.
-	// return false : 접속중이지 않은 유저를 접속해제하려고 함. 즉 이미 삭제된 유저!
-	bool CNetServer::Disconnect(ULONGLONG ClinetID)
+	// Parameter : SessionID
+	// return : 없음
+	void CNetServer::Disconnect(ULONGLONG SessionID)
 	{
 		// 1. 세션 락 
-		stSession* DeleteSession = GetSessionLOCK(ClinetID);
+		stSession* DeleteSession = GetSessionLOCK(SessionID);
 		if (DeleteSession == nullptr)
-			return false;
+			return;
 
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
@@ -539,8 +539,6 @@ namespace Library_Jingyu
 		// 3. 세션 락 해제
 		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
 		GetSessionUnLOCK(DeleteSession);
-
-		return true;
 	}
 
 	///// 각종 게터함수들 /////
