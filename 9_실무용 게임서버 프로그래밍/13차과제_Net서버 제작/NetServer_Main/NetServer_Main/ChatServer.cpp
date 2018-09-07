@@ -33,8 +33,6 @@ CSystemLog* cChatLibLog = CSystemLog::GetInstance();
 // ------------- 공격 테스트용
 extern int m_SectorPosError;
 
-extern int m_SizeError;
-
 extern int m_SectorNoError;
 extern int m_ChatNoError;
 
@@ -43,9 +41,7 @@ extern int m_TypeError;
 extern int m_HeadCodeError;
 
 extern int m_ChackSumError;
-extern int m_NotPayloadDeq;
 extern int m_HeaderLenBig;
-extern int m_PayloadQueError;
 
 
 // -------------------------------------
@@ -126,6 +122,10 @@ bool CChatServer::SetFile(stConfigFile* pConfig)
 	if (Parser.GetValue_Int(_T("MaxJoinUser"), &pConfig->MaxJoinUser) == false)
 		return false;
 
+	// 로그 레벨
+	if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
+		return false;
+
 	return true;
 }
 
@@ -184,65 +184,71 @@ CChatServer::stPlayer* CChatServer::ErasePlayerFunc(ULONGLONG SessionID)
 	return ret;
 }
 
-// 섹터 기준 9방향 구하기
-// 인자로 받은 X,Y를 기준으로, 인자로 받은 구조체에 9방향을 넣어준다.
+// 인자로 받은 9개 섹터의 모든 유저(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 //
-// Parameter : 기준 SectorX, 기준 SectorY, (out)&stSectorCheck
+// parameter : 보낼 버퍼, 섹터 9개
 // return : 없음
-void CChatServer::GetSector(int SectorX, int SectorY, stSectorCheck* Sector)
+void CChatServer::SendPacket_Sector(int SectorX, int SectorY, CProtocolBuff_Net* SendBuff)
 {
+	// 1. 해당 유저 주변 9개 섹터 구함
 	int iCurX, iCurY;
 
+	// 인자로 받은 X기준, [ 좌 | 현재 | 우 ]를 체크해야 하기 때문에, 좌부터 체크하기 위해 X를 1 뺀다.
 	SectorX--;
-	SectorY--;
 
-	Sector->m_dwCount = 0;
+	// 인자로 받은 Y기준,  
+	// *************
+	//		상 
+	//	   현재	
+	//		하
+	// *************
+	// 를 체크해야 하기 때문에, 상부터 체크하기 위해 Y를 1 뺀다.
+	SectorY--;	
+
+	// Y 위치를 기준으로 상,현재,하 순서로 접근.
+	// 빠른 메모리 접근을 위해 Y부터 체크.
+	// 섹터 2차원 배열도, [Y][X] 순서로 관리중.
+	DWORD dwSectorX, dwSectorY;
 
 	for (iCurY = 0; iCurY < 3; iCurY++)
 	{
+		// SectorY위치가 정상을 벗어날 경우, (0보다 작거나, SECTOR_Y_COUNT보다 크거나 같을 경우)
+		// 섹터를 벗어났기 때문에 continue
 		if (SectorY + iCurY < 0 || SectorY + iCurY >= SECTOR_Y_COUNT)
 			continue;
 
 		for (iCurX = 0; iCurX < 3; iCurX++)
 		{
+			// SectorX위치가 정상을 벗어날 경우, (0보다 작거나, SECTOR_X_COUNT보다 크거나 같을 경우)
+			// 섹터를 벗어났기 때문에 continue
 			if (SectorX + iCurX < 0 || SectorX + iCurX >= SECTOR_X_COUNT)
-				continue;
+				continue;	
 
-			Sector->m_Sector[Sector->m_dwCount].x = SectorX + iCurX;
-			Sector->m_Sector[Sector->m_dwCount].y = SectorY + iCurY;
-			Sector->m_dwCount++;
+			// 2. 섹터를 구했으면, 해당 섹터의 모든 유저에게 보낸다.
+			dwSectorX = SectorX + iCurX;
+			dwSectorY = SectorY + iCurY;			
 
-		}
-	}
-}
+			auto NowSector = m_listSecotr[dwSectorY][dwSectorX];
 
-// 인자로 받은 9개 섹터의 모든 유저(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
-//
-// parameter : 보낼 버퍼, 섹터 9개
-// return : 없음
-void CChatServer::SendPacket_Sector(CProtocolBuff_Net* SendBuff, stSectorCheck* Sector)
-{
-	// 1. Sector안의 유저들에게 인자로 받은 패킷을 넣는다.
-	DWORD dwCount = Sector->m_dwCount;
-	for (DWORD i = 0; i < dwCount; ++i)
-	{
-		// 2. itor는 "i" 번째 섹터의 리스트를 가리킨다.
-		auto itor = m_listSecotr[Sector->m_Sector[i].y][Sector->m_Sector[i].x].begin();
-		auto Enditor = m_listSecotr[Sector->m_Sector[i].y][Sector->m_Sector[i].x].end();
+			auto itor = NowSector.begin();
+			auto Enditor = NowSector.end();
 
-		for (; itor != Enditor; ++itor)
-		{
-			// !! Sendpacket전에, 카운트 하나 증가 !!
+			// !! for문 돌기 전에 카운트를, 해당 섹터의 유저 수 만큼 증가 !!
 			// NetServer쪽에서, 완료 통지가 오면 Free를 하기 때문에 Add해야 한다.
-			SendBuff->Add();
+			SendBuff->Add((int)NowSector.size());
 
 			// SendPacket
-			SendPacket((*itor)->m_ullSessionID , SendBuff);
-
+			while (itor != Enditor)
+			{
+				SendPacket((*itor)->m_ullSessionID, SendBuff);
+				++itor;
+			}
 		}
-	}
+	}	
 
-
+	// 3. 패킷 Free
+	// !! Net서버쪽 완통에서 Free 하지만, 하나씩 증가시키면서 보냈기 때문에 1개가 더 증가한 상태. !!	
+	CProtocolBuff_Net::Free(SendBuff);
 }
 
 // 업데이트 스레드
@@ -284,10 +290,11 @@ UINT WINAPI	CChatServer::UpdateThread(LPVOID lParam)
 				g_this->m_ChatDump->Crash();
 
 			// 2. Type에 따라 로직 처리
-			// 분기 예측 성공률을 높이기 위해, 가장 많이 호출될 법 한 것부터 switch case문 상단에 배치.
+				// 분기 예측 성공률을 높이기 위해, 가장 많이 호출될 법 한 것부터 switch case문 상단에 배치.
 			switch (NowWork->m_wType)
 			{
 				// 패킷 처리
+				// 해당 타입 내부에서, 따로 try ~ catch로 처리.
 			case TYPE_PACKET:
 				g_this->Packet_Normal(NowWork->m_ullSessionID, NowWork->m_pPacket);
 
@@ -580,18 +587,10 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	SendBuff->PutData((char*)FindPlayer->m_tNickName, 40);
 	*SendBuff << MessageLen;
 	SendBuff->PutData((char*)Message, MessageLen);
-	
-	// 4) 해당 유저의 주변 9개 섹터 구함.
-	stSectorCheck SecCheck;
-	GetSector(FindPlayer->m_wSectorX, FindPlayer->m_wSectorY, &SecCheck);
 
-	// 5) 주변 유저에게 채팅 메시지 보냄
+	// 4) 주변 유저에게 채팅 메시지 보냄
 	// 모든 유저에게 보낸다 (채팅을 보낸 유저 포함)
-	SendPacket_Sector(SendBuff, &SecCheck);	
-
-	// 6) 패킷 Free
-	// !! Net서버쪽 완통에서 Free 하지만, SendPacket_Sector이 안에서 하나씩 증가시키면서 보냈기 때문에 1개가 더 증가한 상태. !!	
-	CProtocolBuff_Net::Free(SendBuff);
+	SendPacket_Sector(FindPlayer->m_wSectorX, FindPlayer->m_wSectorY, SendBuff);
 }
 
 
@@ -641,6 +640,7 @@ void CChatServer::Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Pack
 
 // 생성자
 CChatServer::CChatServer()
+	:CNetServer()
 {
 	// 할거 없음.
 	// NetServer의 생성자만 호출되면 됨.
@@ -661,10 +661,14 @@ CChatServer::~CChatServer()
 // return true : 성공
 bool CChatServer::ServerStart()
 {
-	//// ------------------- Config정보 셋팅
+	// ------------------- Config정보 셋팅
 	stConfigFile config;
 	if (SetFile(&config) == false)
 		return false;
+
+	// ------------------- 로그 저장할 파일 셋팅
+	cChatLibLog->SetDirectory(L"ChatServer");
+	cChatLibLog->SetLogLeve((CSystemLog::en_LogLevel)config.LogLevel);
 
 
 	// ------------------- 각종 리소스 할당
@@ -693,7 +697,10 @@ bool CChatServer::ServerStart()
 	// ------------------- 넷서버 가동
 	if (Start(config.BindIP, config.Port, config.CreateWorker, config.ActiveWorker, config.CreateAccept, config.Nodelay, config.MaxJoinUser,
 		config.HeadCode, config.XORCode1, config.XORCode2) == false)
-		return false;			
+		return false;		
+
+	// 서버 오픈 로그 찍기		
+	cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 	return true;
 }
@@ -798,11 +805,11 @@ void CChatServer::OnClientJoin(ULONGLONG SessionID)
 
 	InterlockedIncrement(&g_ullUpdateStructCount);
 
-	// 2.  세션 ID 채우기
-	NowMessage->m_ullSessionID = SessionID;
-
-	// 3. 타입 넣기
+	// 2. 타입 넣기
 	NowMessage->m_wType = TYPE_JOIN;
+
+	// 3.  세션 ID 채우기
+	NowMessage->m_ullSessionID = SessionID;	
 
 	// 4. 메시지를 큐에 넣는다.
 	m_LFQueue->Enqueue(NowMessage);	
@@ -817,7 +824,6 @@ void CChatServer::OnClientLeave(ULONGLONG SessionID)
 	// 호출 시점 : 유저가 서버에서 나갈 시
 	// 호출 위치 : NetServer의 워커스레드
 	// 하는 행동 : 컨텐츠가 들고있는 큐에, 유저 종료 메시지를 넣는다.
-
 
 	// 1. 일감 Alloc
 	st_WorkNode* NowMessage = m_MessagePool->Alloc();
@@ -842,7 +848,6 @@ void CChatServer::OnClientLeave(ULONGLONG SessionID)
 
 void CChatServer::OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
 {
-
 	// 호출 시점 : 유저에게 패킷을 받을 시
 	// 호출 위치 : NetServer의 워커스레드
 	// 하는 행동 : 컨텐츠가 들고있는 메시지 큐에, 데이터를 넣는다.	
@@ -882,28 +887,65 @@ void CChatServer::OnWorkerThreadEnd()
 {}
 
 void CChatServer::OnError(int error, const TCHAR* errorStr)
-{
-	// (네트워크) 페이로드만큼 디큐 실패
-	if (error == 15)
-		m_NotPayloadDeq++;
+{	
+	//// 로그 찍기 (로그 레벨 : 에러)
+	//cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+	//	errorStr, error);
 
-	// (네트워크) 헤더 코드 에러
-	else if (error == 21)
-		m_HeadCodeError++;
+	// 에러 코드에 따라 처리
+	switch (error)
+	{
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__IOCP_ERROR:
+		break;
 
-	// (네트워크) 체크썸 에러
-	else if (error == 22)
-		m_ChackSumError++;
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__NOT_FIND_CLINET:
+		break;
 
-	// (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
-	else if (error == 23)
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__WSASEND_FAIL:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__A_THREAD_IOCPCONNECT_FAIL:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__WFSO_ERROR:
+		break;
+
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__IOCP_IO_FAIL:
+		break;
+		
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__JOIN_USER_FULL:	
+		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"%s (ErrorCode : %d)",
+			errorStr, error);
+		break;
+
+		// (네트워크) 헤더 코드 에러
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__RECV_CODE_ERROR:
+		m_HeadCodeError++;		
+		break;
+
+		// (네트워크) 체크썸 에러
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR:
+		m_ChackSumError++;		
+		break;
+
+		// (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
+	case (int)CNetServer::euError::NETWORK_LIB_ERROR__RECV_LENBIG_ERROR:	
 		m_HeaderLenBig++;
+		break;
 
-	// (네트워크) 헤더의 Len만큼 디큐 실패
-	else if (error == 24)
-		m_PayloadQueError++;
-
-	// 로그 찍기 (로그 레벨 : 에러)
-	/*cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
-		errorStr, error);*/
+	default:
+		break;
+	}		
 }

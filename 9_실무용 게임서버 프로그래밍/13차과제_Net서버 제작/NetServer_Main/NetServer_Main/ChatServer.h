@@ -52,31 +52,21 @@ class CChatServer :public CNetServer
 		int XORCode2;
 		int Nodelay;
 		int MaxJoinUser;
-	};
-
-
-	// 섹터 정보를 담는 구조체
-	struct stSectorCheck
-	{
-		// 몇 개의 Sector Index가 저장되어 있는지
-		DWORD m_dwCount;
-
-		// 섹터의 X,Y 인덱스 좌표 저장.
-		POINT m_Sector[9];
-	};
+		int LogLevel;
+	};	
 
 	// 플레이어 구조체
 	struct stPlayer
 	{
+		// 세션 ID (네트워크와 통신 시 사용하는 키값)
+		ULONGLONG m_ullSessionID;
+
 		// 섹터 좌표 X,Y
 		WORD m_wSectorX;
 		WORD m_wSectorY;
 
 		// 유저 고유 값
-		INT64 m_i64AccountNo;
-
-		// 세션 ID (네트워크와 통신 시 사용하는 키값)
-		ULONGLONG m_ullSessionID;
+		INT64 m_i64AccountNo;		
 
 		// 유저 ID (로그인 시 사용하는 ID)
 		WCHAR m_tLoginID[20];
@@ -164,18 +154,11 @@ private:
 	//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 	stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
 
-	// 섹터 기준 9방향 구하기
-	// 인자로 받은 X,Y를 기준으로, 인자로 받은 구조체에 9방향을 넣어준다.
-	//
-	// Parameter : 기준 SectorX, 기준 SectorY, (out)&stSectorCheck
-	// return : 없음
-	void GetSector(int SectorX, int SectorY, stSectorCheck* Sector);
-
 	// 인자로 받은 9개 섹터의 모든 유저(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 	//
 	// parameter : 보낼 버퍼, 섹터 9개
 	// return : 없음
-	void SendPacket_Sector(CProtocolBuff_Net* SendBuff, stSectorCheck* Sector);
+	void SendPacket_Sector(int SectorX, int SectorY, CProtocolBuff_Net* SendBuff);
 
 	// 업데이트 스레드
 	static UINT	WINAPI	UpdateThread(LPVOID lParam);
@@ -261,7 +244,7 @@ public:
 	CChatServer();
 
 	//소멸자
-	~CChatServer();
+	virtual ~CChatServer();
 
 	// 채팅 서버 시작 함수
 	// 내부적으로 NetServer의 Start도 같이 호출

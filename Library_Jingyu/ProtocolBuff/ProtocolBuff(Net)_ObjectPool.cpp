@@ -531,6 +531,14 @@ namespace Library_Jingyu
 		InterlockedIncrement(&m_RefCount);
 	}
 
+	// 레퍼런스 카운트를 인자로 받아서 Add하는 함수
+	// 위의 Add함수 오버로딩
+	void CProtocolBuff_Net::Add(int Count)
+	{
+		// 인터락으로 안전하게 증가
+		InterlockedAdd(&m_RefCount, Count);
+	}
+
 
 
 
