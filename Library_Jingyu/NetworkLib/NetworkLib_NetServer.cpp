@@ -812,7 +812,11 @@ namespace Library_Jingyu
 			// I/O카운트 감소 및 삭제 처리
 			// -----------------
 			// I/O카운트 감소 후, 0이라면접속 종료
-			if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+			int Test = InterlockedDecrement(&stNowSession->m_lIOCount);
+			if (Test < 0)
+				cNetDump->Crash();
+
+			else if (Test == 0)
 				g_This->InDisconnect(stNowSession);
 
 		}
@@ -878,17 +882,17 @@ namespace Library_Jingyu
 			{
 				closesocket(client_sock);
 
-				// 그게 아니라면 OnError 함수 호출
-				// 내 에러 보관
-				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__JOIN_USER_FULL;
+				//// 그게 아니라면 OnError 함수 호출
+				//// 내 에러 보관
+				//g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__JOIN_USER_FULL;
 
-				// 에러 스트링 만들고
-				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, L"accpet(). User Full!!!! (%d)",
-					g_This->m_ullJoinUserCount);
+				//// 에러 스트링 만들고
+				//TCHAR tcErrorString[300];
+				//StringCchPrintf(tcErrorString, 300, L"accpet(). User Full!!!! (%d)",
+				//	g_This->m_ullJoinUserCount);
 
-				// 에러 발생 함수 호출
-				g_This->OnError((int)euError::NETWORK_LIB_ERROR__JOIN_USER_FULL, tcErrorString);
+				//// 에러 발생 함수 호출
+				//g_This->OnError((int)euError::NETWORK_LIB_ERROR__JOIN_USER_FULL, tcErrorString);
 
 				// continue
 				continue;				
@@ -986,7 +990,11 @@ namespace Library_Jingyu
 			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
 			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
-			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
+			int Test = InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount);
+			if (Test < 0)
+				cNetDump->Crash();
+
+			else if (Test == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
 		}
 
@@ -1007,8 +1015,12 @@ namespace Library_Jingyu
 		// 2. I/O 카운트 1 증가.	
 		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
 		{
-			// 감소한 값이 0이면서, inDIsconnect 호출
-			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+			int Test = InterlockedDecrement(&retSession->m_lIOCount);
+			if (Test < 0)
+				cNetDump->Crash();
+
+			// 감소한 값이 0이면, inDIsconnect 호출
+			else if (Test == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
@@ -1019,7 +1031,11 @@ namespace Library_Jingyu
 		{
 			// 아니라면 I/O 카운트 1 감소
 			// 감소한 값이 0이면서, inDIsconnect 호출
-			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+			int Test = InterlockedDecrement(&retSession->m_lIOCount);
+			if (Test < 0)
+				cNetDump->Crash();
+
+			else if (Test == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
@@ -1028,9 +1044,13 @@ namespace Library_Jingyu
 		// 4. Release Flag 체크
 		if (retSession->m_lReleaseFlag == TRUE)
 		{
+			int Test = InterlockedDecrement(&retSession->m_lIOCount);
+			if (Test < 0)
+				cNetDump->Crash();
+
 			// 이미 Release된 유저라면, I/O 카운트 1 감소
 			// 감소한 값이 0이면서, inDIsconnect 호출
-			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+			else if (Test == 0)
 				InDisconnect(retSession);
 
 			return nullptr;
@@ -1049,7 +1069,11 @@ namespace Library_Jingyu
 	bool 	CNetServer::GetSessionUnLOCK(stSession* NowSession)
 	{
 		// 1. I/O 카운트 1 감소
-		if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+		int Test = InterlockedDecrement(&NowSession->m_lIOCount);
+		if (Test < 0)
+			cNetDump->Crash();
+
+		else if (Test == 0)
 		{
 			// 감소 시 0이면 삭제로직
 			InDisconnect(NowSession);
@@ -1263,8 +1287,13 @@ namespace Library_Jingyu
 			// 비동기 입출력이 시작된게 아니라면
 			if (Error != WSA_IO_PENDING)
 			{
+				int Test = InterlockedDecrement(&NowSession->m_lIOCount);
+
+				if (Test < 0)
+					cNetDump->Crash();
+
 				// I/O카운트 1감소.I/O 카운트가 0이라면 접속 종료.
-				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+				else if (Test == 0)
 				{
 					InDisconnect(NowSession);
 					return false;
@@ -1378,8 +1407,12 @@ namespace Library_Jingyu
 				// 비동기 입출력이 시작된게 아니라면
 				if (Error != WSA_IO_PENDING)
 				{
+					int Test = InterlockedDecrement(&NowSession->m_lIOCount);
+					if (Test < 0)
+						cNetDump->Crash();
+
 					// IOcount 하나 감소. I/O 카운트가 0이라면 접속 종료.
-					if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+					else if (Test == 0)
 					{
 						InDisconnect(NowSession);
 						return false;
