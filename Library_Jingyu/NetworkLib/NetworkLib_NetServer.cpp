@@ -16,8 +16,12 @@
 #include "Log\Log.h"
 #include "LockFree_Queue\LockFree_Queue.h"
 
-extern ULONGLONG g_ullAcceptTotal;
-extern LONG	  g_lAcceptTPS;
+ULONGLONG g_ullAcceptTotal;
+LONG	  g_lAcceptTPS;
+
+
+LONG	g_lSendPostTPS;
+LONG	g_lRecvPostTPS;
 
 
 namespace Library_Jingyu
@@ -35,7 +39,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER	5
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
-#define dfSENDPOST_MAX_WSABUF			200
+#define dfSENDPOST_MAX_WSABUF			500
 
 
 	// ------------------------------
@@ -782,6 +786,8 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
+
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
@@ -1196,6 +1202,8 @@ namespace Library_Jingyu
 				// 접속이 끊길 유저이니 더는 아무것도 안하고 리턴
 				return;
 			}
+
+			InterlockedIncrement(&g_lRecvPostTPS);
 
 			// 11. Recv받은 데이터의 헤더 타입에 따라 분기처리.
 			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
