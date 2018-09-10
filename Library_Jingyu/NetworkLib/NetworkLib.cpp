@@ -32,7 +32,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE	2
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
-#define dfSENDPOST_MAX_WSABUF			200
+#define dfSENDPOST_MAX_WSABUF			300
 
 
 	// ------------------------------

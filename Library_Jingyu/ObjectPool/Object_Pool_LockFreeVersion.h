@@ -7,7 +7,7 @@
 #include "CrashDump\CrashDump.h"
 
 
-extern LONG g_lAllocNodeCount;
+
 
 namespace Library_Jingyu
 {
@@ -213,14 +213,16 @@ namespace Library_Jingyu
 			if (m_bPlacementNew == false)
 				deleteNode->stData.~DATA();
 
+			free(deleteNode);
+
 			// m_iBlockNum가 0이라면, 낱개로 Malloc했으니(Alloc시 마다 생성했음. Free()에서는 소멸자만 호출하고, 메모리 해제는 안함.) free한다.
-			if (m_iBlockNum == 0)
-				free(deleteNode);
+			/*if (m_iBlockNum == 0)
+				free(deleteNode);*/
 		}
 
 		//  m_iBlockNum가 0보다 크다면, 한 번에 malloc 한 것이니 한번에 free한다.
-		if (m_iBlockNum > 0)
-			free(m_Memory);
+		/*if (m_iBlockNum > 0)
+			free(m_Memory);*/
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -243,26 +245,41 @@ namespace Library_Jingyu
 			//////////////////////////////////
 			if (m_stpTop.m_pTop == nullptr)
 			{
-				if (m_iBlockNum > 0)
-					return nullptr;
+				// 새로 만든다.
+				st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
+				pNode->stpNextBlock = NULL;
+				pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
-				// m_iBlockNum <= 0 라면, 유저가 갯수 제한을 두지 않은것. 
-				// 새로 생성한다.
-				else
-				{
-					st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
-					pNode->stpNextBlock = NULL;
-					pNode->stMyCode = MEMORYPOOL_ENDCODE;
+				// 플레이스먼트 뉴 호출
+				new (&pNode->stData) DATA();
 
-					// 플레이스먼트 뉴 호출
-					new (&pNode->stData) DATA();
+				// alloc카운트, 유저 사용중 카운트 증가
+				m_iAllocCount++;
+				InterlockedIncrement(&m_iUseCount);
 
-					// alloc카운트, 유저 사용중 카운트 증가
-					InterlockedIncrement(&m_iAllocCount);
-					InterlockedIncrement(&m_iUseCount);
+				return &pNode->stData;
 
-					return &pNode->stData;
-				}
+
+				//if (m_iBlockNum > 0)
+				//	return nullptr;
+
+				//// m_iBlockNum <= 0 라면, 유저가 갯수 제한을 두지 않은것. 
+				//// 새로 생성한다.
+				//else
+				//{
+				//	st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
+				//	pNode->stpNextBlock = NULL;
+				//	pNode->stMyCode = MEMORYPOOL_ENDCODE;
+
+				//	// 플레이스먼트 뉴 호출
+				//	new (&pNode->stData) DATA();
+
+				//	// alloc카운트, 유저 사용중 카운트 증가
+				//	InterlockedIncrement(&m_iAllocCount);
+				//	InterlockedIncrement(&m_iUseCount);
+
+				//	return &pNode->stData;
+				//}
 			}
 
 			//////////////////////////////////
@@ -388,7 +405,7 @@ namespace Library_Jingyu
 		struct stChunk
 		{	
 
-#define NODE_COUNT 1000	// 1개의 청크가 다루는 노드의 수			
+#define NODE_COUNT 300	// 1개의 청크가 다루는 노드의 수			
 
 			// 청크 멤버변수
 
@@ -591,8 +608,6 @@ namespace Library_Jingyu
 				m_TLSDump->Crash();
 			}
 		}	
-
-		InterlockedIncrement(&g_lAllocNodeCount);
 			
 		// 만약, Top이 NODE_COUNT보다 크거나 같다면 뭔가 잘못된것.
 		// 이 전에 이미 캐치되었어야 함
@@ -639,13 +654,7 @@ namespace Library_Jingyu
 
 		// 내가 할당한 블럭이 맞는지 확인
 		if (((Node*)pData)->stMyCode != MEMORYPOOL_ENDCODE)
-		{
-			
-
 			m_TLSDump->Crash();
-		}
-
-		InterlockedDecrement(&g_lAllocNodeCount);
 
 		// FreeRefCount 1 증가
 		// 만약 NODE_COUNT가 되면 청크 내부 내용 초기화 후 청크 관리 메모리풀로 Free

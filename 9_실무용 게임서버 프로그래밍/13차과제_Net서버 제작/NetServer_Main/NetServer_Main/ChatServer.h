@@ -8,9 +8,8 @@
 #include "LockFree_Queue\LockFree_Queue.h"
 #include "Parser\Parser_Class.h"
 
-
-#include <map>
-#include <list>
+#include <vector>
+#include <unordered_map>
 
 
 // 1개 맵의 섹터 수
@@ -27,9 +26,16 @@ using namespace std;
 ////////////////////////////////////////////
 class CChatServer :public CNetServer
 {
+
 	// -------------------------------------
 	// inner 구조체
 	// -------------------------------------
+	// 미리 섹터 9개를 구해두는 구조체
+	struct st_SecotrSaver
+	{
+		POINT m_Sector[9];
+		LONG m_dwCount;
+	};	
 
 	// 일감 구조체
 	struct st_WorkNode
@@ -102,10 +108,29 @@ private:
 	// 플레이어 구조체를 다루는 map
 	// Key : SessionID
 	// Value : stPlayer*
-	map<ULONGLONG, stPlayer*> m_mapPlayer;
+	// 
+	// 선택 이유 ---
+	// 해당 자료구조를 이용해 [삽입, 삭제, 검색]을 주로 사용.
+	// 이 중, 플레이어 접속, 접속해제(삽입, 삭제) 시에는 조금 느려도 괜찮다고 판단.
+	// 핵심은 플레이 중인 유저의 정보를 얼마나 빠르게 처리하는가가 핵심. 
+	// 추가로 딱히 데이터가 정렬되어 있을 필요도 없음
+	// 때문에 umap을 선택
+	unordered_map<ULONGLONG, stPlayer*> m_mapPlayer;
 
-	// 섹터 리스트
-	list< stPlayer*> m_listSecotr[SECTOR_Y_COUNT][SECTOR_X_COUNT];	
+	// 섹터 vector
+	// 요소 : stPlayer*
+	//
+	// 선택 이유 ---
+	// 해당 자료구조를 이용해 [삽입, 삭제, 순회]를 주로 사용
+	// 이 중, 주변 섹터에 채팅 메시지를 발송하는 "순회"를 핵심으로 판단.
+	// 삽입, 삭제의 경우, push_pack, pop_pack 으로 하면 O(1)의 속도
+	// 딱히 정렬될 필요가 없기 때문에, 삽입 시에는 그냥 push_back으로 넣으면 된다.
+	// 문제는 pop_back인데, 이 경우, 빠른 순회를 통해, (배열의 경우, 처음 시작 위치에서 +하면서 위치를 이동하기때문에 순회가 굉장히 빠르다.)
+	// 삭제하고자 하는 요소와 마지막 요소를 swap 후, 마지막 요소를 pop_back하는 형태로 해결.
+	vector<stPlayer*> m_vectorSecotr[SECTOR_Y_COUNT][SECTOR_X_COUNT];
+
+	//  X,Y 기준, 9개의 섹터를 미리 구해서 저장해두는 배열
+	st_SecotrSaver* m_stSectorSaver[SECTOR_Y_COUNT][SECTOR_X_COUNT];
 	
 	// 업데이트 스레드 핸들
 	HANDLE hUpdateThraed;
@@ -114,14 +139,15 @@ private:
 	HANDLE UpdateThreadEvent;
 
 	// 업데이트 스레드 종료 용도 Event
-	HANDLE UpdateThreadEXITEvent;
-	   	  
+	HANDLE UpdateThreadEXITEvent;	   	  
 
 private:
 	// -------------------------------------
 	// 클래스 내부에서만 사용하는 기능 함수
-	// -------------------------------------
-	
+	// -------------------------------------	
+
+	void SecotrSave(int SectorX, int SectorY, st_SecotrSaver* Sector);
+
 	// 파일에서 Config 정보 읽어오기
 	// 
 	// 
@@ -154,9 +180,9 @@ private:
 	//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 	stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
 
-	// 인자로 받은 9개 섹터의 모든 유저(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
+	// 인자로 받은 섹터 X,Y 주변 9개 섹터의 유저들(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 	//
-	// parameter : 보낼 버퍼, 섹터 9개
+	// parameter : 섹터 x,y, 보낼 버퍼
 	// return : 없음
 	void SendPacket_Sector(int SectorX, int SectorY, CProtocolBuff_Net* SendBuff);
 
@@ -284,7 +310,6 @@ public:
 	}
 
 
-
 	// !! 테스트용 !!
 	// 플레이어 TLS의 총 할당된 청크 수 반환
 	LONG GetPlayerChunkCount()
@@ -298,7 +323,6 @@ public:
 	{
 		return m_PlayerPool->GetOutChunkCount();
 	}
-
 };
 
 

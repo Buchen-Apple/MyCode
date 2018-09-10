@@ -1,11 +1,7 @@
 ﻿  stdafx.cpp
   ProtocolBuff.cpp
-c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.cpp(71): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-  RingBuff_20180627.cpp
+c:\git_public\library_jingyu\protocolbuff\protocolbuff.cpp(246): fatal error C1010: 미리 컴파일된 헤더를 찾는 동안 예기치 않은 파일의 끝이 나타났습니다. '#include "stdafx.h"'을(를) 소스에 추가하시겠습니까?
+  RingBuff_20180723.cpp
+c1xx : fatal error C1083: 소스 파일을 열 수 없습니다. '..\..\..\..\Library_Jingyu\RingBuff\RingBuff_20180723.cpp': No such file or directory
   ConsoleApplication1.cpp
-c:\users\procademy\source\repos\library_jingyu\protocolbuff\protocolbuff.h(52): warning C4290: 함수가 __declspec(nothrow)가 아님을 나타내려는 경우를 제외하고 C++ 예외 사양은 무시됩니다.
-  코드를 생성하고 있습니다.
-  All 44 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  코드를 생성했습니다.
-  ConsoleApplication1.vcxproj -> C:\Users\procademy\source\repos\9_실무용 게임서버 프로그래밍\2차과제_DBWriteThread 연습\ConsoleApplication1\x64\Release\ConsoleApplication1.exe
+c:\git_public\9_실무용 게임서버 프로그래밍\2차과제_dbwritethread 연습\consoleapplication1\consoleapplication1\consoleapplication1.cpp(10): fatal error C1083: 포함 파일을 열 수 없습니다. 'Mysql\include\mysql.h': No such file or directory

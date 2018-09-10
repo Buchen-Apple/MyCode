@@ -18,10 +18,7 @@
 
 ULONGLONG g_ullAcceptTotal;
 LONG	  g_lAcceptTPS;
-
-
 LONG	g_lSendPostTPS;
-LONG	g_lRecvPostTPS;
 
 
 namespace Library_Jingyu
@@ -39,7 +36,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER	5
 
 	// 한 번에 샌드할 수 있는 WSABUF의 카운트
-#define dfSENDPOST_MAX_WSABUF			500
+#define dfSENDPOST_MAX_WSABUF			300
 
 
 	// ------------------------------
@@ -106,7 +103,7 @@ namespace Library_Jingyu
 		// 생성자 
 		stSession()
 		{
-			m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(4096, false);
+			m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(1024, false);
 			m_lIOCount = 0;
 			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
@@ -786,6 +783,8 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+				// !! 테스트 출력용 !!
+				// sendpost 추가
 				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
@@ -812,13 +811,8 @@ namespace Library_Jingyu
 			// I/O카운트 감소 및 삭제 처리
 			// -----------------
 			// I/O카운트 감소 후, 0이라면접속 종료
-			int Test = InterlockedDecrement(&stNowSession->m_lIOCount);
-			if (Test < 0)
-				cNetDump->Crash();
-
-			else if (Test == 0)
+			if(InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
 				g_This->InDisconnect(stNowSession);
-
 		}
 		return 0;
 	}
@@ -990,12 +984,8 @@ namespace Library_Jingyu
 			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
 			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
-			int Test = InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount);
-			if (Test < 0)
-				cNetDump->Crash();
-
-			else if (Test == 0)
-				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
+			if(InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
+				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);			
 		}
 
 		return 0;
@@ -1015,13 +1005,10 @@ namespace Library_Jingyu
 		// 2. I/O 카운트 1 증가.	
 		if (InterlockedIncrement(&retSession->m_lIOCount) == 1)
 		{
-			int Test = InterlockedDecrement(&retSession->m_lIOCount);
-			if (Test < 0)
-				cNetDump->Crash();
-
-			// 감소한 값이 0이면, inDIsconnect 호출
-			else if (Test == 0)
-				InDisconnect(retSession);
+			// I/O 카운트가 1이라면 다시 --
+			// 감소한 값이 0이면서, inDIsconnect 호출
+			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);			
 
 			return nullptr;
 		}	
@@ -1031,12 +1018,8 @@ namespace Library_Jingyu
 		{
 			// 아니라면 I/O 카운트 1 감소
 			// 감소한 값이 0이면서, inDIsconnect 호출
-			int Test = InterlockedDecrement(&retSession->m_lIOCount);
-			if (Test < 0)
-				cNetDump->Crash();
-
-			else if (Test == 0)
-				InDisconnect(retSession);
+			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);		
 
 			return nullptr;
 		}
@@ -1044,14 +1027,8 @@ namespace Library_Jingyu
 		// 4. Release Flag 체크
 		if (retSession->m_lReleaseFlag == TRUE)
 		{
-			int Test = InterlockedDecrement(&retSession->m_lIOCount);
-			if (Test < 0)
-				cNetDump->Crash();
-
-			// 이미 Release된 유저라면, I/O 카운트 1 감소
-			// 감소한 값이 0이면서, inDIsconnect 호출
-			else if (Test == 0)
-				InDisconnect(retSession);
+			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);		
 
 			return nullptr;
 		}					
@@ -1069,16 +1046,8 @@ namespace Library_Jingyu
 	bool 	CNetServer::GetSessionUnLOCK(stSession* NowSession)
 	{
 		// 1. I/O 카운트 1 감소
-		int Test = InterlockedDecrement(&NowSession->m_lIOCount);
-		if (Test < 0)
-			cNetDump->Crash();
-
-		else if (Test == 0)
-		{
-			// 감소 시 0이면 삭제로직
-			InDisconnect(NowSession);
-			return false;
-		}
+		if(InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+			InDisconnect(NowSession);		
 
 		return true;
 	}
@@ -1227,8 +1196,6 @@ namespace Library_Jingyu
 				return;
 			}
 
-			InterlockedIncrement(&g_lRecvPostTPS);
-
 			// 11. Recv받은 데이터의 헤더 타입에 따라 분기처리.
 			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
@@ -1287,17 +1254,11 @@ namespace Library_Jingyu
 			// 비동기 입출력이 시작된게 아니라면
 			if (Error != WSA_IO_PENDING)
 			{
-				int Test = InterlockedDecrement(&NowSession->m_lIOCount);
-
-				if (Test < 0)
-					cNetDump->Crash();
-
-				// I/O카운트 1감소.I/O 카운트가 0이라면 접속 종료.
-				else if (Test == 0)
+				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 				{
 					InDisconnect(NowSession);
 					return false;
-				}
+				}				
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
 				if (Error == WSAENOBUFS)
@@ -1407,17 +1368,12 @@ namespace Library_Jingyu
 				// 비동기 입출력이 시작된게 아니라면
 				if (Error != WSA_IO_PENDING)
 				{
-					int Test = InterlockedDecrement(&NowSession->m_lIOCount);
-					if (Test < 0)
-						cNetDump->Crash();
-
-					// IOcount 하나 감소. I/O 카운트가 0이라면 접속 종료.
-					else if (Test == 0)
+					if(InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 					{
 						InDisconnect(NowSession);
 						return false;
 					}
-
+					
 					// 에러가 버퍼 부족이라면
 					if (Error == WSAENOBUFS)
 					{
