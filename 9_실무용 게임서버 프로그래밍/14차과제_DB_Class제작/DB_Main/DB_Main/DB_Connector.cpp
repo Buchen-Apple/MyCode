@@ -6,8 +6,8 @@
 
 namespace Library_Jingyu
 {
+#define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
-#define 
 	CCrashDump* g_DBDump = CCrashDump::GetInstance();
 
 	//////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ namespace Library_Jingyu
 	CDBConnector::CDBConnector(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort)
 	{
 		// -----------------------------------
-		// 인자값들을 멤버변수에 저장
+		// 인자값들 멤버변수에 저장
 		// 저장하다 실패하면 크래시.
 		// 여기서 실패하는건 그냥 코드실수이니 말도안됨.
 		// -----------------------------------
@@ -109,8 +109,10 @@ namespace Library_Jingyu
 	bool	CDBConnector::Disconnect()
 	{
 		// 디비에 연결되어 있을 경우, 연결 해제
-		if(m_pMySQL != nullptr)
+		if (m_pMySQL != nullptr)
 			mysql_close(m_pMySQL);
+
+		return true;
 	}
 
 
@@ -125,11 +127,8 @@ namespace Library_Jingyu
 		WideCharToMultiByte(CP_UTF8, 0, szStringFormat, (int)_tcslen(szStringFormat), m_cQueryUTF8, len, NULL, NULL);
 
 		// 2. 유니코드 저장용 멤버변수에 보관. 차후 로그를 찍거나 하는 등을 할때는 유니코드가 필요
-		if (StringCbCopy(m_wcQuery, eQUERY_MAX_LEN, szStringFormat) != S_OK)
-		{
-			// 카피 실패 시 이유 보관 후, false 리턴
-			return false;
-		}
+		if(StringCbCopy(m_wcQuery, eQUERY_MAX_LEN, szStringFormat) != S_OK)
+			g_DBDump->Crash();
 
 		// 3. 쿼리 날리기
 		int Error = mysql_query(m_pMySQL, m_cQueryUTF8);
@@ -160,13 +159,13 @@ namespace Library_Jingyu
 		// 5회 연결 시도했는데도 연결 실패면, 에러 찍고 리턴 false.
 		if (m_pMySQL == NULL)
 		{
-			printf("DBQuery()1. Mysql connection error : %s(%d)\n", mysql_error(&m_MySQL), mysql_errno(&m_MySQL));
+			SaveLastError();
 			return false;
 		}
 
 
 		// 4. 결과 받아두기
-		// 밖에서 Query_Save() 함수를 호출해서 사용.
+		// 밖에서 FetchRow() 함수를 호출해서 사용.
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 
 		return true;
@@ -214,10 +213,10 @@ namespace Library_Jingyu
 			Sleep(0);
 		}
 
-		// 5회 연결 시도했는데도 연결 실패면, 에러 찍고 리턴 false.
+		// 5회 연결 시도했는데도 연결 실패면, 멤버변수에 에러 메시지 저장 후, 리턴 false.
 		if (m_pMySQL == NULL)
 		{
-			printf("DBQuery()1. Mysql connection error : %s(%d)\n", mysql_error(&m_MySQL), mysql_errno(&m_MySQL));
+			SaveLastError();
 			return false;
 		}
 
@@ -238,8 +237,9 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	MYSQL_ROW	CDBConnector::FetchRow()
 	{
-		// 1 줄 단위로 넘긴다.
-		mysql_fetch_row(m_pSqlResult);
+		// 줄 단위로 넘긴다.
+		// 결과가 없으면 자동으로 NULL이 리턴된다.
+		return mysql_fetch_row(m_pSqlResult);
 	}
 
 	//////////////////////////////////////////////////////////////////////
@@ -256,7 +256,12 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	void	CDBConnector::SaveLastError()
 	{
+		// 에러 넘버 보관
+		m_iLastError = mysql_errno(&m_MySQL);
 
+		// 에러 메시지 보관
+		StringCbPrintf(m_wcLastErrorMsg, _MyCountof(m_wcLastErrorMsg), 
+			L"Mysql error : %s\n", mysql_error(&m_MySQL));
 	}
 
 }

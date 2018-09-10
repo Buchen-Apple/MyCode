@@ -221,9 +221,9 @@ void CChatServer::SendPacket_Sector(int SectorX, int SectorY, CProtocolBuff_Net*
 	DWORD i = 0;
 	while (i < dwCount)
 	{
-		auto NowSector = m_vectorSecotr[m_stSectorSaver[SectorY][SectorX]->m_Sector[i].y][m_stSectorSaver[SectorY][SectorX]->m_Sector[i].x];
+		auto NowSector = &m_vectorSecotr[m_stSectorSaver[SectorY][SectorX]->m_Sector[i].y][m_stSectorSaver[SectorY][SectorX]->m_Sector[i].x];
 
-		size_t Size = NowSector.size();
+		size_t Size = NowSector->size();
 		if (Size > 0)
 		{
 			// !! for문 돌기 전에 카운트를, 해당 섹터의 유저 수 만큼 증가 !!
@@ -233,31 +233,12 @@ void CChatServer::SendPacket_Sector(int SectorX, int SectorY, CProtocolBuff_Net*
 			size_t Index = 0;
 			while (Index < Size)
 			{
-				SendPacket(NowSector[Index]->m_ullSessionID, SendBuff);
+				SendPacket((*NowSector)[Index], SendBuff);
 				Index++;
 			}
 		}
 
 		i++;		
-
-
-		//auto NowSector = m_vectorSecotr[m_stSectorSaver[SectorY][SectorX]->m_Sector[i].y][m_stSectorSaver[SectorY][SectorX]->m_Sector[i].x];
-		//
-		//auto itor = NowSector.begin();
-		//auto Enditor = NowSector.end();
-
-		//// !! for문 돌기 전에 카운트를, 해당 섹터의 유저 수 만큼 증가 !!
-		//// NetServer쪽에서, 완료 통지가 오면 Free를 하기 때문에 Add해야 한다.
-		//SendBuff->Add((int)NowSector.size());
-
-		//// SendPacket
-		//while (itor != Enditor)
-		//{
-		//	SendPacket((*itor)->m_ullSessionID, SendBuff);
-		//	++itor;
-		//}
-
-		//i++;		
 	}
 
 	// 3. 패킷 Free
@@ -295,7 +276,7 @@ UINT WINAPI	CChatServer::UpdateThread(LPVOID lParam)
 		// 만약, 종료 신호가 왔다면업데이트 스레드 종료.
 		else if (Check == WAIT_OBJECT_0)
 			break;		
-		
+
 		// ----------------- 일감 있으면 일한다.
 		// 일감 수를 스냅샷으로 받아둔다.
 		// 해당 일감만큼만 처리하고 자러간다.
@@ -332,16 +313,16 @@ UINT WINAPI	CChatServer::UpdateThread(LPVOID lParam)
 
 			default:
 				break;
-			}					
+			}	
+
+			--Size;
 
 			// 3. 일감 Free
-			g_this->m_MessagePool->Free(NowWork);
-
+			g_this->m_MessagePool->Free(NowWork);			
+			InterlockedAdd(&g_lUpdateStructCount, -1);			
 			InterlockedAdd(&g_lUpdateTPS, 1);
-			InterlockedAdd(&g_lUpdateStructCount, -1);
-
-			--Size;			
 		}		
+		
 	}
 
 	printf("UpdateThread Exit!!\n");
@@ -410,7 +391,7 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 		size_t Size = NowSector->size();
 
 		// -- 마지막 요소가 내가 찾고자 하는 유저이거나, 유저가 1명뿐이라면 사이즈를 1 줄인다.
-		if (Size == 1 || (*NowSector)[Size - 1]->m_ullSessionID == SessionID)
+		if (Size == 1 || (*NowSector)[Size - 1] == SessionID)
 			NowSector->pop_back();
 
 		// 아니라면 swap 한다
@@ -419,9 +400,9 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 			size_t Index = 0;
 			while (Index < Size)
 			{
-				if ((*NowSector)[Index]->m_ullSessionID == SessionID)
+				if ((*NowSector)[Index] == SessionID)
 				{
-					stPlayer* Temp = (*NowSector)[Size - 1];
+					ULONGLONG Temp = (*NowSector)[Size - 1];
 					(*NowSector)[Size - 1] = (*NowSector)[Index];
 					(*NowSector)[Index] = Temp;
 					NowSector->pop_back();
@@ -429,6 +410,7 @@ void CChatServer::Packet_Leave(ULONGLONG SessionID)
 
 					break;
 				}
+				
 				++Index;
 
 			}
@@ -567,7 +549,7 @@ void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Pac
 		size_t Size = NowSector->size();
 
 		// -- 마지막 요소가 내가 찾고자 하는 유저이거나, 유저가 1명뿐이라면 사이즈를 1 줄인다.
-		if (Size == 1 || (*NowSector)[Size - 1]->m_ullSessionID == SessionID)			
+		if (Size == 1 || (*NowSector)[Size - 1] == SessionID)			
 			NowSector->pop_back();
 
 		// 아니라면 swap 한다
@@ -576,18 +558,18 @@ void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Pac
 			size_t Index = 0;
 			while (Index < Size)
 			{
-				if ((*NowSector)[Index]->m_ullSessionID == SessionID)
+				if ((*NowSector)[Index] == SessionID)
 				{
-					stPlayer* Temp = (*NowSector)[Size - 1];
+					ULONGLONG Temp = (*NowSector)[Size - 1];
 					(*NowSector)[Size - 1] = (*NowSector)[Index];
 					(*NowSector)[Index] = Temp;		
 					NowSector->pop_back();
 
 
 					break;
-				}
-				++Index;
+				}	
 
+				++Index;
 			}
 		}		
 	}
@@ -597,7 +579,7 @@ void CChatServer::Packet_Sector_Move(ULONGLONG SessionID, CProtocolBuff_Net* Pac
 	FindPlayer->m_wSectorY = wSectorY;
 
 	// 새로운 색터에 유저 추가
-	m_vectorSecotr[wSectorY][wSectorX].push_back(FindPlayer);
+	m_vectorSecotr[wSectorY][wSectorX].push_back(SessionID);
 
 	// 5) 클라이언트에게 보낼 패킷 조립 (섹터 이동 결과)
 	CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -659,7 +641,6 @@ void CChatServer::Packet_Chat_Message(ULONGLONG SessionID, CProtocolBuff_Net* Pa
 	// 4) 주변 유저에게 채팅 메시지 보냄
 	// 모든 유저에게 보낸다 (채팅을 보낸 유저 포함)
 	SendPacket_Sector(FindPlayer->m_wSectorX, FindPlayer->m_wSectorY, SendBuff);
-	//SendPacket(SessionID, SendBuff);
 }
 
 

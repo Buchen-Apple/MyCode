@@ -117,7 +117,7 @@ private:
 	unordered_map<ULONGLONG, stPlayer*> m_mapPlayer;
 
 	// 섹터 vector
-	// 요소 : stPlayer*
+	// 요소 : SessionID
 	//
 	// 선택 이유 ---
 	// 해당 자료구조를 이용해 [삽입, 삭제, 순회]를 주로 사용
@@ -126,7 +126,7 @@ private:
 	// 딱히 정렬될 필요가 없기 때문에, 삽입 시에는 그냥 push_back으로 넣으면 된다.
 	// 문제는 pop_back인데, 이 경우, 빠른 순회를 통해, (배열의 경우, 처음 시작 위치에서 +하면서 위치를 이동하기때문에 순회가 굉장히 빠르다.)
 	// 삭제하고자 하는 요소와 마지막 요소를 swap 후, 마지막 요소를 pop_back하는 형태로 해결.
-	vector<stPlayer*> m_vectorSecotr[SECTOR_Y_COUNT][SECTOR_X_COUNT];
+	vector<ULONGLONG> m_vectorSecotr[SECTOR_Y_COUNT][SECTOR_X_COUNT];
 
 	//  X,Y 기준, 9개의 섹터를 미리 구해서 저장해두는 배열
 	st_SecotrSaver* m_stSectorSaver[SECTOR_Y_COUNT][SECTOR_X_COUNT];
