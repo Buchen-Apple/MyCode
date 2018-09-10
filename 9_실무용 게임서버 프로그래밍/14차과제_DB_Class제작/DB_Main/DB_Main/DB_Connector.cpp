@@ -69,23 +69,18 @@ namespace Library_Jingyu
 		// 1. 초기화
 		mysql_init(&m_MySQL);
 
-		// 2. 연결을 위한 정보들, char 형태로 변환
-		char IP[32] = { 0, };
-		char User[32] = { 0, };
-		char Password[32] = { 0, };
-		char Name[32] = { 0, };
-
+		// 2. 연결을 위한 정보들, char 형태로 변환해 보관
 		int len = (int)_tcslen(m_wcDBIP);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBIP, (int)_tcslen(m_wcDBIP), IP, len, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBIP, (int)_tcslen(m_wcDBIP), m_cDBIP, len, NULL, NULL);
 
 		len = (int)_tcslen(m_wcDBUser);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBUser, (int)_tcslen(m_wcDBUser), User, len, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBUser, (int)_tcslen(m_wcDBUser), m_cDBUser, len, NULL, NULL);
 
 		len = (int)_tcslen(m_wcDBPassword);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBPassword, (int)_tcslen(m_wcDBPassword), Password, len, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBPassword, (int)_tcslen(m_wcDBPassword), m_cDBPassword, len, NULL, NULL);
 
 		len = (int)_tcslen(m_wcDBName);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBName, (int)_tcslen(m_wcDBName), Name, len, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBName, (int)_tcslen(m_wcDBName), m_cDBName, len, NULL, NULL);
 
 		// 3. DB에 연결 시도
 		// 약 5회 연결 시도.
@@ -93,7 +88,7 @@ namespace Library_Jingyu
 		int iConnectCount = 0;
 		while (1)
 		{
-			m_pMySQL = mysql_real_connect(&m_MySQL, IP, User, Password, Name, m_iDBPort, NULL, 0);
+			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 			if (m_pMySQL != NULL)
 				break;
 
@@ -125,13 +120,113 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	bool	CDBConnector::Query(WCHAR *szStringFormat, ...)
 	{
+		// 1. 받은 쿼리를 utf-8로 변환. 동시에 utf-8 저장용 멤버변수에 보관
+		int len = (int)_tcslen(szStringFormat);
+		WideCharToMultiByte(CP_UTF8, 0, szStringFormat, (int)_tcslen(szStringFormat), m_cQueryUTF8, len, NULL, NULL);
 
+		// 2. 유니코드 저장용 멤버변수에 보관. 차후 로그를 찍거나 하는 등을 할때는 유니코드가 필요
+		if (StringCbCopy(m_wcQuery, eQUERY_MAX_LEN, szStringFormat) != S_OK)
+		{
+			// 카피 실패 시 이유 보관 후, false 리턴
+			return false;
+		}
+
+		// 3. 쿼리 날리기
+		int Error = mysql_query(m_pMySQL, m_cQueryUTF8);
+
+		// 연결이 끊긴거면 5회동안 재연결 시도
+		if (Error == CR_SOCKET_CREATE_ERROR ||
+			Error == CR_CONNECTION_ERROR ||
+			Error == CR_CONN_HOST_ERROR ||
+			Error == CR_SERVER_HANDSHAKE_ERR ||
+			Error == CR_SERVER_GONE_ERROR ||
+			Error == CR_INVALID_CONN_HANDLE ||
+			Error == CR_SERVER_LOST)
+		{
+		}
+
+		int Count = 0;
+		while (Count < 5)
+		{
+			// DB 연결
+			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
+			if (m_pMySQL != NULL)
+				break;
+
+			Count++;
+			Sleep(0);
+		}
+
+		// 5회 연결 시도했는데도 연결 실패면, 에러 찍고 리턴 false.
+		if (m_pMySQL == NULL)
+		{
+			printf("DBQuery()1. Mysql connection error : %s(%d)\n", mysql_error(&m_MySQL), mysql_errno(&m_MySQL));
+			return false;
+		}
+
+
+		// 4. 결과 받아두기
+		// 밖에서 Query_Save() 함수를 호출해서 사용.
+		m_pSqlResult = mysql_store_result(m_pMySQL);
+
+		return true;
 	}
 
 	// DBWriter 스레드의 Save 쿼리 전용
 	// 결과셋을 저장하지 않음.
+	// 보내기만하고 결과 받을 필요 없을때 사용
 	bool	CDBConnector::Query_Save(WCHAR *szStringFormat, ...)	
 	{
+		// 1. 받은 쿼리를 utf-8로 변환. 동시에 utf-8 저장용 멤버변수에 보관
+		int len = (int)_tcslen(szStringFormat);
+		WideCharToMultiByte(CP_UTF8, 0, szStringFormat, (int)_tcslen(szStringFormat), m_cQueryUTF8, len, NULL, NULL);
+
+		// 2. 유니코드 저장용 멤버변수에 보관. 차후 로그를 찍거나 하는 등을 할때는 유니코드가 필요
+		if (StringCbCopy(m_wcQuery, eQUERY_MAX_LEN, szStringFormat) != S_OK)
+		{
+			// 카피 실패 시 이유 보관 후, false 리턴
+			return false;
+		}
+
+		// 3. 쿼리 날리기
+		int Error = mysql_query(m_pMySQL, m_cQueryUTF8);
+
+		// 연결이 끊긴거면 5회동안 재연결 시도
+		if (Error == CR_SOCKET_CREATE_ERROR ||
+			Error == CR_CONNECTION_ERROR ||
+			Error == CR_CONN_HOST_ERROR ||
+			Error == CR_SERVER_HANDSHAKE_ERR ||
+			Error == CR_SERVER_GONE_ERROR ||
+			Error == CR_INVALID_CONN_HANDLE ||
+			Error == CR_SERVER_LOST)
+		{
+		}
+
+		int Count = 0;
+		while (Count < 5)
+		{
+			// DB 연결
+			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
+			if (m_pMySQL != NULL)
+				break;
+
+			Count++;
+			Sleep(0);
+		}
+
+		// 5회 연결 시도했는데도 연결 실패면, 에러 찍고 리턴 false.
+		if (m_pMySQL == NULL)
+		{
+			printf("DBQuery()1. Mysql connection error : %s(%d)\n", mysql_error(&m_MySQL), mysql_errno(&m_MySQL));
+			return false;
+		}
+
+
+		// 4. 결과 받은 후, 바로 result 한다.		
+		m_pSqlResult = mysql_store_result(m_pMySQL);
+		mysql_free_result(m_pSqlResult);
+
+		return true;
 
 	}
 															
@@ -143,7 +238,8 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	MYSQL_ROW	CDBConnector::FetchRow()
 	{
-
+		// 1 줄 단위로 넘긴다.
+		mysql_fetch_row(m_pSqlResult);
 	}
 
 	//////////////////////////////////////////////////////////////////////
@@ -151,7 +247,7 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	void	CDBConnector::FreeResult()
 	{
-
+		mysql_free_result(m_pSqlResult);
 	}
 
 

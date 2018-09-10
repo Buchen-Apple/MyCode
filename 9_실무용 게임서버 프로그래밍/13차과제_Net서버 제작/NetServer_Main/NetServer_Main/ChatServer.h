@@ -6,7 +6,6 @@
 #include "CrashDump\CrashDump.h"
 
 #include "LockFree_Queue\LockFree_Queue.h"
-#include "Parser\Parser_Class.h"
 
 #include <vector>
 #include <unordered_map>

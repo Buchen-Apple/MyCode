@@ -98,12 +98,21 @@ namespace Library_Jingyu
 		//-------------------------------------------------------------
 		MYSQL_RES	*m_pSqlResult;
 
-		WCHAR		m_wcDBIP[16];
-		WCHAR		m_wcDBUser[64];
-		WCHAR		m_wcDBPassword[64];
-		WCHAR		m_wcDBName[64];
-		int			m_iDBPort;
+		//-------------------------------------------------------------
+		// DB 연결을 위한 정보 보관
+		//
+		//-------------------------------------------------------------
+		char	m_cDBIP[32];
+		char	m_cDBUser[128];
+		char	m_cDBPassword[128];
+		char	m_cDBName[128];
 
+		WCHAR	m_wcDBIP[16];
+		WCHAR	m_wcDBUser[64];
+		WCHAR	m_wcDBPassword[64];
+		WCHAR	m_wcDBName[64];
+
+		int		m_iDBPort;
 
 		WCHAR		m_wcQuery[eQUERY_MAX_LEN];
 		char		m_cQueryUTF8[eQUERY_MAX_LEN];
