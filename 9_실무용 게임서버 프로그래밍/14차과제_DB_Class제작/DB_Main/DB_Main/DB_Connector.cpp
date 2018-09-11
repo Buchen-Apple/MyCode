@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "DB_Connector.h"
 #include "CrashDump\CrashDump.h"
+#include "Log\Log.h"
 #include <strsafe.h>
 
 
@@ -9,6 +10,7 @@ namespace Library_Jingyu
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
 	CCrashDump* g_DBDump = CCrashDump::GetInstance();
+	CSystemLog* g_DBLog = CSystemLog::GetInstance();
 
 	//////////////////////////////////////////////////////////////////////
 	// 생성자
@@ -46,7 +48,7 @@ namespace Library_Jingyu
 		// DB 연결 객체 포인터를 nullptr로 초기화.
 		// 이 포인터를 이용해 DB 연결 여부 판단.
 		// -----------------------------------
-		m_pMySQL == nullptr;
+		m_pMySQL = nullptr;
 		
 	}
 
@@ -90,12 +92,23 @@ namespace Library_Jingyu
 		{
 			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 			if (m_pMySQL != NULL)
-				break;
+				break;		
+
+			// 멤버변수에 에러 셋팅
+			SaveLastError();
+			
+			// 카운트 증가
+			iConnectCount++;
+
+			// 로그에 저장
+			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR, 
+				L"Connect() --> Connect Fail... (Count : %d)", iConnectCount);
 
 			if (iConnectCount >= 5)
-				g_DBDump->Crash();
+				g_DBDump->Crash();	
 
-			iConnectCount++;
+			// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
+			Sleep(0);
 		}
 
 		// 디폴트 셋팅을 utf8로 셋팅
@@ -142,27 +155,32 @@ namespace Library_Jingyu
 			Error == CR_INVALID_CONN_HANDLE ||
 			Error == CR_SERVER_LOST)
 		{
+			int Count = 0;
+			while (1)
+			{
+				// DB 연결
+				m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
+				if (m_pMySQL != NULL)
+					break;
+
+				// 멤버변수에 에러 셋팅
+				SaveLastError();
+				
+				// 카운트 1 증가
+				Count++;
+
+				// 실패 시 로그 남김
+				g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"Query() --> Connect Fail... (Count : %d)", Count);
+
+				// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
+				if (Count >= 5)
+					g_DBDump->Crash();	
+
+				// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
+				Sleep(0);
+			}
 		}
-
-		int Count = 0;
-		while (Count < 5)
-		{
-			// DB 연결
-			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
-			if (m_pMySQL != NULL)
-				break;
-
-			Count++;
-			Sleep(0);
-		}
-
-		// 5회 연결 시도했는데도 연결 실패면, 에러 찍고 리턴 false.
-		if (m_pMySQL == NULL)
-		{
-			SaveLastError();
-			return false;
-		}
-
 
 		// 4. 결과 받아두기
 		// 밖에서 FetchRow() 함수를 호출해서 사용.
@@ -199,34 +217,38 @@ namespace Library_Jingyu
 			Error == CR_INVALID_CONN_HANDLE ||
 			Error == CR_SERVER_LOST)
 		{
+			int Count = 0;
+			while (1)
+			{
+				// DB 연결
+				m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
+				if (m_pMySQL != NULL)
+					break;
+
+				// 멤버변수에 에러 셋팅
+				SaveLastError();
+
+				// 카운트 1 증가
+				Count++;
+
+				// 실패 시 로그 남김
+				g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"Query() --> Connect Fail... (Count : %d)", Count);
+
+				// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
+				if (Count >= 5)
+					g_DBDump->Crash();
+
+				// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
+				Sleep(0);
+			}
 		}
-
-		int Count = 0;
-		while (Count < 5)
-		{
-			// DB 연결
-			m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
-			if (m_pMySQL != NULL)
-				break;
-
-			Count++;
-			Sleep(0);
-		}
-
-		// 5회 연결 시도했는데도 연결 실패면, 멤버변수에 에러 메시지 저장 후, 리턴 false.
-		if (m_pMySQL == NULL)
-		{
-			SaveLastError();
-			return false;
-		}
-
 
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 		mysql_free_result(m_pSqlResult);
 
 		return true;
-
 	}
 															
 
@@ -262,6 +284,219 @@ namespace Library_Jingyu
 		// 에러 메시지 보관
 		StringCbPrintf(m_wcLastErrorMsg, _MyCountof(m_wcLastErrorMsg), 
 			L"Mysql error : %s\n", mysql_error(&m_MySQL));
+	}
+
+
+
+	// --------------------------
+	// --------------------------
+	// --------------------------
+	// --------------------------
+	// --------------------------
+
+	// DB TLS
+
+	// 생성자
+	CBConnectorTLS::CBConnectorTLS(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort)
+	{
+		// 1. TLSIndex를 얻어온다.
+		m_dwTLSIndex = TlsAlloc();
+		if (m_dwTLSIndex == TLS_OUT_OF_INDEXES)
+			g_DBDump->Crash();
+
+		// -----------------------------------
+		// 인자값들 멤버변수에 저장
+		// 저장하다 실패하면 크래시.
+		// 여기서 실패하는건 그냥 코드실수이니 말도안됨.
+		// -----------------------------------
+		// 1. IP
+		if (StringCchCopy(m_wcDBIP, 16, DBIP) != S_OK)
+			g_DBDump->Crash();
+
+		// 2. 사용자 이름
+		if (StringCchCopy(m_wcDBUser, 64, User) != S_OK)
+			g_DBDump->Crash();
+
+		// 3. 비밀번호
+		if (StringCchCopy(m_wcDBPassword, 64, Password) != S_OK)
+			g_DBDump->Crash();
+
+		// 4. DB 이름
+		if (StringCchCopy(m_wcDBName, 64, DBName) != S_OK)
+			g_DBDump->Crash();
+
+		// 5. 포트
+		m_iDBPort = DBPort;
+
+		// ---------------------
+		// 로그 셋팅
+		g_DBLog->SetDirectory(L"DB_Connector");
+		g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_ERROR);
+	}
+
+
+	// 소멸자
+	// 스택에 보관하고 있는 DBConnector delete.
+	// 자동으로 DBConnector의 소멸자 호출
+	CBConnectorTLS::~CBConnectorTLS()
+	{
+		LONG Count = m_stackConnector.GetInNode();
+
+		// 스택에 들어있는 DBConnector만큼 돌면서 delete
+		while (Count > 0)
+		{
+			CDBConnector* retval = m_stackConnector.Pop();
+			delete retval;
+			Count--;
+		}
+		
+	}
+
+	//////////////////////////////////////////////////////////////////////
+	// MySQL DB 연결
+	//
+	// return : 성공 시 true, 실패 시 false.
+	// 실패 시, GetLastError와, GetLastErrorMsg를 이용해 에러 확인
+	//////////////////////////////////////////////////////////////////////
+	bool		CBConnectorTLS::Connect(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, DBConnector셋팅
+		if (NowDB == nullptr)
+		{
+			NowDB = new CDBConnector(m_wcDBIP, m_wcDBUser, m_wcDBPassword, m_wcDBName, m_iDBPort);
+
+			if (TlsSetValue(m_dwTLSIndex, NowDB) == 0)
+			{
+				DWORD Error = GetLastError();
+				g_DBDump->Crash();
+			}
+
+		}
+
+		// 2. 꺼내온 DBConnector의 connect 함수 호출 후, 결과 값 리턴
+		return NowDB->Connect();
+	}
+
+	//////////////////////////////////////////////////////////////////////
+	// MySQL DB 끊기
+	//
+	// return : 정상적으로 끊길 시 true
+	//////////////////////////////////////////////////////////////////////
+	bool		CBConnectorTLS::Disconnect(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 Disconnect 함수 호출 후, 결과 값 리턴
+		return NowDB->Disconnect();
+	}
+
+
+	//////////////////////////////////////////////////////////////////////
+	// 쿼리 날리고 결과셋 임시 보관
+	//
+	// Parameter : WCHAR형 쿼리 메시지
+	//////////////////////////////////////////////////////////////////////
+	bool		CBConnectorTLS::Query(WCHAR *szStringFormat, ...)
+	{		
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		 // 2. 꺼내온 DBConnector의 Query 함수 호출 후, 결과 값 리턴
+		return NowDB->Query(szStringFormat);
+	}
+
+	// DBWriter 스레드의 Save 쿼리 전용
+	// 결과셋을 저장하지 않음.
+	bool		CBConnectorTLS::Query_Save(WCHAR *szStringFormat, ...)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 Query_Save 함수 호출 후, 결과 값 리턴
+		return NowDB->Query_Save(szStringFormat);
+	}
+		
+															
+
+	//////////////////////////////////////////////////////////////////////
+	// 쿼리를 날린 뒤에 결과 뽑아오기.
+	// 결과가 없다면 NULL 리턴.
+	// 
+	// return : result의 Row. Row가 없을 시 null 리턴
+	//////////////////////////////////////////////////////////////////////
+	MYSQL_ROW	CBConnectorTLS::FetchRow(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 FetchRow 함수 호출 후, 결과 값 리턴
+		return NowDB->FetchRow();
+	}
+
+	//////////////////////////////////////////////////////////////////////
+	// 한 쿼리에 대한 결과 모두 사용 후 정리.
+	//////////////////////////////////////////////////////////////////////
+	void		CBConnectorTLS::FreeResult(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 FreeResult 함수 호출.
+		NowDB->FreeResult();
+	}
+
+
+	//////////////////////////////////////////////////////////////////////
+	// Error 얻기.
+	//////////////////////////////////////////////////////////////////////
+	int			CBConnectorTLS::GetLastError(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 GetLastError 함수 호출 후 결과값 리턴
+		NowDB->GetLastError();
+	}
+
+	WCHAR*		CBConnectorTLS::GetLastErrorMsg(void)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, Crash
+		if (NowDB == nullptr)
+			g_DBDump->Crash();
+
+		// 2. 꺼내온 DBConnector의 GetLastErrorMsg 함수 호출 후 결과값 리턴
+		NowDB->GetLastErrorMsg();
 	}
 
 }

@@ -18,12 +18,6 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="CommonProtocol.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ChatServer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -47,13 +41,10 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="ChatServer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\ChatServer\ChatServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>

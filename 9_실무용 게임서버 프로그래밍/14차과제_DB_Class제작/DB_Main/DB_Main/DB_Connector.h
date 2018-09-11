@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include "Mysql\include\mysql.h"
 #include "Mysql\include\errmsg.h"
+#include "LockFree_Stack\LockFree_Stack.h"
 
 #pragma comment(lib, "Mysql/lib/vs14/mysqlclient")
 
@@ -87,7 +88,6 @@ namespace Library_Jingyu
 	private:
 
 
-
 		//-------------------------------------------------------------
 		// MySQL 연결객체 본체
 		//-------------------------------------------------------------
@@ -132,7 +132,83 @@ namespace Library_Jingyu
 	class CBConnectorTLS
 	{
 		// TLS 인덱스
-		int m_iTLSIndex;
+		DWORD m_dwTLSIndex;
+
+		// 각 스레드에게 할당한 DBConnector를 관리하는 스택
+		// 소멸자에서 pop 하면서, 각 커넥터의 소멸자 호출
+		CLF_Stack< CDBConnector* > m_stackConnector;
+
+		//-------------------------------------------------------------
+		// DB 연결을 위한 정보 보관
+		//
+		//-------------------------------------------------------------
+		WCHAR	m_wcDBIP[16];
+		WCHAR	m_wcDBUser[64];
+		WCHAR	m_wcDBPassword[64];
+		WCHAR	m_wcDBName[64];
+
+		int		m_iDBPort;
+
+	public:
+		//////////////////////////////////////////////////////////////////////
+		// 생성자
+		// 
+		// Parameter : 연결할 DB IP, 사용자 이름, 비밀번호, 닉네임, 포트
+		//////////////////////////////////////////////////////////////////////
+		CBConnectorTLS(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort);
+
+		// 소멸자
+		// 스택에 보관하고 있는 DBConnector delete.
+		// 자동으로 DBConnector의 소멸자 호출
+		virtual ~CBConnectorTLS();
+
+		//////////////////////////////////////////////////////////////////////
+		// MySQL DB 연결
+		//
+		// return : 성공 시 true, 실패 시 false.
+		// 실패 시, GetLastError와, GetLastErrorMsg를 이용해 에러 확인
+		//////////////////////////////////////////////////////////////////////
+		bool		Connect(void);
+
+		//////////////////////////////////////////////////////////////////////
+		// MySQL DB 끊기
+		//
+		// return : 정상적으로 끊길 시 true
+		//////////////////////////////////////////////////////////////////////
+		bool		Disconnect(void);
+
+
+		//////////////////////////////////////////////////////////////////////
+		// 쿼리 날리고 결과셋 임시 보관
+		//
+		// Parameter : WCHAR형 쿼리 메시지
+		//////////////////////////////////////////////////////////////////////
+		bool		Query(WCHAR *szStringFormat, ...);
+		bool		Query_Save(WCHAR *szStringFormat, ...);	// DBWriter 스레드의 Save 쿼리 전용
+																// 결과셋을 저장하지 않음.
+
+		//////////////////////////////////////////////////////////////////////
+		// 쿼리를 날린 뒤에 결과 뽑아오기.
+		// 결과가 없다면 NULL 리턴.
+		// 
+		// return : result의 Row. Row가 없을 시 null 리턴
+		//////////////////////////////////////////////////////////////////////
+		MYSQL_ROW	FetchRow(void);
+
+		//////////////////////////////////////////////////////////////////////
+		// 한 쿼리에 대한 결과 모두 사용 후 정리.
+		//////////////////////////////////////////////////////////////////////
+		void		FreeResult(void);
+
+
+		//////////////////////////////////////////////////////////////////////
+		// Error 얻기.
+		//////////////////////////////////////////////////////////////////////
+		int			GetLastError(void);;
+		WCHAR		*GetLastErrorMsg(void);
+
+
+
 	};
 
 }

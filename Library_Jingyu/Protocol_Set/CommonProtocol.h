@@ -173,6 +173,9 @@ enum en_PACKET_TYPE
 	en_PACKET_CS_GAME_SERVER				= 1000,
 
 
+
+
+
 	////////////////////////////////////////////////////////
 	//
 	//   Server & Server Protocol  / LAN 통신은 기본으로 응답을 받지 않음.
