@@ -56,6 +56,7 @@ namespace Library_Jingyu
 			NETWORK_LIB_ERROR__RECV_LENBIG_ERROR,			// RecvPost에서 헤더 안에 Len이 비정상적으로 큼.
 		};
 
+
 	private:
 		// 한 번에 샌드할 수 있는 WSABUF의 카운트
 #define dfSENDPOST_MAX_WSABUF			300
@@ -246,7 +247,7 @@ namespace Library_Jingyu
 		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
-		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, bool Nodelay);
+		bool Start(const TCHAR* ConnectIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, bool Nodelay);
 
 		// 서버 스탑.
 		void Stop();

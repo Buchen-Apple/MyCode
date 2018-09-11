@@ -10,14 +10,20 @@ namespace Library_Jingyu
 	Chat_LanClient::Chat_LanClient()
 		:CLanClient()
 	{
-		// 할거 없음.
-		// LanClient의 생성자만 호출되면 됨.
+		// 토큰을 관리하는 umap의 용량을 할당해둔다.
+		m_umapTokenCheck.reserve(10000);
+
+		// 토근 구조체 관리 TLS 동적할당
+		m_MTokenTLS = new CMemoryPoolTLS< stToken >(500, false);
+
+		// 락 초기화
+		InitializeSRWLock(&srwl);
 	}
 
 	Chat_LanClient::~Chat_LanClient()
 	{
-		// 할거 없음.
-		// LanClient의 소멸자만 호출되면 됨.
+		// 토근 구조체 관리 TLS 동적해재
+		delete m_MTokenTLS;
 	}
 
 
@@ -47,8 +53,8 @@ namespace Library_Jingyu
 		INT64 Parameter;
 		Payload->GetData((char*)&Parameter, 8);
 
-		// 5. 자료구조에 AccountNo와 토큰키 쌍 저장
-		m_umapTokenCheck->insert(make_pair(AccountNo, NewToken));
+		// 5. 자료구조에 토큰 저장
+		InsertTokenFunc(AccountNo, NewToken);
 			   
 
 		// 응답패킷 제작 후 보내기 -------------------
@@ -66,6 +72,83 @@ namespace Library_Jingyu
 
 		// 4. Send 한다.
 		SendPacket(SessionID, SendBuff);
+	}
+
+
+
+
+	// -----------------------
+	// 기능 함수
+	// -----------------------
+
+	// 토큰 관리 자료구조에, 새로 접속한 토큰 추가
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : AccountNo, stToken*
+	// return : 추가 성공 시, true
+	//		  : AccountNo가 중복될 시 false
+	bool Chat_LanClient::InsertTokenFunc(INT64 AccountNo, stToken* isnertToken)
+	{
+		// umap에 추가
+		AcquireSRWLockExclusive(&srwl);		// ---------------- Lock
+		auto ret = m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));
+		ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock
+
+		// 중복된 키일 시 false 리턴.
+		if (ret.second == false)
+			return false;
+
+		return true;
+	}
+
+
+	// 토큰 관리 자료구조에서, 토큰 검색
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : AccountNo
+	// return : 검색 성공 시, stToken*
+	//		  : 검색 실패 시 nullptr
+	Chat_LanClient::stToken* Chat_LanClient::FindTokenFunc(INT64 AccountNo)
+	{
+		AcquireSRWLockShared(&srwl);	// ---------------- Shared Lock
+		auto FindToken = m_umapTokenCheck.find(AccountNo);
+		ReleaseSRWLockShared(&srwl);	// ---------------- Shared UnLock
+
+		if (FindToken == m_umapTokenCheck.end())
+			return nullptr;
+
+		return FindToken->second;
+	}
+
+
+	// 토큰 관리 자료구조에서, 토큰 제거
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : AccountNo
+	// return : 성공 시, 제거된 토큰 stToken*
+	//		  : 검색 실패 시 nullptr
+	Chat_LanClient::stToken* Chat_LanClient::EraseTokenFunc(INT64 AccountNo)
+	{
+		// 1) map에서 유저 검색
+
+		// erase까지가 한 작업이기 때문에, Exclusive 락 사용.
+		AcquireSRWLockExclusive(&srwl);		// ---------------- Lock
+
+		auto FindToken = m_umapTokenCheck.find(AccountNo);
+		if (FindToken == m_umapTokenCheck.end())
+		{
+			ReleaseSRWLockExclusive(&srwl);	// ---------------- Unlock
+			return nullptr;
+		}
+
+		stToken* ret = FindToken->second;
+
+		// 2) 맵에서 제거
+		m_umapTokenCheck.erase(FindToken);
+
+		ReleaseSRWLockExclusive(&srwl);	// ---------------- Unlock
+
+		return ret;
 	}
 
 

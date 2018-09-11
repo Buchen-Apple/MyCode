@@ -7,6 +7,8 @@
 
 #include "LockFree_Queue\LockFree_Queue.h"
 
+#include "Chat_LanClient.h"
+
 #include <vector>
 #include <unordered_map>
 
@@ -59,6 +61,12 @@ namespace Library_Jingyu
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;
+
+			TCHAR LoginServerIP[20];
+			int LoginServerPort;
+			int LoginServer_CreateWorker;
+			int LoginServer_ActiveWorker;
+			int LoginServer_Nodelay;
 		};
 
 		// 플레이어 구조체
@@ -93,6 +101,13 @@ namespace Library_Jingyu
 
 		// 덤프
 		CCrashDump* m_ChatDump = CCrashDump::GetInstance();
+
+		////////////////////////////////////////////////
+		// !! 로그인 서버와 통신하기 위한 LanClient !!
+		////////////////////////////////////////////////
+		Chat_LanClient m_Logn_LanClient;
+
+		stConfigFile m_stConfig;
 
 		// 메시지 구조체를 다룰 TLS메모리풀
 		// 일감 구조체를 다룬다.

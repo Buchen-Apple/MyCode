@@ -32,10 +32,13 @@ namespace Library_Jingyu
 		// 토큰 구조체를 관리하는 TLS
 		CMemoryPoolTLS< stToken >* m_MTokenTLS;
 
+		// 토큰 자료구조 Lock
+		SRWLOCK srwl;
+
 		// 토큰키를 관리하는 자료구조
 		// Key : AccountNO
 		// Value : 토큰 구조체
-		unordered_map<INT64, stToken*>* m_umapTokenCheck;
+		unordered_map<INT64, stToken*> m_umapTokenCheck;
 
 	private:
 		// -----------------------
@@ -48,6 +51,38 @@ namespace Library_Jingyu
 		// Parameter : 세션키, CProtocolBuff_Lan*
 		// return : 없음
 		void NewUserJoin(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+
+		// -----------------------
+		// 기능 함수
+		// -----------------------
+
+		// 토큰 관리 자료구조에, 새로 접속한 토큰 추가
+		// 현재 umap으로 관리중
+		// 
+		// Parameter : AccountNo, stToken*
+		// return : 추가 성공 시, true
+		//		  : AccountNo가 중복될 시 false
+		bool InsertTokenFunc(INT64 AccountNo, stToken* isnertToken);
+
+
+		// 토큰 관리 자료구조에서, 토큰 검색
+		// 현재 umap으로 관리중
+		// 
+		// Parameter : AccountNo
+		// return : 검색 성공 시, stToken*
+		//		  : 검색 실패 시 nullptr
+		stToken* FindTokenFunc(INT64 AccountNo);
+
+
+		// 토큰 관리 자료구조에서, 토큰 제거
+		// 현재 umap으로 관리중
+		// 
+		// Parameter : AccountNo
+		// return : 성공 시, 제거된 토큰 stToken*
+		//		  : 검색 실패 시 nullptr
+		stToken* EraseTokenFunc(INT64 AccountNo);
+
 
 	public:
 		// -----------------------
@@ -73,46 +108,46 @@ namespace Library_Jingyu
 		//
 		// parameter : 세션키
 		// return : 없음
-		virtual void OnConnect(ULONGLONG SessionID) = 0;
+		virtual void OnConnect(ULONGLONG SessionID);
 
 		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
 		//
 		// parameter : 세션키
 		// return : 없음
-		virtual void OnDisconnect(ULONGLONG SessionID) = 0;
+		virtual void OnDisconnect(ULONGLONG SessionID);
 
 		// 패킷 수신 완료 후 호출되는 함수.
 		//
 		// parameter : 유저 세션키, CProtocolBuff_Lan*
 		// return : 없음
-		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload) = 0;
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
 		// 패킷 송신 완료 후 호출되는 함수
 		//
 		// parameter : 유저 세션키, Send 한 사이즈
 		// return : 없음
-		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize) = 0;
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize);
 
 		// 워커 스레드가 깨어날 시 호출되는 함수.
 		// GQCS 바로 하단에서 호출
 		// 
 		// parameter : 없음
 		// return : 없음
-		virtual void OnWorkerThreadBegin() = 0;
+		virtual void OnWorkerThreadBegin();
 
 		// 워커 스레드가 잠들기 전 호출되는 함수
 		// GQCS 바로 위에서 호출
 		// 
 		// parameter : 없음
 		// return : 없음
-		virtual void OnWorkerThreadEnd() = 0;
+		virtual void OnWorkerThreadEnd();
 
 		// 에러 발생 시 호출되는 함수.
 		//
 		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
 		//			 : 에러 코드에 대한 스트링
 		// return : 없음
-		virtual void OnError(int error, const TCHAR* errorStr) = 0;
+		virtual void OnError(int error, const TCHAR* errorStr);
 
 	};
 }

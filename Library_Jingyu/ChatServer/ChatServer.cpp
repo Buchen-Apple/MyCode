@@ -96,16 +96,19 @@ namespace Library_Jingyu
 			}
 			else if (expn == 2)
 			{
-				printf("FileR ead Fail...\n");
+				printf("FileR Read Fail...\n");
 				return false;
 			}
 		}
 
-		// 구역 지정
+		////////////////////////////////////////////////////////
+		// ChatServer config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
 		if (Parser.AreaCheck(_T("CHATSERVER")) == false)
 			return false;
-
-		// ------------ 읽어오기
+		
 		// IP
 		if (Parser.GetValue_String(_T("BindIP"), pConfig->BindIP) == false)
 			return false;
@@ -149,6 +152,37 @@ namespace Library_Jingyu
 		// 로그 레벨
 		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
 			return false;
+
+
+		////////////////////////////////////////////////////////
+		// ChatServer의 LanClient config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("CHATLANCLIENT")) == false)
+			return false;
+	
+		// IP
+		if (Parser.GetValue_String(_T("LoginServerIP"), pConfig->LoginServerIP) == false)
+			return false;
+
+		// Port
+		if (Parser.GetValue_Int(_T("LoginServerPort"), &pConfig->LoginServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("LoginServerCreateWorker"), &pConfig->LoginServer_CreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("LoginServerActiveWorker"), &pConfig->LoginServer_ActiveWorker) == false)
+			return false;
+
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("LoginServerNodelay"), &pConfig->LoginServer_Nodelay) == false)
+			return false;
+
 
 		return true;
 	}
@@ -378,10 +412,8 @@ namespace Library_Jingyu
 		// 1) Player 자료구조에서 제거
 		stPlayer* ErasePlayer = ErasePlayerFunc(SessionID);
 		if (ErasePlayer == nullptr)
-		{
-			printf("Not Find Player!!\n");
 			m_ChatDump->Crash();
-		}
+
 
 		// 2) 최초 할당이 아닐 경우, 섹터에서 제거
 		if (ErasePlayer->m_wSectorY != TEMP_SECTOR_POS &&
@@ -422,7 +454,18 @@ namespace Library_Jingyu
 		ErasePlayer->m_wSectorY = TEMP_SECTOR_POS;
 		ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
 
-		// 4) Player Free()
+		// ------------------------
+		// 4) 토큰 umap에서 제외시킨다.
+		Chat_LanClient::stToken* EraseToken = m_Logn_LanClient.EraseTokenFunc(ErasePlayer->m_i64AccountNo);
+		if (EraseToken == nullptr)
+			m_ChatDump->Crash();
+
+		// 5) Toekn Free()
+		m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
+
+		// ------------------------
+
+		// 6) Player Free()
 		m_PlayerPool->Free(ErasePlayer);
 
 		InterlockedAdd(&g_lUpdateStruct_PlayerCount, -1);
@@ -650,21 +693,46 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer::Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 	{
-		// 1) map에서 유저 검색
+		// 1) 마샬링		
+		INT64	AccountNo;
+		WCHAR tcLoginID[20];
+		WCHAR tcNickName[20];
+		char Token[64];
+
+		Packet->GetData((char*)&AccountNo, 8);
+		Packet->GetData((char*)tcLoginID, 40);
+		Packet->GetData((char*)tcNickName, 40);
+		Packet->GetData(Token, 64);
+
+		// 2) 토큰키 체크
+		Chat_LanClient::stToken* FindToken = m_Logn_LanClient.FindTokenFunc(AccountNo);
+		if(FindToken == nullptr)
+			m_ChatDump->Crash();		
+
+		// 찾았으면 토큰키 비교
+		// 다르다면 접속 끊기 요청 후 리턴
+		if (memcmp(FindToken->m_cToken, Token, 64) != 0)
+		{
+			Disconnect(SessionID);
+			return;
+		}
+
+		// 3) 정상이면 플레이어를 알아온 후 값 셋팅
 		stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 		if (FindPlayer == nullptr)
 			m_ChatDump->Crash();
 
-		// 2) 마샬링
-		INT64	AccountNo;
-		Packet->GetData((char*)&AccountNo, 8);
+		// AccountNo
 		FindPlayer->m_i64AccountNo = AccountNo;
 
-		Packet->GetData((char*)FindPlayer->m_tLoginID, 40);
-		Packet->GetData((char*)FindPlayer->m_tNickName, 40);
-		Packet->GetData(FindPlayer->m_cToken, 64);
+		// LoginID 
+		StringCbCopy(FindPlayer->m_tLoginID, 20, tcLoginID);
 
-		// 3) 토큰 검사
+		// NickName
+		StringCbCopy(FindPlayer->m_tNickName, 20, tcNickName);
+
+		// Token
+		StringCbCopyA(FindPlayer->m_cToken, 64, Token);
 
 
 		// 4) 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
@@ -678,8 +746,41 @@ namespace Library_Jingyu
 
 		SendBuff->PutData((char*)&AccountNo, 8);
 
-		// 6) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+		// 5) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 		SendPacket(SessionID, SendBuff);
+			   		 	  	  	   	
+
+
+		//// 1) map에서 유저 검색
+		//stPlayer* FindPlayer = FindPlayerFunc(SessionID);
+		//if (FindPlayer == nullptr)
+		//	m_ChatDump->Crash();
+
+		//// 2) 마샬링
+		//INT64	AccountNo;
+		//Packet->GetData((char*)&AccountNo, 8);
+		//FindPlayer->m_i64AccountNo = AccountNo;
+
+		//Packet->GetData((char*)FindPlayer->m_tLoginID, 40);
+		//Packet->GetData((char*)FindPlayer->m_tNickName, 40);
+		//Packet->GetData(FindPlayer->m_cToken, 64);
+
+		//// 3) 토큰 검사
+
+
+		//// 4) 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
+		//CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		//WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
+		//SendBuff->PutData((char*)&SendType, 2);
+
+		//BYTE Status = 1;
+		//SendBuff->PutData((char*)&Status, 1);
+
+		//SendBuff->PutData((char*)&AccountNo, 8);
+
+		//// 6) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+		//SendPacket(SessionID, SendBuff);
 	}
 
 
@@ -692,35 +793,37 @@ namespace Library_Jingyu
 	CChatServer::CChatServer()
 		:CNetServer()
 	{
-		// 할거 없음.
-		// NetServer의 생성자만 호출되면 됨.
-	}
-
-	// 소멸자
-	CChatServer::~CChatServer()
-	{
-		// 할거 없음
-		// NetServer의 소멸자만 호출되면 됨.
-	}
-
-	// 채팅 서버 시작 함수
-	// 내부적으로 NetServer의 Start도 같이 호출
-	//
-	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
-	// return true : 성공
-	bool CChatServer::ServerStart()
-	{
-		// ------------------- Config정보 셋팅
-		stConfigFile config;
-		if (SetFile(&config) == false)
-			return false;
+		// ------------------- Config정보 셋팅		
+		if (SetFile(&m_stConfig) == false)
+			m_ChatDump->Crash();
 
 		// ------------------- 로그 저장할 파일 셋팅
 		cChatLibLog->SetDirectory(L"ChatServer");
-		cChatLibLog->SetLogLeve((CSystemLog::en_LogLevel)config.LogLevel);
+		cChatLibLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);
+
+		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
+		m_mapPlayer.reserve(m_stConfig.MaxJoinUser);
 
 
 		// ------------------- 각종 리소스 할당
+		// 일감 TLS 메모리풀 동적할당
+		m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(100, false);
+
+		// 플레이어 구조체 TLS 메모리풀 동적할당	
+		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(100, false);
+
+		// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
+		// 사이즈가 0인 이유는, UpdateThread에서 큐가 비었는지 체크하고 쉬러 가야하기 때문에.
+		m_LFQueue = new CLF_Queue<st_WorkNode*>(0);
+
+		// 업데이트 스레드 깨우기 용도 Event, 업데이트 스레드 종료 용도 Event
+		// 
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		UpdateThreadEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+		UpdateThreadEXITEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
 		// 브로드 캐스트 시, 어느 섹터에 보내야하는지 미리 다 만들어둔다.
 		for (int Y = 0; Y < SECTOR_Y_COUNT; ++Y)
 		{
@@ -740,37 +843,54 @@ namespace Library_Jingyu
 				m_vectorSecotr[Y][X].reserve(100);
 			}
 		}
+	}
 
-		// 플레이어를 관리하는 umap의 용량을 미리 할당해둔다.
-		m_mapPlayer.reserve(config.MaxJoinUser);
+	// 소멸자
+	CChatServer::~CChatServer()
+	{
+		// 일감 큐 동적해제.
+		delete m_LFQueue;
 
-		// 일감 TLS 메모리풀 동적할당
-		m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(100, false);
+		// 구조체 메시지 TLS 메모리 풀 동적해제
+		delete m_MessagePool;
 
-		// 플레이어 구조체 TLS 메모리풀 동적할당	
-		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(100, false);
+		// 플레이어 구조체 TLS 메모리풀 동적해제
+		delete m_PlayerPool;
 
-		// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
-		// 사이즈가 0인 이유는, UpdateThread에서 큐가 비었는지 체크하고 쉬러 가야하기 때문에.
-		m_LFQueue = new CLF_Queue<st_WorkNode*>(0);
+		// 업데이트 스레드 깨우기용 이벤트 해제
+		CloseHandle(UpdateThreadEvent);
 
-		// 업데이트 스레드 깨우기 용도 Event, 업데이트 스레드 종료 용도 Event
-		// 
-		// 자동 리셋 Event 
-		// 최초 생성 시 non-signalled 상태
-		// 이름 없는 Event	
-		UpdateThreadEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-		UpdateThreadEXITEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+		// 업데이트 스레드 종료용 이벤트 해제
+		CloseHandle(UpdateThreadEXITEvent);
 
 
+		// 브로드캐스트용 섹터 모두 해제
+		for (int Y = 0; Y < SECTOR_Y_COUNT; ++Y)
+		{
+			for (int X = 0; X < SECTOR_X_COUNT; ++X)
+			{
+				delete m_stSectorSaver[Y][X];
+			}
+		}
+	}
+
+	// 채팅 서버 시작 함수
+	// 내부적으로 NetServer의 Start도 같이 호출
+	//
+	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
+	// return true : 성공
+	bool CChatServer::ServerStart()
+	{	
 		// ------------------- 업데이트 스레드 생성
 		hUpdateThraed = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, 0, 0);
 
-
 		// ------------------- 넷서버 가동
-		if (Start(config.BindIP, config.Port, config.CreateWorker, config.ActiveWorker, config.CreateAccept, config.Nodelay, config.MaxJoinUser,
-			config.HeadCode, config.XORCode1, config.XORCode2) == false)
+		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser,
+			m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
 			return false;
+
+		// ------------------- 로그인 서버와 연결되는, 랜 클라이언트 가동
+		m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.LoginServer_CreateWorker, m_stConfig.LoginServer_ActiveWorker, m_stConfig.LoginServer_Nodelay);
 
 		// 서버 오픈 로그 찍기		
 		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -812,7 +932,6 @@ namespace Library_Jingyu
 			m_MessagePool->Free(FreeNode);
 		}
 
-
 		// 섹터 list에서 모든 유저 제거
 		for (int y = 0; y < SECTOR_Y_COUNT; ++y)
 		{
@@ -822,42 +941,18 @@ namespace Library_Jingyu
 			}
 		}
 
-		// Playermap에서 모든 유저 제거
+		// Playermap에 있는 모든 유저 반환
 		auto itor = m_mapPlayer.begin();
 
 		while (itor != m_mapPlayer.end())
 		{
 			// 메모리풀에 반환
 			m_PlayerPool->Free(itor->second);
+		}		
 
-			// map에서 제거
-			itor = m_mapPlayer.erase(itor);
-		}
-
-		// 브로드캐스트용 섹터 모두 해제
-		for (int Y = 0; Y < SECTOR_Y_COUNT; ++Y)
-		{
-			for (int X = 0; X < SECTOR_X_COUNT; ++X)
-			{
-				delete m_stSectorSaver[Y][X];
-			}
-		}
-
-		// 큐 동적해제.
-		delete m_LFQueue;
-
-		// 구조체 메시지 TLS 메모리 풀 동적해제
-		delete m_MessagePool;
-
-		// 플레이어 구조체 TLS 메모리풀 동적해제
-		delete m_PlayerPool;
-
-		// 업데이트 스레드 깨우기용 이벤트 해제
-		CloseHandle(UpdateThreadEvent);
-
-		// 업데이트 스레드 종료용 이벤트 해제
-		CloseHandle(UpdateThreadEXITEvent);
-
+		// umap 초기화
+		m_mapPlayer.clear();
+		
 		// 업데이트 스레드 핸들 반환
 		CloseHandle(hUpdateThraed);
 	}

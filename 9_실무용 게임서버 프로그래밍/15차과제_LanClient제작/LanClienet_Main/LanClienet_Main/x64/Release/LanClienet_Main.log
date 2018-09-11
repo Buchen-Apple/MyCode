@@ -1,12 +1,17 @@
 ﻿  pch.cpp
+  ChatServer.cpp
+c:\git_public\library_jingyu\chatserver\chatserver.cpp(520): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   Chat_LanClient.cpp
   CrashDump.cpp
   Log.cpp
   NetworkLib_LanClient.cpp
+  NetworkLib_NetServer.cpp
+  Parser_Class.cpp
+  ProtocolBuff(Net)_ObjectPool.cpp
   ProtocolBuff_ObjectPool.cpp
   RingBuff.cpp
   LanClienet_Main.cpp
   코드를 생성하고 있습니다.
-  All 64 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
+  All 871 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   LanClienet_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\15차과제_LanClient제작\LanClienet_Main\x64\Release\LanClienet_Main.exe

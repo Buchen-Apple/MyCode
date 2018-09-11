@@ -4,7 +4,6 @@
 namespace Library_Jingyu
 {
 
-
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
 	// 직렬화 버퍼 1개의 크기
@@ -289,23 +288,5 @@ namespace Library_Jingyu
 	{
 		// 인터락으로 안전하게 증가
 		InterlockedIncrement(&m_RefCount);
-	}
-
-	// ------------------------------------
-	// ------------------------------------
-	// ------------------------------------
-	// ------------------------------------
-	// 예외용
-
-	// 생성자
-	CException::CException(const wchar_t* str)
-	{
-		_tcscpy_s(ExceptionText, _MyCountof(ExceptionText), str);
-	}
-
-	// 예외 텍스트의 주소 반환
-	char* CException::GetExceptionText()
-	{
-		return (char*)&ExceptionText;
 	}
 }

@@ -8,25 +8,12 @@ NetServer 용 직렬화 버퍼
 #include <Windows.h>
 #include "ObjectPool\Object_Pool_LockFreeVersion.h"
 #include "CrashDump\CrashDump.h"
+#include "CException.h"
 
 #include <time.h>
 
 namespace Library_Jingyu
 {
-	// Recv()패킷 처리 중, 예외 발생 시 던지는 예외클래스이다.
-	class CException
-	{
-	private:
-		wchar_t ExceptionText[100];
-
-	public:
-		// 생성자
-		CException(const wchar_t* str);
-
-		// 예외 텍스트 포인터 반환
-		char* GetExceptionText();
-	};
-
 	//  NetServer용 직렬화 버퍼
 	class CProtocolBuff_Net
 	{
