@@ -280,34 +280,27 @@ namespace Library_Jingyu
 		// 순수 가상함수
 		// -----------------------
 
-		// Accept 직후, 호출된다.
+		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
 		//
-		// parameter : 접속한 유저의 IP, Port
-		// return false : 클라이언트 접속 거부
-		// return true : 접속 허용
-		virtual bool OnConnectionRequest(TCHAR* IP, USHORT port) = 0;
-
-		// 연결 후 호출되는 함수 (AcceptThread에서 Accept 후 호출)
-		//
-		// parameter : 접속한 유저에게 할당된 세션키
+		// parameter : 세션키
 		// return : 없음
-		virtual void OnClientJoin(ULONGLONG ClinetID) = 0;
+		virtual void OnConnect(ULONGLONG ClinetID) = 0;
 
-		// 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
 		//
-		// parameter : 유저 세션키
+		// parameter : 세션키
 		// return : 없음
-		virtual void OnClientLeave(ULONGLONG ClinetID) = 0;
+		virtual void OnDisconnect(ULONGLONG ClinetID) = 0;
 
 		// 패킷 수신 완료 후 호출되는 함수.
 		//
-		// parameter : 유저 세션키, 받은 패킷
+		// parameter : 세션키, 받은 패킷
 		// return : 없음
 		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload) = 0;
 
 		// 패킷 송신 완료 후 호출되는 함수
 		//
-		// parameter : 유저 세션키, Send 한 사이즈
+		// parameter : 세션키, Send 한 사이즈
 		// return : 없음
 		virtual void OnSend(ULONGLONG ClinetID, DWORD SendSize) = 0;
 

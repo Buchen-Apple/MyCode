@@ -699,9 +699,8 @@ namespace Library_Jingyu
 	// 소멸자
 	CChatServer::~CChatServer()
 	{
-		// 서버가 가동중이라면 스탑.
-		if (GetServerState() == true)
-			ServerStop();
+		// 할거 없음
+		// NetServer의 소멸자만 호출되면 됨.
 	}
 
 	// 채팅 서버 시작 함수

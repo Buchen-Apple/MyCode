@@ -332,11 +332,7 @@ namespace Library_Jingyu
 
 
 		// 서버 열렸음 !!
-		m_bServerLife = true;
-
-		// 서버 오픈 로그 찍기		
-		// 이건, 상속받는 쪽에서 찍는걸로 수정. 랜서버 자체는 독립적으로 작동하지 않음.
-		// cNetLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		m_bServerLife = true;		
 
 		return true;
 	}
@@ -555,10 +551,6 @@ namespace Library_Jingyu
 	// 생성자
 	CLanServer::CLanServer()
 	{
-		// 로그 초기화
-		cNetLibLog->SetDirectory(L"LanServer");
-		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_ERROR);
-
 		// 서버 가동상태 false로 시작 
 		m_bServerLife = false;
 	}

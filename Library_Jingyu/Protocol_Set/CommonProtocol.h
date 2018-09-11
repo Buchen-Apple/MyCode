@@ -195,7 +195,7 @@ enum en_PACKET_TYPE
 	//
 	//		BYTE	ServerType			// dfSERVER_TYPE_GAME / dfSERVER_TYPE_CHAT
 	//
-	//		WCHAR	ServerName[32]		// 해당 서버의 이름.  
+	//		WCHAR	ServerName[32]		// 해당 서버의 이름.  널 포함
 	//	}
 	//
 	//------------------------------------------------------------

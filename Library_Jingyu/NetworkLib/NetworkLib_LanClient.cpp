@@ -263,10 +263,6 @@ namespace Library_Jingyu
 	// 생성자
 	CLanClient::CLanClient()
 	{
-		// 로그 초기화
-		cNetLibLog->SetDirectory(L"LanClient");
-		cNetLibLog->SetLogLeve(CSystemLog::en_LogLevel::LEVEL_ERROR);
-
 		// 클라 미접속 상태로 시작 
 		m_bClienetConnect = false;
 	}
@@ -335,9 +331,9 @@ namespace Library_Jingyu
 			// 접속 중 유저 수 감소
 			InterlockedDecrement(&m_ullJoinUserCount);
 
-			// 컨텐츠 쪽에 종료된 유저 알려줌 
+			// 컨텐츠 쪽 연결이 종료되었다고 알려줌.
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
-			OnClientLeave(sessionID);
+			OnDisconnect(sessionID);
 		}
 
 		return;
@@ -714,8 +710,10 @@ namespace Library_Jingyu
 				continue;
 			}
 
-			// I/O카운트가 0이되어 삭제된 것이 아니라면, break;
-			// 정상 Connect 된 것
+			// I/O카운트가 0이되어 삭제된 것이 아니라면 정상 Connect 된 것
+			// ConClientJoin 호출
+			OnConnect(m_stSession.m_ullSessionID);
+
 			break;
 		}
 		
