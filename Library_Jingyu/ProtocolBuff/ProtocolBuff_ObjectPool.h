@@ -33,6 +33,7 @@ namespace Library_Jingyu
 	class CProtocolBuff_Lan
 	{
 		friend class CLanServer;	
+		friend class CLanClient;
 
 	private:
 		// ----------- 멤버변수 위치를 잡을 때 '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려

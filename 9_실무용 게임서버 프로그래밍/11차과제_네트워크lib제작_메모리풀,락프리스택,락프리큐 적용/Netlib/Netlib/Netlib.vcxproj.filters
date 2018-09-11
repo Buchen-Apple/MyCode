@@ -32,9 +32,6 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -42,6 +39,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
