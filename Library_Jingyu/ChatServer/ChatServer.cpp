@@ -456,12 +456,12 @@ namespace Library_Jingyu
 
 		// ------------------------
 		// 4) 토큰 umap에서 제외시킨다.
-		Chat_LanClient::stToken* EraseToken = m_Logn_LanClient.EraseTokenFunc(ErasePlayer->m_i64AccountNo);
-		if (EraseToken == nullptr)
-			m_ChatDump->Crash();
+		//Chat_LanClient::stToken* EraseToken = m_Logn_LanClient.EraseTokenFunc(ErasePlayer->m_i64AccountNo);
+		//if (EraseToken == nullptr)
+		//	m_ChatDump->Crash();
 
-		// 5) Toekn Free()
-		m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
+		//// 5) Toekn Free()
+		//m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
 
 		// ------------------------
 
@@ -705,17 +705,17 @@ namespace Library_Jingyu
 		Packet->GetData(Token, 64);
 
 		// 2) 토큰키 체크
-		Chat_LanClient::stToken* FindToken = m_Logn_LanClient.FindTokenFunc(AccountNo);
-		if(FindToken == nullptr)
-			m_ChatDump->Crash();		
+		//Chat_LanClient::stToken* FindToken = m_Logn_LanClient.FindTokenFunc(AccountNo);
+		//if(FindToken == nullptr)
+		//	m_ChatDump->Crash();		
 
-		// 찾았으면 토큰키 비교
-		// 다르다면 접속 끊기 요청 후 리턴
-		if (memcmp(FindToken->m_cToken, Token, 64) != 0)
-		{
-			Disconnect(SessionID);
-			return;
-		}
+		//// 찾았으면 토큰키 비교
+		//// 다르다면 접속 끊기 요청 후 리턴
+		//if (memcmp(FindToken->m_cToken, Token, 64) != 0)
+		//{
+		//	Disconnect(SessionID);
+		//	return;
+		//}
 
 		// 3) 정상이면 플레이어를 알아온 후 값 셋팅
 		stPlayer* FindPlayer = FindPlayerFunc(SessionID);
@@ -890,7 +890,7 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 로그인 서버와 연결되는, 랜 클라이언트 가동
-		m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.LoginServer_CreateWorker, m_stConfig.LoginServer_ActiveWorker, m_stConfig.LoginServer_Nodelay);
+		//m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.LoginServer_CreateWorker, m_stConfig.LoginServer_ActiveWorker, m_stConfig.LoginServer_Nodelay);
 
 		// 서버 오픈 로그 찍기		
 		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");

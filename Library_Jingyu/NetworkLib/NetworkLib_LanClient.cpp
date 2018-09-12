@@ -665,8 +665,13 @@ namespace Library_Jingyu
 					}
 
 					// 실패했으면 다시 접속
+					Sleep(0);
 					continue;
 				}
+
+				// 이미 연결이 되었다면 break;
+				else if (Check == WSAEISCONN)
+					break;
 			}
 
 			// ------------------

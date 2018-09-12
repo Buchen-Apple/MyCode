@@ -105,7 +105,7 @@ namespace Library_Jingyu
 		////////////////////////////////////////////////
 		// !! 로그인 서버와 통신하기 위한 LanClient !!
 		////////////////////////////////////////////////
-		Chat_LanClient m_Logn_LanClient;
+		//Chat_LanClient m_Logn_LanClient;
 
 		stConfigFile m_stConfig;
 
