@@ -11,8 +11,8 @@
 #include <strsafe.h>
 
 #include "NetworkLib_LanClinet.h"
-#include "CrashDump\CrashDump.h"
 
+#include "CrashDump\CrashDump.h"
 #include "Log\Log.h"
 
 
@@ -22,14 +22,15 @@ namespace Library_Jingyu
 
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
+	// 헤더 사이즈
+#define dfNETWORK_PACKET_HEADER_SIZE	2
+
+
 	// 로그 찍을 전역변수 하나 받기.
 	CSystemLog* cLanLibLog = CSystemLog::GetInstance();
 
 	// 덤프 남길 변수 하나 받기
 	CCrashDump* cLanDump = CCrashDump::GetInstance();
-
-	// 헤더 사이즈
-#define dfNETWORK_PACKET_HEADER_SIZE	2
 
 
 	// -----------------------------

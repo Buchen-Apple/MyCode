@@ -167,7 +167,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Library_Jingyu\ChatServer\ChatServer.cpp" />
-    <ClCompile Include="..\..\..\..\Library_Jingyu\ChatServer\Chat_LanClient.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanClient.cpp" />
