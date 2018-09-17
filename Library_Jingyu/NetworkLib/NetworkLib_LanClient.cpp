@@ -482,7 +482,10 @@ namespace Library_Jingyu
 			// -----------------
 			// I/O카운트 감소 후, 0이라면접속 종료
 			if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+			{
 				g_This->InDisconnect(stNowSession);
+				g_This->ConnectFunc();
+			}
 
 		}
 		return 0;
@@ -530,31 +533,31 @@ namespace Library_Jingyu
 			}
 
 			// 소켓의 송신버퍼 크기를 0으로 변경. 그래야 정상적으로 비동기 입출력으로 실행
-			int optval = 0;
-			int retval = setsockopt(m_stSession.m_Client_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
-			if (optval == SOCKET_ERROR)
-			{
-				// 윈도우 에러, 내 에러 보관
-				m_iOSErrorCode = WSAGetLastError();
-				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
+			//int optval = 0;
+			//int retval = setsockopt(m_stSession.m_Client_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
+			//if (optval == SOCKET_ERROR)
+			//{
+			//	// 윈도우 에러, 내 에러 보관
+			//	m_iOSErrorCode = WSAGetLastError();
+			//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
 
-				// 각종 핸들 반환 및 동적해제 절차.
-				ExitFunc(m_iW_ThreadCount);
+			//	// 각종 핸들 반환 및 동적해제 절차.
+			//	ExitFunc(m_iW_ThreadCount);
 
-				// 로그 찍기 (로그 레벨 : 에러)
-				cLanLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
-					(int)m_iMyErrorCode, m_iOSErrorCode);
+			//	// 로그 찍기 (로그 레벨 : 에러)
+			//	cLanLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
+			//		(int)m_iMyErrorCode, m_iOSErrorCode);
 
-				// false 리턴
-				return false;
-			}
+			//	// false 리턴
+			//	return false;
+			//}
 
 			// 노딜레이 옵션 사용 여부에 따라 네이글 옵션 결정 (Start에서 전달받음)
 			// true면 노딜레이 사용하겠다는 것(네이글 중지시켜야함)
 			if (m_bNodelay == true)
 			{
 				BOOL optval = TRUE;
-				retval = setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
+				int retval = setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
 
 				if (retval == SOCKET_ERROR)
 				{
@@ -799,6 +802,7 @@ namespace Library_Jingyu
 		{
 			// 감소 시 0이면 삭제로직
 			InDisconnect(NowSession);
+			ConnectFunc();
 			return false;
 		}
 
@@ -938,6 +942,7 @@ namespace Library_Jingyu
 				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 				{
 					InDisconnect(NowSession);
+					ConnectFunc();
 					return false;
 				}
 
@@ -1050,6 +1055,7 @@ namespace Library_Jingyu
 					if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 					{
 						InDisconnect(NowSession);
+						ConnectFunc();
 						return false;
 					}
 

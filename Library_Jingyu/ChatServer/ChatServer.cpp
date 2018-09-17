@@ -313,7 +313,7 @@ namespace Library_Jingyu
 			if (Check == WAIT_FAILED)
 			{
 				DWORD Error = GetLastError();
-				printf("UpdateThread Exit Error!!! (%d) \n", Error);
+				printf("UpdateThread Exit Error!!! (%d) \n", Error); 
 				break;
 			}
 
@@ -1187,7 +1187,7 @@ namespace Library_Jingyu
 		m_umapTokenCheck.reserve(10000);
 
 		// 토근 구조체 관리 TLS 동적할당
-		m_MTokenTLS = new CMemoryPoolTLS< stToken >(500, false);
+		m_MTokenTLS = new CMemoryPoolTLS< stToken >(100, false);
 
 		// 락 초기화
 		InitializeSRWLock(&srwl);

@@ -51,7 +51,7 @@ namespace Library_Jingyu
 		m_cLanS = new CLogin_LanServer;		
 
 		// Player TLS 동적할당
-		m_MPlayerTLS = new CMemoryPoolTLS< stPlayer >(100, false);
+		m_MPlayerTLS = new CMemoryPoolTLS< stPlayer >(50, false);
 
 		// DBConnector 셋팅
 		m_AcountDB_Connector = new CBConnectorTLS(m_stConfig.DB_IP, m_stConfig.DB_User, m_stConfig.DB_Password, m_stConfig.DB_Name, m_stConfig.DB_Port);
@@ -83,7 +83,6 @@ namespace Library_Jingyu
 	bool CLogin_NetServer::ServerStart()
 	{
 		// ------------------- 랜 서버 가동
-		// 차후 추가
 		if (m_cLanS->Start(m_stConfig.LanBindIP, m_stConfig.LanPort, m_stConfig.LanCreateWorker, m_stConfig.LanActiveWorker,
 			m_stConfig.LanCreateAccept, m_stConfig.LanNodelay, m_stConfig.LanMaxJoinUser) == false)
 			return false;
@@ -367,9 +366,7 @@ namespace Library_Jingyu
 
 		return retPlayer;
 	}
-
-
-
+	   
 	// 유저 관리 자료구조에, 새로 접속한 유저 추가
 	// 현재 umap으로 관리중
 	// 
@@ -581,7 +578,6 @@ namespace Library_Jingyu
 		if (NowPlayer->m_i64AccountNo != AccountNo)
 			g_LoginDump->Crash();
 
-
 		// 3. 직렬화버퍼 Alloc
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -620,7 +616,6 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&Type, 2);
 		SendBuff->PutData((char*)&AccountNo, 8);
 		SendBuff->PutData((char*)&Status, 1);
-		SendBuff->PutData((char*)&Type, 2);
 
 		// ID와 Password가 nullptr이라면, 직렬화버퍼의 rear만 움직인다.
 		// (AccountNo가 없던가 그 외 이유로 ID와 닉네임을 확인 불가능한 상황.)
@@ -716,6 +711,7 @@ namespace Library_Jingyu
 
 			// 로그인 요청이 아니면 접속 해제
 		default:
+			g_LoginDump->Crash();
 			Disconnect(SessionID);
 			break;
 		}	

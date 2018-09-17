@@ -248,24 +248,24 @@ namespace Library_Jingyu
 
 		// 연결된 리슨 소켓의 송신버퍼 크기를 0으로 변경. 그래야 정상적으로 비동기 입출력으로 실행
 		// 리슨 소켓만 바꾸면 모든 클라 송신버퍼 크기는 0이된다.
-		int optval = 0;
-		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
-		if (optval == SOCKET_ERROR)
-		{
-			// 윈도우 에러, 내 에러 보관
-			m_iOSErrorCode = WSAGetLastError();
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
+		//int optval = 0;
+		//retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
+		//if (optval == SOCKET_ERROR)
+		//{
+		//	// 윈도우 에러, 내 에러 보관
+		//	m_iOSErrorCode = WSAGetLastError();
+		//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
 
-			// 각종 핸들 반환 및 동적해제 절차.
-			ExitFunc(m_iW_ThreadCount);
+		//	// 각종 핸들 반환 및 동적해제 절차.
+		//	ExitFunc(m_iW_ThreadCount);
 
-			// 로그 찍기 (로그 레벨 : 에러)
-			cLanLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
-				(int)m_iMyErrorCode, m_iOSErrorCode);
+		//	// 로그 찍기 (로그 레벨 : 에러)
+		//	cLanLibLog->LogSave(L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
+		//		(int)m_iMyErrorCode, m_iOSErrorCode);
 
-			// false 리턴
-			return false;
-		}
+		//	// false 리턴
+		//	return false;
+		//}
 
 		// 인자로 받은 노딜레이 옵션 사용 여부에 따라 네이글 옵션 결정
 		// 이게 true면 노딜레이 사용하겠다는 것(네이글 중지시켜야함)
@@ -500,7 +500,6 @@ namespace Library_Jingyu
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
 		shutdown(DeleteSession->m_Client_sock, SD_BOTH);
-		CancelIoEx((HANDLE)DeleteSession->m_Client_sock, NULL);
 
 		// 3. 세션 락 해제
 		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
