@@ -19,6 +19,7 @@
 ULONGLONG g_ullAcceptTotal;
 LONG	  g_lAcceptTPS;
 LONG	g_lSendPostTPS;
+LONG	g_lSemaphoreCount;
 
 
 namespace Library_Jingyu
@@ -727,6 +728,18 @@ namespace Library_Jingyu
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
 			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+
+			// -------- !! 테스트용!! ERROR_SEM_TIMEOUT 에러 체크
+			/*if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == false)
+			{
+				if (overlapped != NULL && 
+					overlapped == &stNowSession->m_overRecvOverlapped)
+				{
+					if(GetLastError() == ERROR_SEM_TIMEOUT)
+						InterlockedAdd(&g_lSemaphoreCount, 1);
+				}
+			}*/
+
 					
 			// --------------
 			// 완료 체크

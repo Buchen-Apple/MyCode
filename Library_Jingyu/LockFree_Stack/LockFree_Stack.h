@@ -2,6 +2,7 @@
 #define __LOCKFREE_STACK_H__
 
 #include <Windows.h>
+
 #include "ObjectPool\Object_Pool_LockFreeVersion.h"
 #include "CrashDump\CrashDump.h"
 

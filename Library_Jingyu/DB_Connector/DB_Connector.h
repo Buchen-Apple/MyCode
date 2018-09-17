@@ -2,18 +2,18 @@
 #define __DB_CONNECTOR_H__
 
 #include <Windows.h>
-#include "Mysql\include\mysql.h"
-#include "Mysql\include\errmsg.h"
 #include "LockFree_Stack\LockFree_Stack.h"
 
-#pragma comment(lib, "Mysql/lib/vs14/mysqlclient")
+#include "Mysql\include\mysql.h"
+#include "Mysql\include\errmsg.h"
 
+// 일반 버전
 namespace Library_Jingyu
 {
 	class CDBConnector
 	{
 	public:
-		
+
 		enum en_DB_CONNECTOR
 		{
 			// 쿼리 1개의 길이
@@ -51,10 +51,10 @@ namespace Library_Jingyu
 		//////////////////////////////////////////////////////////////////////
 		// 쿼리 날리고 결과셋 임시 보관
 		//
-		// Parameter : WCHAR형 쿼리 메시지
+		// Parameter : char형 쿼리 메시지
 		//////////////////////////////////////////////////////////////////////
-		bool		Query(WCHAR *szStringFormat, ...);
-		bool		Query_Save(WCHAR *szStringFormat, ...);	// DBWriter 스레드의 Save 쿼리 전용
+		void		Query(char *szStringFormat, va_list* vlist);
+		void		Query_Save(char *szStringFormat, va_list* vlist);	// DBWriter 스레드의 Save 쿼리 전용
 																// 결과셋을 저장하지 않음.
 
 		//////////////////////////////////////////////////////////////////////
@@ -128,7 +128,11 @@ namespace Library_Jingyu
 		WCHAR		m_wcLastErrorMsg[128];
 
 	};
+}
 
+// TLS 버전
+namespace Library_Jingyu
+{
 	class CBConnectorTLS
 	{
 		// TLS 인덱스
@@ -136,7 +140,7 @@ namespace Library_Jingyu
 
 		// 각 스레드에게 할당한 DBConnector를 관리하는 스택
 		// 소멸자에서 pop 하면서, 각 커넥터의 소멸자 호출
-		CLF_Stack< CDBConnector* > m_stackConnector;
+		CLF_Stack< CDBConnector*> *m_stackConnector;
 
 		//-------------------------------------------------------------
 		// DB 연결을 위한 정보 보관
@@ -183,8 +187,8 @@ namespace Library_Jingyu
 		//
 		// Parameter : WCHAR형 쿼리 메시지
 		//////////////////////////////////////////////////////////////////////
-		bool		Query(WCHAR *szStringFormat, ...);
-		bool		Query_Save(WCHAR *szStringFormat, ...);	// DBWriter 스레드의 Save 쿼리 전용
+		void		Query(char *szStringFormat, ...);
+		void		Query_Save(char *szStringFormat, ...);	// DBWriter 스레드의 Save 쿼리 전용
 																// 결과셋을 저장하지 않음.
 
 		//////////////////////////////////////////////////////////////////////

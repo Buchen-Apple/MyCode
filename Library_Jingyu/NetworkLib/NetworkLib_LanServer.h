@@ -237,25 +237,25 @@ namespace Library_Jingyu
 		//
 		// parameter : 접속한 유저에게 할당된 세션키
 		// return : 없음
-		virtual void OnClientJoin(ULONGLONG ClinetID) = 0;
+		virtual void OnClientJoin(ULONGLONG SessionID) = 0;
 
 		// 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
 		//
 		// parameter : 유저 세션키
 		// return : 없음
-		virtual void OnClientLeave(ULONGLONG ClinetID) = 0;
+		virtual void OnClientLeave(ULONGLONG SessionID) = 0;
 
 		// 패킷 수신 완료 후 호출되는 함수.
 		//
 		// parameter : 유저 세션키, 받은 패킷
 		// return : 없음
-		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload) = 0;
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload) = 0;
 
 		// 패킷 송신 완료 후 호출되는 함수
 		//
 		// parameter : 유저 세션키, Send 한 사이즈
 		// return : 없음
-		virtual void OnSend(ULONGLONG ClinetID, DWORD SendSize) = 0;
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize) = 0;
 
 		// 워커 스레드가 깨어날 시 호출되는 함수.
 		// GQCS 바로 하단에서 호출

@@ -1,6 +1,8 @@
 #include "pch.h"
 #include "ProtocolBuff_ObjectPool.h"
 
+extern LONG g_lAllocNodeCount_Lan;
+
 namespace Library_Jingyu
 {
 
@@ -264,6 +266,7 @@ namespace Library_Jingyu
 	// 메모리풀에서 직렬화버퍼 1개 Alloc
 	CProtocolBuff_Lan* CProtocolBuff_Lan::Alloc()
 	{
+		InterlockedIncrement(&g_lAllocNodeCount_Lan);
 		return  m_MPool->Alloc();
 	}
 
@@ -275,6 +278,8 @@ namespace Library_Jingyu
 		// 만약 감소 후 0이됐다면 delete
 		if (InterlockedDecrement(&pBuff->m_RefCount) == 0)
 		{
+			InterlockedDecrement(&g_lAllocNodeCount_Lan);
+
 			pBuff->m_Rear = dfNETWORK_PACKET_HEADER_SIZE;		// rear 값 2로 초기화. 헤더 영역 확보
 			pBuff->m_Front = 0;
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
@@ -288,5 +293,13 @@ namespace Library_Jingyu
 	{
 		// 인터락으로 안전하게 증가
 		InterlockedIncrement(&m_RefCount);
+	}
+
+	// 레퍼런스 카운트를 인자로 받아서 Add하는 함수
+	// 위의 Add함수 오버로딩
+	void CProtocolBuff_Lan::Add(int Count)
+	{
+		// 인터락으로 안전하게 증가
+		InterlockedAdd(&m_RefCount, Count);
 	}
 }

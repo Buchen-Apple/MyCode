@@ -8,15 +8,14 @@
 
 
 
-
+/////////////////////////////////////////////////////
+// 메모리 풀(오브젝트 풀)
+////////////////////////////////////////////////////
 namespace Library_Jingyu
 {
 
 #define MEMORYPOOL_ENDCODE	890226
 
-	/////////////////////////////////////////////////////
-	// 메모리 풀(오브젝트 풀)
-	////////////////////////////////////////////////////
 	template <typename DATA>
 	class CMemoryPool
 	{
@@ -112,7 +111,7 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////////
 	template <typename DATA>
 	CMemoryPool<DATA>::CMemoryPool(int iBlockNum, bool bPlacementNew)
-	{		
+	{
 		// 멤버 변수 셋팅	
 		m_iBlockNum = iBlockNum;
 		m_bPlacementNew = bPlacementNew;
@@ -153,7 +152,7 @@ namespace Library_Jingyu
 					new (&pNode->stData) DATA();
 
 				pNode->stpNextBlock = m_stpTop.m_pTop;
-				m_stpTop.m_pTop = pNode;				
+				m_stpTop.m_pTop = pNode;
 
 				pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
@@ -234,7 +233,7 @@ namespace Library_Jingyu
 	template <typename DATA>
 	DATA*	CMemoryPool<DATA>::Alloc(void)
 	{
-		bool bContinueFlag;		
+		bool bContinueFlag;
 
 		while (1)
 		{
@@ -294,7 +293,7 @@ namespace Library_Jingyu
 				// 때문에, 루프 시작 전에 무조건 Count를 먼저 받아온다. 
 				// top을 먼저 받아올 경우, 컨텍스트 스위칭으로 인해 다른 스레드에서 Count값 변조 후, 변조된 값을 받아올 수도 있다.
 				localTop.m_l64Count = m_stpTop.m_l64Count;
-				localTop.m_pTop = m_stpTop.m_pTop;	
+				localTop.m_pTop = m_stpTop.m_pTop;
 
 				// null체크
 				if (localTop.m_pTop == nullptr)
@@ -303,7 +302,7 @@ namespace Library_Jingyu
 					// flag를 true로 바꾸면, do while문 밖에서 체크 후 continue 실행
 					bContinueFlag = true;
 					break;
-				}						
+				}
 
 			} while (!InterlockedCompareExchange128((LONG64*)&m_stpTop, localTop.m_l64Count + 1, (LONG64)localTop.m_pTop->stpNextBlock, (LONG64*)&localTop));
 
@@ -322,7 +321,7 @@ namespace Library_Jingyu
 			return &localTop.m_pTop->stData;
 
 		}
-		
+
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -342,7 +341,7 @@ namespace Library_Jingyu
 		st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)pData;
 
 		if (pNode->stMyCode != MEMORYPOOL_ENDCODE)
-			return false;	
+			return false;
 
 		//플레이스먼트 뉴를 사용한다면 메모리 풀에 추가하기 전에 '객체 소멸자' 호출
 		if (m_bPlacementNew == true)
@@ -350,8 +349,8 @@ namespace Library_Jingyu
 
 		// 유저 사용중 카운트 감소
 		// free(Push) 시에는, 일단 카운트를 먼저 감소시킨다. 그래도 된다! 어차피 락프리는 100%성공 보장.
-		InterlockedDecrement(&m_iUseCount);		
-		
+		InterlockedDecrement(&m_iUseCount);
+
 		// ---- 락프리 적용 ----
 		st_BLOCK_NODE* localTop;
 
@@ -369,22 +368,16 @@ namespace Library_Jingyu
 
 		return true;
 	}
+}
 
 
-
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------
-
-	/////////////////////////////////////////////////////
-	// 메모리 풀 TLS 버전
-	//
-	// 내부에서 청크를 다룸
-	////////////////////////////////////////////////////
+/////////////////////////////////////////////////////
+// 메모리 풀 TLS 버전
+//
+// 내부에서 청크를 다룸
+////////////////////////////////////////////////////
+namespace Library_Jingyu
+{	
 	template <typename DATA>
 	class CMemoryPoolTLS
 	{	

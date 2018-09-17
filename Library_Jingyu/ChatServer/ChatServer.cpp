@@ -12,6 +12,7 @@
 extern LONG g_lUpdateStructCount;
 extern LONG g_lUpdateStruct_PlayerCount;
 extern LONG		 g_lUpdateTPS;
+extern LONG g_lTokenNodeCount;
 
 // ------------- 공격 테스트용
 extern int m_SectorPosError;
@@ -52,6 +53,10 @@ namespace Library_Jingyu
 	// 클래스 내부에서 사용하는 함수
 	// -------------------------------------
 
+	// 인자로 받은 섹터 X,Y 기준, 브로드 캐스트 시, 보내야 할 섹터 9방향 구해둔다.
+	// 
+	// Parameter : 기준 섹터 X, Y, 섹터구조체(out)
+	// return : 없음
 	void CChatServer::SecotrSave(int SectorX, int SectorY, st_SecotrSaver* Sector)
 	{
 		int iCurX, iCurY;
@@ -80,7 +85,6 @@ namespace Library_Jingyu
 	}
 
 	// 파일에서 Config 정보 읽어오기
-	// 
 	// 
 	// Parameter : config 구조체
 	// return : 정상적으로 셋팅 시 true
@@ -178,23 +182,22 @@ namespace Library_Jingyu
 			return false;
 
 		// 생성 워커 수
-		if (Parser.GetValue_Int(_T("LoginServerCreateWorker"), &pConfig->LoginServer_CreateWorker) == false)
+		if (Parser.GetValue_Int(_T("ClientCreateWorker"), &pConfig->Client_CreateWorker) == false)
 			return false;
 
 		// 활성화 워커 수
-		if (Parser.GetValue_Int(_T("LoginServerActiveWorker"), &pConfig->LoginServer_ActiveWorker) == false)
+		if (Parser.GetValue_Int(_T("ClientActiveWorker"), &pConfig->Client_ActiveWorker) == false)
 			return false;
 
 
 		// Nodelay
-		if (Parser.GetValue_Int(_T("LoginServerNodelay"), &pConfig->LoginServer_Nodelay) == false)
+		if (Parser.GetValue_Int(_T("ClientNodelay"), &pConfig->Client_Nodelay) == false)
 			return false;
 
 
 		return true;
 	}
-
-
+	
 	// Player 관리 자료구조에, 유저 추가
 	// 현재 map으로 관리중
 	// 
@@ -460,19 +463,8 @@ namespace Library_Jingyu
 		// SectorPos를 초기 위치로 설정
 		ErasePlayer->m_wSectorY = TEMP_SECTOR_POS;
 		ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
-
-		// ------------------------
-		// 4) 토큰 umap에서 제외시킨다.
-		//Chat_LanClient::stToken* EraseToken = m_Logn_LanClient.EraseTokenFunc(ErasePlayer->m_i64AccountNo);
-		//if (EraseToken == nullptr)
-		//	m_ChatDump->Crash();
-
-		//// 5) Toekn Free()
-		//m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
-
-		// ------------------------
-
-		// 6) Player Free()
+		
+		// 4) Player Free()
 		m_PlayerPool->Free(ErasePlayer);
 
 		InterlockedAdd(&g_lUpdateStruct_PlayerCount, -1);
@@ -700,18 +692,88 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer::Packet_Chat_Login(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
 	{
-		// 1) 마샬링		
-		INT64	AccountNo;
-		WCHAR tcLoginID[20];
-		WCHAR tcNickName[20];
-		char Token[64];
+		// 1) 플레이어 알아오기
+		stPlayer* FindPlayer = FindPlayerFunc(SessionID);
+		if (FindPlayer == nullptr)
+			m_ChatDump->Crash();
 
+		// 2) 마샬링하며 셋팅
+		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
-		Packet->GetData((char*)tcLoginID, 40);
-		Packet->GetData((char*)tcNickName, 40);
+		FindPlayer->m_i64AccountNo = AccountNo;
+
+		Packet->GetData((char*)FindPlayer->m_tLoginID, 40);
+		Packet->GetData((char*)FindPlayer->m_tNickName, 40);
+
+		char Token[64];
 		Packet->GetData(Token, 64);
 
-		// 2) 토큰키 체크
+		// 3) 이번 통신에 받은 패킷이 유효한지 체크		
+		AcquireSRWLockExclusive(&m_Logn_LanClient.srwl);		// 락 -----
+
+		// 검색
+		auto FindToken = m_Logn_LanClient.m_umapTokenCheck.find(AccountNo);
+
+		// 같다면, 정상적으로 로그인 처리 됨			
+		if (memcmp(FindToken->second->m_cToken, Token, 64) == 0)
+		{
+			// 기존 토큰 erase	
+			Chat_LanClient::stToken* retToken = FindToken->second;
+			m_Logn_LanClient.m_umapTokenCheck.erase(FindToken);
+
+			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+
+			// stToken* Free
+			m_Logn_LanClient.m_MTokenTLS->Free(retToken);
+			InterlockedAdd(&g_lTokenNodeCount, -1);
+
+			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
+			SendBuff->PutData((char*)&SendType, 2);
+
+			BYTE Status = 1;
+			SendBuff->PutData((char*)&Status, 1);
+
+			SendBuff->PutData((char*)&AccountNo, 8);
+
+			// 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+			SendPacket(SessionID, SendBuff);
+
+			return;
+		}
+
+		// 다르다면 아무것도 할거 없음. NetServer쪽에서 자동으로 I/O 카운트가 0이 되어, 종료 로직 타게된다.
+		ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+
+
+
+			
+
+
+
+			
+
+
+
+
+
+
+
+
+		//// 1) 마샬링		
+		//INT64	AccountNo;
+		//WCHAR tcLoginID[20];
+		//WCHAR tcNickName[20];
+		//char Token[64];
+
+		//Packet->GetData((char*)&AccountNo, 8);
+		//Packet->GetData((char*)tcLoginID, 40);
+		//Packet->GetData((char*)tcNickName, 40);
+		//Packet->GetData(Token, 64);
+
+		//// 2) 토큰키 체크
 		//Chat_LanClient::stToken* FindToken = m_Logn_LanClient.FindTokenFunc(AccountNo);
 		//if(FindToken == nullptr)
 		//	m_ChatDump->Crash();		
@@ -724,55 +786,22 @@ namespace Library_Jingyu
 		//	return;
 		//}
 
-		// 3) 정상이면 플레이어를 알아온 후 값 셋팅
-		stPlayer* FindPlayer = FindPlayerFunc(SessionID);
-		if (FindPlayer == nullptr)
-			m_ChatDump->Crash();
-
-		// AccountNo
-		FindPlayer->m_i64AccountNo = AccountNo;
-
-		// LoginID 
-		StringCbCopy(FindPlayer->m_tLoginID, 20, tcLoginID);
-
-		// NickName
-		StringCbCopy(FindPlayer->m_tNickName, 20, tcNickName);
-
-		// Token
-		StringCbCopyA(FindPlayer->m_cToken, 64, Token);
-
-
-		// 4) 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
-		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
-
-		WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
-		SendBuff->PutData((char*)&SendType, 2);
-
-		BYTE Status = 1;
-		SendBuff->PutData((char*)&Status, 1);
-
-		SendBuff->PutData((char*)&AccountNo, 8);
-
-		// 5) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
-		SendPacket(SessionID, SendBuff);
-
-
-
-		//// 1) map에서 유저 검색
+		//// 3) 정상이면 플레이어를 알아온 후 값 셋팅
 		//stPlayer* FindPlayer = FindPlayerFunc(SessionID);
 		//if (FindPlayer == nullptr)
 		//	m_ChatDump->Crash();
 
-		//// 2) 마샬링
-		//INT64	AccountNo;
-		//Packet->GetData((char*)&AccountNo, 8);
+		//// AccountNo
 		//FindPlayer->m_i64AccountNo = AccountNo;
 
-		//Packet->GetData((char*)FindPlayer->m_tLoginID, 40);
-		//Packet->GetData((char*)FindPlayer->m_tNickName, 40);
-		//Packet->GetData(FindPlayer->m_cToken, 64);
+		//// LoginID 
+		//StringCbCopy(FindPlayer->m_tLoginID, 20, tcLoginID);
 
-		//// 3) 토큰 검사
+		//// NickName
+		//StringCbCopy(FindPlayer->m_tNickName, 20, tcNickName);
+
+		//// Token
+		////StringCbCopyA(FindPlayer->m_cToken, 64, Token);
 
 
 		//// 4) 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
@@ -786,7 +815,7 @@ namespace Library_Jingyu
 
 		//SendBuff->PutData((char*)&AccountNo, 8);
 
-		//// 6) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+		//// 5) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 		//SendPacket(SessionID, SendBuff);
 	}
 
@@ -897,7 +926,8 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 로그인 서버와 연결되는, 랜 클라이언트 가동
-		//m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.LoginServer_CreateWorker, m_stConfig.LoginServer_ActiveWorker, m_stConfig.LoginServer_Nodelay);
+		if(m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.Client_CreateWorker, m_stConfig.Client_ActiveWorker, m_stConfig.Client_Nodelay) == false)
+			return false;
 
 		// 서버 오픈 로그 찍기		
 		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -1183,6 +1213,7 @@ namespace Library_Jingyu
 		// 1. 토큰 TLS에서 Alloc
 		// !! 토큰 TLS  Free는, ChatServer에서, 실제 유저가 나갔을 때(OnClientLeave)에서 한다 !!
 		stToken* NewToken = m_MTokenTLS->Alloc();
+		InterlockedAdd(&g_lTokenNodeCount, 1);
 
 		// 2. AccountNo 빼온다.
 		INT64 AccountNo;
@@ -1228,20 +1259,32 @@ namespace Library_Jingyu
 	// 현재 umap으로 관리중
 	// 
 	// Parameter : AccountNo, stToken*
-	// return : 추가 성공 시, true
-	//		  : AccountNo가 중복될 시 false
-	bool Chat_LanClient::InsertTokenFunc(INT64 AccountNo, stToken* isnertToken)
+	// 없음
+	void Chat_LanClient::InsertTokenFunc(INT64 AccountNo, stToken* isnertToken)
 	{
 		// umap에 추가
 		AcquireSRWLockExclusive(&srwl);		// ---------------- Lock
-		auto ret = m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));
-		ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock
+		auto ret = m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));		
 
-		// 중복된 키일 시 false 리턴.
+		// 중복된 키일 시 기존 값을 빼고 다시 넣는다.
 		if (ret.second == false)
-			return false;
+		{
+			auto Find = m_umapTokenCheck.find(AccountNo);
 
-		return true;
+			stToken* FreeToken = Find->second;
+			m_umapTokenCheck.erase(Find);
+			m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));
+
+			ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock.
+
+			// 기존의 Token 구조체 Free
+			m_MTokenTLS->Free(FreeToken);
+			InterlockedAdd(&g_lTokenNodeCount, -1);
+
+			return;
+		}
+
+		ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock
 	}
 
 

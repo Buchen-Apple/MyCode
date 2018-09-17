@@ -67,9 +67,8 @@ namespace Library_Jingyu
 		// 현재 umap으로 관리중
 		// 
 		// Parameter : AccountNo, stToken*
-		// return : 추가 성공 시, true
-		//		  : AccountNo가 중복될 시 false
-		bool InsertTokenFunc(INT64 AccountNo, stToken* isnertToken);
+		// return : 없음
+		void InsertTokenFunc(INT64 AccountNo, stToken* isnertToken);
 
 
 		// 토큰 관리 자료구조에서, 토큰 검색
@@ -207,9 +206,9 @@ namespace Library_Jingyu
 
 			TCHAR LoginServerIP[20];
 			int LoginServerPort;
-			int LoginServer_CreateWorker;
-			int LoginServer_ActiveWorker;
-			int LoginServer_Nodelay;
+			int Client_CreateWorker;
+			int Client_ActiveWorker;
+			int Client_Nodelay;
 		};
 
 		// 플레이어 구조체
@@ -232,7 +231,7 @@ namespace Library_Jingyu
 			WCHAR m_tNickName[20];
 
 			// 토큰 (세션 키)
-			char m_cToken[64];
+			//char m_cToken[64];
 		};
 
 	private:
@@ -248,7 +247,7 @@ namespace Library_Jingyu
 		////////////////////////////////////////////////
 		// !! 로그인 서버와 통신하기 위한 LanClient !!
 		////////////////////////////////////////////////
-		//Chat_LanClient m_Logn_LanClient;
+		Chat_LanClient m_Logn_LanClient;
 
 		stConfigFile m_stConfig;
 
@@ -304,10 +303,13 @@ namespace Library_Jingyu
 		// 클래스 내부에서만 사용하는 기능 함수
 		// -------------------------------------	
 
+		// 인자로 받은 섹터 X,Y 기준, 브로드 캐스트 시, 보내야 할 섹터 9방향 구해둔다.
+		// 
+		// Parameter : 기준 섹터 X, Y, 섹터구조체(out)
+		// return : 없음
 		void SecotrSave(int SectorX, int SectorY, st_SecotrSaver* Sector);
 
 		// 파일에서 Config 정보 읽어오기
-		// 
 		// 
 		// Parameter : config 구조체
 		// return : 정상적으로 셋팅 시 true
@@ -482,6 +484,31 @@ namespace Library_Jingyu
 		LONG GetPlayerOutChunkCount()
 		{
 			return m_PlayerPool->GetOutChunkCount();
+		}
+
+		// ----------------------
+		// ----------------------
+		// 랜 클라이언트용 
+
+		// !! 테스트용 !!
+		// 토큰 umap 안의 수 반환
+		LONG GetTokenUmapSize()
+		{
+			return (LONG)m_Logn_LanClient.m_umapTokenCheck.size();
+		}
+
+		// !! 테스트용 !!
+		// 토큰 TLS의 총 할당된 청크 수 반환
+		LONG GetTokenChunkCount()
+		{
+			return m_Logn_LanClient.m_MTokenTLS->GetAllocChunkCount();
+		}
+
+		// !! 테스트용 !!
+		// 토큰 TLS의 현재 밖에서 사용중인 청크 수 반환
+		LONG GetTokenOutChunkCount()
+		{
+			return m_Logn_LanClient.m_MTokenTLS->GetOutChunkCount();
 		}
 	};
 }

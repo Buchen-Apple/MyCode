@@ -116,6 +116,22 @@ namespace Library_Jingyu
 		// 일반 함수 -----------
 		// 레퍼런스 카운트 1 Add하는 함수
 		void Add();
+
+		// 레퍼런스 카운트를 인자로 받아서 Add하는 함수
+		// 위의 Add함수 오버로딩
+		void Add(int Count);
+
+		// TLS 직렬화버퍼의 총 Alloc한 청크 수
+		static LONG GetChunkCount()
+		{
+			return m_MPool->GetAllocChunkCount();
+		}
+
+		// TLS 직렬화버퍼의 청크 중, 밖에서 사용중인 청크 수
+		static LONG GetOutChunkCount()
+		{
+			return m_MPool->GetOutChunkCount();
+		}
 	};
 }
 
