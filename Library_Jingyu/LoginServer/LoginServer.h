@@ -308,7 +308,7 @@ namespace Library_Jingyu
 		ULONGLONG m_arrayJoinServer[10];
 
 		// 배열 안에 있는 유저 수
-		int m_iArrayCount= 0;
+		int m_iArrayCount;
 
 		// 배열의 락
 		SRWLOCK srwl;

@@ -2,7 +2,6 @@
 락프리 적용된 NetServer
 */
 
-
 #ifndef __NETWORK_LIB_NETSERVER_H__
 #define __NETWORK_LIB_NETSERVER_H__
 
@@ -148,9 +147,10 @@ namespace Library_Jingyu
 
 		// RecvPost함수
 		//
-		// return true : 성공적으로 WSARecv() 완료 or 어쨋든 종료된 유저는 아님
-		// return false : I/O카운트가 0이되어서 종료된 유저임
-		bool RecvPost(stSession* NowSession);
+		// return 0 : 성공적으로 WSARecv() 완료
+		// return 1 : RecvQ가 꽉찬 유저
+		// return 2 : I/O 카운트가 0이되어 삭제된 유저
+		int RecvPost(stSession* NowSession);
 
 		// SendPost함수
 		//
@@ -207,9 +207,9 @@ namespace Library_Jingyu
 		// SendPacket은 그냥 아무때나 하면 된다.
 		// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 		//
-		// Parameter : SessionID, SendBuff
+		// Parameter : SessionID, SendBuff, LastFlag(디폴트 FALSE)
 		// return : 없음
-		void SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff);
+		void SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff, LONG LastFlag = FALSE);
 
 
 		// ----------------------------- 게터 함수들 ---------------------------

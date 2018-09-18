@@ -7,7 +7,6 @@
 #include <strsafe.h>
 
 extern LONG g_lStruct_PlayerCount;
-ULONGLONG g_ullDisconnectTotal;
 
 // ----------------------------------
 // LoginServer(NetServer)
@@ -599,7 +598,8 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&m_stConfig.ChatServerPort, 2);
 
 		// 5. SendPacket()
-		SendPacket(SessionID, SendBuff);
+		// 보내고 끊기.
+		SendPacket(SessionID, SendBuff, TRUE);
 	}
 
 	// "실패" 패킷 만들고 보내기
@@ -635,7 +635,8 @@ namespace Library_Jingyu
 		SendBuff->MoveWritePos(68);
 
 		// 3. SendPacket()
-		SendPacket(SessionID, SendBuff);
+		// 보내고 끊기
+		SendPacket(SessionID, SendBuff, TRUE);
 	}
 
 
@@ -725,6 +726,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CLogin_NetServer::OnSend(ULONGLONG SessionID, DWORD SendSize)
 	{
+		/*
 		// 1. 유저 검색
 		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
 
@@ -733,12 +735,13 @@ namespace Library_Jingyu
 			g_LoginDump->Crash();
 
 		// 2. 쿼리를 날려, 해당 유저를 로그인 상태로 변경
-		//WCHAR qurey[200] = L"UPDATE `status` SET `status` = 1 WHERE `accountno` = %d";
-		//m_AcountDB_Connector->Query_Save(qurey, NowPlayer->m_i64AccountNo);
+		char qurey[200] = "UPDATE `status` SET `status` = 1 WHERE `accountno` = %d\0";
+		m_AcountDB_Connector->Query_Save(qurey, NowPlayer->m_i64AccountNo);
 
 		// 데이터를 보냈으면, 해당 유저는 접속 종료
 		InterlockedIncrement(&g_ullDisconnectTotal);
 		Disconnect(SessionID);		
+		*/
 	}
 
 	// 워커 스레드가 깨어날 시 호출되는 함수.
@@ -841,6 +844,8 @@ namespace Library_Jingyu
 	{
 		// 락 초기화
 		InitializeSRWLock(&srwl);
+
+		m_iArrayCount = 0;
 	}
 
 	// 소멸자

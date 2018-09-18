@@ -741,7 +741,17 @@ namespace Library_Jingyu
 				g_This->RecvProc(stNowSession);
 
 				// 2. 리시브 다시 걸기.
-				g_This->RecvPost(stNowSession);
+				if (g_This->RecvPost(stNowSession) == 1)
+				{
+					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					{
+						g_This->InDisconnect(stNowSession);
+						continue;
+					}
+
+					shutdown(stNowSession->m_Client_sock, SD_BOTH);
+					continue;
+				}
 			}
 
 			// -----------------
@@ -940,12 +950,19 @@ namespace Library_Jingyu
 			// ------------------
 			// 비동기 입출력 시작
 			// ------------------
-			// 반환값이 false라면, 이 안에서 종료된 유저임. 근데 안받음
-			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
+			// 리시브 버퍼가 꽉찼으면 1리턴
+			int ret = g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
 			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
 			if (InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
 				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);
+
+			// I/O카운트 감소시켰는데 0이 아니라면, ret 체크.
+			// ret가 1이라면 접속 끊는다.
+			else if (ret == 1)
+			{
+				shutdown(g_This->m_stSessionArray[iIndex].m_Client_sock, SD_BOTH);
+			}
 
 		}
 
@@ -1102,9 +1119,10 @@ namespace Library_Jingyu
 
 	// RecvPost 함수. 비동기 입출력 시작
 	//
-	// return true : 성공적으로 WSARecv() 완료 or WSARecv가 실패했지만 종료된 유저는 아님.
-	// return false : I/O카운트가 0이되어서 종료된 유저
-	bool CLanServer::RecvPost(stSession* NowSession)
+	// return 0 : 성공적으로 WSARecv() 완료
+	// return 1 : RecvQ가 꽉찬 유저
+	// return 2 : I/O 카운트가 0이되어 삭제된 유저
+	int CLanServer::RecvPost(stSession* NowSession)
 	{
 		// ------------------
 		// 비동기 입출력 시작
@@ -1115,6 +1133,11 @@ namespace Library_Jingyu
 
 		int FreeSize = NowSession->m_RecvQueue.GetFreeSize();
 		int Size = NowSession->m_RecvQueue.GetNotBrokenPutSize();
+
+		// 리시브 링버퍼 크기 확인
+		// 빈공간이 없으면 1리턴
+		if (FreeSize <= 0)
+			return 1;
 
 		if (Size < FreeSize)
 		{
@@ -1153,7 +1176,7 @@ namespace Library_Jingyu
 				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 				{
 					InDisconnect(NowSession);
-					return false;
+					return 2;
 				}
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
@@ -1181,7 +1204,7 @@ namespace Library_Jingyu
 			}
 		}
 
-		return true;
+		return 0;
 	}
 
 

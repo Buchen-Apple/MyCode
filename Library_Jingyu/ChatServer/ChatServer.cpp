@@ -18,6 +18,9 @@ extern LONG g_lUpdateStruct_PlayerCount;
 extern LONG		 g_lUpdateTPS;
 extern LONG g_lTokenNodeCount;
 
+extern LONG g_lTokenMiss;
+extern LONG g_lTokenNotFound;
+
 // ------------- 공격 테스트용
 extern int m_SectorPosError;
 
@@ -296,10 +299,9 @@ namespace Library_Jingyu
 		if (FindToken == m_mapLastPacketTime.end())
 		{
 			ReleaseSRWLockExclusive(&m_LastPacketsrwl);	// ---------------- Unlock
+
 			// 말이 안됨. 크래시
 			m_ChatDump->Crash();
-
-			return;
 		}
 
 		// 2) 맵에서 제거	
@@ -462,8 +464,10 @@ namespace Library_Jingyu
 
 			// 1) 하트 비트 체크	-----------------------------------
 			// 하트비트는, 지정된 시간동안 유저에게 패킷이 1개도 오지 않았을 경우.
-			// 즉, 새로 메시지를 받을 때 마다 유저가 마지막으로 패킷을 받은 시간은 계속 갱신된다.
-					
+			// 즉, 새로 메시지를 받을 때 마다 유저가 마지막으로 패킷을 받은 시간은 계속 갱신된다.		
+
+			ULONGLONG DisconnectArray[10000];
+			int ArrayIndex = 0;
 
 			AcquireSRWLockShared(&g_this->m_LastPacketsrwl);	// 락 ----------------
 
@@ -480,8 +484,17 @@ namespace Library_Jingyu
 					// 마지막 패킷을 받은지 40초 이상이 되었다면
 					if ((ullCheckTime - LastPacketbegin->second) >= 40000)
 					{
-						// 접속 끊기
-						g_this->Disconnect(LastPacketbegin->first);
+						// 접속 끊을 유저를 배열에 보관.
+						// !! m_mapLastPacketTime에 락걸고 하고 있기 때문에, 경합현상을 최대한 줄이기 위해 Disconnect 호출을 위한, SessionID만 배열에 보관해 둔다. !!
+						DisconnectArray[ArrayIndex] = LastPacketbegin->first;
+						ArrayIndex++;
+
+						// 배열이 꽉찼으면 break. 나머지는 다음에 깨어났을 때 지운다.
+						if (ArrayIndex == 10000)
+						{
+							ArrayIndex--;
+							break;
+						}
 					}
 
 					++LastPacketbegin;
@@ -489,6 +502,14 @@ namespace Library_Jingyu
 			}
 
 			ReleaseSRWLockShared(&g_this->m_LastPacketsrwl);	// 언 락 ----------------
+
+			// 배열에 보관한 유저를, 카운트만큼 돌면서 Disconnect 한다.
+			while (ArrayIndex >= 0)
+			{
+				// 접속 끊기
+				g_this->Disconnect(DisconnectArray[ArrayIndex]);
+				--ArrayIndex;
+			}
 
 
 			// 2) 토큰 체크	-----------------------------------
@@ -512,14 +533,16 @@ namespace Library_Jingyu
 						auto EraseToken = Tokenbegin->second;
 
 						// 맵에서 제거
-						g_this->m_Logn_LanClient.m_umapTokenCheck.erase(Tokenend);
+						Tokenbegin = g_this->m_Logn_LanClient.m_umapTokenCheck.erase(Tokenbegin);
 
 						// Free
 						g_this->m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
+						InterlockedAdd(&g_lTokenNodeCount, -1);
 
 					}
 
-					++Tokenbegin;
+					else
+						++Tokenbegin;
 				}
 			}
 
@@ -870,10 +893,18 @@ namespace Library_Jingyu
 		// 3) 이번 통신에 받은 패킷이 유효한지 체크		
 		AcquireSRWLockExclusive(&m_Logn_LanClient.srwl);		// 락 -----
 
-		// 검색
+		// 토큰 검색
 		auto FindToken = m_Logn_LanClient.m_umapTokenCheck.find(AccountNo);
 
-		// 같다면, 정상적으로 로그인 처리 됨			
+		// 토큰을 못찾았으면 g_lTokenNotFound 카운트 증가
+		if (FindToken == m_Logn_LanClient.m_umapTokenCheck.end())
+		{
+			InterlockedAdd(&g_lTokenNotFound, 1);
+			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			return;
+		}
+
+		// 토큰이 같다면, 정상적으로 로그인 처리 됨			
 		if (memcmp(FindToken->second->m_cToken, Token, 64) == 0)
 		{
 			// 기존 토큰 erase	
@@ -903,7 +934,10 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 다르다면 아무것도 할거 없음. NetServer쪽에서 자동으로 I/O 카운트가 0이 되어, 종료 로직 타게된다.
+		// 다르다면 g_lTokenMiss 카운트 증가
+		InterlockedAdd(&g_lTokenMiss, 1);
+
+		// NetServer쪽에서 자동으로 I/O 카운트가 0이 되어, 종료 로직 타게된다.
 		ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
 
 	}

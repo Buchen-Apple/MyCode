@@ -19,7 +19,6 @@
 ULONGLONG g_ullAcceptTotal;
 LONG	  g_lAcceptTPS;
 LONG	g_lSendPostTPS;
-ULONGLONG	g_ullTrensferdCount;
 
 
 namespace Library_Jingyu
@@ -91,6 +90,9 @@ namespace Library_Jingyu
 
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
+
+		// 마지막 Send인지 체크. 1이면 더 이상 샌드 불가능, 0이면 샌드 가능.
+		LONG	m_lLastSendFlag;
 
 		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
 		CLF_Queue<CProtocolBuff_Net*>* m_SendQueue;
@@ -486,9 +488,9 @@ namespace Library_Jingyu
 	// SendPacket은 그냥 아무때나 하면 된다.
 	// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 	//
-	// Parameter : SessionID, SendBuff
+	// Parameter : SessionID, SendBuff, LastFlag(디폴트 FALSE)
 	// return : 없음
-	void CNetServer::SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff)
+	void CNetServer::SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff, LONG LastFlag)
 	{
 		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
 		stSession* NowSession = GetSessionLOCK(SessionID);
@@ -500,21 +502,35 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 2. 헤더를 넣어서, 패킷 완성하기
+		// 2. 마지막 Send 상태라면 더 이상 샌드 못함.
+		if (NowSession->m_lLastSendFlag == TRUE)
+		{
+			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
+			// ref 카운트가 0이 되면 메모리풀에 반환
+			CProtocolBuff_Net::Free(payloadBuff);
+			return;
+		}
+
+		// 3. 헤더를 넣어서, 패킷 완성하기
 		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
 
-		// 3. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
+		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
 		payloadBuff->Add();
 		NowSession->m_SendQueue->Enqueue(payloadBuff);
 
-		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
+		// 5. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff_Net::Free(payloadBuff);	
 
-		// 5. SendPost시도
+		// 6. 인자로 받은 Flag가 true라면, 세션의 Flag를 true로 변경
+		// 안전하게 하기 위해, Enq 후에 Flag 변경
+		if(LastFlag == TRUE)
+			NowSession->m_lLastSendFlag = TRUE;
+
+		// 7. SendPost시도
 		SendPost(NowSession);
 
-		// 6. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 8. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		// 근데 따로 리턴값 받지 않고 있음
 		GetSessionUnLOCK(NowSession);
@@ -725,19 +741,7 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			//GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
-
-			// -------- !! 테스트용!! 
-			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == false)
-			{
-				if (overlapped == &stNowSession->m_overSendOverlapped)
-				{
-					if (cbTransferred == 0)
-						InterlockedIncrement(&g_ullTrensferdCount);
-				}
-			}
-
-
+			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
 					
 			// --------------
 			// 완료 체크
@@ -785,7 +789,19 @@ namespace Library_Jingyu
 				g_This->RecvProc(stNowSession);
 
 				// 2. 리시브 다시 걸기.
-				g_This->RecvPost(stNowSession);
+				// 리시브 큐가 꽉찼으면 접속 끊는다.
+				if (g_This->RecvPost(stNowSession) == 1)
+				{
+					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					{
+						g_This->InDisconnect(stNowSession);
+						continue;
+					}
+
+					shutdown(stNowSession->m_Client_sock, SD_BOTH);
+					continue;
+				}
+
 			}
 
 			// -----------------
@@ -795,13 +811,28 @@ namespace Library_Jingyu
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
 				// !! 테스트 출력용 !!
-				// sendpost 추가
+				// sendpostTPS 추가
 				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
-				// 2. 보냈던 직렬화버퍼 삭제
+				// 2. LastSendFlag와 큐 사이즈 체크
+				// 마지막 Send 상태이고, 큐 사이즈가 0이라면 Disconnect 날림
+				if (stNowSession->m_lLastSendFlag == TRUE &&
+					stNowSession->m_SendQueue->GetInNode() == 0)
+				{
+					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					{
+						g_This->InDisconnect(stNowSession);
+						continue;
+					}
+
+					shutdown(stNowSession->m_Client_sock, SD_BOTH);
+					continue;
+				}
+
+				// 3. 보냈던 직렬화버퍼 삭제
 				int i = 0;
 				while (i < stNowSession->m_iWSASendCount)
 				{
@@ -812,7 +843,7 @@ namespace Library_Jingyu
 				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
 
 				// 4. 샌드 가능 상태로 변경
-				stNowSession->m_lSendFlag = FALSE;
+				stNowSession->m_lSendFlag = FALSE;				
 
 				// 5. 다시 샌드 시도
 				g_This->SendPost(stNowSession);
@@ -942,6 +973,9 @@ namespace Library_Jingyu
 
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
+
+			// -- LastSendFlag 초기화
+			g_This->m_stSessionArray[iIndex].m_lLastSendFlag = FALSE;
 			
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;						
@@ -950,7 +984,7 @@ namespace Library_Jingyu
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
 
-			// 3) 해당 세션 배열, 사용중으로 변경
+			// 3) 해당 세션, 사용중으로 변경
 			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
 			g_This->m_stSessionArray[iIndex].m_lReleaseFlag = FALSE;
 
@@ -991,12 +1025,19 @@ namespace Library_Jingyu
 			// ------------------
 			// 비동기 입출력 시작
 			// ------------------
-			// 반환값이 false라면, 이 안에서 종료된 유저임. 근데 안받음
-			g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
+			// 리시브 버퍼가 꽉찼으면 1리턴
+			int ret = g_This->RecvPost(&g_This->m_stSessionArray[iIndex]);
 
 			// 증가시켰던, I/O카운트 --. 0이라면 삭제처리
 			if(InterlockedDecrement(&g_This->m_stSessionArray[iIndex].m_lIOCount) == 0)
-				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);			
+				g_This->InDisconnect(&g_This->m_stSessionArray[iIndex]);		
+
+			// I/O카운트 감소시켰는데 0이 아니라면, ret 체크.
+			// ret가 1이라면 접속 끊는다.
+			else if (ret == 1)
+			{
+				shutdown(g_This->m_stSessionArray[iIndex].m_Client_sock, SD_BOTH);
+			}
 		}
 
 		return 0;
@@ -1024,25 +1065,25 @@ namespace Library_Jingyu
 			return nullptr;
 		}	
 
-		// 3. 내가 원하던 세션이 맞는지 체크
-		if (retSession->m_ullSessionID != SessionID)
+		// 3. Release Flag 체크
+		if (retSession->m_lReleaseFlag == TRUE)
 		{
-			// 아니라면 I/O 카운트 1 감소
-			// 감소한 값이 0이면서, inDIsconnect 호출
-			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
-				InDisconnect(retSession);		
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
 
 			return nullptr;
 		}
 
-		// 4. Release Flag 체크
-		if (retSession->m_lReleaseFlag == TRUE)
+		// 4. 내가 원하던 세션이 맞는지 체크
+		if (retSession->m_ullSessionID != SessionID)
 		{
-			if(InterlockedDecrement(&retSession->m_lIOCount) == 0)
-				InDisconnect(retSession);		
+			// 아니라면 I/O 카운트 1 감소
+			// 감소한 값이 0이면서, inDIsconnect 호출
+			if (InterlockedDecrement(&retSession->m_lIOCount) == 0)
+				InDisconnect(retSession);
 
 			return nullptr;
-		}					
+		}								
 
 		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;
@@ -1215,9 +1256,10 @@ namespace Library_Jingyu
 
 	// RecvPost 함수. 비동기 입출력 시작
 	//
-	// return true : 성공적으로 WSARecv() 완료 or WSARecv가 실패했지만 종료된 유저는 아님.
-	// return false : I/O카운트가 0이되어서 종료된 유저
-	bool CNetServer::RecvPost(stSession* NowSession)
+	// return 0 : 성공적으로 WSARecv() 완료
+	// return 1 : RecvQ가 꽉찬 유저
+	// return 2 : I/O 카운트가 0이되어 삭제된 유저
+	int CNetServer::RecvPost(stSession* NowSession)
 	{
 		// ------------------
 		// 비동기 입출력 시작
@@ -1228,6 +1270,11 @@ namespace Library_Jingyu
 
 		int FreeSize = NowSession->m_RecvQueue.GetFreeSize();
 		int Size = NowSession->m_RecvQueue.GetNotBrokenPutSize();
+
+		// 리시브 링버퍼 크기 확인
+		// 빈공간이 없으면 1리턴
+		if (FreeSize <= 0)
+			return 1;
 
 		if (Size < FreeSize)
 		{
@@ -1265,7 +1312,7 @@ namespace Library_Jingyu
 				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 				{
 					InDisconnect(NowSession);
-					return false;
+					return 1;
 				}				
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
@@ -1293,7 +1340,7 @@ namespace Library_Jingyu
 			}
 		}
 
-		return true;
+		return 0;
 	}
 
 
@@ -1317,8 +1364,13 @@ namespace Library_Jingyu
 			// ------------------
 			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
-			if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-				break;				
+			/*if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
+				break;	*/
+
+			// 1. SendFlag(1번인자)가 를 TRUE(2번인자)로 변경.
+			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
+			if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+				break;
 			
 			// 2. SendBuff에 데이터가 있는지 확인
 			// 여기서 구한 UseSize는 이제 스냅샷 이다. 
