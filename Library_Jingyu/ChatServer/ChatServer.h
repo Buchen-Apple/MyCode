@@ -28,6 +28,7 @@ namespace Library_Jingyu
 		struct stToken
 		{
 			char	m_cToken[64];
+			ULONGLONG m_ullInsertTime;	// 인서트 된 시간
 		};
 
 	private:
@@ -42,6 +43,7 @@ namespace Library_Jingyu
 		SRWLOCK srwl;
 
 		// 토큰키를 관리하는 자료구조
+		//
 		// Key : AccountNO
 		// Value : 토큰 구조체
 		unordered_map<INT64, stToken*> m_umapTokenCheck;
@@ -66,9 +68,9 @@ namespace Library_Jingyu
 		// 토큰 관리 자료구조에, 새로 접속한 토큰 추가
 		// 현재 umap으로 관리중
 		// 
-		// Parameter : AccountNo, stToken*
+		// Parameter : AccountNo, Token(char*)
 		// return : 없음
-		void InsertTokenFunc(INT64 AccountNo, stToken* isnertToken);
+		void InsertTokenFunc(INT64 AccountNo, char* Token);
 
 
 		// 토큰 관리 자료구조에서, 토큰 검색
@@ -230,9 +232,13 @@ namespace Library_Jingyu
 			// 닉네임
 			WCHAR m_tNickName[20];
 
+			// 마지막으로 패킷을 받은 시간 (GetTickCount64)
+			ULONGLONG m_ullLastPacketTime;
+
 			// 토큰 (세션 키)
 			//char m_cToken[64];
 		};
+			
 
 	private:
 		// -------------------------------------
@@ -249,6 +255,7 @@ namespace Library_Jingyu
 		////////////////////////////////////////////////
 		Chat_LanClient m_Logn_LanClient;
 
+		// 파싱을 위한 구조체
 		stConfigFile m_stConfig;
 
 		// 메시지 구조체를 다룰 TLS메모리풀
@@ -262,7 +269,7 @@ namespace Library_Jingyu
 		// 플레이어 구조체를 다룰 TLS메모리풀
 		CMemoryPoolTLS<stPlayer> *m_PlayerPool;
 
-		// 플레이어 구조체를 다루는 map
+		// 플레이어 구조체를 다루는 umap
 		// Key : SessionID
 		// Value : stPlayer*
 		// 
@@ -289,6 +296,16 @@ namespace Library_Jingyu
 		//  X,Y 기준, 9개의 섹터를 미리 구해서 저장해두는 배열
 		st_SecotrSaver* m_stSectorSaver[SECTOR_Y_COUNT][SECTOR_X_COUNT];
 
+		// 마지막으로 패킷을 받은 시간을 관리하는 umap
+		// Key : SessionID
+		// Value : 마지막으로 패킷을 받은 시간 (GetTickCount64)
+		//
+		// 순회가 있어서, vector로 하고 싶었으나, key / value 구조가 되어야 하기 때문에 umap으로 결정
+		unordered_map<ULONGLONG, ULONGLONG> m_mapLastPacketTime;
+
+		// 마지막으로 패킷을 받은 시간을 관리하는 umap의 락
+		SRWLOCK m_LastPacketsrwl;
+
 		// 업데이트 스레드 핸들
 		HANDLE hUpdateThraed;
 
@@ -297,6 +314,14 @@ namespace Library_Jingyu
 
 		// 업데이트 스레드 종료 용도 Event
 		HANDLE UpdateThreadEXITEvent;
+
+
+		// 일감 추가 스레드 핸들
+		HANDLE hJobThraed;
+
+		// 일감 추가 스레드 종료 용도 Event
+		HANDLE JobThreadEXITEvent;
+
 
 	private:
 		// -------------------------------------
@@ -340,6 +365,25 @@ namespace Library_Jingyu
 		//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 		stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
 
+
+
+		// 마지막 패킷 받은 시간 관리 자료구조에, 유저와 시간 추가
+		// 이미 있는 유저라면 기존의 정보를 갱신한다.
+		// 현재 umap으로 관리중
+		// 
+		// Parameter : SessionID
+		// return : 없음
+		void InsertLastTime(ULONGLONG SessionID);
+
+		// 마지막 패킷 받은 시간 관리 자료구조에서, 유저 제거
+		// 현재 umap으로 관리중
+		// 
+		// Parameter : SessionID
+		// return : 없음
+		void EraseLastTime(ULONGLONG SessionID);
+
+
+
 		// 인자로 받은 섹터 X,Y 주변 9개 섹터의 유저들(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 		//
 		// parameter : 섹터 x,y, 보낼 버퍼
@@ -348,6 +392,11 @@ namespace Library_Jingyu
 
 		// 업데이트 스레드
 		static UINT	WINAPI	UpdateThread(LPVOID lParam);
+
+		// 일감 추가 스레드
+		//
+		// 유저 하트비트 등...
+		static UINT	WINAPI	JobAddThread(LPVOID lParam);
 
 
 

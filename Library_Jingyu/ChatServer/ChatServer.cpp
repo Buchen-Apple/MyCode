@@ -8,6 +8,10 @@
 #include <strsafe.h>
 #include <process.h>
 
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+
+
 
 extern LONG g_lUpdateStructCount;
 extern LONG g_lUpdateStruct_PlayerCount;
@@ -252,6 +256,59 @@ namespace Library_Jingyu
 		return ret;
 	}
 
+	// 마지막 패킷 받은 시간 관리 자료구조에, 유저와 시간 추가
+	// 이미 있는 유저라면 기존의 정보를 갱신한다.
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : SessionID
+	// return : 없음
+	void CChatServer::InsertLastTime(ULONGLONG SessionID)
+	{
+		// 유저가 마지막으로 패킷을 받은 시간 갱신
+		ULONGLONG LastTime = GetTickCount64();
+
+		AcquireSRWLockExclusive(&m_LastPacketsrwl);		// ------------- 락
+		auto ret = m_mapLastPacketTime.insert(make_pair(SessionID, LastTime));
+
+		// 이미 있는 유저라면, 시간 갱신
+		if (ret.second == false)
+		{
+			auto Find = m_mapLastPacketTime.find(SessionID);
+			Find->second = LastTime;		
+		}
+
+		ReleaseSRWLockExclusive(&m_LastPacketsrwl);		// ------------- 언락
+	}
+
+	// 마지막 패킷 받은 시간 관리 자료구조에서, 유저 제거
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : SessionID
+	// return : 없음
+	void CChatServer::EraseLastTime(ULONGLONG SessionID)
+	{
+		// 1) map에서 유저 검색
+
+		// erase까지가 한 작업이기 때문에, Exclusive 락 사용.
+		AcquireSRWLockExclusive(&m_LastPacketsrwl);		// ---------------- Lock
+
+		auto FindToken = m_mapLastPacketTime.find(SessionID);
+		if (FindToken == m_mapLastPacketTime.end())
+		{
+			ReleaseSRWLockExclusive(&m_LastPacketsrwl);	// ---------------- Unlock
+			// 말이 안됨. 크래시
+			m_ChatDump->Crash();
+
+			return;
+		}
+
+		// 2) 맵에서 제거	
+		m_mapLastPacketTime.erase(FindToken);
+
+		ReleaseSRWLockExclusive(&m_LastPacketsrwl);	// ---------------- Unlock
+	}
+
+
 	// 인자로 받은 섹터 X,Y 주변 9개 섹터의 유저들(서버에 패킷을 보낸 클라 포함)에게 SendPacket 호출
 	//
 	// parameter : 섹터 x,y, 보낼 버퍼
@@ -331,7 +388,7 @@ namespace Library_Jingyu
 			{
 				// 1. 큐에서 일감 1개 빼오기	
 				if (g_this->m_LFQueue->Dequeue(NowWork) == -1)
-					g_this->m_ChatDump->Crash();
+					g_this->m_ChatDump->Crash();				
 
 				// 2. Type에 따라 로직 처리				
 				switch (NowWork->m_wType)
@@ -374,6 +431,105 @@ namespace Library_Jingyu
 		return 0;
 	}
 
+	// 일감 추가 스레드
+	//
+	// 유저 하트비트, 토큰 자료구조 일정시간마다 비우기
+	UINT	WINAPI	CChatServer::JobAddThread(LPVOID lParam)
+	{
+		CChatServer* g_this = (CChatServer*)lParam;
+
+		// [종료 신호] 인자로 받아두기
+		HANDLE hEvent = g_this->JobThreadEXITEvent;
+
+		while (1)
+		{
+			// 대기
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("JobAddThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면업데이트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그 무엇도 아니라면, 일을 한다.
+
+			// 1) 하트 비트 체크	-----------------------------------
+			// 하트비트는, 지정된 시간동안 유저에게 패킷이 1개도 오지 않았을 경우.
+			// 즉, 새로 메시지를 받을 때 마다 유저가 마지막으로 패킷을 받은 시간은 계속 갱신된다.
+					
+
+			AcquireSRWLockShared(&g_this->m_LastPacketsrwl);	// 락 ----------------
+
+			// 유저 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
+			if (g_this->m_mapLastPacketTime.size() > 0)
+			{
+				ULONGLONG ullCheckTime = GetTickCount64();
+
+				auto LastPacketbegin = g_this->m_mapLastPacketTime.begin();
+				auto LastPacketend = g_this->m_mapLastPacketTime.end();
+
+				while (LastPacketbegin != LastPacketend)
+				{
+					// 마지막 패킷을 받은지 40초 이상이 되었다면
+					if ((ullCheckTime - LastPacketbegin->second) >= 40000)
+					{
+						// 접속 끊기
+						g_this->Disconnect(LastPacketbegin->first);
+					}
+
+					++LastPacketbegin;
+				}
+			}
+
+			ReleaseSRWLockShared(&g_this->m_LastPacketsrwl);	// 언 락 ----------------
+
+
+			// 2) 토큰 체크	-----------------------------------
+			// 30초 이상 유지되고 있는 토큰은 erase한다.		
+
+			AcquireSRWLockShared(&g_this->m_Logn_LanClient.srwl);	// 락 ----------------
+
+			// 토큰 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
+			if (g_this->m_Logn_LanClient.m_umapTokenCheck.size() > 0)
+			{
+				ULONGLONG ullCheckTime = GetTickCount64();
+
+				auto Tokenbegin = g_this->m_Logn_LanClient.m_umapTokenCheck.begin();
+				auto Tokenend = g_this->m_Logn_LanClient.m_umapTokenCheck.end();
+
+				while (Tokenbegin != Tokenend)
+				{
+					// 인서트 된 지 30초 이상이 되었다면
+					if ((ullCheckTime - Tokenbegin->second->m_ullInsertTime) >= 30000)
+					{
+						auto EraseToken = Tokenbegin->second;
+
+						// 맵에서 제거
+						g_this->m_Logn_LanClient.m_umapTokenCheck.erase(Tokenend);
+
+						// Free
+						g_this->m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
+
+					}
+
+					++Tokenbegin;
+				}
+			}
+
+			ReleaseSRWLockShared(&g_this->m_Logn_LanClient.srwl);	// 언 락 ----------------
+		}
+
+		printf("JobAddThread Exit!!\n");
+
+		return 0;
+	}
 
 
 
@@ -466,6 +622,9 @@ namespace Library_Jingyu
 		
 		// 4) Player Free()
 		m_PlayerPool->Free(ErasePlayer);
+
+		// 5) 마지막 패킷 시간관리 자료구조에서 삭제.
+		EraseLastTime(SessionID);
 
 		InterlockedAdd(&g_lUpdateStruct_PlayerCount, -1);
 	}
@@ -579,9 +738,9 @@ namespace Library_Jingyu
 
 			// 비정상이면 밖으로 예외 던진다
 			throw CException(_T("Packet_Sector_Move(). AccountNo Error"));
-		}
+		}		
 
-		// 4) 유저의 섹터 정보 갱신
+		// 5) 유저의 섹터 정보 갱신
 		// 최초 섹터 패킷이 아니라면, 기존 섹터에서 뺀다.
 		// 똑같은 값이기 때문에, 하나만 체크해도 된다.
 		if (FindPlayer->m_wSectorY != TEMP_SECTOR_POS &&
@@ -623,7 +782,7 @@ namespace Library_Jingyu
 		// 새로운 색터에 유저 추가
 		m_vectorSecotr[wSectorY][wSectorX].push_back(SessionID);
 
-		// 5) 클라이언트에게 보낼 패킷 조립 (섹터 이동 결과)
+		// 6) 클라이언트에게 보낼 패킷 조립 (섹터 이동 결과)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		// 타입, AccountNo, SecotrX, SecotrY
@@ -633,7 +792,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&wSectorX, 2);
 		SendBuff->PutData((char*)&wSectorY, 2);
 
-		// 6) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+		// 7) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 		SendPacket(SessionID, SendBuff);
 	}
 
@@ -660,7 +819,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)Message, MessageLen);
 
 		// ------------------- 검증
-		// 4) AccountNo 체크
+		// 3) AccountNo 체크
 		if (AccountNo != FindPlayer->m_i64AccountNo)
 		{
 			m_ChatNoError++;
@@ -669,7 +828,7 @@ namespace Library_Jingyu
 			throw CException(_T("Packet_Chat_Message(). AccountNo Error"));
 		}
 
-		// 3) 클라이언트에게 보낼 패킷 조립 (채팅 보내기 응답)
+		// 4) 클라이언트에게 보낼 패킷 조립 (채팅 보내기 응답)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_CHAT_RES_MESSAGE;
@@ -680,7 +839,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&MessageLen, 2);
 		SendBuff->PutData((char*)Message, MessageLen);
 
-		// 4) 주변 유저에게 채팅 메시지 보냄
+		// 5) 주변 유저에게 채팅 메시지 보냄
 		// 모든 유저에게 보낸다 (채팅을 보낸 유저 포함)
 		SendPacket_Sector(FindPlayer->m_wSectorX, FindPlayer->m_wSectorY, SendBuff);
 	}
@@ -747,76 +906,6 @@ namespace Library_Jingyu
 		// 다르다면 아무것도 할거 없음. NetServer쪽에서 자동으로 I/O 카운트가 0이 되어, 종료 로직 타게된다.
 		ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
 
-
-
-			
-
-
-
-			
-
-
-
-
-
-
-
-
-		//// 1) 마샬링		
-		//INT64	AccountNo;
-		//WCHAR tcLoginID[20];
-		//WCHAR tcNickName[20];
-		//char Token[64];
-
-		//Packet->GetData((char*)&AccountNo, 8);
-		//Packet->GetData((char*)tcLoginID, 40);
-		//Packet->GetData((char*)tcNickName, 40);
-		//Packet->GetData(Token, 64);
-
-		//// 2) 토큰키 체크
-		//Chat_LanClient::stToken* FindToken = m_Logn_LanClient.FindTokenFunc(AccountNo);
-		//if(FindToken == nullptr)
-		//	m_ChatDump->Crash();		
-
-		//// 찾았으면 토큰키 비교
-		//// 다르다면 접속 끊기 요청 후 리턴
-		//if (memcmp(FindToken->m_cToken, Token, 64) != 0)
-		//{
-		//	Disconnect(SessionID);
-		//	return;
-		//}
-
-		//// 3) 정상이면 플레이어를 알아온 후 값 셋팅
-		//stPlayer* FindPlayer = FindPlayerFunc(SessionID);
-		//if (FindPlayer == nullptr)
-		//	m_ChatDump->Crash();
-
-		//// AccountNo
-		//FindPlayer->m_i64AccountNo = AccountNo;
-
-		//// LoginID 
-		//StringCbCopy(FindPlayer->m_tLoginID, 20, tcLoginID);
-
-		//// NickName
-		//StringCbCopy(FindPlayer->m_tNickName, 20, tcNickName);
-
-		//// Token
-		////StringCbCopyA(FindPlayer->m_cToken, 64, Token);
-
-
-		//// 4) 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
-		//CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
-
-		//WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
-		//SendBuff->PutData((char*)&SendType, 2);
-
-		//BYTE Status = 1;
-		//SendBuff->PutData((char*)&Status, 1);
-
-		//SendBuff->PutData((char*)&AccountNo, 8);
-
-		//// 5) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
-		//SendPacket(SessionID, SendBuff);
 	}
 
 
@@ -837,11 +926,14 @@ namespace Library_Jingyu
 		cChatLibLog->SetDirectory(L"ChatServer");
 		cChatLibLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);
 
+
+		// ------------------- 각종 리소스 할당
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_mapPlayer.reserve(m_stConfig.MaxJoinUser);
 
+		// 플레이어 최근 패킷 시간을 관리하는 umap의 용량을 할당해둔다.
+		m_mapLastPacketTime.reserve(m_stConfig.MaxJoinUser);
 
-		// ------------------- 각종 리소스 할당
 		// 일감 TLS 메모리풀 동적할당
 		m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(100, false);
 
@@ -859,6 +951,7 @@ namespace Library_Jingyu
 		// 이름 없는 Event	
 		UpdateThreadEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		UpdateThreadEXITEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+		JobThreadEXITEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 		// 브로드 캐스트 시, 어느 섹터에 보내야하는지 미리 다 만들어둔다.
 		for (int Y = 0; Y < SECTOR_Y_COUNT; ++Y)
@@ -879,6 +972,12 @@ namespace Library_Jingyu
 				m_vectorSecotr[Y][X].reserve(100);
 			}
 		}
+
+		// 락 초기화
+		InitializeSRWLock(&m_LastPacketsrwl);
+
+		// 시간
+		timeBeginPeriod(1);
 	}
 
 	// 소멸자
@@ -899,6 +998,9 @@ namespace Library_Jingyu
 		// 업데이트 스레드 종료용 이벤트 해제
 		CloseHandle(UpdateThreadEXITEvent);
 
+		// 잡 스레드 종료용 이벤트 해제
+		CloseHandle(JobThreadEXITEvent);
+
 
 		// 브로드캐스트용 섹터 모두 해제
 		for (int Y = 0; Y < SECTOR_Y_COUNT; ++Y)
@@ -908,6 +1010,9 @@ namespace Library_Jingyu
 				delete m_stSectorSaver[Y][X];
 			}
 		}
+
+		// 시간 
+		timeEndPeriod(1);
 	}
 
 	// 채팅 서버 시작 함수
@@ -917,6 +1022,9 @@ namespace Library_Jingyu
 	// return true : 성공
 	bool CChatServer::ServerStart()
 	{
+		// ------------------- 잡 스레드 생성
+		hJobThraed = (HANDLE)_beginthreadex(NULL, 0, JobAddThread, this, 0, 0);
+
 		// ------------------- 업데이트 스레드 생성
 		hUpdateThraed = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, 0, 0);
 
@@ -929,9 +1037,11 @@ namespace Library_Jingyu
 		if(m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.Client_CreateWorker, m_stConfig.Client_ActiveWorker, m_stConfig.Client_Nodelay) == false)
 			return false;
 
+		
+
 		// 서버 오픈 로그 찍기		
 		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
-
+		
 		return true;
 	}
 
@@ -943,6 +1053,16 @@ namespace Library_Jingyu
 	{
 		// 넷서버 스탑 (엑셉트, 워커 종료)
 		Stop();
+
+		// 잡 스레드 종료 신호
+		SetEvent(CloseHandle);
+
+		// 잡 스레드 종료 대기
+		if (WaitForSingleObject(CloseHandle, INFINITE) == WAIT_FAILED)
+		{
+			DWORD Error = GetLastError();
+			printf("JobThread Exit Error!!! (%d) \n", Error);
+		}
 
 		// 업데이트 스레드 종료 신호
 		SetEvent(UpdateThreadEXITEvent);
@@ -992,6 +1112,9 @@ namespace Library_Jingyu
 
 		// 업데이트 스레드 핸들 반환
 		CloseHandle(hUpdateThraed);
+
+		// 잡 스레드 핸들 반환
+		CloseHandle(hJobThraed);		
 	}
 
 
@@ -1017,6 +1140,9 @@ namespace Library_Jingyu
 		// 1. 일감 Alloc
 
 		st_WorkNode* NowMessage = m_MessagePool->Alloc();
+
+		// 2. 패킷 시간 갱신(접속만 하고 로그인 패킷을 안보내는 유저도 있을 수 있기때문에. 걸러내기 용도)
+		InsertLastTime(SessionID);
 
 		InterlockedAdd(&g_lUpdateStructCount, 1);
 
@@ -1070,6 +1196,10 @@ namespace Library_Jingyu
 
 		// 1. 일감 Alloc
 		st_WorkNode* NowMessage = m_MessagePool->Alloc();
+
+		// 2. 마지막 패킷 시간 관리 자료구조에 유저 추가
+		// 이미 있는 유저는 시간 갱신.
+		InsertLastTime(SessionID);
 
 		InterlockedAdd(&g_lUpdateStructCount, 1);
 
@@ -1210,25 +1340,20 @@ namespace Library_Jingyu
 	// 이 토큰키를 저장한 후 응답을 보내는 함수
 	void Chat_LanClient::NewUserJoin(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
 	{
-		// 1. 토큰 TLS에서 Alloc
-		// !! 토큰 TLS  Free는, ChatServer에서, 실제 유저가 나갔을 때(OnClientLeave)에서 한다 !!
-		stToken* NewToken = m_MTokenTLS->Alloc();
-		InterlockedAdd(&g_lTokenNodeCount, 1);
-
-		// 2. AccountNo 빼온다.
+		// 1. AccountNo 빼온다.
 		INT64 AccountNo;
 		Payload->GetData((char*)&AccountNo, 8);
 
-		// 3. 토큰키 빼온다.	
-		// NewToken에 직접 넣는다.
-		Payload->GetData((char*)NewToken->m_cToken, 64);
+		// 2. 토큰키 빼온다.	
+		char Token[64];
+		Payload->GetData(Token, 64);
 
-		// 4. 파라미터 빼온다.
+		// 3. 파라미터 빼온다.
 		INT64 Parameter;
 		Payload->GetData((char*)&Parameter, 8);
 
 		// 5. 자료구조에 토큰 저장
-		InsertTokenFunc(AccountNo, NewToken);
+		InsertTokenFunc(AccountNo, Token);
 
 
 		// 응답패킷 제작 후 보내기 -------------------
@@ -1258,33 +1383,38 @@ namespace Library_Jingyu
 	// 토큰 관리 자료구조에, 새로 접속한 토큰 추가
 	// 현재 umap으로 관리중
 	// 
-	// Parameter : AccountNo, stToken*
+	// Parameter : AccountNo, Token(char*)
 	// 없음
-	void Chat_LanClient::InsertTokenFunc(INT64 AccountNo, stToken* isnertToken)
+	void Chat_LanClient::InsertTokenFunc(INT64 AccountNo, char* Token)
 	{
-		// umap에 추가
+		// 1. 존재하는 유저인지 체크
 		AcquireSRWLockExclusive(&srwl);		// ---------------- Lock
-		auto ret = m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));		
-
-		// 중복된 키일 시 기존 값을 빼고 다시 넣는다.
-		if (ret.second == false)
+		auto Find = m_umapTokenCheck.find(AccountNo);
+		
+		// 이미 존재하는 유저라면, 값 교체만 한다.
+		// !! 검색에 성공했으면 Find가 end가 아니다. !!
+		if (Find != m_umapTokenCheck.end())
 		{
-			auto Find = m_umapTokenCheck.find(AccountNo);
-
-			stToken* FreeToken = Find->second;
-			m_umapTokenCheck.erase(Find);
-			m_umapTokenCheck.insert(make_pair(AccountNo, isnertToken));
-
-			ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock.
-
-			// 기존의 Token 구조체 Free
-			m_MTokenTLS->Free(FreeToken);
-			InterlockedAdd(&g_lTokenNodeCount, -1);
-
-			return;
+			Find->second->m_ullInsertTime = GetTickCount64();
+			memcpy_s(Find->second->m_cToken, 64, Token, 64);
 		}
 
-		ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock
+		// 없는 유저라면, stToken Alloc 후 추가한다.
+		else
+		{
+			// 토큰 TLS에서 Alloc
+			// !! 토큰 TLS  Free는, ChatServer에서, 실제 유저가 나갔을 때(OnClientLeave)에서 한다 !!
+			stToken* NewToken = m_MTokenTLS->Alloc();
+
+			NewToken->m_ullInsertTime = GetTickCount64();
+			memcpy_s(NewToken->m_cToken, 64, Token, 64);
+
+			InterlockedAdd(&g_lTokenNodeCount, 1);
+
+			m_umapTokenCheck.insert(make_pair(AccountNo, NewToken));
+		}
+
+		ReleaseSRWLockExclusive(&srwl);		// ---------------- Unock		
 	}
 
 
