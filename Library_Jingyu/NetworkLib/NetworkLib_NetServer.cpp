@@ -792,12 +792,14 @@ namespace Library_Jingyu
 				// 리시브 큐가 꽉찼으면 접속 끊는다.
 				if (g_This->RecvPost(stNowSession) == 1)
 				{
+					// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 InDisconnect.
 					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
 					{
 						g_This->InDisconnect(stNowSession);
 						continue;
 					}
 
+					// 0이 아니라면 서버측에서 접속 끊는다.
 					shutdown(stNowSession->m_Client_sock, SD_BOTH);
 					continue;
 				}
@@ -822,12 +824,14 @@ namespace Library_Jingyu
 				if (stNowSession->m_lLastSendFlag == TRUE &&
 					stNowSession->m_SendQueue->GetInNode() == 0)
 				{
+					// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 InDisconnect.
 					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
 					{
 						g_This->InDisconnect(stNowSession);
 						continue;
 					}
 
+					// 0이 아니라면 서버측에서 접속 끊는다.
 					shutdown(stNowSession->m_Client_sock, SD_BOTH);
 					continue;
 				}
@@ -1035,9 +1039,7 @@ namespace Library_Jingyu
 			// I/O카운트 감소시켰는데 0이 아니라면, ret 체크.
 			// ret가 1이라면 접속 끊는다.
 			else if (ret == 1)
-			{
 				shutdown(g_This->m_stSessionArray[iIndex].m_Client_sock, SD_BOTH);
-			}
 		}
 
 		return 0;
