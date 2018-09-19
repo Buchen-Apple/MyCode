@@ -470,7 +470,11 @@ namespace Library_Jingyu
 		case en_PACKET_SS_RES_NEW_CLIENT_LOGIN:
 			Success_Packet(SessionID, AccountNo, dfLOGIN_STATUS_OK);
 			break;
+
+			// 내가 지정한 것 외 패킷 응답이 오면 말이 안됨. 
+			// 내부통신이기 때문에 무조건 안전해야함. 크래시
 		default:
+			g_LoginDump->Crash();
 			break;
 		}
 
@@ -697,27 +701,40 @@ namespace Library_Jingyu
 	// parameter : 유저 세션키, 받은 패킷
 	// return : 없음
 	void CLogin_NetServer::OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
-	{
-		// 1. Type만 마샬링
-		WORD Type;
-		Payload->GetData((char*)&Type, 2);
-
-		// 2. Type에 따라 분기처리
-		switch (Type)
+	{		
+		try
 		{
-			// 로그인 요청
-		case en_PACKET_CS_LOGIN_REQ_LOGIN:
-			LoginPacketFunc(SessionID, Payload);
-			break;
+			// 1. Type만 마샬링
+			WORD Type;
+			Payload->GetData((char*)&Type, 2);
 
-			// 로그인 요청이 아니면 접속 해제
-		default:
-			g_LoginDump->Crash();
+			// 2. Type에 따라 분기처리
+			switch (Type)
+			{
+				// 로그인 요청
+			case en_PACKET_CS_LOGIN_REQ_LOGIN:
+				LoginPacketFunc(SessionID, Payload);
+				break;
+
+				// 로그인 요청이 아니면 접속 끊음
+				// 현재는 로그인 요청 외에 타입이 올 이유가 없음
+			default:
+				throw CException(_T("OnRecv(). TypeError"));
+				break;
+			}
+
+		}
+		catch (CException& exc)
+		{
+			char* pExc = exc.GetExceptionText();		
+
+			// 로그 찍기 (로그 레벨 : 에러)
+			cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				(TCHAR*)pExc);	
+
+			// 접속 끊기 요청
 			Disconnect(SessionID);
-			break;
-		}	
-
-
+		}
 	}
 
 	// 패킷 송신 완료 후 호출되는 함수
@@ -726,22 +743,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CLogin_NetServer::OnSend(ULONGLONG SessionID, DWORD SendSize)
 	{
-		/*
-		// 1. 유저 검색
-		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
-
-		// 없는건 말이안됨. 크래시
-		if (NowPlayer == nullptr)
-			g_LoginDump->Crash();
-
-		// 2. 쿼리를 날려, 해당 유저를 로그인 상태로 변경
-		char qurey[200] = "UPDATE `status` SET `status` = 1 WHERE `accountno` = %d\0";
-		m_AcountDB_Connector->Query_Save(qurey, NowPlayer->m_i64AccountNo);
-
-		// 데이터를 보냈으면, 해당 유저는 접속 종료
-		InterlockedIncrement(&g_ullDisconnectTotal);
-		Disconnect(SessionID);		
-		*/
+		// 할것 없음
 	}
 
 	// 워커 스레드가 깨어날 시 호출되는 함수.

@@ -435,7 +435,8 @@ namespace Library_Jingyu
 
 	// 일감 추가 스레드
 	//
-	// 유저 하트비트, 토큰 자료구조 일정시간마다 비우기
+	// 유저 하트비트 체크 후, 끊어야 할 시 일감 만들어서 일감큐에 넣기.
+	// 토큰 자료구조 일정시간마다 비우기
 	UINT	WINAPI	CChatServer::JobAddThread(LPVOID lParam)
 	{
 		CChatServer* g_this = (CChatServer*)lParam;
@@ -466,6 +467,7 @@ namespace Library_Jingyu
 			// 하트비트는, 지정된 시간동안 유저에게 패킷이 1개도 오지 않았을 경우.
 			// 즉, 새로 메시지를 받을 때 마다 유저가 마지막으로 패킷을 받은 시간은 계속 갱신된다.		
 
+			/*
 			ULONGLONG DisconnectArray[10000];
 			int ArrayIndex = 0;
 
@@ -503,6 +505,7 @@ namespace Library_Jingyu
 
 			ReleaseSRWLockShared(&g_this->m_LastPacketsrwl);	// 언 락 ----------------
 
+
 			// 배열에 보관한 유저를, 카운트만큼 돌면서 Disconnect 한다.
 			while (ArrayIndex >= 0)
 			{
@@ -510,6 +513,7 @@ namespace Library_Jingyu
 				g_this->Disconnect(DisconnectArray[ArrayIndex]);
 				--ArrayIndex;
 			}
+			*/
 
 
 			// 2) 토큰 체크	-----------------------------------
@@ -657,14 +661,14 @@ namespace Library_Jingyu
 	// Parameter : SessionID, CProtocolBuff_Net*
 	// return : 없음
 	void CChatServer::Packet_Normal(ULONGLONG SessionID, CProtocolBuff_Net* Packet)
-	{
-		// 1. 패킷 타입 확인
-		WORD Type;
-		Packet->GetData((char*)&Type, 2);
-
-		// 2. 타입에 따라 switch case
+	{		
 		try
 		{
+			// 1. 패킷 타입 확인
+			WORD Type;
+			Packet->GetData((char*)&Type, 2);
+
+			// 2. 타입에 따라 switch case
 			switch (Type)
 			{
 				// 채팅서버 섹터 이동 요청
@@ -700,11 +704,11 @@ namespace Library_Jingyu
 		}
 		catch (CException& exc)
 		{
-			// char* pExc = exc.GetExceptionText();		
+			 char* pExc = exc.GetExceptionText();		
 
-			//// 로그 찍기 (로그 레벨 : 에러)
-			//cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
-			//	(TCHAR*)pExc);	
+			// 로그 찍기 (로그 레벨 : 에러)
+			cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				(TCHAR*)pExc);	
 
 			// 접속 끊기 요청
 			Disconnect(SessionID);
@@ -1268,11 +1272,11 @@ namespace Library_Jingyu
 
 	void CChatServer::OnError(int error, const TCHAR* errorStr)
 	{
-		//// 로그 찍기 (로그 레벨 : 에러)
-		//cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
-		//	errorStr, error);
+		// 로그 찍기 (로그 레벨 : 에러)
+		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+			errorStr, error);
 
-		// 에러 코드에 따라 처리
+		// 에러 코드에 따라 로직 처리
 		switch (error)
 		{
 		case (int)CNetServer::euError::NETWORK_LIB_ERROR__IOCP_ERROR:

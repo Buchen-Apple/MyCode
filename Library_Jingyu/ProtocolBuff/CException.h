@@ -9,7 +9,7 @@ namespace Library_Jingyu
 
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
-	// Recv()패킷 처리 중, 예외 발생 시 던지는 예외클래스이다.
+	// 예외 발생 시 던지는 예외클래스이다.
 	class CException
 	{
 	private:

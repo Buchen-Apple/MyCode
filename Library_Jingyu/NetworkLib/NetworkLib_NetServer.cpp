@@ -922,7 +922,6 @@ namespace Library_Jingyu
 			{
 				closesocket(client_sock);
 
-				// 그게 아니라면 OnError 함수 호출
 				// 내 에러 보관
 				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__JOIN_USER_FULL;
 
@@ -1314,7 +1313,7 @@ namespace Library_Jingyu
 				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 				{
 					InDisconnect(NowSession);
-					return 1;
+					return 2;
 				}				
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.

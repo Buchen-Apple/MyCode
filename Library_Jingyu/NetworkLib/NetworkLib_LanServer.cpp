@@ -1228,8 +1228,13 @@ namespace Library_Jingyu
 			// ------------------
 			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
-			if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-				return true;
+			//if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
+			//	return true;
+
+			// 1. SendFlag(1번인자)가 를 TRUE(2번인자)로 변경.
+			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
+			if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+				break;
 
 			// 2. SendBuff에 데이터가 있는지 확인
 			// 여기서 구한 UseSize는 이제 스냅샷 이다. 
@@ -1237,7 +1242,7 @@ namespace Library_Jingyu
 			if (UseSize == 0)
 			{
 				// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
-				NowSession->m_lSendFlag = 0;
+				NowSession->m_lSendFlag = FALSE;
 
 				// 3. 진짜로 사이즈가 없는지 다시한번 체크. 락 풀고 왔는데, 컨텍스트 스위칭 일어나서 다른 스레드가 건드렸을 가능성
 				// 사이즈 있으면 위로 올라가서 한번 더 시도
