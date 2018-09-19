@@ -56,5 +56,8 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\LoginServer\LoginServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\CPUUsage\CPUUsage.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

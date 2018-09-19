@@ -1,0 +1,11 @@
+﻿  PDH_Main.cpp
+c:\git_public\9_실무용 게임서버 프로그래밍\18차과제_pdh사용율class 제작\pdh_main\pdh_main\pdh_main.cpp(36): warning C4101: '_pdh_Counter_Handle_GameServer' :참조되지 않은 지역 변수입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\18차과제_pdh사용율class 제작\pdh_main\pdh_main\pdh_main.cpp(37): warning C4101: '_pdh_Counter_Handle_ChatServer' :참조되지 않은 지역 변수입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\18차과제_pdh사용율class 제작\pdh_main\pdh_main\pdh_main.cpp(41): warning C4101: '_pdh_value_Handle_GameServer' :참조되지 않은 지역 변수입니다.
+c:\git_public\9_실무용 게임서버 프로그래밍\18차과제_pdh사용율class 제작\pdh_main\pdh_main\pdh_main.cpp(42): warning C4101: '_pdh_value_Handle_ChatServer' :참조되지 않은 지역 변수입니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  1 of 1 functions (100.0%) were compiled.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  PDH_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\18차과제_PDH사용율Class 제작\PDH_Main\x64\Release\PDH_Main.exe

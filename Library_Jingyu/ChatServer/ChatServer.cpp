@@ -921,7 +921,8 @@ namespace Library_Jingyu
 			m_Logn_LanClient.m_MTokenTLS->Free(retToken);
 			InterlockedAdd(&g_lTokenNodeCount, -1);
 
-			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답)
+			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답) 
+			// 성공패킷
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
@@ -934,15 +935,33 @@ namespace Library_Jingyu
 
 			// 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 			SendPacket(SessionID, SendBuff);
-
-			return;
 		}
 
-		// 다르다면 g_lTokenMiss 카운트 증가
-		InterlockedAdd(&g_lTokenMiss, 1);
+		// 토큰이 다르다면 실패패킷 "보내고 끊기".
+		// 토큰 자료구조에서 삭제하지 않음. 곧 접속할 유저일 가능성이 높기 때문에.
+		else
+		{		
+			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			
+			// g_lTokenMiss 카운트 증가
+			InterlockedAdd(&g_lTokenMiss, 1);
 
-		// NetServer쪽에서 자동으로 I/O 카운트가 0이 되어, 종료 로직 타게된다.
-		ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답) 
+			// 실패패킷
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD SendType = en_PACKET_CS_CHAT_RES_LOGIN;
+			SendBuff->PutData((char*)&SendType, 2);
+
+			BYTE Status = 0;
+			SendBuff->PutData((char*)&Status, 1);
+
+			SendBuff->PutData((char*)&AccountNo, 8);
+
+			// 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+			// 보내고 끊기
+			SendPacket(SessionID, SendBuff, TRUE);			
+		}
 
 	}
 

@@ -1,5 +1,6 @@
 ﻿  pch.cpp
   ChatServer.cpp
+  CPUUsage.cpp
   CrashDump.cpp
   Log.cpp
   NetworkLib_LanClient.cpp
@@ -10,6 +11,6 @@
   RingBuff.cpp
   LanClienet_Main.cpp
   코드를 생성하고 있습니다.
+  All 1086 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
-  All 1080 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   LanClienet_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\15차과제_LanClient제작\LanClienet_Main\x64\Release\LanClienet_Main.exe
