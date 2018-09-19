@@ -3,8 +3,9 @@
 #include "Protocol_Set\CommonProtocol.h"
 #include "Parser\Parser_Class.h"
 #include "Log\Log.h"
+#include "Protocol_Set\MonitorProtocol.h"
 
-#include <strsafe.h>
+#include <process.h>
 
 extern LONG g_lStruct_PlayerCount;
 
@@ -49,6 +50,9 @@ namespace Library_Jingyu
 		// LanServer 동적할당
 		m_cLanS = new CLogin_LanServer;		
 
+		// 모니터링 LanClient 동적할당.
+		m_LanMonitorC = new CMoniter_Clinet;
+
 		// Player TLS 동적할당
 		m_MPlayerTLS = new CMemoryPoolTLS< stPlayer >(50, false);
 
@@ -90,6 +94,9 @@ namespace Library_Jingyu
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser,
 			m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
 			return false;
+
+		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 가동
+		// m_LanMonitorC
 
 		// 서버 오픈 로그 찍기		
 		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -1017,4 +1024,235 @@ namespace Library_Jingyu
 
 }
 
+
+// ----------------------------------
+// 모니터링 클라이언트 (LanClient)
+// ----------------------------------
+namespace Library_Jingyu
+{
+	// -----------------------
+	// 생성자와 소멸자
+	// -----------------------
+	CMoniter_Clinet::CMoniter_Clinet()
+	{
+		// 모니터링 서버를 종료시킬 이벤트 생성
+		//
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+	}
+
+	CMoniter_Clinet::~CMoniter_Clinet()
+	{
+		// 하는거 없음
+	}
+
+
+	// --------------------------------
+	// 외부에서 호출 가능한 기능 함수
+	// --------------------------------
+
+	// 시작 함수
+	//
+	// 내부적으로, 상속받은 CLanClient의 Start호출.
+	// 추가로, 리소스 할당 등
+	bool CMoniter_Clinet::ClientStart()
+	{
+		//Start();
+
+		// 모니터링 서버로 정보 전송할 스레드 생성
+		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MoniterThread, this, 0, NULL);
+	}
+
+	// 종료 함수
+	//
+	// 내부적으로, 상속받은 CLanClient의 Stop호출.
+	// 추가로, 리소스 해제 등
+	bool CMoniter_Clinet::ClientStop()
+	{
+		// 1. 모니터링 서버 정보전송 스레드 종료
+		SetEvent(m_hMonitorThreadExitEvent);
+
+		// 종료 대기
+		if (WaitForSingleObject(m_hMonitorThread, INFINITE) == WAIT_FAILED)
+		{
+			DWORD Error = GetLastError();
+			printf("MonitorThread Exit Error!!! (%d) \n", Error);
+		}
+
+		// 2. 핸들 반환
+		CloseHandle(m_hMonitorThread);
+
+		// 3. 모니터링 서버와 연결 종료
+		Stop();
+	}
+
+
+
+
+	// -----------------------
+	// 내부에서만 사용하는 기능 함수
+	// -----------------------
+
+	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+	UINT	__stdcall CMoniter_Clinet::MoniterThread(LPVOID lParam)
+	{
+		// this 받아두기
+		CMoniter_Clinet* g_This = (CMoniter_Clinet*)lParam;
+
+		// 종료 신호 이벤트 받아두기
+		HANDLE hEvent = g_This->m_hMonitorThreadExitEvent;
+
+		// CPU 사용율 체크 클래스 (하드웨어)
+		CCpuUsage_Processor CProcessorCPU;
+
+		// CPU 사용율 체크 클래스 (소프트웨어)
+		CCpuUsage_Processor CProcessCPU;
+
+		// PDH용 클래스
+		CPDH	CPdh;
+
+		while (1)
+		{
+			// 1초에 한번 깨어나서 정보를 보낸다.
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("MoniterThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면업데이트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그게 아니라면, 일을 한다.
+
+			// 공통 : 일단, 프로세서와 프로세스 사용율 갱신
+			CProcessorCPU.UpdateCpuTime();
+			CProcessCPU.UpdateCpuTime();
+
+			// ----------------------------------
+			// 하드웨어 정보 보내기 (프로세서)
+			// ----------------------------------
+			WORD Type;
+
+			// 1. 하드웨어 CPU 사용률 전체
+			float fData = CProcessorCPU.ProcessorTotal();
+
+			Type = dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL;
+			CProtocolBuff_Lan* SendBuff_CPU = CProtocolBuff_Lan::Alloc();
+			SendBuff_CPU->PutData((char*)&fData, 4);
+			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_CPU);
+
+			// 2. 하드웨어 사용가능 메모리
+			CPdh.Query(L"\\Memory\\Available MBytes\0");
+			double dData = CPdh.GetResult();
+
+			Type = dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY;
+			CProtocolBuff_Lan* SendBuff_AVAMEM = CProtocolBuff_Lan::Alloc();
+			SendBuff_AVAMEM->PutData((char*)&dData, 8);
+			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_AVAMEM);
+
+			// 3. 하드웨어 이더넷 수신 바이트
+
+
+			// 4. 하드웨어 이더넷 송신 바이트
+
+
+			// 5. 하드웨어 논페이지 메모리 사용량
+			CPdh.Query(L"\\Memory\\Pool Nonpaged Bytes\0");
+			dData = CPdh.GetResult();
+
+			Type = dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY;
+			CProtocolBuff_Lan* SendBuff_NONMEM = CProtocolBuff_Lan::Alloc();
+			SendBuff_NONMEM->PutData((char*)&dData, 8);
+			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_NONMEM);
+		}
+	}
+
+
+
+
+
+	// -----------------------
+	// 순수 가상함수
+	// -----------------------
+
+	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CMoniter_Clinet::OnConnect(ULONGLONG SessionID)
+	{
+		// 세션아이디 기억해둔다.
+		m_ullSessionID = SessionID;
+	}
+
+	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CMoniter_Clinet::OnDisconnect(ULONGLONG SessionID)
+	{
+		// 지금 하는거 없음. 
+		// 연결이 끊기면, LanClient에서 이미 연결 다시 시도함.
+	}
+
+	// 패킷 수신 완료 후 호출되는 함수.
+	//
+	// parameter : 유저 세션키, 받은 패킷
+	// return : 없음
+	void CMoniter_Clinet::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{
+		// 현재 할거 없음
+	}
+
+	// 패킷 송신 완료 후 호출되는 함수
+	//
+	// parameter : 유저 세션키, Send 한 사이즈
+	// return : 없음
+	void CMoniter_Clinet::OnSend(ULONGLONG SessionID, DWORD SendSize)
+	{
+		// 현재 할거 없음
+	}
+
+	// 워커 스레드가 깨어날 시 호출되는 함수.
+	// GQCS 바로 하단에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CMoniter_Clinet::OnWorkerThreadBegin()
+	{
+		// 현재 할거 없음
+	}
+
+	// 워커 스레드가 잠들기 전 호출되는 함수
+	// GQCS 바로 위에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CMoniter_Clinet::OnWorkerThreadEnd()
+	{
+		// 현재 할거 없음
+	}
+
+	// 에러 발생 시 호출되는 함수.
+	//
+	// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+	//			 : 에러 코드에 대한 스트링
+	// return : 없음
+	void CMoniter_Clinet::OnError(int error, const TCHAR* errorStr)
+	{
+		// 현재 할거 없음
+	}
+
+
+
+
+}
 

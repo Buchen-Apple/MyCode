@@ -98,12 +98,6 @@ namespace Library_Jingyu
 		Chat_LanClient();
 		virtual ~Chat_LanClient();
 
-		// -----------------------
-		// 외부에서 호출하는 함수
-		// -----------------------
-		// Start 함수
-
-
 
 
 	public:
