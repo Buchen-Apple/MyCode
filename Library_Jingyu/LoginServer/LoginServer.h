@@ -235,7 +235,7 @@ namespace Library_Jingyu
 		// return true : 성공
 		bool ServerStart();
 
-		// 채팅 서버 종료 함수
+		// 로그인 서버 종료 함수
 		//
 		// Parameter : 없음
 		// return : 없음
@@ -312,6 +312,7 @@ namespace Library_Jingyu
 		CLogin_NetServer* m_cParentS;
 
 		// 접속한 서버 관리할 배열
+		// SessionID를 들고 있다.
 		ULONGLONG m_arrayJoinServer[10];
 
 		// 배열 안에 있는 유저 수

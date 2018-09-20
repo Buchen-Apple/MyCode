@@ -1,3 +1,8 @@
+#ifndef __MONITOR_PROTOCOL_H__
+#define __MONITOR_PROTOCOL_H__
+
+
+/*
 모니터링 서버와 연동관련 프로토콜
 
 본래 CommonProtocol.h 에 통합으로 들어있으나
@@ -9,132 +14,11 @@ CommonProtocol.h 의 채팅,로그인 등 패킷변동사항이 많아서
 
 
 # 최종 프로젝트 채팅변경사항 - MO 서버 구성으로 방(채널) 개념의 채팅서버로 변경됩니다.
-
+*/
 
 enum en_PACKET_TYPE
 {
-	//------------------------------------------------------
-	// Monitor Server Protocol
-	//------------------------------------------------------
-
-
-	////////////////////////////////////////////////////////
-	//
-	//   MonitorServer & MoniterTool Protocol / 응답을 받지 않음.
-	//
-	////////////////////////////////////////////////////////
-
-	//------------------------------------------------------
-	// Monitor Server  Protocol
-	//------------------------------------------------------
-	en_PACKET_SS_MONITOR					= 20000,
-	//------------------------------------------------------
-	// Server -> Monitor Protocol
-	//------------------------------------------------------
-	//------------------------------------------------------------
-	// LoginServer, GameServer , ChatServer , Agent 가 모니터링 서버에 로그인 함
-	//
-	// 
-	//	{
-	//		WORD	Type
-	//
-	//		int		ServerNo		// 서버 타입 없이 각 서버마다 고유 번호를 부여하여 사용
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_SS_MONITOR_LOGIN,
-
-	//------------------------------------------------------------
-	// 서버가 모니터링서버로 데이터 전송
-	// 각 서버는 자신이 모니터링중인 수치를 1초마다 모니터링 서버로 전송.
-	//
-	// 서버의 다운 및 기타 이유로 모니터링 데이터가 전달되지 못할떄를 대비하여 TimeStamp 를 전달한다.
-	// 이는 모니터링 클라이언트에서 계산,비교 사용한다.
-	// 
-	//	{
-	//		WORD	Type
-	//
-	//		BYTE	DataType				// 모니터링 데이터 Type 하단 Define 됨.
-	//		int		DataValue				// 해당 데이터 수치.
-	//		int		TimeStamp				// 해당 데이터를 얻은 시간 TIMESTAMP  (time() 함수)
-	//										// 본래 time 함수는 time_t 타입변수이나 64bit 로 낭비스러우니
-	//										// int 로 캐스팅하여 전송. 그래서 2038년 까지만 사용가능
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_SS_MONITOR_DATA_UPDATE,
-
-
-	en_PACKET_CS_MONITOR					= 25000,
-	//------------------------------------------------------
-	// Monitor -> Monitor Tool Protocol  (Client <-> Server 프로토콜)
-	//------------------------------------------------------
-	//------------------------------------------------------------
-	// 모니터링 클라이언트(툴) 이 모니터링 서버로 로그인 요청
-	//
-	//	{
-	//		WORD	Type
-	//
-	//		char	LoginSessionKey[32]		// 로그인 인증 키. (이는 모니터링 서버에 고정값으로 보유)
-	//										// 각 모니터링 툴은 같은 키를 가지고 들어와야 함
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_CS_MONITOR_TOOL_REQ_LOGIN,
-
-	//------------------------------------------------------------
-	// 모니터링 클라이언트(툴) 모니터링 서버로 로그인 응답
-	// 로그인에 실패하면 0 보내고 끊어버림
-	//
-	//	{
-	//		WORD	Type
-	//
-	//		BYTE	Status					// 로그인 결과 0 / 1 
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_CS_MONITOR_TOOL_RES_LOGIN,
-
-	//------------------------------------------------------------
-	// 모니터링 서버가 모니터링 클라이언트(툴) 에게 모니터링 데이터 전송
-	//
-	// 모니터링 서버는 모든 모니터링 클라이언트에게 모든 데이터를 뿌려준다.
-	//
-	// 데이터를 절약하기 위해서는 초단위로 모든 데이터를 묶어서 30~40개의 모니터링 데이터를 하나의 패킷으로 만드는게
-	// 좋으나  여러가지 생각할 문제가 많으므로 그냥 각각의 모니터링 데이터를 개별적으로 전송처리 한다.
-	//
-	//	{
-	//		WORD	Type
-	//		
-	//		BYTE	ServerNo				// 서버 No
-	//		BYTE	DataType				// 모니터링 데이터 Type 하단 Define 됨.
-	//		int		DataValue				// 해당 데이터 수치.
-	//		int		TimeStamp				// 해당 데이터를 얻은 시간 TIMESTAMP  (time() 함수)
-	//										// 본래 time 함수는 time_t 타입변수이나 64bit 로 낭비스러우니
-	//										// int 로 캐스팅하여 전송. 그래서 2038년 까지만 사용가능
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE,
-
-/*
-	원격 제어 기능을 사용하지 않을 것이므로 생략 됨.
-	//------------------------------------------------------------
-	// 모니터링 클라이언트(툴) 가 모니터링 서버에게 서버 컨트롤
-	//
-	// 이는 모니터링 서버에서 각 클라(모니터링 툴) 에게 지정된 서버의 에이전트에게 재전달 됨.
-	// * 채팅서버는 Shutdown 기능이 없음.  
-	//
-	//	{
-	//		WORD	Type
-	//
-	//		BYTE	ServerType				// 컨트롤 대상 서버  하단 Define 사용
-	//		BYTE	Control					// 컨트롤 명령, Run / Terminate / Shutdown   하단 Define 사용
-	//	}
-	//
-	//------------------------------------------------------------
-	en_PACKET_CS_MONITOR_TOOL_SERVER_CONTROL,
-*/
+	
 
 };
 
@@ -143,14 +27,14 @@ enum en_PACKET_TYPE
 // en_PACKET_SS_MONITOR_LOGIN
 enum en_PACKET_CS_MONITOR_TOOL_SERVER_CONTROL
 {
-	dfMONITOR_SERVER_TYPE_LOGIN		= 1,
-	dfMONITOR_SERVER_TYPE_GAME		= 2,
-	dfMONITOR_SERVER_TYPE_CHAT		= 3,
-	dfMONITOR_SERVER_TYPE_AGENT		= 4,
+	dfMONITOR_SERVER_TYPE_LOGIN = 1,
+	dfMONITOR_SERVER_TYPE_GAME = 2,
+	dfMONITOR_SERVER_TYPE_CHAT = 3,
+	dfMONITOR_SERVER_TYPE_AGENT = 4,
 
-	dfMONITOR_SERVER_CONTROL_SHUTDOWN			= 1,		// 서버 정상종료 (게임서버 전용)
-	dfMONITOR_SERVER_CONTROL_TERMINATE			= 2,		// 서버 프로세스 강제종료
-	dfMONITOR_SERVER_CONTROL_RUN				= 3,		// 서버 프로세스 생성 & 실행
+	dfMONITOR_SERVER_CONTROL_SHUTDOWN = 1,		// 서버 정상종료 (게임서버 전용)
+	dfMONITOR_SERVER_CONTROL_TERMINATE = 2,		// 서버 프로세스 강제종료
+	dfMONITOR_SERVER_CONTROL_RUN = 3,		// 서버 프로세스 생성 & 실행
 };
 
 
@@ -218,4 +102,10 @@ enum en_PACKET_SS_MONITOR_DATA_UPDATE
 	dfMONITOR_DATA_TYPE_CHAT_ROOM                               // 배틀서버 방 수
 
 };
+
+
+
+
+
+#endif // !__MONITOR_PROTOCOL_H__
 

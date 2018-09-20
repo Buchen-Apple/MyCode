@@ -927,7 +927,7 @@ namespace Library_Jingyu
 
 				// 에러 스트링 만들고
 				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, L"accpet(). User Full!!!! (%d)",
+				StringCchPrintf(tcErrorString, 300, L"accpet(). User Full!!!! (%lld)",
 					g_This->m_ullJoinUserCount);
 
 				// 에러 발생 함수 호출
@@ -1160,7 +1160,7 @@ namespace Library_Jingyu
 
 				// 에러 스트링 만들고
 				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_CodeError.UserID : %d, [%s:%d]"),
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_CodeError.UserID : %lld, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);				
 
 				// 에러 함수 호출
@@ -1182,7 +1182,7 @@ namespace Library_Jingyu
 
 				// 에러 스트링 만들고
 				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_LenBig.UserID : %d, [%s:%d]"),
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_LenBig.UserID : %lld, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 				// 에러 함수 호출
@@ -1233,7 +1233,7 @@ namespace Library_Jingyu
 
 				// 에러 스트링 만들고
 				TCHAR tcErrorString[300];
-				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %d, [%s:%d]"),
+				StringCchPrintf(tcErrorString, 300, _T("RecvRingBuff_Empry.UserID : %lld, [%s:%d]"),
 					NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 				// 에러 함수 호출
@@ -1325,7 +1325,7 @@ namespace Library_Jingyu
 
 					// 에러 스트링 만들고
 					TCHAR tcErrorString[300];
-					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
+					StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %lld, [%s:%d]"),
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 					// 로그 찍기 (로그 레벨 : 에러)
@@ -1443,7 +1443,7 @@ namespace Library_Jingyu
 
 						// 에러 스트링 만들고
 						TCHAR tcErrorString[300];
-						StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %d, [%s:%d]"),
+						StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %lld, [%s:%d]"),
 							NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 						// 로그 찍기 (로그 레벨 : 에러)

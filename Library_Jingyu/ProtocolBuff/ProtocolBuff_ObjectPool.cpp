@@ -49,7 +49,7 @@ namespace Library_Jingyu
 	// 헤더를 채우는 함수. Lan서버 전용
 	void CProtocolBuff_Lan::SetProtocolBuff_HeaderSet()
 	{
-		// 현재, 헤더는 무조건 페이로드 사이즈. 즉, 8이 들어간다.
+		// Lan통신에서 헤더는, 페이로드 사이즈.
 		WORD wHeader = GetUseSize() - dfNETWORK_PACKET_HEADER_SIZE;
 
 		*(short *)m_pProtocolBuff = *(short *)&wHeader;	

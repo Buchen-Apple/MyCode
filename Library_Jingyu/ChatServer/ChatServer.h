@@ -393,7 +393,7 @@ namespace Library_Jingyu
 		static UINT	WINAPI	JobAddThread(LPVOID lParam);
 
 
-
+	private:
 		// -------------------------------------
 		// 클래스 내부에서만 사용하는 패킷 처리 함수
 		// -------------------------------------

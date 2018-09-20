@@ -704,11 +704,11 @@ namespace Library_Jingyu
 		}
 		catch (CException& exc)
 		{
-			 char* pExc = exc.GetExceptionText();		
+			// char* pExc = exc.GetExceptionText();		
 
-			// 로그 찍기 (로그 레벨 : 에러)
-			cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
-				(TCHAR*)pExc);	
+			//// 로그 찍기 (로그 레벨 : 에러)
+			//cChatLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			//	(TCHAR*)pExc);	
 
 			// 접속 끊기 요청
 			Disconnect(SessionID);
@@ -1292,8 +1292,8 @@ namespace Library_Jingyu
 	void CChatServer::OnError(int error, const TCHAR* errorStr)
 	{
 		// 로그 찍기 (로그 레벨 : 에러)
-		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
-			errorStr, error);
+		/*cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+			errorStr, error);*/
 
 		// 에러 코드에 따라 로직 처리
 		switch (error)
@@ -1329,8 +1329,6 @@ namespace Library_Jingyu
 			break;
 
 		case (int)CNetServer::euError::NETWORK_LIB_ERROR__JOIN_USER_FULL:
-			cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_DEBUG, L"%s (ErrorCode : %d)",
-				errorStr, error);
 			break;
 
 			// (네트워크) 헤더 코드 에러

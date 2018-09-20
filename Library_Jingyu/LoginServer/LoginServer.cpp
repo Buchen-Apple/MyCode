@@ -3,7 +3,6 @@
 #include "Protocol_Set\CommonProtocol.h"
 #include "Parser\Parser_Class.h"
 #include "Log\Log.h"
-#include "Protocol_Set\MonitorProtocol.h"
 
 #include <process.h>
 
@@ -96,7 +95,7 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 가동
-		// m_LanMonitorC
+		//m_LanMonitorC->ClientStart();
 
 		// 서버 오픈 로그 찍기		
 		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -116,6 +115,8 @@ namespace Library_Jingyu
 		// ------------------- 랜 서버 스탑
 		m_cLanS->Stop();
 
+		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 종료
+		//m_LanMonitorC->ClientStop();
 
 		// ------------- 디비 저장
 		// 현재 없음.
@@ -945,38 +946,49 @@ namespace Library_Jingyu
 	// return : 없음
 	void CLogin_LanServer::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
 	{
-		// 1. 패킷 마샬링
-		WORD Type;
-		Payload->GetData((char*)&Type, 2);
-
-		// 2. 타입에 따라 처리
-		switch (Type)
+		try
 		{
-			// 다른 서버가 로그인 랜서버로 로그인
-			// 현재는 할거 없음.
-			// 차후 게임서버가 추가되면, 게임서버인지 랜서버인지?에 따라 달라질듯. 보내주는 정보가 달라지려나?
-		case en_PACKET_SS_LOGINSERVER_LOGIN:			
+			// 1. 패킷 마샬링
+			WORD Type;
+			Payload->GetData((char*)&Type, 2);
+
+			// 2. 타입에 따라 처리
+			switch (Type)
+			{
+				// 다른 서버가 로그인 랜서버로 로그인
+				// 현재는 할거 없음.
+				// 차후 게임서버가 추가되면, 게임서버인지 랜서버인지?에 따라 달라질듯. 보내주는 정보가 달라지려나?
+			case en_PACKET_SS_LOGINSERVER_LOGIN:
+				break;
+
+				// 게임 or 채팅에서 응답이 왔다면, 넷 서버로 중계
+			case en_PACKET_SS_RES_NEW_CLIENT_LOGIN:
+			{
+				INT64 AccountNo;
+				ULONGLONG Parameter;
+
+				Payload->GetData((char*)&AccountNo, 8);
+				Payload->GetData((char*)&Parameter, 8);
+
+				// 2. Net의 Lan 패킷처리 함수 호출
+				m_cParentS->LanClientPacketFunc(Type, AccountNo, Parameter);
+			}
 			break;
 
-			// 게임 or 채팅에서 응답이 왔다면, 넷 서버로 중계
-		case en_PACKET_SS_RES_NEW_CLIENT_LOGIN:
-		{
-			INT64 AccountNo;
-			ULONGLONG Parameter;
+			// 타입에러 시 throw 던짐
+			default:
+				throw CException(_T("OnRecv. Type Error."));				
+				break;
+			}
 
-			Payload->GetData((char*)&AccountNo, 8);
-			Payload->GetData((char*)&Parameter, 8);
-
-			// 2. Net의 Lan 패킷처리 함수 호출
-			m_cParentS->LanClientPacketFunc(Type, AccountNo, Parameter);
 		}
-			break;
-
-			// 그 외의 것은 잘못된것. 덤프
-		default:
+		catch (const std::exception&)
+		{
+			// 랜통신에서 잘못된 것이 오는것은 그냥 코드에러로 판단.
+			// 크래시
 			g_LoginDump->Crash();
-			break;
 		}
+		
 		
 	}
 
@@ -1035,7 +1047,7 @@ namespace Library_Jingyu
 	// -----------------------
 	CMoniter_Clinet::CMoniter_Clinet()
 	{
-		// 모니터링 서버를 종료시킬 이벤트 생성
+		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
 		//
 		// 자동 리셋 Event 
 		// 최초 생성 시 non-signalled 상태
@@ -1045,7 +1057,8 @@ namespace Library_Jingyu
 
 	CMoniter_Clinet::~CMoniter_Clinet()
 	{
-		// 하는거 없음
+		// 이벤트 삭제
+		CloseHandle(m_hMonitorThreadExitEvent);
 	}
 
 
@@ -1063,6 +1076,8 @@ namespace Library_Jingyu
 
 		// 모니터링 서버로 정보 전송할 스레드 생성
 		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MoniterThread, this, 0, NULL);
+
+		return true;
 	}
 
 	// 종료 함수
@@ -1081,7 +1096,7 @@ namespace Library_Jingyu
 			printf("MonitorThread Exit Error!!! (%d) \n", Error);
 		}
 
-		// 2. 핸들 반환
+		// 2. 스레드 핸들 반환
 		CloseHandle(m_hMonitorThread);
 
 		// 3. 모니터링 서버와 연결 종료
@@ -1107,9 +1122,6 @@ namespace Library_Jingyu
 		// CPU 사용율 체크 클래스 (하드웨어)
 		CCpuUsage_Processor CProcessorCPU;
 
-		// CPU 사용율 체크 클래스 (소프트웨어)
-		CCpuUsage_Processor CProcessCPU;
-
 		// PDH용 클래스
 		CPDH	CPdh;
 
@@ -1126,15 +1138,15 @@ namespace Library_Jingyu
 				break;
 			}
 
-			// 만약, 종료 신호가 왔다면업데이트 스레드 종료.
+			// 만약, 종료 신호가 왔다면 스레드 종료.
 			else if (Check == WAIT_OBJECT_0)
 				break;
 
 			// 그게 아니라면, 일을 한다.
 
-			// 공통 : 일단, 프로세서와 프로세스 사용율 갱신
+			// 프로세서 CPU 사용율, PDH 정보 갱신
 			CProcessorCPU.UpdateCpuTime();
-			CProcessCPU.UpdateCpuTime();
+			CPdh.SetInfo();
 
 			// ----------------------------------
 			// 하드웨어 정보 보내기 (프로세서)
@@ -1150,8 +1162,7 @@ namespace Library_Jingyu
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_CPU);
 
 			// 2. 하드웨어 사용가능 메모리
-			CPdh.Query(L"\\Memory\\Available MBytes\0");
-			double dData = CPdh.GetResult();
+			double dData = CPdh.Get_AVA_Mem();
 
 			Type = dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY;
 			CProtocolBuff_Lan* SendBuff_AVAMEM = CProtocolBuff_Lan::Alloc();
@@ -1159,20 +1170,33 @@ namespace Library_Jingyu
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_AVAMEM);
 
 			// 3. 하드웨어 이더넷 수신 바이트
+			dData = CPdh.Get_Net_Recv();
+
+			Type = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
+			CProtocolBuff_Lan* SendBuff_Recv = CProtocolBuff_Lan::Alloc();
+			SendBuff_Recv->PutData((char*)&dData, 8);
+			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Recv);
 
 
 			// 4. 하드웨어 이더넷 송신 바이트
+			dData = CPdh.Get_Net_Send();
+
+			Type = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
+			CProtocolBuff_Lan* SendBuff_Send = CProtocolBuff_Lan::Alloc();
+			SendBuff_Send->PutData((char*)&dData, 8);
+			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Send);
 
 
-			// 5. 하드웨어 논페이지 메모리 사용량
-			CPdh.Query(L"\\Memory\\Pool Nonpaged Bytes\0");
-			dData = CPdh.GetResult();
+			// 5. 하드웨어 논페이지 메모리 사용량			
+			dData = CPdh.Get_NonPaged_Mem();
 
 			Type = dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY;
 			CProtocolBuff_Lan* SendBuff_NONMEM = CProtocolBuff_Lan::Alloc();
 			SendBuff_NONMEM->PutData((char*)&dData, 8);
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_NONMEM);
 		}
+
+		return 0;
 	}
 
 
