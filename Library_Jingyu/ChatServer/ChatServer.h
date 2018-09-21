@@ -3,6 +3,7 @@
 
 #include "NetworkLib\NetworkLib_NetServer.h"
 #include "NetworkLib\NetworkLib_LanClinet.h"
+#include "CPUUsage\CPUUsage.h"
 
 #include <vector>
 #include <unordered_map>
@@ -100,7 +101,7 @@ namespace Library_Jingyu
 
 
 
-	public:
+	private:
 		// -----------------------
 		// 순수 가상함수
 		// -----------------------
@@ -228,6 +229,10 @@ namespace Library_Jingyu
 
 			// 마지막으로 패킷을 받은 시간 (GetTickCount64)
 			ULONGLONG m_ullLastPacketTime;
+
+			// 로그인 여부
+			// true면 로그인 패킷까지 처리된 유저
+			bool m_bLoginCheck;
 
 			// 토큰 (세션 키)
 			//char m_cToken[64];
@@ -465,15 +470,19 @@ namespace Library_Jingyu
 		virtual void OnError(int error, const TCHAR* errorStr);
 
 	public:
-		// -------------------------------------
-		// 클래스 외부에서 사용 가능한 함수
-		// -------------------------------------
-
 		// 생성자
 		CChatServer();
 
 		//소멸자
 		virtual ~CChatServer();
+
+	public:
+		// -------------------------------------
+		// 외부에서 사용 가능한 함수
+		// -------------------------------------
+
+		// 출력용 함수
+		void ShowPrintf();
 
 		// 채팅 서버 시작 함수
 		// 내부적으로 NetServer의 Start도 같이 호출
@@ -486,73 +495,7 @@ namespace Library_Jingyu
 		//
 		// Parameter : 없음
 		// return : 없음
-		void ServerStop();
-
-		// 테스트용. 큐 노드 수 얻기
-		LONG GetQueueInNode()
-		{
-			return m_LFQueue->GetInNode();
-		}
-
-		// 테스트용. 맵 안의 플레이어 수 얻기
-		LONG JoinPlayerCount()
-		{
-			return (LONG)m_mapPlayer.size();
-		}
-
-		// !! 테스트용 !!
-		// 일감 TLS의 총 할당된 청크 수 반환
-		LONG GetWorkChunkCount()
-		{
-			return m_MessagePool->GetAllocChunkCount();
-		}
-
-		// !! 테스트용 !!
-		// 일감 TLS의 현재 밖에서 사용중인 청크 수 반환
-		LONG GetWorkOutChunkCount()
-		{
-			return m_MessagePool->GetOutChunkCount();
-		}
-
-
-		// !! 테스트용 !!
-		// 플레이어 TLS의 총 할당된 청크 수 반환
-		LONG GetPlayerChunkCount()
-		{
-			return m_PlayerPool->GetAllocChunkCount();
-		}
-
-		// !! 테스트용 !!
-		// 플레이어 TLS의 현재 밖에서 사용중인 청크 수 반환
-		LONG GetPlayerOutChunkCount()
-		{
-			return m_PlayerPool->GetOutChunkCount();
-		}
-
-		// ----------------------
-		// ----------------------
-		// 랜 클라이언트용 
-
-		// !! 테스트용 !!
-		// 토큰 umap 안의 수 반환
-		LONG GetTokenUmapSize()
-		{
-			return (LONG)m_Logn_LanClient.m_umapTokenCheck.size();
-		}
-
-		// !! 테스트용 !!
-		// 토큰 TLS의 총 할당된 청크 수 반환
-		LONG GetTokenChunkCount()
-		{
-			return m_Logn_LanClient.m_MTokenTLS->GetAllocChunkCount();
-		}
-
-		// !! 테스트용 !!
-		// 토큰 TLS의 현재 밖에서 사용중인 청크 수 반환
-		LONG GetTokenOutChunkCount()
-		{
-			return m_Logn_LanClient.m_MTokenTLS->GetOutChunkCount();
-		}
+		void ServerStop();		
 	};
 }
 

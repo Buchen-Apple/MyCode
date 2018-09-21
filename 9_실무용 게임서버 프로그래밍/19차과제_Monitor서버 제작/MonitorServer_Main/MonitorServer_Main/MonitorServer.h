@@ -166,7 +166,7 @@ namespace Library_Jingyu
 		// 소멸자
 		virtual ~CLan_Monitor_Server();
 
-	public:
+	private:
 		// -----------------------
 		// 가상함수
 		// -----------------------

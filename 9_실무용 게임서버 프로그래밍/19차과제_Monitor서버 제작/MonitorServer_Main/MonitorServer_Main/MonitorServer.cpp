@@ -423,24 +423,27 @@ namespace Library_Jingyu
 		// 정보 갱신
 		AcquireSRWLockExclusive(&DBInfoSrwl);	// ------------- 락
 
-		// 1. Value 갱신
-		m_stDBInfo[Type].m_iValue = Value;
+		// Value가 0이면 정보 갱신하지 않음.
+		// 뷰어에게 Send는 한다.
+		if (Value != 0)
+		{
+			// 1. Value 갱신
+			m_stDBInfo[Type].m_iValue = Value;
 
-		// 2. Min 갱신
-		if (m_stDBInfo[Type].m_iMin > Value)
-			m_stDBInfo[Type].m_iMin = Value;
+			// 2. Min 갱신
+			if (m_stDBInfo[Type].m_iMin > Value)
+				m_stDBInfo[Type].m_iMin = Value;
 
-		// 3. Max 갱신
-		if (m_stDBInfo[Type].m_iMax < Value)
-			m_stDBInfo[Type].m_iMax = Value;
+			// 3. Max 갱신
+			if (m_stDBInfo[Type].m_iMax < Value)
+				m_stDBInfo[Type].m_iMax = Value;
 
-		// 4. Total에 값 추가
-		m_stDBInfo[Type].m_iTotal += Value;
+			// 4. Total에 값 추가
+			m_stDBInfo[Type].m_iTotal += Value;
 
-		// 5. 카운트 증가
-		// 0이면 카운트 증가 안함
-		if(Value > 0)
+			// 5. 카운트 증가
 			m_stDBInfo[Type].m_iTotalCount++;
+		}		
 
 		ReleaseSRWLockExclusive(&DBInfoSrwl);	// ------------- 언락
 

@@ -166,7 +166,7 @@ namespace Library_Jingyu
 		// DB 연결을 위한 정보 보관
 		//
 		//-------------------------------------------------------------
-		WCHAR	m_wcDBIP[16];
+		WCHAR	m_wcDBIP[64];
 		WCHAR	m_wcDBUser[64];
 		WCHAR	m_wcDBPassword[64];
 		WCHAR	m_wcDBName[64];

@@ -91,9 +91,6 @@ namespace Library_Jingyu
 		// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 		LONG	m_lSendFlag;
 
-		// 마지막 Send인지 체크. 1이면 더 이상 샌드 불가능, 0이면 샌드 가능.
-		LONG	m_lLastSendFlag;
-
 		// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
 		CLF_Queue<CProtocolBuff_Net*>* m_SendQueue;
 
@@ -102,6 +99,9 @@ namespace Library_Jingyu
 
 		// Recv버퍼. 일반 링버퍼. 
 		CRingBuff m_RecvQueue;
+
+		// 마지막 패킷 저장소
+		void* m_LastPacket = nullptr;
 
 		// 생성자 
 		stSession()
@@ -502,14 +502,9 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 2. 마지막 Send 상태라면 더 이상 샌드 못함.
-		if (NowSession->m_lLastSendFlag == TRUE)
-		{
-			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
-			// ref 카운트가 0이 되면 메모리풀에 반환
-			CProtocolBuff_Net::Free(payloadBuff);
-			return;
-		}
+		// 2. 인자로 받은 Flag가 true라면, 마지막 패킷의 주소를 보관
+		if (LastFlag == TRUE)
+			NowSession->m_LastPacket = payloadBuff;
 
 		// 3. 헤더를 넣어서, 패킷 완성하기
 		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
@@ -521,16 +516,11 @@ namespace Library_Jingyu
 
 		// 5. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff_Net::Free(payloadBuff);	
-
-		// 6. 인자로 받은 Flag가 true라면, 세션의 Flag를 true로 변경
-		// 안전하게 하기 위해, Enq 후에 Flag 변경
-		if(LastFlag == TRUE)
-			NowSession->m_lLastSendFlag = TRUE;
-
-		// 7. SendPost시도
+				
+		// 6. SendPost시도
 		SendPost(NowSession);
 
-		// 8. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 7. 세션 락 해제(락 아니지만 락처럼 사용)
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		// 근데 따로 리턴값 받지 않고 있음
 		GetSessionUnLOCK(NowSession);
@@ -742,6 +732,7 @@ namespace Library_Jingyu
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
 			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+
 					
 			// --------------
 			// 완료 체크
@@ -817,12 +808,30 @@ namespace Library_Jingyu
 				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
-				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);				
 
-				// 2. LastSendFlag와 큐 사이즈 체크
-				// 마지막 Send 상태이고, 큐 사이즈가 0이라면 Disconnect 날림
-				if (stNowSession->m_lLastSendFlag == TRUE &&
-					stNowSession->m_SendQueue->GetInNode() == 0)
+				// 2. 보낸 직렬화버퍼 비움
+				int i = 0;
+				bool Flag = false;
+				while (i < stNowSession->m_iWSASendCount)
+				{
+					CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);					
+
+					// 보내고 끊을 유저였을 경우, 잘 갔는지 체크한다.
+					if (stNowSession->m_LastPacket != nullptr)
+					{
+						// 마지막 패킷이 잘 갔으면, falg를 True로 바꾼다.
+						if (stNowSession->m_PacketArray[i] == stNowSession->m_LastPacket)
+							Flag = true;
+					}
+
+					i++;
+				}
+
+				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.	
+
+				// 보낸게 잘 갔으면, 해당 유저는 접속을 끊는다.
+				if (Flag == true)
 				{
 					// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 InDisconnect.
 					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
@@ -834,17 +843,7 @@ namespace Library_Jingyu
 					// 0이 아니라면 서버측에서 접속 끊는다.
 					shutdown(stNowSession->m_Client_sock, SD_BOTH);
 					continue;
-				}
-
-				// 3. 보냈던 직렬화버퍼 삭제
-				int i = 0;
-				while (i < stNowSession->m_iWSASendCount)
-				{
-					CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
-					i++;
-				}				
-
-				stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.						
+				}									
 
 				// 4. 샌드 가능 상태로 변경
 				stNowSession->m_lSendFlag = FALSE;				
@@ -977,8 +976,8 @@ namespace Library_Jingyu
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
 
-			// -- LastSendFlag 초기화
-			g_This->m_stSessionArray[iIndex].m_lLastSendFlag = FALSE;
+			// -- LastPacket 초기화
+			g_This->m_stSessionArray[iIndex].m_LastPacket = nullptr;
 			
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;						

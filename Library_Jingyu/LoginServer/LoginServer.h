@@ -32,6 +32,8 @@ namespace Library_Jingyu
 			INT64 m_i64AccountNo;
 			WCHAR m_wcID[20];
 			WCHAR m_wcNickName[20];
+
+			bool m_bLoginCheck;		// 로그인 여부. true면 로그인 된 유저.
 		};
 
 		// 파일에서 읽어오기 용 구조체
@@ -114,12 +116,6 @@ namespace Library_Jingyu
 
 		// 유저 관리 자료구조에 사용되는 락
 		SRWLOCK srwl;
-
-		// 프로세서 사용량 체크할 클래스
-		CCpuUsage_Processor ProcessorUsage;
-
-		// 해당 프로세스의 사용량 체크할 클래스
-		CCpuUsage_Process ProcessUsage;
 
 	private:	
 
@@ -239,7 +235,7 @@ namespace Library_Jingyu
 		void ServerStop();
 
 
-	public:
+	private:
 		/////////////////////////////
 		// 가상함수
 		/////////////////////////////

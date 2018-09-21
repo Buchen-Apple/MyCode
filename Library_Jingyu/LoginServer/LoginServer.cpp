@@ -35,77 +35,89 @@ namespace Library_Jingyu
 	// 출력용 함수
 	void CLogin_NetServer::ShowPrintf()
 	{
-		// 화면 출력할 것 셋팅
-		/*
-		SessionNum : 	- NetServer 의 세션수
-		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+		// 프로세서 사용량 체크할 클래스
+		CCpuUsage_Processor ProcessorUsage;
 
-		PlayerData_Pool :	- Player 구조체 할당량
-		Player Count :		- Contents 파트 Player의 수 (밖에서 사용중인 노드 수 포함)
+		// 해당 프로세스의 사용량 체크할 클래스
+		CCpuUsage_Process ProcessUsage;
 
-		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
-		Accept TPS :		- Accept 처리 횟수
-		Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+		while (1)
+		{
+			Sleep(1000);
 
-		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-		Player_ChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			// 화면 출력할 것 셋팅
+			/*
+			SessionNum : 	- NetServer 의 세션수
+			PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
 
-		----------------------------------------------------
-		SessionNum : 	- LanServer 의 세션수
-		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
+			PlayerData_Pool :	- Player 구조체 할당량
+			Player Count :		- Contents 파트 Player의 수 (밖에서 사용중인 노드 수 포함)
 
-		Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+			Accept TPS :		- Accept 처리 횟수
+			Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
 
-		----------------------------------------------------
-		CPU usage [T:%.1f%% U:%.1f%% K:%.1f%%] [LoginServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세서 / 프로세스 사용량.
-		*/
+			Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			Player_ChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
-		LONG AccpetTPS = g_lAcceptTPS;
-		LONG SendTPS = g_lSendPostTPS;
-		InterlockedExchange(&g_lAcceptTPS, 0);
-		InterlockedExchange(&g_lSendPostTPS, 0);
+			----------------------------------------------------
+			SessionNum : 	- LanServer 의 세션수
+			PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
 
-		// 출력 전에, 프로세서 / 프로세스 사용량 갱신
-		ProcessUsage.UpdateCpuTime();
-		ProcessorUsage.UpdateCpuTime();
+			Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
-		printf("========================================================\n"
-			"SessionNum : %lld\n"
-			"PacketPool_Net : %d\n\n"
+			----------------------------------------------------
+			CPU usage [T:%.1f%% U:%.1f%% K:%.1f%%] [LoginServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세서 / 프로세스 사용량.
+			*/
 
-			"PlayerData_Pool : %d\n"
-			"Player Count : %lld\n\n"
+			LONG AccpetTPS = g_lAcceptTPS;
+			LONG SendTPS = g_lSendPostTPS;
+			InterlockedExchange(&g_lAcceptTPS, 0);
+			InterlockedExchange(&g_lSendPostTPS, 0);
 
-			"Accept Total : %lld\n"
-			"Accept TPS : %d\n"
-			"Send TPS : %d\n\n"
+			// 출력 전에, 프로세서 / 프로세스 사용량 갱신
+			ProcessUsage.UpdateCpuTime();
+			ProcessorUsage.UpdateCpuTime();
 
-			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
-			"Player_ChunkAlloc_Count : %d (Out : %d)\n\n"
+			printf("========================================================\n"
+				"SessionNum : %lld\n"
+				"PacketPool_Net : %d\n\n"
 
-			"------------------------------------------------\n"
-			"SessionNum : %lld\n"
-			"PacketPool_Lan : %d\n\n"
+				"PlayerData_Pool : %d\n"
+				"Player Count : %lld\n\n"
 
-			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"
+				"Accept Total : %lld\n"
+				"Accept TPS : %d\n"
+				"Send TPS : %d\n\n"
 
-			"========================================================\n\n"
-			"CPU Usage [T:%.1f%%  U:%.1f%%  K:%.1f%%]  [LoginServer:%.1f%%  U:%.1f%%  K:%.1f%%]\n",
+				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
+				"Player_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
-			// ----------- 로그인 넷 서버용
-			GetClientCount(), g_lAllocNodeCount,
-			g_lStruct_PlayerCount, m_umapJoinUser.size(),
-			g_ullAcceptTotal, AccpetTPS, SendTPS,
-			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
-			m_MPlayerTLS->GetAllocChunkCount(), m_MPlayerTLS->GetOutChunkCount(),
+				"------------------------------------------------\n"
+				"SessionNum : %lld\n"
+				"PacketPool_Lan : %d\n\n"
 
-			// ----------- 로그인 랜 서버용
-			m_cLanS->GetClientCount(), g_lAllocNodeCount_Lan,
-			CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
+				"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"
 
-			// ----------- 프로세서 / 프로세스 사용량 
-			ProcessorUsage.ProcessorTotal(), ProcessorUsage.ProcessorUser(), ProcessorUsage.ProcessorKernel(),
-			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
+				"========================================================\n\n"
+				"CPU Usage [T:%.1f%%  U:%.1f%%  K:%.1f%%]  [LoginServer:%.1f%%  U:%.1f%%  K:%.1f%%]\n",
+
+				// ----------- 로그인 넷 서버용
+				GetClientCount(), g_lAllocNodeCount,
+				g_lStruct_PlayerCount, m_umapJoinUser.size(),
+				g_ullAcceptTotal, AccpetTPS, SendTPS,
+				CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
+				m_MPlayerTLS->GetAllocChunkCount(), m_MPlayerTLS->GetOutChunkCount(),
+
+				// ----------- 로그인 랜 서버용
+				m_cLanS->GetClientCount(), g_lAllocNodeCount_Lan,
+				CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
+
+				// ----------- 프로세서 / 프로세스 사용량 
+				ProcessorUsage.ProcessorTotal(), ProcessorUsage.ProcessorUser(), ProcessorUsage.ProcessorKernel(),
+				ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
+		}
+		
 	}
 
 
@@ -127,7 +139,7 @@ namespace Library_Jingyu
 		m_cLanS = new CLogin_LanServer;		
 
 		// 모니터링 LanClient 동적할당.
-		m_LanMonitorC = new CMoniter_Clinet;
+		//m_LanMonitorC = new CMoniter_Clinet;
 
 		// Player TLS 동적할당
 		m_MPlayerTLS = new CMemoryPoolTLS< stPlayer >(50, false);
@@ -172,9 +184,9 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 가동
-		if (m_LanMonitorC->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.ClientCreateWorker, 
+		/*if (m_LanMonitorC->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.ClientCreateWorker, 
 			m_stConfig.ClientActiveWorker, m_stConfig.ClientNodelay) == false)
-			return false;
+			return false;*/
 
 		// 서버 오픈 로그 찍기		
 		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -520,7 +532,7 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 2. 정보 갱신 (AccountNo, ID, NickName)
+		// 2. 정보 갱신 (AccountNo, ID, NickName, 로그인 상태)
 		NowPlayer->second->m_i64AccountNo = AccountNo;
 
 		int len = (int)strlen(UserID);
@@ -528,6 +540,8 @@ namespace Library_Jingyu
 
 		len = (int)strlen(NickName);
 		MultiByteToWideChar(CP_UTF8, 0, NickName, (int)strlen(NickName), NowPlayer->second->m_wcNickName, len);
+
+		NowPlayer->second->m_bLoginCheck = true;
 
 
 		ReleaseSRWLockExclusive(&srwl);		// ----------- 언락
@@ -787,6 +801,9 @@ namespace Library_Jingyu
 		stPlayer* JoinPlayer = m_MPlayerTLS->Alloc();
 		InterlockedAdd(&g_lStruct_PlayerCount, 1);
 
+		// 로그인 중 아닌 유저
+		JoinPlayer->m_bLoginCheck = false;
+
 		// 2. umap에 유저 추가
 		if (InsertPlayerFunc(SessionID, JoinPlayer) == false)
 		{
@@ -859,7 +876,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CLogin_NetServer::OnSend(ULONGLONG SessionID, DWORD SendSize)
 	{
-		// 할것 없음
+
 	}
 
 	// 워커 스레드가 깨어날 시 호출되는 함수.
@@ -884,7 +901,9 @@ namespace Library_Jingyu
 	//			 : 에러 코드에 대한 스트링
 	// return : 없음
 	void CLogin_NetServer::OnError(int error, const TCHAR* errorStr)
-	{}
+	{
+		g_LoginDump->Crash();
+	}
 
 
 

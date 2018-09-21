@@ -11,28 +11,33 @@
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
+LONG g_lAllocNodeCount;
+LONG g_lAllocNodeCount_Lan;
 
+extern ULONGLONG g_ullAcceptTotal;
+extern LONG	  g_lAcceptTPS;
+extern LONG	g_lSendPostTPS;
 
-extern LONG g_lUpdateStructCount;
-extern LONG g_lUpdateStruct_PlayerCount;
-extern LONG		 g_lUpdateTPS;
-extern LONG g_lTokenNodeCount;
+LONG g_lUpdateStructCount;
+LONG g_lUpdateStruct_PlayerCount;
+LONG		 g_lUpdateTPS;
+LONG g_lTokenNodeCount;
 
-extern LONG g_lTokenMiss;
-extern LONG g_lTokenNotFound;
+LONG g_lTokenMiss;
+LONG g_lTokenNotFound;
 
 // ------------- 공격 테스트용
-extern int m_SectorPosError;
+int m_SectorPosError;
 
-extern int m_SectorNoError;
-extern int m_ChatNoError;
+int m_SectorNoError;
+int m_ChatNoError;
 
-extern int m_TypeError;
+int m_TypeError;
 
-extern int m_HeadCodeError;
+int m_HeadCodeError;
 
-extern int m_ChackSumError;
-extern int m_HeaderLenBig;
+int m_ChackSumError;
+int m_HeaderLenBig;
 
 
 
@@ -579,11 +584,17 @@ namespace Library_Jingyu
 
 		InterlockedAdd(&g_lUpdateStruct_PlayerCount, 1);
 
-		// 2) SessionID 셋팅
+		// 2) 셋팅
+		// SessionID
 		JoinPlayer->m_ullSessionID = SessionID;
 
+		// 섹터 좌표
 		JoinPlayer->m_wSectorY = TEMP_SECTOR_POS;
 		JoinPlayer->m_wSectorX = TEMP_SECTOR_POS;
+
+		// 로그인 상태 아님
+		JoinPlayer->m_bLoginCheck = false;
+
 
 		// 3) Player 관리 자료구조에 유저 추가
 		if (InsertPlayerFunc(SessionID, JoinPlayer) == false)
@@ -739,7 +750,11 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 2) 마샬링
+		// 2) 로그인 중인 유저인지 체크
+		if(FindPlayer->m_bLoginCheck == false)
+			throw CException(_T("Packet_Sector_Move(). Not Login User"));
+
+		// 3) 마샬링
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
@@ -748,7 +763,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)&wSectorY, 2);
 
 		// 패킷 검증 -----------------------------
-		// 3) 이동하고자 하는 섹터가 정상인지 체크
+		// 4) 이동하고자 하는 섹터가 정상인지 체크
 		if (wSectorX < 0 || wSectorX > SECTOR_X_COUNT ||
 			wSectorY < 0 || wSectorY > SECTOR_Y_COUNT)
 		{
@@ -758,7 +773,7 @@ namespace Library_Jingyu
 			throw CException(_T("Packet_Sector_Move(). Sector pos Error"));
 		}
 
-		// 4) AccountNo 체크
+		// 5) AccountNo 체크
 		if (AccountNo != FindPlayer->m_i64AccountNo)
 		{
 			m_SectorNoError++;
@@ -767,7 +782,7 @@ namespace Library_Jingyu
 			throw CException(_T("Packet_Sector_Move(). AccountNo Error"));
 		}		
 
-		// 5) 유저의 섹터 정보 갱신
+		// 6) 유저의 섹터 정보 갱신
 		// 최초 섹터 패킷이 아니라면, 기존 섹터에서 뺀다.
 		// 똑같은 값이기 때문에, 하나만 체크해도 된다.
 		if (FindPlayer->m_wSectorY != TEMP_SECTOR_POS &&
@@ -809,7 +824,7 @@ namespace Library_Jingyu
 		// 새로운 색터에 유저 추가
 		m_vectorSecotr[wSectorY][wSectorX].push_back(SessionID);
 
-		// 6) 클라이언트에게 보낼 패킷 조립 (섹터 이동 결과)
+		// 7) 클라이언트에게 보낼 패킷 조립 (섹터 이동 결과)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		// 타입, AccountNo, SecotrX, SecotrY
@@ -819,7 +834,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&wSectorX, 2);
 		SendBuff->PutData((char*)&wSectorY, 2);
 
-		// 7) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
+		// 8) 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 		SendPacket(SessionID, SendBuff);
 	}
 
@@ -835,7 +850,11 @@ namespace Library_Jingyu
 		if (FindPlayer == nullptr)
 			m_ChatDump->Crash();
 
-		// 2) 마샬링
+		// 2) 로그인 중인 유저인지 체크
+		if (FindPlayer->m_bLoginCheck == false)
+			throw CException(_T("Packet_Chat_Message(). Not Login User"));
+
+		// 3) 마샬링
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
@@ -846,7 +865,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)Message, MessageLen);
 
 		// ------------------- 검증
-		// 3) AccountNo 체크
+		// 4) AccountNo 체크
 		if (AccountNo != FindPlayer->m_i64AccountNo)
 		{
 			m_ChatNoError++;
@@ -855,7 +874,7 @@ namespace Library_Jingyu
 			throw CException(_T("Packet_Chat_Message(). AccountNo Error"));
 		}
 
-		// 4) 클라이언트에게 보낼 패킷 조립 (채팅 보내기 응답)
+		// 5) 클라이언트에게 보낼 패킷 조립 (채팅 보내기 응답)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_CHAT_RES_MESSAGE;
@@ -866,7 +885,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&MessageLen, 2);
 		SendBuff->PutData((char*)Message, MessageLen);
 
-		// 5) 주변 유저에게 채팅 메시지 보냄
+		// 6) 주변 유저에게 채팅 메시지 보냄
 		// 모든 유저에게 보낸다 (채팅을 보낸 유저 포함)
 		SendPacket_Sector(FindPlayer->m_wSectorX, FindPlayer->m_wSectorY, SendBuff);
 	}
@@ -883,7 +902,11 @@ namespace Library_Jingyu
 		if (FindPlayer == nullptr)
 			m_ChatDump->Crash();
 
-		// 2) 마샬링하며 셋팅
+		// 2) 이미 로그인 중인 유저인지 체크
+		if (FindPlayer->m_bLoginCheck == true)
+			throw CException(_T("Packet_Chat_Message(). Login User!!! Login Fail..."));
+
+		// 3) 마샬링하며 셋팅
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 		FindPlayer->m_i64AccountNo = AccountNo;
@@ -894,7 +917,7 @@ namespace Library_Jingyu
 		char Token[64];
 		Packet->GetData(Token, 64);
 
-		// 3) 이번 통신에 받은 패킷이 유효한지 체크		
+		// 4) 이번 통신에 받은 패킷이 유효한지 체크		
 		AcquireSRWLockExclusive(&m_Logn_LanClient.srwl);		// 락 -----
 
 		// 토큰 검색
@@ -916,6 +939,9 @@ namespace Library_Jingyu
 			m_Logn_LanClient.m_umapTokenCheck.erase(FindToken);
 
 			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+
+			// 유저 로그인 상태로 변경
+			FindPlayer->m_bLoginCheck = true;
 
 			// stToken* Free
 			m_Logn_LanClient.m_MTokenTLS->Free(retToken);
@@ -968,7 +994,7 @@ namespace Library_Jingyu
 
 
 	// ------------------------------------------------
-	// 외부에서 호출하는 함수
+	// 생성자와 소멸자
 	// ------------------------------------------------
 
 	// 생성자
@@ -1070,6 +1096,156 @@ namespace Library_Jingyu
 
 		// 시간 
 		timeEndPeriod(1);
+	}
+
+
+
+	// -------------------------------------
+	// 외부에서 사용 가능한 함수
+	// -------------------------------------
+	
+	// 출력용 함수
+	void  CChatServer::ShowPrintf()
+	{
+		// 해당 프로세스의 사용량 체크할 클래스
+		CCpuUsage_Process ProcessUsage;
+
+		while (1)
+		{
+			Sleep(1000);
+
+			//if (_kbhit())
+			//{
+			//	int Key = _getch();
+
+			//	// q를 누르면 채팅서버 종료
+			//	if (Key == 'Q' || Key == 'q')
+			//	{
+			//		ChatS.ServerStop();
+			//		break;
+			//	}
+
+			//}
+
+
+			// 화면 출력할 것 셋팅
+			/*
+			SessionNum : 	- NetServer 의 세션수
+			PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+
+			UpdateMessage_Pool :	- UpdateThread 용 구조체 할당량 (일감)
+			UpdateMessage_Queue : 	- UpdateThread 큐 남은 개수
+
+			PlayerData_Pool :	- Player 구조체 할당량
+			Player Count : 		- Contents 파트 Player 개수
+
+			Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+			Accept TPS :		- Accept 처리 횟수
+			Update TPS :		- Update 처리 초당 횟수
+			Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+
+			SecotrPosError :	- 섹터 위치 에러
+			SectorAccountError : - 섹터 패킷의 AccountNo 에러
+			ChatAccountError :	- 채팅 패킷의 AccountNo 에러
+			TypeError :			- 페이로드의 메시지 타입 에러
+			HeadCodeError :		- (네트워크) 헤더 코드 에러
+			CheckSumError :		- (네트워크) 체크썸 에러
+			HeaderLenBig :		- (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
+
+			Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			Chat_MessageChunkAlloc_Count : - 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			Chat_MessageChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+			TokenMiss : 		- 토큰키가 다른 유저가 채팅서버로 들어옴
+			TokenNotFound : 	- 토큰키를 찾지 못함
+
+			----------------------------------------------------
+			PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
+
+			Token_umap_Count - 토큰 umap 안의 카운트
+			Token_UseNode_Count - 토큰 TLS의 사용 중인 Node 카운트
+
+			Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+			Token_ChunkAlloc_Count : - 토큰 TLS의 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+			----------------------------------------------------
+			CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
+
+			*/
+
+			LONG AccpetTPS = g_lAcceptTPS;
+			LONG UpdateTPS = g_lUpdateTPS;
+			LONG SendTPS = g_lSendPostTPS;
+			InterlockedExchange(&g_lUpdateTPS, 0);
+			InterlockedExchange(&g_lAcceptTPS, 0);
+			InterlockedExchange(&g_lSendPostTPS, 0);
+
+			// 출력 전에, 프로세스 사용량 갱신
+			ProcessUsage.UpdateCpuTime();
+
+			printf("========================================================\n"
+				"SessionNum : %lld\n"
+				"PacketPool_Net : %d\n\n"
+
+				"UpdateMessage_Pool : %d\n"
+				"UpdateMessage_Queue : %d\n\n"
+
+				"PlayerData_Pool : %d\n"
+				"Player Count : %lld\n\n"
+
+				"Accept Total : %lld\n"
+				"Accept TPS : %d\n"
+				"Update TPS : %d\n"
+				"Send TPS : %d\n\n"
+
+				"SecotrPosError : %d\n"
+				"SectorAccountError : %d\n"
+				"ChatAccountError : %d\n"
+				"TypeError : %d\n"
+				"HeadCodeError : %d\n"
+				"CheckSumError : %d\n"
+				"HeaderLenBig : %d\n\n"
+
+				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
+				"Chat_MessageChunkAlloc_Count : %d (Out : %d)\n"
+				"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
+
+				"TokenMiss : %d\n"
+				"TokenNotFound : %d\n\n"
+
+				"------------------------------------------------\n"
+				"PacketPool_Lan : %d\n\n"
+
+				"Token_umap_Count : %lld\n"
+				"Token_UseNode_Count : %d\n\n"
+
+				"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n"
+				"Token_ChunkAlloc_Count : %d (Out : %d)\n\n"
+
+				"========================================================\n\n"
+				"CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
+
+				// ----------- 채팅 서버용
+				GetClientCount(), g_lAllocNodeCount,
+				g_lUpdateStructCount, m_LFQueue->GetInNode(),
+				g_lUpdateStruct_PlayerCount, m_mapPlayer.size(),
+				g_ullAcceptTotal, AccpetTPS, UpdateTPS, SendTPS,
+				m_SectorPosError, m_SectorNoError, m_ChatNoError, m_TypeError, m_HeadCodeError, m_ChackSumError, m_HeaderLenBig,
+				CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
+				m_MessagePool->GetAllocChunkCount(), m_MessagePool->GetOutChunkCount(),
+				m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
+				g_lTokenMiss, g_lTokenNotFound,
+
+				// ----------- 랜 클라이언트용
+				g_lAllocNodeCount_Lan,
+				m_Logn_LanClient.m_umapTokenCheck.size(), g_lTokenNodeCount,
+				CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
+				m_Logn_LanClient.m_MTokenTLS->GetAllocChunkCount(), m_Logn_LanClient.m_MTokenTLS->GetOutChunkCount(),
+
+				// ----------- 프로세스 사용량 
+				ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
+		}
+		
 	}
 
 	// 채팅 서버 시작 함수
