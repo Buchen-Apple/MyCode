@@ -206,9 +206,12 @@ namespace Library_Jingyu
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 	}
 
+	//////////////////////////////////////////////////////////////////////
 	// DBWriter 스레드의 Save 쿼리 전용
 	// 결과셋을 저장하지 않음.
-	// 보내기만하고 결과 받을 필요 없을때 사용
+	// 
+	// Parameter : char형 쿼리 메시지, vlist 가변인자
+	//////////////////////////////////////////////////////////////////////
 	void	CDBConnector::Query_Save(char *szStringFormat, va_list* vlist)
 	{
 		// 1. 가변인자의 값을 스트링 1개로 뽑아내기.		
@@ -231,7 +234,7 @@ namespace Library_Jingyu
 				break;
 
 			// 연결이 끊긴거면 5회동안 재연결 시도
-			if (Error == CR_SOCKET_CREATE_ERROR ||
+			else if (Error == CR_SOCKET_CREATE_ERROR ||
 				Error == CR_CONNECTION_ERROR ||
 				Error == CR_CONN_HOST_ERROR ||
 				Error == CR_SERVER_HANDSHAKE_ERR ||
@@ -265,6 +268,12 @@ namespace Library_Jingyu
 					Sleep(0);
 				}
 			}
+
+			// 만약, 테이블이 없다면, 새로 만든다.
+
+			// 연결 끊긴게 아니면 에러 보관
+			else
+				SaveLastError();
 		}
 		
 
@@ -272,7 +281,95 @@ namespace Library_Jingyu
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 		mysql_free_result(m_pSqlResult);
 	}
-															
+		
+
+	//////////////////////////////////////////////////////////////////////
+	// DBWriter 스레드의 Save 쿼리 전용
+	// 결과셋을 저장하지 않음.
+	// !! 월 별로 테이블 등을 관리하고 싶을때 사용하는 함수.
+	// !! 테이블이 없으면, 입력받은 테이블 이름으로 테이블을 생성한다.
+	// 
+	// Parameter : char형 템플릿 테이블 이름, char형 테이블 이름, char형 쿼리 메시지, vlist 가변인자
+	//////////////////////////////////////////////////////////////////////
+	void	CDBConnector::Query_Save(char* TemplateName, char* TableName, char *szStringFormat, va_list* vlist)
+	{
+		// 1. 가변인자의 값을 스트링 1개로 뽑아내기.		
+		HRESULT retval = StringCbVPrintfA(m_cQueryUTF8, eQUERY_MAX_LEN, szStringFormat, *vlist);
+
+		// 쿼리 글자 수 이상이면 로그찍고 끝.
+		if (retval != S_OK)
+		{
+
+		}
+
+		// 2. 쿼리 날리기
+		int Error, Count;
+		while (1)
+		{
+			Error = mysql_query(m_pMySQL, m_cQueryUTF8);
+
+			// 성공 시 break;
+			if (Error == 0)
+				break;
+
+			// 연결이 끊긴거면 5회동안 재연결 시도
+			else if (Error == CR_SOCKET_CREATE_ERROR ||
+				Error == CR_CONNECTION_ERROR ||
+				Error == CR_CONN_HOST_ERROR ||
+				Error == CR_SERVER_HANDSHAKE_ERR ||
+				Error == CR_SERVER_GONE_ERROR ||
+				Error == CR_INVALID_CONN_HANDLE ||
+				Error == CR_SERVER_LOST)
+			{
+				Count = 0;
+				while (1)
+				{
+					// DB 연결
+					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
+					if (m_pMySQL != NULL)
+						break;
+
+					// 멤버변수에 에러 셋팅
+					SaveLastError();
+
+					// 카운트 1 증가
+					Count++;
+
+					// 실패 시 로그 남김
+					g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+						L"Query() --> Connect Fail... (Count : %d)", Count);
+
+					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
+					if (Count >= 5)
+						g_DBDump->Crash();
+
+					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
+					Sleep(0);
+				}
+			}
+
+			// 만약, 테이블이 없다면, 새로 만든다.
+			else if (mysql_errno(&m_MySQL) == 1146)
+			{
+				// 테이블 생성 쿼리 만들기
+				char query[1024] = { 0, };
+				StringCbPrintfA(query, 1024, "CREATE TABLE `%s` LIKE %s", TableName, TemplateName);
+
+				// 테이블 생성 쿼리 날림
+				mysql_query(m_pMySQL, query);
+			}
+
+			// 연결 끊긴게 아니면 에러 보관
+			else
+				SaveLastError();
+		}
+
+
+		// 4. 결과 받은 후, 바로 result 한다.		
+		m_pSqlResult = mysql_store_result(m_pMySQL);
+		mysql_free_result(m_pSqlResult);
+
+	}
 
 	//////////////////////////////////////////////////////////////////////
 	// 쿼리를 날린 뒤에 결과 뽑아오기.
@@ -421,7 +518,7 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	// 쿼리 날리고 결과셋 임시 보관
 	//
-	// Parameter : WCHAR형 쿼리 메시지
+	// Parameter : char형 쿼리 메시지
 	//////////////////////////////////////////////////////////////////////
 	void		CBConnectorTLS::Query(char *szStringFormat, ...)
 	{
@@ -453,8 +550,12 @@ namespace Library_Jingyu
 		va_end(vlist);
 	}
 
+	//////////////////////////////////////////////////////////////////////
 	// DBWriter 스레드의 Save 쿼리 전용
 	// 결과셋을 저장하지 않음.
+	// 
+	// Parameter : char형 쿼리 메시지
+	//////////////////////////////////////////////////////////////////////
 	void		CBConnectorTLS::Query_Save(char *szStringFormat, ...)
 	{
 		// 1. TLS에서 DBConnector를 꺼내온다.
@@ -485,6 +586,44 @@ namespace Library_Jingyu
 		va_end(vlist);
 	}
 
+
+	//////////////////////////////////////////////////////////////////////
+	// DBWriter 스레드의 Save 쿼리 전용
+	// 결과셋을 저장하지 않음.
+	// !! 월 별로 테이블 등을 관리하고 싶을때 사용하는 함수.
+	// !! 테이블이 없으면, 입력받은 테이블 이름으로 테이블을 생성한다.
+	// 
+	// Parameter : char형 템플릿 테이블 이름, char형 테이블 이름, char형 쿼리 메시지
+	//////////////////////////////////////////////////////////////////////
+	void	CBConnectorTLS::Query_Save(char* TemplateName, char* TableName, char *szStringFormat, ...)
+	{
+		// 1. TLS에서 DBConnector를 꺼내온다.
+		CDBConnector* NowDB = (CDBConnector*)TlsGetValue(m_dwTLSIndex);
+
+		// 만약, 아직 DBConnector를 할당하지 않은 상태라면, DBConnector셋팅
+		if (NowDB == nullptr)
+		{
+			NowDB = new CDBConnector(m_wcDBIP, m_wcDBUser, m_wcDBPassword, m_wcDBName, m_iDBPort);
+
+			// 새로운 디비 보관
+			m_stackConnector->Push(NowDB);
+
+			if (TlsSetValue(m_dwTLSIndex, NowDB) == 0)
+			{
+				DWORD Error = GetLastError();
+				g_DBDump->Crash();
+			}
+		}
+
+		va_list vlist;
+		va_start(vlist, szStringFormat);
+
+		// 2. 꺼내온 DBConnector의 Query_Save 함수 호출 후, 결과 값 리턴
+		NowDB->Query_Save(TemplateName, TableName, szStringFormat, &vlist);
+
+		// 3. 다 쓴 가변인자 리소스 해제
+		va_end(vlist);
+	}
 
 
 	//////////////////////////////////////////////////////////////////////

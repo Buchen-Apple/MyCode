@@ -6,7 +6,16 @@
 
 #include <process.h>
 
+// 출력용 코드
 extern LONG g_lStruct_PlayerCount;
+extern LONG	  g_lAcceptTPS;
+extern LONG	g_lSendPostTPS;
+extern ULONGLONG g_ullAcceptTotal;
+
+LONG g_lAllocNodeCount;
+LONG g_lStruct_PlayerCount;
+LONG g_lAllocNodeCount_Lan;
+
 
 // ----------------------------------
 // LoginServer(NetServer)
@@ -23,12 +32,80 @@ namespace Library_Jingyu
 	// 외부에서 호출 가능 함수
 	/////////////////////////////
 
-
-	// !! 테스트용 !!
-	// 랜서버 접속자 얻기
-	ULONGLONG CLogin_NetServer::GetLanClientCount()
+	// 출력용 함수
+	void CLogin_NetServer::ShowPrintf()
 	{
-		return m_cLanS->GetClientCount();
+		// 화면 출력할 것 셋팅
+		/*
+		SessionNum : 	- NetServer 의 세션수
+		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+
+		PlayerData_Pool :	- Player 구조체 할당량
+		Player Count :		- Contents 파트 Player의 수 (밖에서 사용중인 노드 수 포함)
+
+		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+		Accept TPS :		- Accept 처리 횟수
+		Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+
+		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		Player_ChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+		----------------------------------------------------
+		SessionNum : 	- LanServer 의 세션수
+		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
+
+		Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+		----------------------------------------------------
+		CPU usage [T:%.1f%% U:%.1f%% K:%.1f%%] [LoginServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세서 / 프로세스 사용량.
+		*/
+
+		LONG AccpetTPS = g_lAcceptTPS;
+		LONG SendTPS = g_lSendPostTPS;
+		InterlockedExchange(&g_lAcceptTPS, 0);
+		InterlockedExchange(&g_lSendPostTPS, 0);
+
+		// 출력 전에, 프로세서 / 프로세스 사용량 갱신
+		ProcessUsage.UpdateCpuTime();
+		ProcessorUsage.UpdateCpuTime();
+
+		printf("========================================================\n"
+			"SessionNum : %lld\n"
+			"PacketPool_Net : %d\n\n"
+
+			"PlayerData_Pool : %d\n"
+			"Player Count : %lld\n\n"
+
+			"Accept Total : %lld\n"
+			"Accept TPS : %d\n"
+			"Send TPS : %d\n\n"
+
+			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
+			"Player_ChunkAlloc_Count : %d (Out : %d)\n\n"
+
+			"------------------------------------------------\n"
+			"SessionNum : %lld\n"
+			"PacketPool_Lan : %d\n\n"
+
+			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"
+
+			"========================================================\n\n"
+			"CPU Usage [T:%.1f%%  U:%.1f%%  K:%.1f%%]  [LoginServer:%.1f%%  U:%.1f%%  K:%.1f%%]\n",
+
+			// ----------- 로그인 넷 서버용
+			GetClientCount(), g_lAllocNodeCount,
+			g_lStruct_PlayerCount, m_umapJoinUser.size(),
+			g_ullAcceptTotal, AccpetTPS, SendTPS,
+			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
+			m_MPlayerTLS->GetAllocChunkCount(), m_MPlayerTLS->GetOutChunkCount(),
+
+			// ----------- 로그인 랜 서버용
+			m_cLanS->GetClientCount(), g_lAllocNodeCount_Lan,
+			CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
+
+			// ----------- 프로세서 / 프로세스 사용량 
+			ProcessorUsage.ProcessorTotal(), ProcessorUsage.ProcessorUser(), ProcessorUsage.ProcessorKernel(),
+			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
 	}
 
 
@@ -95,7 +172,9 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 가동
-		//m_LanMonitorC->ClientStart();
+		if (m_LanMonitorC->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.ClientCreateWorker, 
+			m_stConfig.ClientActiveWorker, m_stConfig.ClientNodelay) == false)
+			return false;
 
 		// 서버 오픈 로그 찍기		
 		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -327,6 +406,35 @@ namespace Library_Jingyu
 
 		// 로그 레벨
 		if (Parser.GetValue_Int(_T("LanLogLevel"), &pConfig->LanLogLevel) == false)
+			return false;
+
+
+		////////////////////////////////////////////////////////
+		// 모니터링 클라이언트 Config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MONITORCLIENT")) == false)
+			return false;
+
+		// IP
+		if (Parser.GetValue_String(_T("MonitorServerIP"), pConfig->MonitorServerIP) == false)
+			return false;
+
+		// Port
+		if (Parser.GetValue_Int(_T("MonitorServerPort"), &pConfig->MonitorServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("ClientCreateWorker"), &pConfig->ClientCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("ClientActiveWorker"), &pConfig->ClientActiveWorker) == false)
+			return false;
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("ClientNodelay"), &pConfig->ClientNodelay) == false)
 			return false;
 
 
@@ -1067,12 +1175,15 @@ namespace Library_Jingyu
 	// --------------------------------
 
 	// 시작 함수
-	//
 	// 내부적으로, 상속받은 CLanClient의 Start호출.
-	// 추가로, 리소스 할당 등
-	bool CMoniter_Clinet::ClientStart()
+	//
+	// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+	// return : 성공 시 true , 실패 시 falsel 
+	bool CMoniter_Clinet::ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay)
 	{
-		//Start();
+		// 모니터링 서버에 연결
+		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
+			return false;
 
 		// 모니터링 서버로 정보 전송할 스레드 생성
 		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MoniterThread, this, 0, NULL);
@@ -1111,7 +1222,7 @@ namespace Library_Jingyu
 	// -----------------------
 
 	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
-	UINT	__stdcall CMoniter_Clinet::MoniterThread(LPVOID lParam)
+	UINT	WINAPI CMoniter_Clinet::MoniterThread(LPVOID lParam)
 	{
 		// this 받아두기
 		CMoniter_Clinet* g_This = (CMoniter_Clinet*)lParam;
@@ -1151,48 +1262,120 @@ namespace Library_Jingyu
 			// ----------------------------------
 			// 하드웨어 정보 보내기 (프로세서)
 			// ----------------------------------
-			WORD Type;
+			int TimeStamp = (int)(time(NULL));
+			WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
+			BYTE DataType;			
+			int iData;
 
 			// 1. 하드웨어 CPU 사용률 전체
-			float fData = CProcessorCPU.ProcessorTotal();
-
-			Type = dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL;
 			CProtocolBuff_Lan* SendBuff_CPU = CProtocolBuff_Lan::Alloc();
-			SendBuff_CPU->PutData((char*)&fData, 4);
+
+			// 타입
+			SendBuff_CPU->PutData((char*)&Type, 2);
+
+			// 데이터 타입
+			DataType = dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL;
+			SendBuff_CPU->PutData((char*)&DataType, 1);
+
+			// 데이터 값
+			iData = (int)CProcessorCPU.ProcessorTotal();
+			SendBuff_CPU->PutData((char*)&iData, 4);
+
+			// 타임스탬프
+			SendBuff_CPU->PutData((char*)&TimeStamp, 4);
+
+			// Send하기
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_CPU);
 
-			// 2. 하드웨어 사용가능 메모리
-			double dData = CPdh.Get_AVA_Mem();
 
-			Type = dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY;
+
+			// 2. 하드웨어 사용가능 메모리 (MByte)
 			CProtocolBuff_Lan* SendBuff_AVAMEM = CProtocolBuff_Lan::Alloc();
-			SendBuff_AVAMEM->PutData((char*)&dData, 8);
+
+			// 타입
+			SendBuff_AVAMEM->PutData((char*)&Type, 2);
+
+			// 데이터 타입
+			DataType = dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY;
+			SendBuff_AVAMEM->PutData((char*)&DataType, 1);
+
+			// 데이터 값
+			iData = (int)CPdh.Get_AVA_Mem();
+			SendBuff_AVAMEM->PutData((char*)&iData, 4);
+
+			// 타임스탬프
+			SendBuff_AVAMEM->PutData((char*)&TimeStamp, 4);
+			
+			// Send하기
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_AVAMEM);
 
-			// 3. 하드웨어 이더넷 수신 바이트
-			dData = CPdh.Get_Net_Recv();
+		
 
-			Type = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
+			// 3. 하드웨어 이더넷 수신 바이트 (KByte)
 			CProtocolBuff_Lan* SendBuff_Recv = CProtocolBuff_Lan::Alloc();
-			SendBuff_Recv->PutData((char*)&dData, 8);
+			
+			// 타입
+			SendBuff_Recv->PutData((char*)&Type, 2);
+
+			// 데이터 타입
+			DataType = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
+			SendBuff_Recv->PutData((char*)&DataType, 1);
+
+			// 데이터 값
+			// Kbyte단위로 보내기 위해 1024 나눔
+			iData = (int)(CPdh.Get_Net_Recv() / 1024);
+			SendBuff_Recv->PutData((char*)&iData, 4);
+
+			// 타임스탬프
+			SendBuff_Recv->PutData((char*)&TimeStamp, 4);
+
+			// Send하기
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Recv);
 
 
-			// 4. 하드웨어 이더넷 송신 바이트
-			dData = CPdh.Get_Net_Send();
 
-			Type = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
+			// 4. 하드웨어 이더넷 송신 바이트 (KByte)
 			CProtocolBuff_Lan* SendBuff_Send = CProtocolBuff_Lan::Alloc();
-			SendBuff_Send->PutData((char*)&dData, 8);
+
+			// 타입
+			SendBuff_Send->PutData((char*)&Type, 2);
+
+			// 데이터 타입
+			DataType = dfMONITOR_DATA_TYPE_SERVER_NETWORK_SEND;
+			SendBuff_Send->PutData((char*)&DataType, 1);
+
+			// 데이터 값
+			// Kbyte단위로 보내기 위해 1024 나눔
+			iData = (int)(CPdh.Get_Net_Send() / 1024);
+			SendBuff_Send->PutData((char*)&iData, 4);
+
+			// 타임스탬프
+			SendBuff_Send->PutData((char*)&TimeStamp, 4);
+
+			// Send하기
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Send);
 
 
-			// 5. 하드웨어 논페이지 메모리 사용량			
-			dData = CPdh.Get_NonPaged_Mem();
 
-			Type = dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY;
+
+			// 5. 하드웨어 논페이지 메모리 사용량 (MByte)
 			CProtocolBuff_Lan* SendBuff_NONMEM = CProtocolBuff_Lan::Alloc();
-			SendBuff_NONMEM->PutData((char*)&dData, 8);
+
+			// 타입
+			SendBuff_NONMEM->PutData((char*)&Type, 2);
+
+			// 데이터 타입
+			DataType = dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY;
+			SendBuff_NONMEM->PutData((char*)&DataType, 1);
+
+			// 데이터 값
+			iData = (int)CPdh.Get_NonPaged_Mem();
+			SendBuff_NONMEM->PutData((char*)&iData, 4);
+
+			// 타임스탬프
+			SendBuff_NONMEM->PutData((char*)&TimeStamp, 4);
+
+			// Send하기
 			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_NONMEM);
 		}
 
@@ -1215,6 +1398,17 @@ namespace Library_Jingyu
 	{
 		// 세션아이디 기억해둔다.
 		m_ullSessionID = SessionID;
+
+		// 모니터링 서버(Lan)로 로그인 패킷 보냄
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_SS_MONITOR_LOGIN;
+		int ServerNo = dfSERVER_NO;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ServerNo, 4);
+
+		SendPacket(SessionID, SendBuff);
 	}
 
 	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)

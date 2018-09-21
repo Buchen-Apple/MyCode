@@ -37,6 +37,7 @@ namespace Library_Jingyu
 		// 파일에서 읽어오기 용 구조체
 		struct stConfigFile
 		{
+			// 로그인 Net서버 정보
 			TCHAR BindIP[20];
 			int Port;
 			int CreateWorker;
@@ -49,18 +50,21 @@ namespace Library_Jingyu
 			int MaxJoinUser;
 			int LogLevel;
 
+			// 게임서버와 채팅서버의 정보.
 			TCHAR GameServerIP[16];
 			int GameServerPort;
 
 			TCHAR ChatServerIP[16];
 			int ChatServerPort;
 
+			// AccountDB에 연결 시 필요한 정보
 			TCHAR DB_IP[20];
 			TCHAR DB_User[40];
 			TCHAR DB_Password[40];
 			TCHAR DB_Name[40];
 			int  DB_Port;
 
+			// 로그인 Lan서버 정보
 			TCHAR LanBindIP[20];
 			int LanPort;
 			int LanCreateWorker;
@@ -69,6 +73,13 @@ namespace Library_Jingyu
 			int LanNodelay;
 			int LanMaxJoinUser;
 			int LanLogLevel;
+
+			// 모니터링 클라 정보
+			TCHAR MonitorServerIP[20];
+			int	MonitorServerPort;
+			int ClientCreateWorker;
+			int ClientActiveWorker;
+			int ClientNodelay;
 		};
 
 		
@@ -103,6 +114,12 @@ namespace Library_Jingyu
 
 		// 유저 관리 자료구조에 사용되는 락
 		SRWLOCK srwl;
+
+		// 프로세서 사용량 체크할 클래스
+		CCpuUsage_Processor ProcessorUsage;
+
+		// 해당 프로세스의 사용량 체크할 클래스
+		CCpuUsage_Process ProcessUsage;
 
 	private:	
 
@@ -191,42 +208,22 @@ namespace Library_Jingyu
 			   
 
 	public:
-
-		// 테스트용. 맵 안의 플레이어 수 얻기
-		LONG JoinPlayerCount()
-		{
-			return (LONG)m_umapJoinUser.size();
-		}
-
-		// !! 테스트용 !!
-		// 플레이어 TLS의 총 할당된 청크 수 반환
-		LONG GetPlayerChunkCount()
-		{
-			return m_MPlayerTLS->GetAllocChunkCount();
-		}
-
-		// !! 테스트용 !!
-		// 플레이어 TLS의 현재 밖에서 사용중인 청크 수 반환
-		LONG GetPlayerOutChunkCount()
-		{
-			return m_MPlayerTLS->GetOutChunkCount();
-		}
-
-		// !! 테스트용 !!
-		// 랜서버 접속자 얻기
-		ULONGLONG GetLanClientCount();
-
-
+		// 출력용 함수
+		void ShowPrintf();
 	
 
-
-
+	public:
 		// 생성자
 		CLogin_NetServer();
 
 		// 소멸자
 		virtual ~CLogin_NetServer();
 
+
+	public:
+		/////////////////////////////
+		// 외부에서 호출 가능한 기능 함수
+		/////////////////////////////
 
 		// 로그인 서버 시작 함수
 		// 내부적으로 NetServer의 Start 호출
@@ -241,6 +238,11 @@ namespace Library_Jingyu
 		// return : 없음
 		void ServerStop();
 
+
+	public:
+		/////////////////////////////
+		// 가상함수
+		/////////////////////////////
 
 		// Accept 직후, 호출된다.
 		//
@@ -410,6 +412,12 @@ namespace Library_Jingyu
 	{
 		friend class CLogin_NetServer;
 
+		// 디파인 정보들 모아두기
+		enum en_MonitorClient
+		{
+			dfSERVER_NO = 2	// 하드웨어를 전송하는 서버의 No는 2번이다.
+		};
+
 		// 모니터링 서버로 정보 전달할 스레드의 핸들.
 		HANDLE m_hMonitorThread;
 
@@ -432,10 +440,11 @@ namespace Library_Jingyu
 		virtual ~CMoniter_Clinet();
 
 		// 시작 함수
-		//
 		// 내부적으로, 상속받은 CLanClient의 Start호출.
-		// 추가로, 리소스 할당 등
-		bool ClientStart();
+		//
+		// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+		// return : 성공 시 true , 실패 시 falsel 
+		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
 
 		// 종료 함수
 		//
