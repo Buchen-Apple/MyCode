@@ -139,7 +139,7 @@ namespace Library_Jingyu
 		m_cLanS = new CLogin_LanServer;		
 
 		// 모니터링 LanClient 동적할당.
-		//m_LanMonitorC = new CMoniter_Clinet;
+		m_LanMonitorC = new CMoniter_Clinet;
 
 		// Player TLS 동적할당
 		m_MPlayerTLS = new CMemoryPoolTLS< stPlayer >(50, false);
@@ -157,6 +157,9 @@ namespace Library_Jingyu
 	{
 		// LanServer 동적해제
 		delete m_cLanS;
+
+		// 모니터링 서버와 연결된 LanClient 동적해제
+		delete m_LanMonitorC;
 
 		// Player TLS 동적해제
 		delete m_MPlayerTLS;
@@ -184,9 +187,9 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 가동
-		/*if (m_LanMonitorC->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.ClientCreateWorker, 
+		if (m_LanMonitorC->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.ClientCreateWorker, 
 			m_stConfig.ClientActiveWorker, m_stConfig.ClientNodelay) == false)
-			return false;*/
+			return false;
 
 		// 서버 오픈 로그 찍기		
 		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -207,7 +210,7 @@ namespace Library_Jingyu
 		m_cLanS->Stop();
 
 		// ------------------- 모니터링 서버와 연결되는, 모니터링 클라이언트 종료
-		//m_LanMonitorC->ClientStop();
+		m_LanMonitorC->ClientStop();
 
 		// ------------- 디비 저장
 		// 현재 없음.
@@ -988,7 +991,9 @@ namespace Library_Jingyu
 	// 소멸자
 	CLogin_LanServer::~CLogin_LanServer()
 	{
-		// 하는거 없음
+		// 만약, 서버가 작동중이면 작동 해제
+		if (GetServerState() == true)
+			Stop();
 	}
 
 
@@ -1184,6 +1189,10 @@ namespace Library_Jingyu
 
 	CMoniter_Clinet::~CMoniter_Clinet()
 	{
+		// 클라가 아직 접속중이라면 접속해제
+		if (GetClinetState() == true)
+			ClientStop();
+
 		// 이벤트 삭제
 		CloseHandle(m_hMonitorThreadExitEvent);
 	}
@@ -1205,16 +1214,18 @@ namespace Library_Jingyu
 			return false;
 
 		// 모니터링 서버로 정보 전송할 스레드 생성
-		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MoniterThread, this, 0, NULL);
+		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
 
 		return true;
 	}
 
 	// 종료 함수
-	//
 	// 내부적으로, 상속받은 CLanClient의 Stop호출.
 	// 추가로, 리소스 해제 등
-	bool CMoniter_Clinet::ClientStop()
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CMoniter_Clinet::ClientStop()
 	{
 		// 1. 모니터링 서버 정보전송 스레드 종료
 		SetEvent(m_hMonitorThreadExitEvent);
@@ -1241,7 +1252,7 @@ namespace Library_Jingyu
 	// -----------------------
 
 	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
-	UINT	WINAPI CMoniter_Clinet::MoniterThread(LPVOID lParam)
+	UINT	WINAPI CMoniter_Clinet::MonitorThread(LPVOID lParam)
 	{
 		// this 받아두기
 		CMoniter_Clinet* g_This = (CMoniter_Clinet*)lParam;

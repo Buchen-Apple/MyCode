@@ -4,6 +4,8 @@
 #include "Protocol_Set\CommonProtocol.h"
 #include "Log\Log.h"
 #include "Parser\Parser_Class.h"
+#include "CPUUsage\CPUUsage.h"
+#include "PDHClass\PDHCheck.h"
 
 #include <strsafe.h>
 #include <process.h>
@@ -25,6 +27,8 @@ LONG g_lTokenNodeCount;
 
 LONG g_lTokenMiss;
 LONG g_lTokenNotFound;
+
+LONG ChatLoginCount;	// 실제 로그인 패킷까지 처리된 유저 카운트.
 
 // ------------- 공격 테스트용
 int m_SectorPosError;
@@ -204,6 +208,36 @@ namespace Library_Jingyu
 
 		// Nodelay
 		if (Parser.GetValue_Int(_T("ClientNodelay"), &pConfig->Client_Nodelay) == false)
+			return false;
+
+
+		////////////////////////////////////////////////////////
+		// 모니터링 LanClient config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MONITORLANCLIENT")) == false)
+			return false;
+
+		// IP
+		if (Parser.GetValue_String(_T("MonitorServerIP"), pConfig->MonitorServerIP) == false)
+			return false;
+
+		// Port
+		if (Parser.GetValue_Int(_T("MonitorServerPort"), &pConfig->MonitorServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientCreateWorker"), &pConfig->MonitorClientCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientActiveWorker"), &pConfig->MonitorClientActiveWorker) == false)
+			return false;
+
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("MonitorClientNodelay"), &pConfig->MonitorClientNodelay) == false)
 			return false;
 
 
@@ -524,15 +558,15 @@ namespace Library_Jingyu
 			// 2) 토큰 체크	-----------------------------------
 			// 30초 이상 유지되고 있는 토큰은 erase한다.		
 
-			AcquireSRWLockShared(&g_this->m_Logn_LanClient.srwl);	// 락 ----------------
+			AcquireSRWLockShared(&g_this->m_Logn_LanClient->srwl);	// 락 ----------------
 
 			// 토큰 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
-			if (g_this->m_Logn_LanClient.m_umapTokenCheck.size() > 0)
+			if (g_this->m_Logn_LanClient->m_umapTokenCheck.size() > 0)
 			{
 				ULONGLONG ullCheckTime = GetTickCount64();
 
-				auto Tokenbegin = g_this->m_Logn_LanClient.m_umapTokenCheck.begin();
-				auto Tokenend = g_this->m_Logn_LanClient.m_umapTokenCheck.end();
+				auto Tokenbegin = g_this->m_Logn_LanClient->m_umapTokenCheck.begin();
+				auto Tokenend = g_this->m_Logn_LanClient->m_umapTokenCheck.end();
 
 				while (Tokenbegin != Tokenend)
 				{
@@ -542,10 +576,10 @@ namespace Library_Jingyu
 						auto EraseToken = Tokenbegin->second;
 
 						// 맵에서 제거
-						Tokenbegin = g_this->m_Logn_LanClient.m_umapTokenCheck.erase(Tokenbegin);
+						Tokenbegin = g_this->m_Logn_LanClient->m_umapTokenCheck.erase(Tokenbegin);
 
 						// Free
-						g_this->m_Logn_LanClient.m_MTokenTLS->Free(EraseToken);
+						g_this->m_Logn_LanClient->m_MTokenTLS->Free(EraseToken);
 						InterlockedAdd(&g_lTokenNodeCount, -1);
 
 					}
@@ -555,7 +589,7 @@ namespace Library_Jingyu
 				}
 			}
 
-			ReleaseSRWLockShared(&g_this->m_Logn_LanClient.srwl);	// 언 락 ----------------
+			ReleaseSRWLockShared(&g_this->m_Logn_LanClient->srwl);	// 언 락 ----------------
 		}
 
 		printf("JobAddThread Exit!!\n");
@@ -592,9 +626,8 @@ namespace Library_Jingyu
 		JoinPlayer->m_wSectorY = TEMP_SECTOR_POS;
 		JoinPlayer->m_wSectorX = TEMP_SECTOR_POS;
 
-		// 로그인 상태 아님
+		// 로그인 상태 아님으로 변경
 		JoinPlayer->m_bLoginCheck = false;
-
 
 		// 3) Player 관리 자료구조에 유저 추가
 		if (InsertPlayerFunc(SessionID, JoinPlayer) == false)
@@ -658,6 +691,10 @@ namespace Library_Jingyu
 		ErasePlayer->m_wSectorY = TEMP_SECTOR_POS;
 		ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
 		
+		// 로그인 패킷까지 처리된 유저였다면, 로그인 유저 카운트 1 감소
+		if(ErasePlayer->m_bLoginCheck == true)
+			InterlockedAdd(&ChatLoginCount, -1);
+		
 		// 4) Player Free()
 		m_PlayerPool->Free(ErasePlayer);
 
@@ -665,6 +702,7 @@ namespace Library_Jingyu
 		EraseLastTime(SessionID);
 
 		InterlockedAdd(&g_lUpdateStruct_PlayerCount, -1);
+
 	}
 
 	// 일반 패킷처리 함수
@@ -918,16 +956,16 @@ namespace Library_Jingyu
 		Packet->GetData(Token, 64);
 
 		// 4) 이번 통신에 받은 패킷이 유효한지 체크		
-		AcquireSRWLockExclusive(&m_Logn_LanClient.srwl);		// 락 -----
+		AcquireSRWLockExclusive(&m_Logn_LanClient->srwl);		// 락 -----
 
 		// 토큰 검색
-		auto FindToken = m_Logn_LanClient.m_umapTokenCheck.find(AccountNo);
+		auto FindToken = m_Logn_LanClient->m_umapTokenCheck.find(AccountNo);
 
 		// 토큰을 못찾았으면 g_lTokenNotFound 카운트 증가
-		if (FindToken == m_Logn_LanClient.m_umapTokenCheck.end())
+		if (FindToken == m_Logn_LanClient->m_umapTokenCheck.end())
 		{
 			InterlockedAdd(&g_lTokenNotFound, 1);
-			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
 			return;
 		}
 
@@ -936,15 +974,15 @@ namespace Library_Jingyu
 		{
 			// 기존 토큰 erase	
 			Chat_LanClient::stToken* retToken = FindToken->second;
-			m_Logn_LanClient.m_umapTokenCheck.erase(FindToken);
+			m_Logn_LanClient->m_umapTokenCheck.erase(FindToken);
 
-			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
 
 			// 유저 로그인 상태로 변경
 			FindPlayer->m_bLoginCheck = true;
 
 			// stToken* Free
-			m_Logn_LanClient.m_MTokenTLS->Free(retToken);
+			m_Logn_LanClient->m_MTokenTLS->Free(retToken);
 			InterlockedAdd(&g_lTokenNodeCount, -1);
 
 			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답) 
@@ -959,6 +997,9 @@ namespace Library_Jingyu
 
 			SendBuff->PutData((char*)&AccountNo, 8);
 
+			// 로그인 패킷까지 처리된 유저 카운트 1 증가
+			InterlockedAdd(&ChatLoginCount, 1);
+
 			// 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 			SendPacket(SessionID, SendBuff);
 		}
@@ -967,7 +1008,7 @@ namespace Library_Jingyu
 		// 토큰 자료구조에서 삭제하지 않음. 곧 접속할 유저일 가능성이 높기 때문에.
 		else
 		{		
-			ReleaseSRWLockExclusive(&m_Logn_LanClient.srwl);		// 언락 -----
+			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
 			
 			// g_lTokenMiss 카운트 증가
 			InterlockedAdd(&g_lTokenMiss, 1);
@@ -1011,6 +1052,13 @@ namespace Library_Jingyu
 
 
 		// ------------------- 각종 리소스 할당
+		// 로그인 서버와 통신하기 위한 LanClient 동적할당
+		m_Logn_LanClient = new Chat_LanClient;
+
+		// 모니터링 서버와 통신하기 위한 LanClient 동적할당
+		m_Monitor_LanClient = new Chat_MonitorClient;
+		m_Monitor_LanClient->ParentSet(this);		
+
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_mapPlayer.reserve(m_stConfig.MaxJoinUser);
 
@@ -1066,6 +1114,12 @@ namespace Library_Jingyu
 	// 소멸자
 	CChatServer::~CChatServer()
 	{
+		// 로그인 서버와 통신하는 LanClient 동적해제
+		delete m_Logn_LanClient;
+
+		// 모니터링 서버와 통신하는 LanClient 동적해제
+		delete m_Monitor_LanClient;
+
 		// 일감 큐 동적해제.
 		delete m_LFQueue;
 
@@ -1238,9 +1292,9 @@ namespace Library_Jingyu
 
 				// ----------- 랜 클라이언트용
 				g_lAllocNodeCount_Lan,
-				m_Logn_LanClient.m_umapTokenCheck.size(), g_lTokenNodeCount,
+				m_Logn_LanClient->m_umapTokenCheck.size(), g_lTokenNodeCount,
 				CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
-				m_Logn_LanClient.m_MTokenTLS->GetAllocChunkCount(), m_Logn_LanClient.m_MTokenTLS->GetOutChunkCount(),
+				m_Logn_LanClient->m_MTokenTLS->GetAllocChunkCount(), m_Logn_LanClient->m_MTokenTLS->GetOutChunkCount(),
 
 				// ----------- 프로세스 사용량 
 				ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
@@ -1267,9 +1321,13 @@ namespace Library_Jingyu
 			return false;
 
 		// ------------------- 로그인 서버와 연결되는, 랜 클라이언트 가동
-		if(m_Logn_LanClient.Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.Client_CreateWorker, m_stConfig.Client_ActiveWorker, m_stConfig.Client_Nodelay) == false)
+		if(m_Logn_LanClient->Start(m_stConfig.LoginServerIP, m_stConfig.LoginServerPort, m_stConfig.Client_CreateWorker, m_stConfig.Client_ActiveWorker, m_stConfig.Client_Nodelay) == false)
 			return false;
 
+		// ------------------- 모니터링 서버와 연결되는, 랜 클라이언트 가동
+		if (m_Monitor_LanClient->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.MonitorClientCreateWorker, 
+			m_stConfig.MonitorClientActiveWorker, m_stConfig.MonitorClientNodelay) == false)
+			return false;
 		
 
 		// 서버 오픈 로그 찍기		
@@ -1530,7 +1588,6 @@ namespace Library_Jingyu
 
 
 
-
 // ---------------------------------------------
 // 
 // LoginServer의 LanServer와 통신하는 LanClient
@@ -1556,6 +1613,10 @@ namespace Library_Jingyu
 
 	Chat_LanClient::~Chat_LanClient()
 	{
+		// 아직 연결이 되어있으면, 연결 해제
+		if (GetClinetState() == true)
+			Stop();
+
 		// 토근 구조체 관리 TLS 동적해재
 		delete m_MTokenTLS;
 	}
@@ -1810,3 +1871,260 @@ namespace Library_Jingyu
 	}
 }
 
+
+
+// ---------------------------------------------
+// 
+// 모니터링 LanClient
+// 
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+
+	// -----------------------
+	// 생성자와 소멸자
+	// -----------------------
+	Chat_MonitorClient::Chat_MonitorClient()
+	{
+		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
+		//
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+	}
+
+	Chat_MonitorClient::~Chat_MonitorClient()
+	{
+		// 아직 연결이 되어있으면, 연결 해제
+		if (GetClinetState() == true)
+			ClientStop();
+
+		// 이벤트 삭제
+		CloseHandle(m_hMonitorThreadExitEvent);
+	}
+
+
+	// -----------------------
+	// 외부에서 사용 가능한 함수
+	// -----------------------
+
+	// 시작 함수
+	// 내부적으로, 상속받은 CLanClient의 Start호출.
+	//
+	// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+	// return : 성공 시 true , 실패 시 falsel 
+	bool Chat_MonitorClient::ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay)
+	{
+		// 모니터링 서버에 연결
+		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
+			return false;
+
+		// 모니터링 서버로 정보 전송할 스레드 생성
+		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
+
+		return true;
+	}
+
+	// 종료 함수
+	// 내부적으로, 상속받은 CLanClient의 Stop호출.
+	// 추가로, 리소스 해제 등
+	//
+	// Parameter : 없음
+	// return : 없음
+	void Chat_MonitorClient::ClientStop()
+	{
+		// 1. 모니터링 서버 정보전송 스레드 종료
+		SetEvent(m_hMonitorThreadExitEvent);
+
+		// 종료 대기
+		if (WaitForSingleObject(m_hMonitorThread, INFINITE) == WAIT_FAILED)
+		{
+			DWORD Error = GetLastError();
+			printf("MonitorThread Exit Error!!! (%d) \n", Error);
+		}
+
+		// 2. 스레드 핸들 반환
+		CloseHandle(m_hMonitorThread);
+
+		// 3. 모니터링 서버와 연결 종료
+		Stop();
+	}
+
+	// 채팅서버의 this를 입력받는 함수
+	// 
+	// Parameter : 쳇 서버의 this
+	// return : 없음
+	void Chat_MonitorClient::ParentSet(CChatServer* ChatThis)
+	{
+		m_ChatServer_this = ChatThis;
+	}
+
+
+
+
+	// -----------------------
+	// 내부에서만 사용하는 기능 함수
+	// -----------------------
+
+	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+	UINT	WINAPI Chat_MonitorClient::MonitorThread(LPVOID lParam)
+	{
+		// this 받아두기
+		Chat_MonitorClient* g_This = (Chat_MonitorClient*)lParam;
+
+		// 종료 신호 이벤트 받아두기
+		HANDLE hEvent = g_This->m_hMonitorThreadExitEvent;
+
+		// CPU 사용율 체크 클래스 (하드웨어)
+		CCpuUsage_Processor CProcessorCPU;
+
+		// PDH용 클래스
+		CPDH	CPdh;
+
+		while (1)
+		{
+			// 1초에 한번 깨어나서 정보를 보낸다.
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("MoniterThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+
+			// 그게 아니라면, 일을 한다.
+
+			// 프로세서 CPU 사용율, PDH 정보 갱신
+			CProcessorCPU.UpdateCpuTime();
+			CPdh.SetInfo();
+
+			// 채팅서버가 On일 경우, 패킷을 보낸다.
+			if (g_This->m_ChatServer_this->GetServerState() == true)
+			{
+				// 타임스탬프 구하기
+				int TimeStamp = (int)(time(NULL));
+
+				// 1. 채팅서버 ON		
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_SERVER_ON, TRUE, TimeStamp);
+
+				// 2. 채팅서버 CPU 사용률 (커널 + 유저)
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_CPU, (int)CProcessorCPU.ProcessorTotal(), TimeStamp);
+
+				// 3. 채팅서버 메모리 유저 커밋 사용량 (Private) MByte
+				int Data = (int)(CPdh.Get_UserCommit() / 1024 / 1024);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_MEMORY_COMMIT, Data, TimeStamp);
+
+				// 4. 채팅서버 패킷풀 사용량
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL, g_lAllocNodeCount + g_lAllocNodeCount_Lan, TimeStamp);
+				
+				// 5. 채팅서버 접속 세션전체
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_SESSION, (int)g_This->m_ChatServer_this->GetClientCount(), TimeStamp);
+
+				// 6. 채팅서버 로그인을 성공한 전체 인원				
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_PLAYER, ChatLoginCount, TimeStamp);
+
+			}
+
+		}
+
+		return 0;
+	}
+
+	// 모니터링 서버로 데이터 전송
+	//
+	// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+	// return : 없음
+	void Chat_MonitorClient::InfoSend(BYTE DataType, int DataValue, int TimeStamp)
+	{
+		WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&DataType, 1);
+		SendBuff->PutData((char*)&DataValue, 4);
+		SendBuff->PutData((char*)&TimeStamp, 4);
+
+		SendPacket(m_ullSessionID, SendBuff);
+	}
+
+
+
+	// -----------------------
+	// 순수 가상함수
+	// -----------------------
+
+	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void Chat_MonitorClient::OnConnect(ULONGLONG SessionID)
+	{
+		m_ullSessionID = SessionID;
+
+		// 모니터링 서버(Lan)로 로그인 패킷 보냄
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_SS_MONITOR_LOGIN;
+		int ServerNo = dfSERVER_NO;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ServerNo, 4);
+
+		SendPacket(SessionID, SendBuff);
+	}
+
+	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void Chat_MonitorClient::OnDisconnect(ULONGLONG SessionID)
+	{}
+
+	// 패킷 수신 완료 후 호출되는 함수.
+	//
+	// parameter : 유저 세션키, CProtocolBuff_Lan*
+	// return : 없음
+	void Chat_MonitorClient::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{}
+
+	// 패킷 송신 완료 후 호출되는 함수
+	//
+	// parameter : 유저 세션키, Send 한 사이즈
+	// return : 없음
+	void Chat_MonitorClient::OnSend(ULONGLONG SessionID, DWORD SendSize)
+	{}
+
+	// 워커 스레드가 깨어날 시 호출되는 함수.
+	// GQCS 바로 하단에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void Chat_MonitorClient::OnWorkerThreadBegin()
+	{}
+
+	// 워커 스레드가 잠들기 전 호출되는 함수
+	// GQCS 바로 위에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void Chat_MonitorClient::OnWorkerThreadEnd()
+	{}
+
+	// 에러 발생 시 호출되는 함수.
+	//
+	// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+	//			 : 에러 코드에 대한 스트링
+	// return : 없음
+	void Chat_MonitorClient::OnError(int error, const TCHAR* errorStr)
+	{}
+}

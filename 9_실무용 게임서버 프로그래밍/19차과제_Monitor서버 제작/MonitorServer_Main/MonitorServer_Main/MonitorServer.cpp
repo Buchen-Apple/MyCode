@@ -211,7 +211,7 @@ namespace Library_Jingyu
 				g_MonitorDump->Crash();
 
 			// 3. 이름 만들기. [DBName_Year-Mon]의 형태로 만들어진다.
-			StringCbPrintfA(DBTableName, 30, "monitorlog_%04d-%02d", NowTime.tm_year + 1900, NowTime.tm_mon + 1);
+			StringCchPrintfA(DBTableName, 30, "monitorlog_%04d-%02d", NowTime.tm_year + 1900, NowTime.tm_mon + 1);
 
 
 			// -----------------------------------------------------
@@ -225,8 +225,8 @@ namespace Library_Jingyu
 
 				// 쿼리 만들기. -----------
 				char query[1024] = "INSERT INTO `";
-				StringCbCatA(query, 1024, DBTableName);
-				StringCbCatA(query, 1024, "` (`logtime`, `serverno`, `servername`, `type`, `value`, `min`, `max`, `avg`) VALUE (now(), %d, '%s', %d, %d, %d, %d, %.2f)");
+				StringCchCatA(query, 1024, DBTableName);
+				StringCchCatA(query, 1024, "` (`logtime`, `serverno`, `servername`, `type`, `value`, `min`, `max`, `avg`) VALUE (now(), %d, '%s', %d, %d, %d, %d, %.2f)");
 								
 				// DB로 날리기 -----------
 				// 테이블이 없을 경우, 테이블 생성까지 하는 함수 호출.

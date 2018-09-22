@@ -295,8 +295,6 @@ namespace Library_Jingyu
 }
 
 
-
-
 // ----------------------------------
 // LoginServer (LanServer)
 // ----------------------------------
@@ -426,7 +424,7 @@ namespace Library_Jingyu
 
 	private:
 		// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
-		static UINT	__stdcall MoniterThread(LPVOID lParam);
+		static UINT	__stdcall MonitorThread(LPVOID lParam);
 
 	public:
 		// -----------------------
@@ -443,10 +441,12 @@ namespace Library_Jingyu
 		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
 
 		// 종료 함수
-		//
 		// 내부적으로, 상속받은 CLanClient의 Stop호출.
 		// 추가로, 리소스 해제 등
-		bool ClientStop();
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ClientStop();
 
 
 	public:

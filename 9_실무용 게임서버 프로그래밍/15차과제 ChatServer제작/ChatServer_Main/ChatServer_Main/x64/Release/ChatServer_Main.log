@@ -1,6 +1,6 @@
 ﻿  pch.cpp
   ChatServer.cpp
-c:\git_public\library_jingyu\chatserver\chatserver.cpp(716): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
+c:\git_public\library_jingyu\chatserver\chatserver.cpp(754): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   CPUUsage.cpp
   CrashDump.cpp
   Log.cpp
@@ -8,11 +8,12 @@ c:\git_public\library_jingyu\chatserver\chatserver.cpp(716): warning C4101: 'exc
   NetworkLib_LanServer.cpp
   NetworkLib_NetServer.cpp
   Parser_Class.cpp
+  PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
   ProtocolBuff_ObjectPool.cpp
   RingBuff.cpp
   ChatServer_Main.cpp
   코드를 생성하고 있습니다.
-  All 1085 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 1119 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   ChatServer_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\15차과제 ChatServer제작\ChatServer_Main\x64\Release\ChatServer_Main.exe

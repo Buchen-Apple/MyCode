@@ -80,17 +80,17 @@ namespace Library_Jingyu
 		mysql_init(&m_MySQL);
 
 		// 2. 연결을 위한 정보들, char 형태로 변환해 보관
-		int len = (int)_tcslen(m_wcDBIP);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBIP, (int)_tcslen(m_wcDBIP), m_cDBIP, len, NULL, NULL);
+		int len = WideCharToMultiByte(CP_UTF8, 0, m_wcDBIP, lstrlenW(m_wcDBIP), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBIP, lstrlenW(m_wcDBIP), m_cDBIP, len, NULL, NULL);
 
-		len = (int)_tcslen(m_wcDBUser);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBUser, (int)_tcslen(m_wcDBUser), m_cDBUser, len, NULL, NULL);
+		len = WideCharToMultiByte(CP_UTF8, 0, m_wcDBUser, lstrlenW(m_wcDBUser), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBUser, lstrlenW(m_wcDBUser), m_cDBUser, len, NULL, NULL);
 
-		len = (int)_tcslen(m_wcDBPassword);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBPassword, (int)_tcslen(m_wcDBPassword), m_cDBPassword, len, NULL, NULL);
+		len = WideCharToMultiByte(CP_UTF8, 0, m_wcDBPassword, lstrlenW(m_wcDBPassword), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBPassword, lstrlenW(m_wcDBPassword), m_cDBPassword, len, NULL, NULL);
 
-		len = (int)_tcslen(m_wcDBName);
-		WideCharToMultiByte(CP_UTF8, 0, m_wcDBName, (int)_tcslen(m_wcDBName), m_cDBName, len, NULL, NULL);
+		len = WideCharToMultiByte(CP_UTF8, 0, m_wcDBName, lstrlenW(m_wcDBName), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, m_wcDBName, lstrlenW(m_wcDBName), m_cDBName, len, NULL, NULL);
 
 		// 3. DB에 연결 시도
 		// 약 5회 연결 시도.

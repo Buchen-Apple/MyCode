@@ -170,6 +170,7 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_NetServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\PDHClass\PDHCheck.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
