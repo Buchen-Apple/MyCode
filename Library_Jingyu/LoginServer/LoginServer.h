@@ -423,8 +423,18 @@ namespace Library_Jingyu
 
 
 	private:
+		// -----------------------
+		// 내부에서만 사용하는 기능 함수
+		// -----------------------
+
 		// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
-		static UINT	__stdcall MonitorThread(LPVOID lParam);
+		static UINT	WINAPI MonitorThread(LPVOID lParam);
+
+		// 모니터링 서버로 데이터 전송
+		//
+		// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+		// return : 없음
+		void InfoSend(BYTE DataType, int DataValue, int TimeStamp);
 
 	public:
 		// -----------------------
@@ -451,7 +461,7 @@ namespace Library_Jingyu
 
 	public:
 		// -----------------------
-		// 순수 가상함수
+		// 가상함수
 		// -----------------------
 
 		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)

@@ -1066,10 +1066,10 @@ namespace Library_Jingyu
 		m_mapLastPacketTime.reserve(m_stConfig.MaxJoinUser);
 
 		// 일감 TLS 메모리풀 동적할당
-		m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(100, false);
+		m_MessagePool = new CMemoryPoolTLS<st_WorkNode>(0, false);
 
 		// 플레이어 구조체 TLS 메모리풀 동적할당	
-		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(100, false);
+		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
 
 		// 락프리 큐 동적할당 (네트워크가 컨텐츠에게 일감 던지는 큐)
 		// 사이즈가 0인 이유는, UpdateThread에서 큐가 비었는지 체크하고 쉬러 가야하기 때문에.
@@ -1405,7 +1405,10 @@ namespace Library_Jingyu
 		CloseHandle(hUpdateThraed);
 
 		// 잡 스레드 핸들 반환
-		CloseHandle(hJobThraed);		
+		CloseHandle(hJobThraed);	
+
+		// 서버 종료 로그 찍기		
+		cChatLibLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 
@@ -1605,7 +1608,7 @@ namespace Library_Jingyu
 		m_umapTokenCheck.reserve(10000);
 
 		// 토근 구조체 관리 TLS 동적할당
-		m_MTokenTLS = new CMemoryPoolTLS< stToken >(100, false);
+		m_MTokenTLS = new CMemoryPoolTLS< stToken >(0, false);
 
 		// 락 초기화
 		InitializeSRWLock(&srwl);
@@ -1977,8 +1980,8 @@ namespace Library_Jingyu
 		// 종료 신호 이벤트 받아두기
 		HANDLE hEvent = g_This->m_hMonitorThreadExitEvent;
 
-		// CPU 사용율 체크 클래스 (하드웨어)
-		CCpuUsage_Processor CProcessorCPU;
+		// CPU 사용율 체크 클래스 (채팅서버 소프트웨어)
+		CCpuUsage_Process CProcessorCPU;
 
 		// PDH용 클래스
 		CPDH	CPdh;
@@ -2017,7 +2020,7 @@ namespace Library_Jingyu
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_SERVER_ON, TRUE, TimeStamp);
 
 				// 2. 채팅서버 CPU 사용률 (커널 + 유저)
-				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_CPU, (int)CProcessorCPU.ProcessorTotal(), TimeStamp);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_CPU, (int)CProcessorCPU.ProcessTotal(), TimeStamp);
 
 				// 3. 채팅서버 메모리 유저 커밋 사용량 (Private) MByte
 				int Data = (int)(CPdh.Get_UserCommit() / 1024 / 1024);

@@ -154,150 +154,6 @@ namespace Library_Jingyu
 }
 
 
-
-
-// ---------------------------------------------
-// 
-// 모니터링 LanClient
-// 
-// ---------------------------------------------
-namespace Library_Jingyu
-{
-	class Chat_MonitorClient :public CLanClient
-	{
-		friend class CChatServer;
-
-		// 디파인 정보들 모아두기
-		enum en_MonitorClient
-		{
-			dfSERVER_NO = 3	// 채팅서버는 3번이다
-		};
-
-		// -----------------------
-		// 멤버 변수
-		// -----------------------
-
-		// 모니터링 서버로 정보 전달할 스레드의 핸들.
-		HANDLE m_hMonitorThread;
-
-		// 모니터링 서버를 종료시킬 이벤트
-		HANDLE m_hMonitorThreadExitEvent;
-
-		// 현재 모니터링 서버와 연결된 세션 ID
-		ULONGLONG m_ullSessionID;
-
-		// ----------------------
-		// !! 채팅 서버의 this !!
-		// ----------------------
-		CChatServer* m_ChatServer_this;
-
-	private:
-		// -----------------------
-		// 내부에서만 사용하는 기능 함수
-		// -----------------------
-
-		// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
-		static UINT	WINAPI MonitorThread(LPVOID lParam);
-
-		// 모니터링 서버로 데이터 전송
-		//
-		// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
-		// return : 없음
-		void InfoSend(BYTE DataType, int DataValue, int TimeStamp);
-
-
-
-
-	public:
-		// -----------------------
-		// 생성자와 소멸자
-		// -----------------------
-		Chat_MonitorClient();
-		virtual ~Chat_MonitorClient();
-
-
-	public:
-
-		// -----------------------
-		// 외부에서 사용 가능한 함수
-		// -----------------------
-
-		// 시작 함수
-		// 내부적으로, 상속받은 CLanClient의 Start호출.
-		//
-		// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
-		// return : 성공 시 true , 실패 시 falsel 
-		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
-
-		// 종료 함수
-		// 내부적으로, 상속받은 CLanClient의 Stop호출.
-		// 추가로, 리소스 해제 등
-		//
-		// Parameter : 없음
-		// return : 없음
-		void ClientStop();
-
-		// 채팅서버의 this를 입력받는 함수
-		// 
-		// Parameter : 쳇 서버의 this
-		// return : 없음
-		void ParentSet(CChatServer* ChatThis);
-
-
-	private:
-		// -----------------------
-		// 순수 가상함수
-		// -----------------------
-
-		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
-		//
-		// parameter : 세션키
-		// return : 없음
-		virtual void OnConnect(ULONGLONG SessionID);
-
-		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
-		//
-		// parameter : 세션키
-		// return : 없음
-		virtual void OnDisconnect(ULONGLONG SessionID);
-
-		// 패킷 수신 완료 후 호출되는 함수.
-		//
-		// parameter : 유저 세션키, CProtocolBuff_Lan*
-		// return : 없음
-		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
-
-		// 패킷 송신 완료 후 호출되는 함수
-		//
-		// parameter : 유저 세션키, Send 한 사이즈
-		// return : 없음
-		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize);
-
-		// 워커 스레드가 깨어날 시 호출되는 함수.
-		// GQCS 바로 하단에서 호출
-		// 
-		// parameter : 없음
-		// return : 없음
-		virtual void OnWorkerThreadBegin();
-
-		// 워커 스레드가 잠들기 전 호출되는 함수
-		// GQCS 바로 위에서 호출
-		// 
-		// parameter : 없음
-		// return : 없음
-		virtual void OnWorkerThreadEnd();
-
-		// 에러 발생 시 호출되는 함수.
-		//
-		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
-		//			 : 에러 코드에 대한 스트링
-		// return : 없음
-		virtual void OnError(int error, const TCHAR* errorStr);
-
-	};
-}
-
-
 // ---------------------------------------------
 // 
 // ChatServer
@@ -653,6 +509,150 @@ namespace Library_Jingyu
 		void ServerStop();
 	};
 }
+
+
+
+// ---------------------------------------------
+// 
+// 모니터링 LanClient
+// 
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+	class Chat_MonitorClient :public CLanClient
+	{
+		friend class CChatServer;
+
+		// 디파인 정보들 모아두기
+		enum en_MonitorClient
+		{
+			dfSERVER_NO = 3	// 채팅서버는 3번이다
+		};
+
+		// -----------------------
+		// 멤버 변수
+		// -----------------------
+
+		// 모니터링 서버로 정보 전달할 스레드의 핸들.
+		HANDLE m_hMonitorThread;
+
+		// 모니터링 서버를 종료시킬 이벤트
+		HANDLE m_hMonitorThreadExitEvent;
+
+		// 현재 모니터링 서버와 연결된 세션 ID
+		ULONGLONG m_ullSessionID;
+
+		// ----------------------
+		// !! 채팅 서버의 this !!
+		// ----------------------
+		CChatServer* m_ChatServer_this;
+
+	private:
+		// -----------------------
+		// 내부에서만 사용하는 기능 함수
+		// -----------------------
+
+		// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+		static UINT	WINAPI MonitorThread(LPVOID lParam);
+
+		// 모니터링 서버로 데이터 전송
+		//
+		// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+		// return : 없음
+		void InfoSend(BYTE DataType, int DataValue, int TimeStamp);
+
+
+
+
+	public:
+		// -----------------------
+		// 생성자와 소멸자
+		// -----------------------
+		Chat_MonitorClient();
+		virtual ~Chat_MonitorClient();
+
+
+	public:
+
+		// -----------------------
+		// 외부에서 사용 가능한 함수
+		// -----------------------
+
+		// 시작 함수
+		// 내부적으로, 상속받은 CLanClient의 Start호출.
+		//
+		// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+		// return : 성공 시 true , 실패 시 falsel 
+		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
+
+		// 종료 함수
+		// 내부적으로, 상속받은 CLanClient의 Stop호출.
+		// 추가로, 리소스 해제 등
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ClientStop();
+
+		// 채팅서버의 this를 입력받는 함수
+		// 
+		// Parameter : 쳇 서버의 this
+		// return : 없음
+		void ParentSet(CChatServer* ChatThis);
+
+
+	private:
+		// -----------------------
+		// 순수 가상함수
+		// -----------------------
+
+		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnConnect(ULONGLONG SessionID);
+
+		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnDisconnect(ULONGLONG SessionID);
+
+		// 패킷 수신 완료 후 호출되는 함수.
+		//
+		// parameter : 유저 세션키, CProtocolBuff_Lan*
+		// return : 없음
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+		// 패킷 송신 완료 후 호출되는 함수
+		//
+		// parameter : 유저 세션키, Send 한 사이즈
+		// return : 없음
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize);
+
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadBegin();
+
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadEnd();
+
+		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
+		virtual void OnError(int error, const TCHAR* errorStr);
+
+	};
+}
+
 
 
 

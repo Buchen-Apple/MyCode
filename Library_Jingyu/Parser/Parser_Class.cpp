@@ -38,7 +38,8 @@ bool Parser::AreaCheck(const TCHAR* AreaName)
 	int iStartPos;
 	int iEndPos;
 	m_ilen = 0;
-	bool bWhileBreakCheck = false;
+	bool bWhileBreakCheck = false;	
+
 
 	while (!bWhileBreakCheck)
 	{
@@ -130,6 +131,10 @@ bool Parser::AreaCheck(const TCHAR* AreaName)
 			// 마지막 위치를 지정한다.
 			iEndPos = m_ilen;
 
+			// 기존에 구역을 지정했었다면, 동적 해제
+			if (m_cAreaBuffer != nullptr)
+				delete[] m_cAreaBuffer;
+
 			// 찾은 iStartPos와 iEndPos를 참조해서 m_cBuffer의 값을 m_cAreaBuffer에 저장한다.
 			m_cAreaBuffer = new TCHAR[iEndPos];
 
@@ -160,7 +165,7 @@ bool Parser::SkipNoneCommand(TCHAR TempSkipWord)
 bool Parser::GetNextWord()
 {
 	int i = 0;
-	TCHAR cTempWord[256];
+	TCHAR cTempWord[1024];
 
 	// 단어 시작 위치를 찾는다. true면 계속 스킵된다.
 	while (SkipNoneCommand(m_cAreaBuffer[m_ilen]))

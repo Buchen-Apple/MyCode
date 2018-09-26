@@ -231,6 +231,9 @@ namespace Library_Jingyu
 
 		// umap 초기화
 		m_umapJoinUser.clear();
+
+		// 서버 종료 로그 찍기		
+		cLoginLibLog->LogSave(L"LoginServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 
@@ -1293,131 +1296,54 @@ namespace Library_Jingyu
 			// 하드웨어 정보 보내기 (프로세서)
 			// ----------------------------------
 			int TimeStamp = (int)(time(NULL));
-			WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
-			BYTE DataType;			
-			int iData;
+			WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;			
 
 			// 1. 하드웨어 CPU 사용률 전체
-			CProtocolBuff_Lan* SendBuff_CPU = CProtocolBuff_Lan::Alloc();
-
-			// 타입
-			SendBuff_CPU->PutData((char*)&Type, 2);
-
-			// 데이터 타입
-			DataType = dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL;
-			SendBuff_CPU->PutData((char*)&DataType, 1);
-
-			// 데이터 값
-			iData = (int)CProcessorCPU.ProcessorTotal();
-			SendBuff_CPU->PutData((char*)&iData, 4);
-
-			// 타임스탬프
-			SendBuff_CPU->PutData((char*)&TimeStamp, 4);
-
-			// Send하기
-			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_CPU);
-
-
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL, (int)CProcessorCPU.ProcessorTotal(), TimeStamp);
 
 			// 2. 하드웨어 사용가능 메모리 (MByte)
-			CProtocolBuff_Lan* SendBuff_AVAMEM = CProtocolBuff_Lan::Alloc();
-
-			// 타입
-			SendBuff_AVAMEM->PutData((char*)&Type, 2);
-
-			// 데이터 타입
-			DataType = dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY;
-			SendBuff_AVAMEM->PutData((char*)&DataType, 1);
-
-			// 데이터 값
-			iData = (int)CPdh.Get_AVA_Mem();
-			SendBuff_AVAMEM->PutData((char*)&iData, 4);
-
-			// 타임스탬프
-			SendBuff_AVAMEM->PutData((char*)&TimeStamp, 4);
-			
-			// Send하기
-			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_AVAMEM);
-
-		
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY, (int)CPdh.Get_AVA_Mem(), TimeStamp);
 
 			// 3. 하드웨어 이더넷 수신 바이트 (KByte)
-			CProtocolBuff_Lan* SendBuff_Recv = CProtocolBuff_Lan::Alloc();
-			
-			// 타입
-			SendBuff_Recv->PutData((char*)&Type, 2);
-
-			// 데이터 타입
-			DataType = dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV;
-			SendBuff_Recv->PutData((char*)&DataType, 1);
-
-			// 데이터 값
-			// Kbyte단위로 보내기 위해 1024 나눔
-			iData = (int)(CPdh.Get_Net_Recv() / 1024);
-			SendBuff_Recv->PutData((char*)&iData, 4);
-
-			// 타임스탬프
-			SendBuff_Recv->PutData((char*)&TimeStamp, 4);
-
-			// Send하기
-			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Recv);
-
-
-
+			int iData = (int)(CPdh.Get_Net_Recv() / 1024);
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV, iData, TimeStamp);
+				
 			// 4. 하드웨어 이더넷 송신 바이트 (KByte)
-			CProtocolBuff_Lan* SendBuff_Send = CProtocolBuff_Lan::Alloc();
-
-			// 타입
-			SendBuff_Send->PutData((char*)&Type, 2);
-
-			// 데이터 타입
-			DataType = dfMONITOR_DATA_TYPE_SERVER_NETWORK_SEND;
-			SendBuff_Send->PutData((char*)&DataType, 1);
-
-			// 데이터 값
-			// Kbyte단위로 보내기 위해 1024 나눔
 			iData = (int)(CPdh.Get_Net_Send() / 1024);
-			SendBuff_Send->PutData((char*)&iData, 4);
-
-			// 타임스탬프
-			SendBuff_Send->PutData((char*)&TimeStamp, 4);
-
-			// Send하기
-			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_Send);
-
-
-
-
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NETWORK_SEND, iData, TimeStamp);
+			
 			// 5. 하드웨어 논페이지 메모리 사용량 (MByte)
-			CProtocolBuff_Lan* SendBuff_NONMEM = CProtocolBuff_Lan::Alloc();
-
-			// 타입
-			SendBuff_NONMEM->PutData((char*)&Type, 2);
-
-			// 데이터 타입
-			DataType = dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY;
-			SendBuff_NONMEM->PutData((char*)&DataType, 1);
-
-			// 데이터 값
-			iData = (int)CPdh.Get_NonPaged_Mem();
-			SendBuff_NONMEM->PutData((char*)&iData, 4);
-
-			// 타임스탬프
-			SendBuff_NONMEM->PutData((char*)&TimeStamp, 4);
-
-			// Send하기
-			g_This->SendPacket(g_This->m_ullSessionID, SendBuff_NONMEM);
+			iData = (int)(CPdh.Get_NonPaged_Mem() / 1024 / 1024);
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY, iData, TimeStamp);
 		}
 
 		return 0;
 	}
 
+	// 모니터링 서버로 데이터 전송
+	//
+	// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+	// return : 없음
+	void CMoniter_Clinet::InfoSend(BYTE DataType, int DataValue, int TimeStamp)
+	{
+		WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&DataType, 1);
+		SendBuff->PutData((char*)&DataValue, 4);
+		SendBuff->PutData((char*)&TimeStamp, 4);
+
+		SendPacket(m_ullSessionID, SendBuff);
+
+	}
 
 
 
 
 	// -----------------------
-	// 순수 가상함수
+	// 가상함수
 	// -----------------------
 
 	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)

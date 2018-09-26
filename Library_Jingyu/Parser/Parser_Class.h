@@ -3,12 +3,13 @@
 #define __PARSER_CLASS_H__
 
 #include <tchar.h>
+#include <windows.h>
 
 class Parser
 {
 private:
 	TCHAR* m_cBuffer;		// 파일을 읽어올 버퍼
-	TCHAR* m_cAreaBuffer;	// 구역 체크로 지정된 구역. m_cBuffer 중, 현재 필요한 구역만 빼낸 버퍼.
+	TCHAR* m_cAreaBuffer = nullptr;	// 구역 체크로 지정된 구역. m_cBuffer 중, 현재 필요한 구역만 빼낸 버퍼.
 	TCHAR m_cWord[256];		// 매칭되는 단어를 저장할 버퍼
 	int m_ilen;				// GetValue 함수들에서 사용하는 문자열 길이.	
 	TCHAR m_cSkipWord;		// SkipNoneCommand함수에서 현재 문자가 스킵해야하는 문자인지 구분하기 위한 변수

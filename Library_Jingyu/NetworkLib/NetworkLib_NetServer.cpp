@@ -106,7 +106,7 @@ namespace Library_Jingyu
 		// »ý¼ºÀÚ 
 		stSession()
 		{
-			m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(1024, false);
+			m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(0, false);
 			m_lIOCount = 0;
 			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
