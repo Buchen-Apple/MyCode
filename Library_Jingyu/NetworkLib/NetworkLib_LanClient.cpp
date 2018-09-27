@@ -61,7 +61,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WINSTARTUP_FAIL;
 
 			// 각종 핸들 반환 및 동적해제 절차.
-			ExitFunc(m_iW_ThreadCount);
+			ExitFunc(WorkerThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
 			cLanClientLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
@@ -176,13 +176,13 @@ namespace Library_Jingyu
 		for (int i = 0; i < m_iW_ThreadCount; ++i)
 			CloseHandle(m_hWorkerHandle[i]);
 
-		// 3) 워커 스레드 배열 동적해제
+		// 2) 워커 스레드 배열 동적해제
 		delete[] m_hWorkerHandle;
 
-		// 4) IOCP핸들 반환
+		// 3) IOCP핸들 반환
 		CloseHandle(m_hIOCPHandle);
 
-		// 5) 윈속 해제
+		// 4) 윈속 해제
 		WSACleanup();
 
 		// 4. 클라 접속중 아님 상태로 변경
@@ -191,7 +191,7 @@ namespace Library_Jingyu
 		// 5. 각종 변수 초기화
 		Reset();
 
-		// 6. 서버 종료 로그 찍기		
+		// 6. 클라 종료 로그 찍기		
 		cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
@@ -372,9 +372,13 @@ namespace Library_Jingyu
 			// 워커스레드 핸들 배열 동적해제. 
 			// Count가 0보다 크다면 무조건 동적할당을 한 적이 있음
 			delete[] m_hWorkerHandle;
-		}		
+		}	
 
-		// 3. 윈속 해제
+		// 3. 리슨소켓 닫기
+		if (m_soListen_sock != NULL)
+			closesocket(m_soListen_sock);
+
+		// 4. 윈속 해제
 		// 윈속 초기화 하지 않은 상태에서 WSAClenup() 호출해도 아무 문제 없음
 		WSACleanup();
 	}
@@ -728,6 +732,8 @@ namespace Library_Jingyu
 
 			break;
 		}
+
+		m_bClienetConnect = true;
 
 		return true;		
 	}
