@@ -293,8 +293,8 @@ namespace Library_Jingyu
 	{
 		TCHAR IP[20] = L"127.0.0.1";
 		WORD Port = 18245;
-		int CreateWorker = 1;
-		int ActiveWorker = 1;
+		int CreateWorker = 4;
+		int ActiveWorker = 2;
 		int Nodelay = 0;
 		BYTE HeadCode = 119;
 		BYTE XORCode1 = 50;

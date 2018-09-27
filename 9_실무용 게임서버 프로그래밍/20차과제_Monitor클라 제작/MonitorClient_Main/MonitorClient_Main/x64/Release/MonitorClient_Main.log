@@ -9,6 +9,6 @@
 c:\git_public\9_실무용 게임서버 프로그래밍\20차과제_monitor클라 제작\monitorclient_main\monitorclient_main\monitorclinet.cpp(241): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   MonitorView.cpp
   코드를 생성하고 있습니다.
-  All 201 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
+  All 201 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   MonitorClient_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\20차과제_Monitor클라 제작\MonitorClient_Main\x64\Release\MonitorClient_Main.exe
