@@ -20,6 +20,35 @@ namespace Library_Jingyu
 			dfMONITOR_CHATSERVER = 3		// 채팅 서버
 		};
 
+		// SetMonitorClass 에서 사용.
+		// 파일에서 읽어온 정보를 저장해둔다.
+		struct stSetMonitorInfo
+		{
+			bool m_bUseCheck; // 사용여부
+
+			int m_iDataTypeCount;
+			int m_iDataType[4];
+			int m_iGraphType;
+			int m_iPosX;
+			int m_iPosY;
+			int m_iWidth;
+			int m_iHeight;
+
+			TCHAR m_tcCaptionText[30];
+			TCHAR m_tcUnit[20];
+
+			int m_iRedColor;
+			int m_iGreenColor;
+			int m_iBlueColor;
+
+			int m_iGraphMaxValue;
+			int m_iAlarmValue;
+		
+			int m_iServerNo[4];			
+			TCHAR m_tcColumText[4][20];
+		};
+
+
 		// 화면에 출력할 데이터 보관 구조체
 		struct stLastData
 		{
@@ -36,6 +65,22 @@ namespace Library_Jingyu
 			ULONGLONG SessionID;
 			CProtocolBuff_Net* m_pPacket;
 		};
+
+		struct stInfo
+		{
+			TCHAR m_tcConnectIP[30];
+			int m_iPort;
+			int m_iCreateWorker;
+			int m_iActiveWorker;
+			int m_bHeadCode;
+			int m_bXORCode1;
+			int m_bXORCode2;
+			int m_iNodelay;
+			int m_iLogLevel;
+		};
+
+		// 모니터링 서버로 들고갈 키
+		char m_cLoginKey[32];
 
 		// 일감 TLS
 		CMemoryPoolTLS<st_WorkNode>* m_WorkPool;
@@ -57,6 +102,9 @@ namespace Library_Jingyu
 
 		// 뷰어에 출력하기 전, 마지막으로 받은 데이터를 보관하는 장소.
 		stLastData m_LastData[dfMONITOR_DATA_TYPE_END - 1];
+
+		// Config 데이터
+		stInfo m_stConfig;
 
 	public:
 		// -----------------------
@@ -99,6 +147,7 @@ namespace Library_Jingyu
 		void ClientStop();
 
 
+
 	private:
 		// -----------------------
 		// 내부에서만 사용 가능한 기능 함수
@@ -115,6 +164,18 @@ namespace Library_Jingyu
 		// Parameter : SessionID, Packet(Net), stLastData*
 		// return : 없음
 		void Data_Packet(ULONGLONG SessionID, CProtocolBuff_Net* Packet, stLastData* LastData);
+
+		// 파싱 함수
+		// 
+		// Parameter : config 구조체
+		// return : 실패 시 false
+		bool SetFile(stInfo* Config);		
+
+		// 모니터링 정보를 읽어오는 함수
+		// 
+		// Parameter : stSetMonitorInfo 구조체, 구역 이름
+		// return : 실패 시 false
+		bool SetMonitorInfo(stSetMonitorInfo* pConfig, TCHAR* AreaName);
 
 
 

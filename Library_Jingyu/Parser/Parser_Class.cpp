@@ -165,7 +165,8 @@ bool Parser::SkipNoneCommand(TCHAR TempSkipWord)
 bool Parser::GetNextWord()
 {
 	int i = 0;
-	TCHAR cTempWord[1024];
+	TCHAR cTempWord[4096];
+	bool bFlag = false;
 
 	// 단어 시작 위치를 찾는다. true면 계속 스킵된다.
 	while (SkipNoneCommand(m_cAreaBuffer[m_ilen]))
@@ -177,6 +178,11 @@ bool Parser::GetNextWord()
 		m_ilen++;
 	}
 
+	// 현재 찾는 Value가 String이라면, "를 만날때 까지 찾아야한다.
+	// 때문에 Flag 하나 둔다.
+	if (m_cAreaBuffer[m_ilen - 1] == '"')
+		bFlag = true;
+
 	// 시작위치를 찾았다. 이제 끝 위치를 찾아야한다.
 	while (1)
 	{
@@ -184,10 +190,24 @@ bool Parser::GetNextWord()
 		if (m_ilen > _tcslen(m_cBuffer))
 			return false;
 
-		// 순서대로 콤마, 마침표, 따옴표, 스페이스, 백스페이스, 탭, 라인피드, 캐리지 리턴
-		// 이 중 하나라도 해당되면, 끝 위치를 찾은거니 while문을 나간다.
-		else if (m_cAreaBuffer[m_ilen] == ',' || m_cAreaBuffer[m_ilen] == '"' || m_cAreaBuffer[m_ilen] == 0x20 || m_cAreaBuffer[m_ilen] == 0x08 || m_cAreaBuffer[m_ilen] == 0x09 || m_cAreaBuffer[m_ilen] == 0x0a || m_cAreaBuffer[m_ilen] == 0x0d)
-			break;
+		// 찾는 Value가 숫자일 때 로직
+		if (bFlag == false)
+		{
+			// 순서대로 콤마, 마침표, 따옴표, 스페이스, 백스페이스, 탭, 라인피드, 캐리지 리턴
+			// 이 중 하나라도 해당되면, 끝 위치를 찾은거니 while문을 나간다.
+			if (m_cAreaBuffer[m_ilen] == ',' || m_cAreaBuffer[m_ilen] == '"' || m_cAreaBuffer[m_ilen] == 0x20 || m_cAreaBuffer[m_ilen] == 0x08 || m_cAreaBuffer[m_ilen] == 0x09 || m_cAreaBuffer[m_ilen] == 0x0a || m_cAreaBuffer[m_ilen] == 0x0d)
+				break;
+			
+		}
+
+		// 찾는 Value가 문자일 때 로직
+		else
+		{
+			// 순서대로 콤마, 마침표, 따옴표, 스페이스, 백스페이스, 탭, 라인피드, 캐리지 리턴
+			// 이 중 하나라도 해당되면, 끝 위치를 찾은거니 while문을 나간다.
+			if (m_cAreaBuffer[m_ilen] == '"')
+				break;
+		}
 
 		// 값을 넣는다.
 		// 그리고 다음 값을 넣기 위해 현재 배열의 위치를 1칸 이동

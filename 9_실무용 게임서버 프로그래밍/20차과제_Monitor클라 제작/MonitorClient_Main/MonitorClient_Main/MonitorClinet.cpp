@@ -2,12 +2,14 @@
 #include "MonitorClient.h"
 #include "CrashDump\CrashDump.h"
 #include "Log\Log.h"
+#include "Parser\Parser_Class.h"
 
 #include "Protocol_Set\CommonProtocol.h"
 
+#include <strsafe.h>
+
 namespace Library_Jingyu
 {
-
 
 	// 서버 ID
 #define SERVER_HARDWARE	2
@@ -22,10 +24,13 @@ namespace Library_Jingyu
 	// -----------------------
 	CMonitorClient::CMonitorClient()
 	{
+		// ------------------- 파일 읽어오기
+		if (SetFile(&m_stConfig) == false)
+			g_MonitorClientDump->Crash();
 
 		// ------------------- 로그 저장할 파일 셋팅
 		g_MonitorClientLog->SetDirectory(L"MonitorClient");
-		g_MonitorClientLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
+		g_MonitorClientLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.m_iLogLevel);
 
 		// 일감 TLS 동적할당.
 		m_WorkPool = new CMemoryPoolTLS<st_WorkNode>(0, false);
@@ -106,6 +111,71 @@ namespace Library_Jingyu
 	// retrun : 없음
 	void CMonitorClient::SetMonitorClass(HINSTANCE hInst, HWND hWnd)
 	{
+		// -------------------------
+		// 모니터링 정보 파싱
+		// -------------------------
+		stSetMonitorInfo FileInfo[dfMONITOR_DATA_TYPE_END - 1];
+
+		int i = 0;
+		int End = dfMONITOR_DATA_TYPE_END - 1;
+		while (i < End)
+		{
+			// 구역 이름 만들기
+			TCHAR Count[3] = { 0, };
+			_itot_s(i+1, Count, 3, 10);
+
+			TCHAR AreaName[20] = _T("MONITOR");
+
+			StringCchCat(AreaName, 20, Count);
+
+			// 구역 찾아보기.
+			if (SetMonitorInfo(&FileInfo[i], AreaName) == true)
+			{
+				// 찾았으면, 사용중으로 바꾼다.
+				FileInfo[i].m_bUseCheck = true;
+			}
+			else
+			{
+				// 못찾았을 경우, 사용중 아님으로 바꾸고 넘어간다.
+				FileInfo[i].m_bUseCheck = false;
+			}			
+
+			++i;
+		}
+
+
+		// -------------------------
+		// 모니터링 뷰어 생성
+		// -------------------------
+		i = 0;
+
+		while (i < End)
+		{
+			if(FileInfo[i].m_bUseCheck == true)
+			{
+				// 생성자 호출
+				m_pMonitor[i] = new CMonitorGraphUnit(hInst, hWnd, RGB(FileInfo[i].m_iRedColor, FileInfo[i].m_iGreenColor, FileInfo[i].m_iBlueColor), (CMonitorGraphUnit::TYPE)FileInfo[i].m_iGraphType,
+					FileInfo[i].m_iPosX, FileInfo[i].m_iPosY, FileInfo[i].m_iWidth, FileInfo[i].m_iHeight, FileInfo[i].m_tcCaptionText);
+
+				// 추가 정보 셋팅
+				// 순서대로 [Max값, 알람 울리는 수치, 표시할 값의 단위]. 
+				// - Max 값이 0이면, 현재 큐의 값을 가장 큰 값으로 사용
+				// - 알람 값이 0이면 알람 울리지 않음.
+				// - 표시할 값의 단위가 L"NULL" 이면, 단위 표시하지 않음.
+				m_pMonitor[i]->AddData(FileInfo[i].m_iGraphMaxValue, FileInfo[i].m_iAlarmValue, FileInfo[i].m_tcUnit);
+
+				// 컬럼 최초 정보 셋팅
+				m_pMonitor[i]->SetColumnInfo(FileInfo[i].m_iDataTypeCount, FileInfo[i].m_iServerNo,
+					FileInfo[i].m_iDataType, FileInfo[i].m_tcColumText);
+			}
+
+			++i;
+		}
+
+
+
+		
+		/*
 		// -------------------- 
 		// 하드웨어
 		// -------------------- 
@@ -214,6 +284,8 @@ namespace Library_Jingyu
 		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SESSION - 1]->SetColumnInfo(1, p9_ServerID, p9_DataType, p9_DataName);
 		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PLAYER - 1]->SetColumnInfo(1, p10_ServerID, p10_DataType, p10_DataName);
 		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_ROOM - 1]->SetColumnInfo(1, p11_ServerID, p11_DataType, p11_DataName);
+		*/
+		
 	}
 
 	// 1초에 1회 호출되는 업데이트 정보
@@ -291,16 +363,8 @@ namespace Library_Jingyu
 	// return : 실패 시 false
 	bool CMonitorClient::ClientStart()
 	{
-		TCHAR IP[20] = L"127.0.0.1";
-		WORD Port = 18245;
-		int CreateWorker = 4;
-		int ActiveWorker = 2;
-		int Nodelay = 0;
-		BYTE HeadCode = 119;
-		BYTE XORCode1 = 50;
-		BYTE XORCode2 = 132;
-
-		if (Start(IP, Port, CreateWorker, ActiveWorker, Nodelay, HeadCode, XORCode1, XORCode2) == false)
+		if (Start(m_stConfig.m_tcConnectIP, m_stConfig.m_iPort, m_stConfig.m_iCreateWorker, m_stConfig.m_iActiveWorker, m_stConfig.m_iNodelay, 
+			m_stConfig.m_bHeadCode, m_stConfig.m_bXORCode1, m_stConfig.m_bXORCode2) == false)
 			return false;
 
 		// 연결 성공 로그 찍기	
@@ -387,128 +451,255 @@ namespace Library_Jingyu
 			LastData[DataType].m_ServerNo = ServerNo;
 			LastData[DataType].m_Value = DataValue;			
 		}
-
-
-
-
-		///////////////////////////////////////////////////////////
-		//// 전달할 데이터 세팅
-		///////////////////////////////////////////////////////////
-		//int SendVal[12] = { 0, };
-
-		//int a[12];
-
-		//// 하드웨어의 CPU 사용량
-		//a[0] = rand() % 5;
-
-		//// 하드웨어의 사용 가능 메모리
-		//a[1] = rand() % 80;
-
-		//// 하드웨어의 Network Recv
-		//a[2] = rand() % 40;
-
-		//// 하드웨어의 Network Send
-		//a[3] = rand() % 40;
-
-		//// 하드웨어의 Nonpaged_Mem
-		//a[4] = rand() % 38;
-
-		//// 채팅서버 On/Off
-		//a[5] = rand() % 2;
-
-		//// 채팅서버 CPU
-		//a[6] = rand() % 5;
-
-		//// 채팅서버 메모리
-		//a[7] = rand() % 10;
-
-		//// PacketPool
-		//a[8] = rand() % 100;
-
-		//// SessionAll
-		//a[9] = rand() % 100;
-
-		//// Login Player
-		//a[10] = rand() % 50;
-
-		//// Room
-		//a[11] = rand() % 3;
-
-
-		///////////////////////////////////////////////////////////
-		//// 전달할 데이터 가공
-		///////////////////////////////////////////////////////////
-		//// 첫 번째 그래프는 %로 표시하기 때문에(임시로) 100 이상을 넘지 않도록 강제한다.
-		//// 전달할 값을, +할지 -할지 결정한다.
-		//int randCheck = rand() % 2;
-
-		//if (randCheck == 0)	// 0이면 뺸다.
-		//{
-		//	if (0 > (SendVal[0] - a[0]))	// 빼야하는데 뺸 후의 값이 -라면 더한다.
-		//		SendVal[0] += a[0];
-		//	else
-		//		SendVal[0] -= a[0];
-		//}
-		//else   // 1이면 더한다.
-		//{
-		//	if (100 < (SendVal[0] + a[0]))	// 더해야 하는데, 더한 후의 값이 100을 넘어가면 뺀다.
-		//		SendVal[0] -= a[0];
-		//	else
-		//		SendVal[0] += a[0];
-		//}
-
-		//int MonitorIndex = 0;
-		//int End = dfMONITOR_DATA_TYPE_END - 1;
-		//int DataType = 1;
-
-		//while (MonitorIndex < End)
-		//{
-		//	if (m_pMonitor[MonitorIndex] != nullptr)
-		//	{
-		//		m_pMonitor[MonitorIndex]->InsertData(SendVal[0], SERVER_1, DataType);
-		//	}
-		//	++MonitorIndex;
-		//}
-
-		//DataType++;
-
-		//// 2~10번 정보들 처리
-		//for (int i = 1; i < 12; ++i)
-		//{
-		//	// 전달할 값을, +할지 -할지 결정한다.
-		//	randCheck = rand() % 2;
-
-		//	if (randCheck == 0)	// 0이면 뺸다.
-		//	{
-		//		if (0 > (SendVal[i] - a[i]))	// 빼야하는데 뺸 값이 -라면 더한다.
-		//			SendVal[i] += a[i];
-		//		else
-		//			SendVal[i] -= a[i];
-		//	}
-		//	else   // 1이면 더한다.
-		//	{
-		//		SendVal[i] += a[i];
-		//	}
-
-		//	MonitorIndex = 0;
-
-		//	while (MonitorIndex < End)
-		//	{
-		//		if (m_pMonitor[MonitorIndex] != nullptr)
-		//		{
-		//			m_pMonitor[MonitorIndex]->InsertData(SendVal[i], SERVER_1, DataType);
-		//		}
-		//		++MonitorIndex;
-		//	}
-
-		//	DataType++;
-		//	if (DataType == 6)
-		//		DataType += 30;
-		//}
-
 	}
 
 
+	// 파싱 함수
+	// 
+	// Parameter : stInfo*
+	// return : 실패 시 false
+	bool CMonitorClient::SetFile(stInfo* pConfig)
+	{
+		Parser Parser;
+
+		// 파일 로드
+		try
+		{
+			Parser.LoadFile(_T("MonitorClient_Config.ini"));
+		}
+		catch (int expn)
+		{
+			if (expn == 1)
+			{
+				printf("File Open Fail...\n");
+				return false;
+			}
+			else if (expn == 2)
+			{
+				printf("FileR Read Fail...\n");
+				return false;
+			}
+		}
+
+		////////////////////////////////////////////////////////
+		// Monitor NetClinet Config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MONITORCLIENT")) == false)
+			return false;
+
+		// IP
+		if (Parser.GetValue_String(_T("ConnectIP"), pConfig->m_tcConnectIP) == false)
+			return false;
+
+		// Port
+		if (Parser.GetValue_Int(_T("Port"), &pConfig->m_iPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("CreateWorker"), &pConfig->m_iCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("ActiveWorker"), &pConfig->m_iActiveWorker) == false)
+			return false;		
+
+		// 헤더 코드
+		if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->m_bHeadCode) == false)
+			return false;
+
+		// xorcode1
+		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->m_bXORCode1) == false)
+			return false;
+
+		// xorcode2
+		if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->m_bXORCode2) == false)
+			return false;
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("Nodelay"), &pConfig->m_iNodelay) == false)
+			return false;		
+
+		// 로그 레벨
+		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->m_iLogLevel) == false)
+			return false;
+
+		// 로그인 키
+		TCHAR tcLoginKey[33];
+		if (Parser.GetValue_String(_T("LoginKey"), tcLoginKey) == false)
+			return false;
+
+		// 클라가 들고올 때는 char형으로 들고오기 때문에 변환해서 가지고 있어야한다.
+		int len = WideCharToMultiByte(CP_UTF8, 0, tcLoginKey, lstrlenW(tcLoginKey), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, tcLoginKey, lstrlenW(tcLoginKey), m_cLoginKey, len, NULL, NULL);
+
+		return true;
+
+	}
+
+	// 모니터링 정보를 읽어오는 함수
+	// 
+	// Parameter : stSetMonitorInfo 구조체, 구역 이름
+	// return : 구역 지정 실패 시 false (그 외 실패는 모두 Crash)
+	bool CMonitorClient::SetMonitorInfo(stSetMonitorInfo* pConfig, TCHAR* AreaName)
+	{
+		Parser Parser;
+
+		// 파일 로드
+		try
+		{
+			Parser.LoadFile(_T("MonitorClient_Config.ini"));
+		}
+		catch (int expn)
+		{
+			if (expn == 1)
+			{
+				printf("File Open Fail...\n");
+				return false;
+			}
+			else if (expn == 2)
+			{
+				printf("FileR Read Fail...\n");
+				return false;
+			}
+		}
+
+		////////////////////////////////////////////////////////
+		// Monitor NetClinet Config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(AreaName) == false)
+			return false;
+
+		// DataTypeCount
+		if (Parser.GetValue_Int(_T("DataTypeCount"), &pConfig->m_iDataTypeCount) == false)
+			g_MonitorClientDump->Crash();
+		
+		// DataType
+		// DataTypeCount만큼 돌면서 뽑아낸다.
+		int i = 0;
+		while (i < pConfig->m_iDataTypeCount)
+		{
+			// 컬럼 이름 만들기
+			TCHAR Count[3] = { 0, };
+			_itot_s(i + 1, Count, 3, 10);
+
+			TCHAR TypeName[20] = _T("DataType");
+
+			StringCchCat(TypeName, 20, Count);
+
+			if (Parser.GetValue_Int(TypeName, &pConfig->m_iDataType[i]) == false)
+				g_MonitorClientDump->Crash();
+
+			++i;
+		}
+		
+
+		
+
+		// GraphType
+		if (Parser.GetValue_Int(_T("GraphType"), &pConfig->m_iGraphType) == false)
+			g_MonitorClientDump->Crash();
+
+		// PosX
+		if (Parser.GetValue_Int(_T("PosX"), &pConfig->m_iPosX) == false)
+			g_MonitorClientDump->Crash();
+
+		// PosY
+		if (Parser.GetValue_Int(_T("PosY"), &pConfig->m_iPosY) == false)
+			g_MonitorClientDump->Crash();
+
+		// Width
+		if (Parser.GetValue_Int(_T("Width"), &pConfig->m_iWidth) == false)
+			g_MonitorClientDump->Crash();
+
+		// Height
+		if (Parser.GetValue_Int(_T("Height"), &pConfig->m_iHeight) == false)
+			g_MonitorClientDump->Crash();
+
+
+
+		// 캡션 텍스트
+		if (Parser.GetValue_String(_T("CaptionText"), pConfig->m_tcCaptionText) == false)
+			g_MonitorClientDump->Crash();
+
+		// Unit텍스트
+		if (Parser.GetValue_String(_T("Unit"), pConfig->m_tcUnit) == false)
+			g_MonitorClientDump->Crash();
+
+
+
+
+		// Red
+		if (Parser.GetValue_Int(_T("Red"), &pConfig->m_iRedColor) == false)
+			g_MonitorClientDump->Crash();
+
+		// Green
+		if (Parser.GetValue_Int(_T("Green"), &pConfig->m_iGreenColor) == false)
+			g_MonitorClientDump->Crash();
+
+		// Blue
+		if (Parser.GetValue_Int(_T("Blue"), &pConfig->m_iBlueColor) == false)
+			g_MonitorClientDump->Crash();
+
+
+
+
+		// GraphMaxValue 
+		if (Parser.GetValue_Int(_T("GraphMaxValue"), &pConfig->m_iGraphMaxValue) == false)
+			g_MonitorClientDump->Crash();
+
+		// AlarmValue 
+		if (Parser.GetValue_Int(_T("AlarmValue"), &pConfig->m_iAlarmValue) == false)
+			g_MonitorClientDump->Crash();
+
+			   		 
+
+		
+
+		// ServerNo 
+		// DataTypeCount만큼 돌면서 뽑아낸다.
+		i = 0;
+		while (i < pConfig->m_iDataTypeCount)
+		{
+			// 컬럼 이름 만들기
+			TCHAR Count[3] = { 0, };
+			_itot_s(i + 1, Count, 3, 10);
+
+			TCHAR ServerNoText[20] = _T("ServerNo");
+
+			StringCchCat(ServerNoText, 20, Count);
+
+			if (Parser.GetValue_Int(ServerNoText, &pConfig->m_iServerNo[i]) == false)
+				g_MonitorClientDump->Crash();
+
+			++i;
+		}		
+
+		// Colum 텍스트
+		// DataTypeCount만큼 돌면서 뽑아낸다.
+		i = 0;
+		while (i < pConfig->m_iDataTypeCount)
+		{
+			// 컬럼 이름 만들기
+			TCHAR Count[3] = { 0, };
+			_itot_s(i + 1, Count, 3, 10);
+
+			TCHAR ColumName[20] = _T("ColumText");
+
+			StringCchCat(ColumName, 20, Count);
+
+			if (Parser.GetValue_String(ColumName, pConfig->m_tcColumText[i]) == false)
+				g_MonitorClientDump->Crash();
+
+			++i;
+		}
+		
+
+		return true;
+	}
 
 
 	// -----------------------
@@ -553,38 +744,51 @@ namespace Library_Jingyu
 	// return : 없음
 	void CMonitorClient::OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
 	{
-		// 1. Type을 빼본다.
-		WORD Type;
-		Payload->GetData((char*)&Type, 2);
-
-		switch (Type)
+		try
 		{
-			// type이 로그인 요청이라면 로그인 패킷 처리
-		case en_PACKET_CS_MONITOR_TOOL_RES_LOGIN:
-			Login_Packet(SessionID, Payload);
+			// 1. Type을 빼본다.
+			WORD Type;
+			Payload->GetData((char*)&Type, 2);
+
+			switch (Type)
+			{
+				// type이 로그인 요청이라면 로그인 패킷 처리
+			case en_PACKET_CS_MONITOR_TOOL_RES_LOGIN:
+				Login_Packet(SessionID, Payload);
+				break;
+
+				// type이 데이터 전송이라면
+			case en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE:
+			{
+				// 일감 TLS에서 일감 구조체 Alloc
+				st_WorkNode* NowWork = m_WorkPool->Alloc();
+
+				// Payload 레퍼런스 카운트 증가 후 일감에 연결
+				Payload->Add();
+				NowWork->m_pPacket = Payload;
+				NowWork->SessionID = SessionID;
+
+				// 일감 큐에 넣기
+				m_LFQueue->Enqueue(NowWork);
+			}
 			break;
 
-			// type이 데이터 전송이라면
-		case en_PACKET_CS_MONITOR_TOOL_DATA_UPDATE:
-		{
-			// 일감 TLS에서 일감 구조체 Alloc
-			st_WorkNode* NowWork = m_WorkPool->Alloc();
+			// 그 외 타입은 에러
+			default:
+				throw CException(_T("OnRecv() --> Type Error!!"));
+				
+				break;
+			}
 
-			// Payload 레퍼런스 카운트 증가 후 일감에 연결
-			Payload->Add();
-			NowWork->m_pPacket = Payload;
-			NowWork->SessionID = SessionID;
-
-			// 일감 큐에 넣기
-			m_LFQueue->Enqueue(NowWork);
 		}
-			break;
+		catch (CException& exc)
+		{
+			g_MonitorClientLog->LogSave(L"MonitorClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s", 
+				(TCHAR*)exc.GetExceptionText());
 
-			// 그 외 타입은 크래시
-		default:
 			g_MonitorClientDump->Crash();
-			break;
 		}
+		
 		
 	}
 
@@ -617,5 +821,8 @@ namespace Library_Jingyu
 	//			 : 에러 코드에 대한 스트링
 	// return : 없음
 	void CMonitorClient::OnError(int error, const TCHAR* errorStr)
-	{}
+	{
+		g_MonitorClientLog->LogSave(L"MonitorClient", CSystemLog::en_LogLevel::LEVEL_ERROR, errorStr);
+		g_MonitorClientDump->Crash();
+	}
 }

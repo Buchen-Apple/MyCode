@@ -62,6 +62,9 @@
     <ClCompile Include="MonitorClinet.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="MonitorClient_Main.rc">

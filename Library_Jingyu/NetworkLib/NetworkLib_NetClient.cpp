@@ -751,7 +751,8 @@ namespace Library_Jingyu
 					else if (retval == 0)
 					{
 						printf("Select Timeout..\n");
-						printf("%d\n", WSAGetLastError());
+						int Error = WSAGetLastError();
+						printf("%d\n", Error);
 
 					}
 
