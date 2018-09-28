@@ -2,13 +2,13 @@
   CrashDump.cpp
   DB_Connector.cpp
   Log.cpp
+  MonitorServer.cpp
   NetworkLib_LanServer.cpp
   NetworkLib_NetServer.cpp
   Parser_Class.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
   ProtocolBuff_ObjectPool.cpp
   RingBuff.cpp
-  MonitorServer.cpp
   MonitorServer_Main.cpp
   코드를 생성하고 있습니다.
   All 389 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.

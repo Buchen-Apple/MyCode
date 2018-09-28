@@ -24,12 +24,6 @@
     <ClInclude Include="MonitorClient_Main.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="MonitorView.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="MonitorClient.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -39,9 +33,6 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="MonitorClient_Main.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="MonitorView.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp">
@@ -59,10 +50,13 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="MonitorClinet.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\MonitorClient\MonitorClinet.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\MonitorClient\MonitorView.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
