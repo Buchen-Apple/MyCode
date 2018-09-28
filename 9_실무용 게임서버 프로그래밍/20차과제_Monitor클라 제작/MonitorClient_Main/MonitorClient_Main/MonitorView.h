@@ -89,12 +89,18 @@ namespace Library_Jingyu
 		// 데이터 넣기, 처음 디폴트 값 추가세팅
 		/////////////////////////////////////////////////////////
 		void InsertData(int iData, int ServerID, int DataType);
-		void AddData(int iMax, int AleCount, LPCTSTR Unit);
+		void AddData(int iMax, int MaxAleCount, int MinAleCount, LPCTSTR Unit);
 
 		/////////////////////////////////////////////////////////
 		// 컬럼 정보 최초 세팅
 		/////////////////////////////////////////////////////////
 		void SetColumnInfo(int iColumnCount, int ServerID[], int DataType[], TCHAR DataName[][20]);
+
+		//------------------------------------------------------
+		// 알람 시, 부모 배경 빨간색으로 칠하기 체크 함수
+		//------------------------------------------------------
+		void ParentBackCheck(int Data);		// 최대
+		void ParentBackCheck_Min(int Data);	// 최소
 
 	private:
 		//------------------------------------------------------
@@ -105,12 +111,7 @@ namespace Library_Jingyu
 		void Paint_BAR_SINGLE_VERT();
 		void Paint_BAR_COLUMN_VERT();
 		void Paint_PIE();
-		void paint_ONOFF();
-
-		//------------------------------------------------------
-		// 알람 시, 부모 배경 빨간색으로 칠하기 체크 함수
-		//------------------------------------------------------
-		void ParentBackCheck(int Data);
+		void paint_ONOFF();		
 
 		//------------------------------------------------------
 		// 기본 UI 세팅
@@ -142,7 +143,15 @@ namespace Library_Jingyu
 		Queue queue;	// 큐	
 		double iAddY;
 		int Greedint[4];
-		bool AleOnOff;			//해당 윈도우가 알람을 울릴지 말지. false면 울리지 않음
+
+		// 해당 윈도우가 알람을 울릴지 말지. 지정한 값보다 큰 값이 나오면 알람이 울리도록 한다.
+		// false면 울리지 않음
+		bool AleOnOff;			
+
+		// 해당 윈도우가 알람을 울릴지 말지. 지정한 값보다 작은 값이 나오면 알람이 울리도록 한다.
+		// false면 울리지 않음.
+		bool MinAleOnOff;	
+
 		int iColumnCount;		// 해당 윈도우의 컬럼 수 카운트
 
 		//------------------------------------------------------
@@ -157,6 +166,7 @@ namespace Library_Jingyu
 		bool MaxVariable;
 		int iMax;
 		double AleCount;
+		double MinAleCount;
 		bool bObjectCheck;
 
 		//------------------------------------------------------

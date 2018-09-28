@@ -889,7 +889,7 @@ namespace Library_Jingyu
 		int TimeStamp;
 		Payload->GetData((char*)&TimeStamp, 4);
 
-		BYTE ServerNo;
+		
 
 		// 2. 정보 갱신
 		AcquireSRWLockExclusive(&DBInfoSrwl);	// ------------- 락
@@ -913,11 +913,11 @@ namespace Library_Jingyu
 			m_stDBInfo[Type].m_iTotal += Value;
 
 			// 5. 카운트 증가
-			m_stDBInfo[Type].m_iTotalCount++;
-
-			// 6. Send할 서버 No 받아두기
-			ServerNo = m_stDBInfo[Type].m_iServerNo;
+			m_stDBInfo[Type].m_iTotalCount++;			
 		}		
+
+		// 6. Send할 서버 No 받아두기
+		BYTE ServerNo = m_stDBInfo[Type].m_iServerNo;
 
 		ReleaseSRWLockExclusive(&DBInfoSrwl);	// ------------- 언락	
 

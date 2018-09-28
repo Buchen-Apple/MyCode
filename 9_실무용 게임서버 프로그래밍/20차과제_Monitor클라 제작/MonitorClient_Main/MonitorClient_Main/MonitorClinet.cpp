@@ -162,7 +162,7 @@ namespace Library_Jingyu
 				// - Max 값이 0이면, 현재 큐의 값을 가장 큰 값으로 사용
 				// - 알람 값이 0이면 알람 울리지 않음.
 				// - 표시할 값의 단위가 L"NULL" 이면, 단위 표시하지 않음.
-				m_pMonitor[i]->AddData(FileInfo[i].m_iGraphMaxValue, FileInfo[i].m_iAlarmValue, FileInfo[i].m_tcUnit);
+				m_pMonitor[i]->AddData(FileInfo[i].m_iGraphMaxValue, FileInfo[i].m_iAlarmValue, FileInfo[i].m_iMinAlarmValue, FileInfo[i].m_tcUnit);
 
 				// 컬럼 최초 정보 셋팅
 				m_pMonitor[i]->SetColumnInfo(FileInfo[i].m_iDataTypeCount, FileInfo[i].m_iServerNo,
@@ -170,122 +170,7 @@ namespace Library_Jingyu
 			}
 
 			++i;
-		}
-
-
-
-		
-		/*
-		// -------------------- 
-		// 하드웨어
-		// -------------------- 
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL-1] = new CMonitorGraphUnit(hInst, hWnd, RGB(62, 62, 62), CMonitorGraphUnit::LINE_SINGLE, 10, 10, 500, 130, L"서버 CPU");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY-1] = new CMonitorGraphUnit(hInst, hWnd, RGB(62, 62, 62), CMonitorGraphUnit::LINE_SINGLE, 520, 10, 400, 130, L"서버 사용 가능 메모리");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV-1] = new CMonitorGraphUnit(hInst, hWnd, RGB(62, 62, 62), CMonitorGraphUnit::LINE_MULTI, 930, 10, 510, 130, L"Network");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY -1] = new CMonitorGraphUnit(hInst, hWnd, RGB(62, 62, 62), CMonitorGraphUnit::LINE_SINGLE, 1450, 10, 460, 130, L"Nonpaged Mem");
-
-		// 추가 정보 세팅
-		// 순서대로 [Max값, 알람 울리는 수치, 표시할 값의 단위]. 
-		// Max 값이 0이면, 현재 큐의 값을 가장 큰 값으로 사용
-		// 알람 값이 0이면 알람 울리지 않음.
-		// 표시할 값의 단위가 L"NULL" 이면, 단위 표시하지 않음.
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL - 1]->AddData(100, 90, L"%");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY - 1]->AddData(0, 0, L"MB");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV - 1]->AddData(0, 0, L"KByte");
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY - 1]->AddData(0, 0, L"MB");
-
-		// 컬럼 최초 정보 세팅
-		int p1_ColumnCount = 1;
-		int p1_ServerID[1] = { SERVER_HARDWARE };
-		int p1_DataType[1] = { dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL };
-		TCHAR p1_DataName[1][20] = { L"CPU 사용량" };
-
-		int p2_ColumnCount = 1;
-		int p2_ServerID[1] = { SERVER_HARDWARE };
-		int p2_DataType[1] = { dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY };
-		TCHAR p2_DataName[1][20] = { L"서버 사용 가능 메모리" };
-
-		int p3_ColumnCount = 2;
-		int p3_ServerID[2] = { SERVER_HARDWARE, SERVER_HARDWARE };
-		int p3_DataType[2] = { dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV, dfMONITOR_DATA_TYPE_SERVER_NETWORK_SEND };
-		TCHAR p3_DataName[2][20] = { L"Recv", L"Send" };
-
-		int p4_ColumnCount = 1;
-		int p4_ServerID[1] = { SERVER_HARDWARE };
-		int p4_DataType[1] = { dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY };
-		TCHAR p4_DataName[1][20] = { L"Nonpaged Mem" };
-
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL - 1]->SetColumnInfo(1, p1_ServerID, p1_DataType, p1_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY - 1]->SetColumnInfo(1, p2_ServerID, p2_DataType, p2_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV - 1]->SetColumnInfo(2, p3_ServerID, p3_DataType, p3_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY - 1]->SetColumnInfo(1, p4_ServerID, p4_DataType, p4_DataName);
-
-
-		// -------------------- 
-		// 채팅서버
-		// -------------------- 
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SERVER_ON - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::ONOFF, 10, 150, 150, 130, L"채팅 서버 On/Off");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_CPU - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 170, 150, 200, 130, L"채팅서버 CPU");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_MEMORY_COMMIT - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 380, 150, 200, 130, L"채팅서버 메모리");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 590, 150, 200, 130, L"PacketPool");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SESSION - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 1110, 150, 200, 130, L"SessionAll");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PLAYER - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 1320, 150, 300, 130, L"Login Player");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_ROOM - 1] = new CMonitorGraphUnit(hInst, hWnd, RGB(18, 52, 120), CMonitorGraphUnit::LINE_SINGLE, 1630, 150, 280, 130, L"Room");
-				
-		// 추가 정보 세팅		
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SERVER_ON - 1]->AddData(0, 0, L"NULL");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_CPU - 1]->AddData(100, 90, L"%");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_MEMORY_COMMIT - 1]->AddData(0, 0, L"MB");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL - 1]->AddData(0, 0, L"NULL");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SESSION - 1]->AddData(0, 0, L"NULL");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PLAYER - 1]->AddData(0, 0, L"NULL");
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_ROOM - 1]->AddData(0, 0, L"NULL");
-
-		// 컬럼 최초 정보 세팅
-		int p5_ColumnCount = 1;
-		int p5_ServerID[1] = { SERVER_CHAT };
-		int p5_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_SERVER_ON };
-		TCHAR p5_DataName[1][20] = { L"채팅 서버 On/Off" };
-
-		int p6_ColumnCount = 1;
-		int p6_ServerID[1] = { SERVER_CHAT };
-		int p6_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_CPU };
-		TCHAR p6_DataName[1][20] = { L"채팅서버 CPU" };
-
-		int p7_ColumnCount = 1;
-		int p7_ServerID[1] = { SERVER_CHAT };
-		int p7_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_MEMORY_COMMIT };
-		TCHAR p7_DataName[1][20] = { L"채팅서버 메모리" };
-
-		int p8_ColumnCount = 1;
-		int p8_ServerID[1] = { SERVER_CHAT };
-		int p8_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL };
-		TCHAR p8_DataName[1][20] = { L"PacketPool" };
-
-		int p9_ColumnCount = 1;
-		int p9_ServerID[1] = { SERVER_CHAT };
-		int p9_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_SESSION };
-		TCHAR p9_DataName[1][20] = { L"SessionAll" };
-
-		int p10_ColumnCount = 1;
-		int p10_ServerID[1] = { SERVER_CHAT };
-		int p10_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_PLAYER };
-		TCHAR p10_DataName[1][20] = { L"Login Player" };
-
-		int p11_ColumnCount = 1;
-		int p11_ServerID[1] = { SERVER_CHAT };
-		int p11_DataType[1] = { dfMONITOR_DATA_TYPE_CHAT_ROOM };
-		TCHAR p11_DataName[1][20] = { L"Room" };
-		
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SERVER_ON - 1]->SetColumnInfo(1, p5_ServerID, p5_DataType, p5_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_CPU - 1]->SetColumnInfo(1, p6_ServerID, p6_DataType, p6_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_MEMORY_COMMIT - 1]->SetColumnInfo(1, p7_ServerID, p7_DataType, p7_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PACKET_POOL - 1]->SetColumnInfo(1, p8_ServerID, p8_DataType, p8_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_SESSION - 1]->SetColumnInfo(1, p9_ServerID, p9_DataType, p9_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_PLAYER - 1]->SetColumnInfo(1, p10_ServerID, p10_DataType, p10_DataName);
-		m_pMonitor[dfMONITOR_DATA_TYPE_CHAT_ROOM - 1]->SetColumnInfo(1, p11_ServerID, p11_DataType, p11_DataName);
-		*/
-		
+		}		
 	}
 
 	// 1초에 1회 호출되는 업데이트 정보
@@ -308,7 +193,6 @@ namespace Library_Jingyu
 				// 2. 여기왔다는 것은 무조건 데이터라는것.
 				// 데이터 처리
 				Data_Packet(NowNode->SessionID, NowNode->m_pPacket, m_LastData);
-
 			}
 			catch (CException& exc)
 			{
@@ -328,30 +212,63 @@ namespace Library_Jingyu
 		int DataIndex = 0;
 
 		while (DataIndex < End)
-		{
-			int Value = 0;
-
-			// value가 -1이 아니라면, 데이터가 온것. 데이터 셋팅
-			if (m_LastData[DataIndex].m_Value != -1)
+		{			
+			// 최초로, 한 번이라도 데이터를 받은적 있는 경우에만 아래 처리
+			// 받은 적 없으면, 무엇도 체크할것 없음.
+			if (m_LastData[DataIndex].m_bFirstCheck == true)
 			{
-				Value = m_LastData[DataIndex].m_Value;						
-			}
+				int Value;
 
-			// 실제 데이터 넣기. 넣으면서 출력도 같이.
-			while (MonitorIndex < End)
-			{
-				if (m_pMonitor[MonitorIndex] != nullptr)
+				// value가 -1이 아니라면, 데이터가 온것. 데이터 셋팅
+				if (m_LastData[DataIndex].m_Value != -1)
 				{
-					m_pMonitor[MonitorIndex]->InsertData(Value, m_LastData[DataIndex].m_ServerNo, DataIndex + 1);
+					Value = m_LastData[DataIndex].m_Value;
 				}
-				++MonitorIndex;
+
+				// value가 -1이라면 데이터가 안온것.
+				else
+				{
+					if(m_LastData[DataIndex].m_ZeroCount < 3)
+						m_LastData[DataIndex].m_ZeroCount++;
+
+					// 만약, 데이터 안온게, 서버 On/Off라면 ZeroCount를 올려준다.
+					// 이걸로, 몇 번이나 안왔는지 체크 후 빨간화면 만들기를 한다.
+					if (DataIndex + 1 == dfMONITOR_DATA_TYPE_MATCH_SERVER_ON ||
+						DataIndex + 1 == dfMONITOR_DATA_TYPE_MASTER_SERVER_ON ||
+						DataIndex + 1 == dfMONITOR_DATA_TYPE_CHAT_SERVER_ON)
+					{
+						// 증가 후, 값이 5가 되었다면, 5번동안 On 메시지가 안온것.
+						// 이 때는 정말 서버가 꺼져있다고 판단한 후, 0을 넣는다. (서버 Off)
+						if (m_LastData[DataIndex].m_ZeroCount >= 3)
+							Value = 0;
+
+						// 아직 3번까지는 안됐다면, 1을 넣는다. (서버 On 중)
+						else
+							Value = 1;
+					}
+
+					// 서버 On/Off가 아니라면, 바로 Value에 0을 넣는다.
+					else
+						Value = 0;
+
+				}
+
+				// 실제 데이터 넣기. 넣으면서 출력도 같이.
+				while (MonitorIndex < End)
+				{
+					if (m_pMonitor[MonitorIndex] != nullptr)
+					{
+						m_pMonitor[MonitorIndex]->InsertData(Value, m_LastData[DataIndex].m_ServerNo, DataIndex + 1);
+					}
+					++MonitorIndex;
+				}
+
+				// 초기화
+				MonitorIndex = 0;
+				m_LastData[DataIndex].m_Value = -1;	
 			}
 
-			// 초기화
-			MonitorIndex = 0;
-			m_LastData[DataIndex].m_Value = -1;
-
-			// 인덱스 ++
+			// 데이터 인덱스 ++
 			DataIndex++;
 		}
 	}
@@ -437,12 +354,34 @@ namespace Library_Jingyu
 
 		DataType -= 1;
 
-		// 2. 데이터 보관
+		// 2. 데이터를 받았으니, 데이터를 최초로 받음 표시를 true로 변경
+		LastData[DataType].m_bFirstCheck = true;
+
+		// 3. 데이터 보관
 		// 만약, 이미 0으로 출력한 데이터가 뒤늦게 왔다면 무시한다.
 		if (LastData[DataType].m_ZeroCount > 0)
 		{
-			// 카운트 하나 줄이고 끝.
-			LastData[DataType].m_ZeroCount--;
+			// 타입이, 서버 On/Off라면, 받는 순간, 기존의 ZeroCount를 0으로 만들고, 받은 값을 바로 반영한다.
+			if (DataType + 1 == dfMONITOR_DATA_TYPE_MATCH_SERVER_ON ||
+				DataType + 1 == dfMONITOR_DATA_TYPE_MASTER_SERVER_ON ||
+				DataType + 1 == dfMONITOR_DATA_TYPE_CHAT_SERVER_ON)
+			{
+				LastData[DataType].m_ZeroCount = 0;
+				LastData[DataType].m_ServerNo = ServerNo;
+				LastData[DataType].m_Value = DataValue;
+			}
+
+			// 만약, ZeroCount가 3이었다면, 오랫동안 안오다가 온것. 바로 반영한다.
+			else if (LastData[DataType].m_ZeroCount == 3)
+			{
+				LastData[DataType].m_ZeroCount = 0;
+				LastData[DataType].m_ServerNo = ServerNo;
+				LastData[DataType].m_Value = DataValue;
+			}
+
+			// 그게 아니라면 카운트 하나 줄이고 끝.
+			else
+				LastData[DataType].m_ZeroCount--;			
 		}
 
 		// 0으로 출력한 데이터가 없다면, 정말 이번에 찍을 데이터가 온 것.
@@ -653,6 +592,10 @@ namespace Library_Jingyu
 
 		// AlarmValue 
 		if (Parser.GetValue_Int(_T("AlarmValue"), &pConfig->m_iAlarmValue) == false)
+			g_MonitorClientDump->Crash();
+
+		// MinAlarmValue 
+		if (Parser.GetValue_Int(_T("MinAlarmValue"), &pConfig->m_iMinAlarmValue) == false)
 			g_MonitorClientDump->Crash();
 
 			   		 

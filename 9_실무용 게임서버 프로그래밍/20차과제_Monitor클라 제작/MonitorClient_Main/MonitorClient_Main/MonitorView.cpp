@@ -323,6 +323,10 @@ namespace Library_Jingyu
 				// true면 부모의 화면 빨갛게 칠하기를 체크 한다. false면 안함.
 				if (AleOnOff == true)
 					ParentBackCheck(iData);
+
+				// 여기에다 최소 체크
+				if(MinAleOnOff == true)
+					ParentBackCheck_Min(iData);
 			}
 		}
 
@@ -330,8 +334,8 @@ namespace Library_Jingyu
 		InvalidateRect(hWnd, NULL, false);
 	}
 
-	// 추가 데이터 세팅. 순서대로 [Max값 , 알람 울리는 값, 표시할 단위]
-	void CMonitorGraphUnit::AddData(int iMax, int AleCount, LPCTSTR Unit)
+	// 추가 데이터 세팅. 순서대로 [Max값 , 알람 울리는 최대값, 알람 울리는 최소값, 표시할 단위]
+	void CMonitorGraphUnit::AddData(int iMax, int MaxAleCount, int MinAleCount, LPCTSTR Unit)
 	{
 		this->iMax = iMax;
 
@@ -359,13 +363,24 @@ namespace Library_Jingyu
 		/////////////////////////////////////////////////////////
 		// 알림이 울릴 값 세팅
 		/////////////////////////////////////////////////////////
-		// AleCount값이 0이면 알람 울리지 않음.
-		if (AleCount == 0)
+		// 인자로 받은 MaxAleCount 셋팅
+		// 값이 0이면 알람 울리지 않음.
+		if (MaxAleCount == 0)
 			AleOnOff = false;
 		else
 		{
 			AleOnOff = true;
-			this->AleCount = AleCount;
+			AleCount = MaxAleCount;
+		}
+
+		// 인자로 받은 MinAleCount 셋팅
+		// 값이 0이면 알람 울리지 않음.
+		if (MinAleCount == 0)
+			MinAleOnOff = false;
+		else
+		{
+			MinAleOnOff = true;
+			this->MinAleCount = MinAleCount;
 		}
 
 		/////////////////////////////////////////////////////////
@@ -745,12 +760,14 @@ namespace Library_Jingyu
 
 		SelectObject(MemDC, MyFont);	// 본래 폰트(MyFont) 적용.
 		SetTextAlign(MemDC, TA_LEFT);	// 본래 텍스트 설정 적용
+
+		DeleteObject(BigFont);			// 다 쓴 커다란 폰트 삭제
 	}
 
-	// 부모의 백그라운드 빨간색으로 칠하기
+	// 부모의 백그라운드 빨간색으로 칠하기 (최대 체크용)
 	void CMonitorGraphUnit::ParentBackCheck(int data)
 	{
-		// 마지막에 디큐한 Data가 알람보다 작다면, 부모에게 화면 빨갛게 하라고 무조건 메시지를 보낸다. 
+		// 마지막에 디큐한 Data가 알람보다 크다면, 부모에게 화면 빨갛게 하라고 무조건 메시지를 보낸다. 
 		// 이미 빨간색인지 아닌지는 부모가 체크
 		if (data > AleCount)
 		{
@@ -777,6 +794,38 @@ namespace Library_Jingyu
 			SetTextColor(MemDC, NowFontColor);
 		}
 	}
+
+	// 부모의 백그라운드 빨간색으로 칠하기 (최소 체크용)
+	void CMonitorGraphUnit::ParentBackCheck_Min(int data)
+	{
+		// 마지막에 디큐한 Data가 알람보다 작다면, 부모에게 화면 빨갛게 하라고 무조건 메시지를 보낸다. 
+		// 이미 빨간색인지 아닌지는 부모가 체크
+		if (data < MinAleCount)
+		{
+			SendMessage(hWndParent, UM_PARENTBACKCHANGE, 0, 0);	// 부모에게 화면 빨갛게 하라고 전달.
+
+			// 부모에게 빨갛게 하라고 전달한 후, 폰트의 색 변경. 
+			// 현재 알람 수치보다 적은 값일 경우, 폰트 색 빨간색으로 변경.
+			// 즉, 모든 윈도우가 폰트 빨간색으로 될 수도 있다.
+			// 이미 전달했다면(bObjectCheck가 true) if문 작동 안함.
+			if (!bObjectCheck)
+			{
+				bObjectCheck = true;
+				NowFontColor = RGB(255, 0, 0);
+				SetTextColor(MemDC, NowFontColor);
+				// Timer를 세팅한다. 빨간색 폰트 표시 시간을 위해.
+			}
+		}
+
+		// Data가 알람보다 크다면, 다시 내 폰트를 원래대로 복구. 
+		else
+		{
+			bObjectCheck = false;
+			NowFontColor = NormalFontColor;
+			SetTextColor(MemDC, NowFontColor);
+		}
+	}
+
 
 	// 기본 UI 세팅 함수
 	void CMonitorGraphUnit::UISet()

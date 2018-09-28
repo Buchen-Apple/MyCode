@@ -41,8 +41,9 @@ namespace Library_Jingyu
 			int m_iGreenColor;
 			int m_iBlueColor;
 
-			int m_iGraphMaxValue;
-			int m_iAlarmValue;
+			int m_iGraphMaxValue;			
+			int m_iAlarmValue;	
+			int m_iMinAlarmValue;
 		
 			int m_iServerNo[4];			
 			TCHAR m_tcColumText[4][20];
@@ -52,10 +53,10 @@ namespace Library_Jingyu
 		// 화면에 출력할 데이터 보관 구조체
 		struct stLastData
 		{
+			bool m_bFirstCheck;		// 최초로 데이터를 한 번이라도 받은적 있는지 체크. 받은 적 있으면 true
 			int m_ZeroCount = 0;	// 데이터를 못받으면 0을 찍는데, 이걸 몇번했는지 체크.
 			BYTE m_ServerNo = 0;
-			int m_Value = -1;
-			
+			int m_Value = -1;			
 		};
 
 		// 일감 구조체
