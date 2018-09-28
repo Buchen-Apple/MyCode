@@ -237,7 +237,7 @@ namespace Library_Jingyu
 						DataIndex + 1 == dfMONITOR_DATA_TYPE_MASTER_SERVER_ON ||
 						DataIndex + 1 == dfMONITOR_DATA_TYPE_CHAT_SERVER_ON)
 					{
-						// 증가 후, 값이 5가 되었다면, 5번동안 On 메시지가 안온것.
+						// 증가 후, 값이 3이 되었다면, 3번동안 On 메시지가 안온것.
 						// 이 때는 정말 서버가 꺼져있다고 판단한 후, 0을 넣는다. (서버 Off)
 						if (m_LastData[DataIndex].m_ZeroCount >= 3)
 							Value = 0;

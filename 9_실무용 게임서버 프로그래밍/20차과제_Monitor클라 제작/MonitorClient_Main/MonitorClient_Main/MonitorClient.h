@@ -105,7 +105,7 @@ namespace Library_Jingyu
 		stLastData m_LastData[dfMONITOR_DATA_TYPE_END - 1];
 
 		// Config ตฅภฬลอ
-		stInfo m_stConfig;
+		stInfo m_stConfig;		
 
 	public:
 		// -----------------------
