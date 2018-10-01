@@ -472,11 +472,11 @@ namespace Library_Jingyu
 		return 0;
 	}
 
-	// 일감 추가 스레드
+	// 일감 스레드
 	//
-	// 유저 하트비트 체크 후, 끊어야 할 시 일감 만들어서 일감큐에 넣기.
+	// 유저 하트비트 체크, 토큰 삭제 체크
 	// 토큰 자료구조 일정시간마다 비우기
-	UINT	WINAPI	CChatServer::JobAddThread(LPVOID lParam)
+	UINT	WINAPI	CChatServer::JobThread(LPVOID lParam)
 	{
 		CChatServer* g_this = (CChatServer*)lParam;
 
@@ -485,8 +485,8 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			// 대기
-			DWORD Check = WaitForSingleObject(hEvent, 1000);
+			// 대기 (10초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 10000);
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
@@ -1160,143 +1160,127 @@ namespace Library_Jingyu
 	void  CChatServer::ShowPrintf()
 	{
 		// 해당 프로세스의 사용량 체크할 클래스
-		CCpuUsage_Process ProcessUsage;
+		static CCpuUsage_Process ProcessUsage;
 
-		while (1)
-		{
-			Sleep(1000);
+		// 화면 출력할 것 셋팅
+		/*
+		MonitorConnect : %d, LoginConnect : %d	- 모니터링 서버에 접속 여부, 로그인 서버에 접속 여부. 1이면 접속함.
+		SessionNum : 	- NetServer 의 세션수
+		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
 
-			//if (_kbhit())
-			//{
-			//	int Key = _getch();
+		UpdateMessage_Pool :	- UpdateThread 용 구조체 할당량 (일감)
+		UpdateMessage_Queue : 	- UpdateThread 큐 남은 개수
 
-			//	// q를 누르면 채팅서버 종료
-			//	if (Key == 'Q' || Key == 'q')
-			//	{
-			//		ChatS.ServerStop();
-			//		break;
-			//	}
+		PlayerData_Pool :	- Player 구조체 할당량
+		Player Count : 		- Contents 파트 Player 개수
 
-			//}
+		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+		Accept TPS :		- Accept 처리 횟수
+		Update TPS :		- Update 처리 초당 횟수
+		Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
 
+		SecotrPosError :	- 섹터 위치 에러
+		SectorAccountError : - 섹터 패킷의 AccountNo 에러
+		ChatAccountError :	- 채팅 패킷의 AccountNo 에러
+		TypeError :			- 페이로드의 메시지 타입 에러
+		HeadCodeError :		- (네트워크) 헤더 코드 에러
+		CheckSumError :		- (네트워크) 체크썸 에러
+		HeaderLenBig :		- (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
 
-			// 화면 출력할 것 셋팅
-			/*
-			SessionNum : 	- NetServer 의 세션수
-			PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		Chat_MessageChunkAlloc_Count : - 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		Chat_MessageChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
-			UpdateMessage_Pool :	- UpdateThread 용 구조체 할당량 (일감)
-			UpdateMessage_Queue : 	- UpdateThread 큐 남은 개수
+		TokenMiss : 		- 토큰키가 다른 유저가 채팅서버로 들어옴
+		TokenNotFound : 	- 토큰키를 찾지 못함
 
-			PlayerData_Pool :	- Player 구조체 할당량
-			Player Count : 		- Contents 파트 Player 개수
+		----------------------------------------------------
+		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
 
-			Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
-			Accept TPS :		- Accept 처리 횟수
-			Update TPS :		- Update 처리 초당 횟수
-			Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+		Token_umap_Count - 토큰 umap 안의 카운트
+		Token_UseNode_Count - 토큰 TLS의 사용 중인 Node 카운트
 
-			SecotrPosError :	- 섹터 위치 에러
-			SectorAccountError : - 섹터 패킷의 AccountNo 에러
-			ChatAccountError :	- 채팅 패킷의 AccountNo 에러
-			TypeError :			- 페이로드의 메시지 타입 에러
-			HeadCodeError :		- (네트워크) 헤더 코드 에러
-			CheckSumError :		- (네트워크) 체크썸 에러
-			HeaderLenBig :		- (네트워크) 헤더의 Len사이즈가 비정상적으로 큼.
+		Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		Token_ChunkAlloc_Count : - 토큰 TLS의 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
-			Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-			Chat_MessageChunkAlloc_Count : - 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-			Chat_MessageChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		----------------------------------------------------
+		CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
 
-			TokenMiss : 		- 토큰키가 다른 유저가 채팅서버로 들어옴
-			TokenNotFound : 	- 토큰키를 찾지 못함
+		*/
 
-			----------------------------------------------------
-			PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
+		LONG AccpetTPS = g_lAcceptTPS;
+		LONG UpdateTPS = g_lUpdateTPS;
+		LONG SendTPS = g_lSendPostTPS;
+		InterlockedExchange(&g_lUpdateTPS, 0);
+		InterlockedExchange(&g_lAcceptTPS, 0);
+		InterlockedExchange(&g_lSendPostTPS, 0);
 
-			Token_umap_Count - 토큰 umap 안의 카운트
-			Token_UseNode_Count - 토큰 TLS의 사용 중인 Node 카운트
+		// 출력 전에, 프로세스 사용량 갱신
+		ProcessUsage.UpdateCpuTime();
 
-			Lan_BuffChunkAlloc_Count : - Lan 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-			Token_ChunkAlloc_Count : - 토큰 TLS의 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		printf("========================================================\n"
+			"MonitorConnect : %d, LoginConnect : %d\n"
+			"SessionNum : %lld\n"
+			"PacketPool_Net : %d\n\n"
 
-			----------------------------------------------------
-			CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
+			"UpdateMessage_Pool : %d\n"
+			"UpdateMessage_Queue : %d\n\n"
 
-			*/
+			"PlayerData_Pool : %d\n"
+			"Player Count : %lld\n\n"
 
-			LONG AccpetTPS = g_lAcceptTPS;
-			LONG UpdateTPS = g_lUpdateTPS;
-			LONG SendTPS = g_lSendPostTPS;
-			InterlockedExchange(&g_lUpdateTPS, 0);
-			InterlockedExchange(&g_lAcceptTPS, 0);
-			InterlockedExchange(&g_lSendPostTPS, 0);
+			"Accept Total : %lld\n"
+			"Accept TPS : %d\n"
+			"Update TPS : %d\n"
+			"Send TPS : %d\n\n"
 
-			// 출력 전에, 프로세스 사용량 갱신
-			ProcessUsage.UpdateCpuTime();
+			"SecotrPosError : %d\n"
+			"SectorAccountError : %d\n"
+			"ChatAccountError : %d\n"
+			"TypeError : %d\n"
+			"HeadCodeError : %d\n"
+			"CheckSumError : %d\n"
+			"HeaderLenBig : %d\n\n"
 
-			printf("========================================================\n"
-				"SessionNum : %lld\n"
-				"PacketPool_Net : %d\n\n"
+			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
+			"Chat_MessageChunkAlloc_Count : %d (Out : %d)\n"
+			"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
 
-				"UpdateMessage_Pool : %d\n"
-				"UpdateMessage_Queue : %d\n\n"
+			"TokenMiss : %d\n"
+			"TokenNotFound : %d\n\n"
 
-				"PlayerData_Pool : %d\n"
-				"Player Count : %lld\n\n"
+			"------------------------------------------------\n"
+			"PacketPool_Lan : %d\n\n"
 
-				"Accept Total : %lld\n"
-				"Accept TPS : %d\n"
-				"Update TPS : %d\n"
-				"Send TPS : %d\n\n"
+			"Token_umap_Count : %lld\n"
+			"Token_UseNode_Count : %d\n\n"
 
-				"SecotrPosError : %d\n"
-				"SectorAccountError : %d\n"
-				"ChatAccountError : %d\n"
-				"TypeError : %d\n"
-				"HeadCodeError : %d\n"
-				"CheckSumError : %d\n"
-				"HeaderLenBig : %d\n\n"
+			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n"
+			"Token_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
-				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
-				"Chat_MessageChunkAlloc_Count : %d (Out : %d)\n"
-				"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
+			"========================================================\n\n"
+			"CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
 
-				"TokenMiss : %d\n"
-				"TokenNotFound : %d\n\n"
+			// ----------- 채팅 서버용
+			m_Monitor_LanClient->GetClinetState(), m_Logn_LanClient->GetClinetState(),
+			GetClientCount(), g_lAllocNodeCount,
+			g_lUpdateStructCount, m_LFQueue->GetInNode(),
+			g_lUpdateStruct_PlayerCount, m_mapPlayer.size(),
+			g_ullAcceptTotal, AccpetTPS, UpdateTPS, SendTPS,
+			m_SectorPosError, m_SectorNoError, m_ChatNoError, m_TypeError, m_HeadCodeError, m_ChackSumError, m_HeaderLenBig,
+			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
+			m_MessagePool->GetAllocChunkCount(), m_MessagePool->GetOutChunkCount(),
+			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
+			g_lTokenMiss, g_lTokenNotFound,
 
-				"------------------------------------------------\n"
-				"PacketPool_Lan : %d\n\n"
+			// ----------- 랜 클라이언트용
+			g_lAllocNodeCount_Lan,
+			m_Logn_LanClient->m_umapTokenCheck.size(), g_lTokenNodeCount,
+			CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
+			m_Logn_LanClient->m_MTokenTLS->GetAllocChunkCount(), m_Logn_LanClient->m_MTokenTLS->GetOutChunkCount(),
 
-				"Token_umap_Count : %lld\n"
-				"Token_UseNode_Count : %d\n\n"
-
-				"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n"
-				"Token_ChunkAlloc_Count : %d (Out : %d)\n\n"
-
-				"========================================================\n\n"
-				"CPU usage [ChatServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
-
-				// ----------- 채팅 서버용
-				GetClientCount(), g_lAllocNodeCount,
-				g_lUpdateStructCount, m_LFQueue->GetInNode(),
-				g_lUpdateStruct_PlayerCount, m_mapPlayer.size(),
-				g_ullAcceptTotal, AccpetTPS, UpdateTPS, SendTPS,
-				m_SectorPosError, m_SectorNoError, m_ChatNoError, m_TypeError, m_HeadCodeError, m_ChackSumError, m_HeaderLenBig,
-				CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
-				m_MessagePool->GetAllocChunkCount(), m_MessagePool->GetOutChunkCount(),
-				m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
-				g_lTokenMiss, g_lTokenNotFound,
-
-				// ----------- 랜 클라이언트용
-				g_lAllocNodeCount_Lan,
-				m_Logn_LanClient->m_umapTokenCheck.size(), g_lTokenNodeCount,
-				CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount(),
-				m_Logn_LanClient->m_MTokenTLS->GetAllocChunkCount(), m_Logn_LanClient->m_MTokenTLS->GetOutChunkCount(),
-
-				// ----------- 프로세스 사용량 
-				ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
-		}
+			// ----------- 프로세스 사용량 
+			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
 		
 	}
 
@@ -1308,7 +1292,7 @@ namespace Library_Jingyu
 	bool CChatServer::ServerStart()
 	{
 		// ------------------- 잡 스레드 생성
-		hJobThraed = (HANDLE)_beginthreadex(NULL, 0, JobAddThread, this, 0, 0);
+		hJobThraed = (HANDLE)_beginthreadex(NULL, 0, JobThread, this, 0, 0);
 
 		// ------------------- 업데이트 스레드 생성
 		hUpdateThraed = (HANDLE)_beginthreadex(NULL, 0, UpdateThread, this, 0, 0);

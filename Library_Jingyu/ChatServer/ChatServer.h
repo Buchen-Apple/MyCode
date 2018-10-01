@@ -406,7 +406,7 @@ namespace Library_Jingyu
 		// 일감 추가 스레드
 		//
 		// 유저 하트비트 등...
-		static UINT	WINAPI	JobAddThread(LPVOID lParam);
+		static UINT	WINAPI	JobThread(LPVOID lParam);
 
 
 	private:

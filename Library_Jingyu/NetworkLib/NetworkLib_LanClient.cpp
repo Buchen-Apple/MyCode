@@ -332,6 +332,9 @@ namespace Library_Jingyu
 			// 클로즈 소켓
 			closesocket(DeleteSession->m_Client_sock);
 
+			// 접속중 아님으로 상태 변경
+			m_bClienetConnect = false;
+
 			// 접속 중 유저 수 감소
 			InterlockedDecrement(&m_ullJoinUserCount);
 

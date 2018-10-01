@@ -1067,11 +1067,9 @@ namespace Library_Jingyu
 		}
 		catch (CException& exc)
 		{
-			char* pExc = exc.GetExceptionText();
-
 			// 로그 찍기 (로그 레벨 : 에러)
 			cMonitorLibLog->LogSave(L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
-				(TCHAR*)pExc);
+				(TCHAR*)exc.GetExceptionText());
 
 			g_MonitorDump->Crash();
 		}
