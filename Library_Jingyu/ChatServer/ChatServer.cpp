@@ -1963,7 +1963,7 @@ namespace Library_Jingyu
 		HANDLE hEvent = g_This->m_hMonitorThreadExitEvent;
 
 		// CPU 사용율 체크 클래스 (채팅서버 소프트웨어)
-		CCpuUsage_Process CProcessorCPU;
+		CCpuUsage_Process CProcessCPU;
 
 		// PDH용 클래스
 		CPDH	CPdh;
@@ -1989,7 +1989,7 @@ namespace Library_Jingyu
 			// 그게 아니라면, 일을 한다.
 
 			// 프로세서 CPU 사용율, PDH 정보 갱신
-			CProcessorCPU.UpdateCpuTime();
+			CProcessCPU.UpdateCpuTime();
 			CPdh.SetInfo();
 
 			// 채팅서버가 On일 경우, 패킷을 보낸다.
@@ -2002,7 +2002,7 @@ namespace Library_Jingyu
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_SERVER_ON, TRUE, TimeStamp);
 
 				// 2. 채팅서버 CPU 사용률 (커널 + 유저)
-				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_CPU, (int)CProcessorCPU.ProcessTotal(), TimeStamp);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_CPU, (int)CProcessCPU.ProcessTotal(), TimeStamp);
 
 				// 3. 채팅서버 메모리 유저 커밋 사용량 (Private) MByte
 				int Data = (int)(CPdh.Get_UserCommit() / 1024 / 1024);

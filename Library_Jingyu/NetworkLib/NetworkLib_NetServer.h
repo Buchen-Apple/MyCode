@@ -19,9 +19,9 @@ namespace Library_Jingyu
 	// 그 중 서버 부분이다.
 	// --------------
 	class CNetServer
-	{
+	{	
 	protected:
-		// enum 전방선언
+		// Error enum 전방선언
 		enum class euError : int
 		{
 			NETWORK_LIB_ERROR__NORMAL = 0,					// 에러 없는 기본 상태
@@ -51,7 +51,7 @@ namespace Library_Jingyu
 			NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR,			// RecvPost에서 Decode 중 체크섬이 다름
 			NETWORK_LIB_ERROR__RECV_LENBIG_ERROR,			// RecvPost에서 헤더 안에 Len이 비정상적으로 큼.
 		};
-
+			
 	private:
 		// ----------------------
 		// private 구조체

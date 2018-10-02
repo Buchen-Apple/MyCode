@@ -1,5 +1,5 @@
-#ifndef __OBJECT_POOL_H__
-#define __OBJECT_POOL_H__
+#ifndef __OBJECT_POOL_NORMAL_H__
+#define __OBJECT_POOL_NORMAL_H__
 
 #include <new.h>
 #include <stdlib.h>
@@ -164,16 +164,6 @@ namespace Library_Jingyu
 				pNode->stpNextBlock = m_pTop;
 				m_pTop = pNode;
 
-				/*
-				if (i == 0)
-					pNode->stpNextBlock = NULL;
-
-				else
-				{
-					pNode->stpNextBlock = m_pTop;
-					m_pTop = pNode;
-				}*/
-
 				pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
 				pMemory += sizeof(st_BLOCK_NODE);
@@ -215,7 +205,7 @@ namespace Library_Jingyu
 		// 내 메모리풀에 있는 노드를 모두 'free()' 한다.
 		while (1)
 		{
-			if (m_pTop == NULL)
+			if (m_pTop == nullptr)
 				break;
 
 			st_BLOCK_NODE* deleteNode = (st_BLOCK_NODE*)m_pTop;
@@ -225,14 +215,16 @@ namespace Library_Jingyu
 			if (m_bPlacementNew == false)
 				deleteNode->stData.~DATA();
 
+			free(deleteNode);
+
 			// m_iBlockNum가 0이라면, 낱개로 Malloc했으니(Alloc시 마다 생성했음. Free()에서는 소멸자만 호출하고, 메모리 해제는 안함.) free한다.
-			if(m_iBlockNum == 0)
-				free(deleteNode);
+			/*if(m_iBlockNum == 0)
+				free(deleteNode);*/
 		}
 
 		//  m_iBlockNum가 0보다 크다면, 한 번에 malloc 한 것이니 한번에 free한다.
-		if (m_iBlockNum > 0)
-			free(m_Memory);
+		/*if (m_iBlockNum > 0)
+			free(m_Memory);*/
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -249,24 +241,39 @@ namespace Library_Jingyu
 		//////////////////////////////////
 		if (m_pTop == NULL)
 		{
-			if (m_iBlockNum > 0)
-				return nullptr;
 
-			else
-			{
-				st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
-				pNode->stpNextBlock = NULL;
-				pNode->stMyCode = MEMORYPOOL_ENDCODE;
+			st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
+			pNode->stpNextBlock = NULL;
+			pNode->stMyCode = MEMORYPOOL_ENDCODE;
 
-				// 플레이스먼트 뉴 사용 여부와 관계 없이, 여기까지 왔는데 m_iBlockNum < 0 이라면, 무조건 새로 생성하는 것.
-				// 플레이스먼트 뉴 호출
-				new (&pNode->stData) DATA();
+			// 플레이스먼트 뉴 사용 여부와 관계 없이, 여기까지 왔는데 m_iBlockNum < 0 이라면, 무조건 새로 생성하는 것.
+			// 플레이스먼트 뉴 호출
+			new (&pNode->stData) DATA();
 
-				m_iAllocCount++;
-				m_iUseCount++;
+			m_iAllocCount++;
+			m_iUseCount++;
 
-				return (DATA*)&pNode->stData;
-			}
+			return &pNode->stData;
+
+
+			//if (m_iBlockNum > 0)
+			//	return nullptr;
+
+			//else
+			//{
+			//	st_BLOCK_NODE* pNode = (st_BLOCK_NODE*)malloc(sizeof(st_BLOCK_NODE));
+			//	pNode->stpNextBlock = NULL;
+			//	pNode->stMyCode = MEMORYPOOL_ENDCODE;
+
+			//	// 플레이스먼트 뉴 사용 여부와 관계 없이, 여기까지 왔는데 m_iBlockNum < 0 이라면, 무조건 새로 생성하는 것.
+			//	// 플레이스먼트 뉴 호출
+			//	new (&pNode->stData) DATA();
+
+			//	m_iAllocCount++;
+			//	m_iUseCount++;
+
+			//	return (DATA*)&pNode->stData;
+			//}
 		}
 
 		//////////////////////////////////
@@ -281,7 +288,7 @@ namespace Library_Jingyu
 
 		m_iUseCount++;
 
-		return (DATA*)&pNode->stData;
+		return &pNode->stData;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -317,4 +324,4 @@ namespace Library_Jingyu
 	}
 }
 
-#endif // !__OBJECT_POOL_H__
+#endif // !__OBJECT_POOL_NORMAL_H__
