@@ -595,6 +595,7 @@ namespace Library_Jingyu
 
 	// 생성자
 	CLan_Monitor_Server::CLan_Monitor_Server()
+		:CLanServer()
 	{
 		// ----------------- DB 정보 보관 구조체에 타입과 서버 이름 셋팅해두기
 		int i = 0;

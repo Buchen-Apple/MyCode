@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "ProtocolBuff_ObjectPool.h"
 
-extern LONG g_lAllocNodeCount_Lan;
+LONG g_lAllocNodeCount_Lan;
 
 namespace Library_Jingyu
 {

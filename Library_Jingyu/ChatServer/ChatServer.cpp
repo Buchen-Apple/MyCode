@@ -13,8 +13,8 @@
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
-LONG g_lAllocNodeCount;
-LONG g_lAllocNodeCount_Lan;
+extern LONG g_lAllocNodeCount;
+extern LONG g_lAllocNodeCount_Lan;
 
 extern ULONGLONG g_ullAcceptTotal;
 extern LONG	  g_lAcceptTPS;
@@ -1870,6 +1870,7 @@ namespace Library_Jingyu
 	// 생성자와 소멸자
 	// -----------------------
 	Chat_MonitorClient::Chat_MonitorClient()
+		:CLanClient()
 	{
 		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
 		//

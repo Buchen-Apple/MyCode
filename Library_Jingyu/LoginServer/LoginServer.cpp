@@ -12,9 +12,9 @@ extern LONG	  g_lAcceptTPS;
 extern LONG	g_lSendPostTPS;
 extern ULONGLONG g_ullAcceptTotal;
 
-LONG g_lAllocNodeCount;
+extern LONG g_lAllocNodeCount;
+extern LONG g_lAllocNodeCount_Lan;
 LONG g_lStruct_PlayerCount;
-LONG g_lAllocNodeCount_Lan;
 
 
 // ----------------------------------
@@ -123,6 +123,7 @@ namespace Library_Jingyu
 
 	// 생성자
 	CLogin_NetServer::CLogin_NetServer()
+		:CNetServer()
 	{
 		// ------------------- 파일에서 필요한 정보 읽어오기
 		if (SetFile(&m_stConfig) == false)
@@ -984,6 +985,7 @@ namespace Library_Jingyu
 
 	// 생성자
 	CLogin_LanServer::CLogin_LanServer()
+		:CLanServer()
 	{
 		// 락 초기화
 		InitializeSRWLock(&srwl);
@@ -1181,6 +1183,7 @@ namespace Library_Jingyu
 	// 생성자와 소멸자
 	// -----------------------
 	CMoniter_Clinet::CMoniter_Clinet()
+		:CLanClient()
 	{
 		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
 		//

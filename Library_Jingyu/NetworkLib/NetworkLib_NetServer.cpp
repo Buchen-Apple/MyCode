@@ -492,12 +492,19 @@ namespace Library_Jingyu
 	// return : 없음
 	void CNetServer::SendPacket(ULONGLONG SessionID, CProtocolBuff_Net* payloadBuff, LONG LastFlag)
 	{
-		// 1. 세션 락 걸기(락 아니지만 락처럼 사용함)
+		// 세션 락 걸기(락 아니지만 락처럼 사용함) ----------------
 		stSession* NowSession = GetSessionLOCK(SessionID);
 		if (NowSession == nullptr)
 		{
 			// 이 때는, 큐에도 넣지 못했기 때문에, 인자로 받은 직렬화버퍼를 Free한다.
 			// ref 카운트가 0이 되면 메모리풀에 반환
+			CProtocolBuff_Net::Free(payloadBuff);
+			return;
+		}
+
+		// 1. m_LastPacket가 nullptr이 아니라면, 보내고 끊을 유저. 큐에 넣지 않는다.
+		if (NowSession->m_LastPacket != nullptr)
+		{
 			CProtocolBuff_Net::Free(payloadBuff);
 			return;
 		}
@@ -520,7 +527,7 @@ namespace Library_Jingyu
 		// 6. SendPost시도
 		SendPost(NowSession);
 
-		// 7. 세션 락 해제(락 아니지만 락처럼 사용)
+		// 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		// 근데 따로 리턴값 받지 않고 있음
 		GetSessionUnLOCK(NowSession);
@@ -650,15 +657,15 @@ namespace Library_Jingyu
 			// 클로즈 소켓
 			closesocket(DeleteSession->m_Client_sock);
 
-			// 미사용 인덱스 스택에 반납
-			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
-
 			// 접속 중 유저 수 감소
 			InterlockedDecrement(&m_ullJoinUserCount);
 
 			// 컨텐츠 쪽에 종료된 유저 알려줌 
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 			OnClientLeave(sessionID);
+
+			// 미사용 인덱스 스택에 반납
+			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);			
 		}
 		
 		return;	

@@ -159,14 +159,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CGameServer.h" />
     <ClInclude Include="NetworkLib_MMOServer.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
+    <ClCompile Include="CGameServer.cpp" />
     <ClCompile Include="MMOServer_Main.cpp" />
     <ClCompile Include="NetworkLib_MMOServer.cpp" />
     <ClCompile Include="pch.cpp">

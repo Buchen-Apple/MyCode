@@ -612,15 +612,15 @@ namespace Library_Jingyu
 			// 클로즈 소켓
 			closesocket(DeleteSession->m_Client_sock);
 
-			// 미사용 인덱스 스택에 반납
-			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
-
 			// 접속 중 유저 수 감소
 			InterlockedDecrement(&m_ullJoinUserCount);
 
 			// 컨텐츠 쪽에 종료된 유저 알려줌 
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 			OnClientLeave(sessionID);
+
+			// 미사용 인덱스 스택에 반납
+			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);			
 		}
 		
 		return;	

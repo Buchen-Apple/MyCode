@@ -6,14 +6,25 @@
 #include "ObjectPool\Object_Pool_LockFreeVersion.h"
 #include "LockFree_Stack\LockFree_Stack.h"
 #include "LockFree_Queue\LockFree_Queue.h"
+#include "RingBuff\RingBuff.h"
+#include "NormalTemplate_Queue\Normal_Queue_Template.h"
 
 // ------------------------
 // MMOServer
 // ------------------------
 namespace Library_Jingyu
 {
+
 	class CMMOServer
 	{
+
+		// 한 번에 샌드할 수 있는 WSABUF의 카운트
+#define dfSENDPOST_MAX_WSABUF			300
+
+		// Max User 카운트. 파일에서 읽어오는것과는 다름.
+		// 이 서버의 진짜 MAX User. 이 이상은 설정도 못함.
+#define MAX_USER						17000
+
 	protected:
 		// enum 전방선언
 		enum class euError : int
@@ -21,8 +32,7 @@ namespace Library_Jingyu
 			NETWORK_LIB_ERROR__NORMAL = 0,					// 에러 없는 기본 상태
 			NETWORK_LIB_ERROR__WINSTARTUP_FAIL,				// 윈속 초기화 하다가 에러남
 			NETWORK_LIB_ERROR__CREATE_IOCP_PORT,			// IPCP 만들다가 에러남
-			NETWORK_LIB_ERROR__W_THREAD_CREATE_FAIL,		// 워커스레드 만들다가 실패 
-			NETWORK_LIB_ERROR__A_THREAD_CREATE_FAIL,		// 엑셉트 스레드 만들다가 실패 
+			NETWORK_LIB_ERROR__THREAD_CREATE_FAIL,		// 워커스레드 만들다가 실패 
 			NETWORK_LIB_ERROR__CREATE_SOCKET_FAIL,			// 소켓 생성 실패 
 			NETWORK_LIB_ERROR__BINDING_FAIL,				// 바인딩 실패
 			NETWORK_LIB_ERROR__LISTEN_FAIL,					// 리슨 실패
@@ -63,7 +73,142 @@ namespace Library_Jingyu
 		// ------------------
 		// 이너 클래스 전방선언
 		// ------------------
-		struct stSession;
+
+		// 세션 클래스
+		class cSession
+		{
+			friend class CMMOServer;
+
+			// -----------
+			// 멤버 변수
+			// -----------
+
+			// Auth To Game Falg
+			// true면 Game모드로 전환될 유저
+			LONG m_lAuthToGameFlag;
+
+			// 유저의 모드 상태
+			euSessionModeState m_euMode;
+
+			// 로그아웃 플래그
+			// true면 로그아웃 될 유저.
+			LONG m_lLogoutFlag;
+
+			// CompleteRecvPacket(Queue)
+			CNormalQueue<CProtocolBuff_Net*>* m_CRPacketQueue;
+
+			// 세션과 연결된 소켓
+			SOCKET m_Client_sock;
+
+			// 해당 세션이 들어있는 배열 인덱스
+			WORD m_lIndex;
+
+			// 연결된 세션의 IP와 Port
+			TCHAR m_IP[30];
+			USHORT m_prot;
+
+			// Send overlapped구조체
+			OVERLAPPED m_overSendOverlapped;
+
+			// 세션 ID. 컨텐츠와 통신 시 사용.
+			ULONGLONG m_ullSessionID;
+
+			// I/O 카운트. WSASend, WSARecv시 1씩 증가.
+			// 0이되면 접속 종료된 유저로 판단.
+			// 사유 : 연결된 유저는 WSARecv를 무조건 걸기 때문에 0이 될 일이 없다.
+			LONG	m_lIOCount;
+
+			// 현재, WSASend에 몇 개의 데이터를 샌드했는가. (바이트 아님! 카운트. 주의!)
+			int m_iWSASendCount;
+
+			// Send한 직렬화 버퍼들 저장할 포인터 변수
+			CProtocolBuff_Net* m_PacketArray[dfSENDPOST_MAX_WSABUF];
+
+			// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
+			LONG	m_lSendFlag;
+
+			// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
+			CLF_Queue<CProtocolBuff_Net*>* m_SendQueue;
+
+			// Recv overlapped구조체
+			OVERLAPPED m_overRecvOverlapped;
+
+			// Recv버퍼. 일반 링버퍼. 
+			CRingBuff m_RecvQueue;
+
+			// 마지막 패킷 저장소
+			void* m_LastPacket = nullptr;
+
+			// 헤더 코드
+			BYTE m_bCode;
+
+			// XOR1 코드
+			BYTE m_bXORCode_1;
+
+			// XOR2 코드
+			BYTE m_bXORCode_2;
+
+		public:
+			// -----------------
+			// 생성자와 소멸자
+			// -----------------
+			cSession();
+			virtual ~cSession();
+
+		protected:
+			// -----------------
+			// 순수 가상함수
+			// -----------------
+
+			// Auth 스레드에서 처리
+			virtual void OnAuth_ClientJoin() = 0;
+			virtual void OnAuth_ClientLeave() = 0;
+			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet) = 0;
+
+			// Game 스레드에서 처리
+			virtual void OnGame_ClientJoin() = 0;
+			virtual void OnGame_ClientLeave() = 0;
+			virtual void OnGame_Packet(CProtocolBuff_Net* Packet) = 0;
+
+			// Release용
+			virtual void OnGame_ClientRelease() = 0;
+
+
+		protected:
+			// -----------------
+			// 네트워크용 기능함수
+			// -----------------
+
+			// 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
+			// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
+			//
+			// Parameter : 없음
+			// return : 없음
+			void Disconnect();
+
+			// 외부에서, 해다 유저에게 어떤 데이터를 보내고 싶을때 호출하는 함수.
+			// SendPacket은 그냥 아무때나 하면 된다.
+			// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
+			//
+			// Parameter : SendBuff, LastFlag(디폴트 FALSE)
+			// return : 없음
+			void SendPacket(CProtocolBuff_Net* payloadBuff, LONG LastFlag = FALSE);
+
+
+			// -----------------
+			// 일반 기능 함수
+			// -----------------
+			// 해당 유저의 모드를 GAME모드로 변경하는 함수
+			// 내부에서는 m_lAuthToGameFlag 변수를 TRUE로 만든다.
+			//
+			// Parameter : 없음
+			// return : 없음
+			void SetMode_GAME();
+
+		};
+
+		// 헤더 구조체
+		struct stProtocolHead;
 
 	private:
 
@@ -96,21 +241,27 @@ namespace Library_Jingyu
 		// 리슨소켓
 		SOCKET m_soListen_sock;
 
-		// 워커, 엑셉트 스레드 핸들 배열
+		// 워커, 엑셉트, 샌드, 어스, 게임 스레드 핸들 배열
 		HANDLE*	m_hAcceptHandle;
 		HANDLE* m_hWorkerHandle;
+		HANDLE* m_hSendHandle;
+		HANDLE* m_hAuthHandle;
+		HANDLE* m_hGameHandle;
 
 		// IOCP 핸들
 		HANDLE m_hIOCPHandle;
 
-		// 워커스레드 수, 엑셉트 스레드 수
+		// 워커스레드 수, 엑셉트 스레드 수, 샌드 스레드 수, 어스 스레드 수, 게임 스레드 수
 		int m_iA_ThreadCount;
 		int m_iW_ThreadCount;
+		int m_iS_ThreadCount;
+		int m_iAuth_ThreadCount;
+		int m_iGame_ThreadCount;
 
 
 		// ----- 세션 관리용 -------
 		// 세션 관리 배열
-		stSession* m_stSessionArray;
+		cSession* m_stSessionArray[MAX_USER];
 
 		// 미사용 인덱스 관리 스택
 		CLF_Stack<WORD>* m_stEmptyIndexStack;
@@ -129,6 +280,11 @@ namespace Library_Jingyu
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
 
+		// Auth, Game, Send 스레드 종료 이벤트
+		HANDLE m_hAuthExitEvent;
+		HANDLE m_hGameExitEvent;
+		HANDLE m_hSendExitEvent;
+
 
 	public:
 		// -----------------------
@@ -137,6 +293,17 @@ namespace Library_Jingyu
 		CMMOServer();
 		virtual ~CMMOServer();
 
+	public:
+		// -----------------------
+		// 외부에서 사용 가능한 함수
+		// -----------------------
+
+		// 서버 작동중인지 확인
+		//
+		// Parameter : 없음
+		// return : 작동중일 시 true.
+		bool GetServerState();
+
 
 	private:
 		// -----------------------
@@ -144,23 +311,36 @@ namespace Library_Jingyu
 		// -----------------------
 
 		// Start에서 에러가 날 시 호출하는 함수.
-		// 1. 입출력 완료포트 핸들 반환
-		// 2. 워커스레드 종료, 핸들반환, 핸들 배열 동적해제
-		// 3. 엑셉트 스레드 종료, 핸들 반환
-		// 4. 리슨소켓 닫기
-		// 5. 윈속 해제
+		//
+		// Parameter : 워커스레드의 수
+		// return : 없음
 		void ExitFunc(int w_ThreadCount);
 
 		// 각종 변수들을 리셋시킨다.
 		// Stop() 함수에서 사용.
 		void Reset();
 
+		// 내부에서 실제로 유저를 끊는 함수.
+		//
+		// Parameter : 끊을 세션 포인터
+		// return : 없음
+		void InDisconnect(cSession* DeleteSession);
+
+		// RecvProc 함수.
+		// 완성된 패킷을 인자로받은 Session의 CompletionRecvPacekt (Queue)에 넣는다.
+		//
+		// Parameter : 세션 포인터
+		// return : 없음
+		void RecvProc(cSession* NowSession);
+
 		// RecvPost함수
 		//
 		// return 0 : 성공적으로 WSARecv() 완료
 		// return 1 : RecvQ가 꽉찬 유저
 		// return 2 : I/O 카운트가 0이되어 삭제된 유저
-		int RecvPost(stSession* NowSession);
+		int RecvPost(cSession* NowSession);	
+
+
 
 
 	private:
@@ -180,22 +360,13 @@ namespace Library_Jingyu
 		// Game 스레드
 		static UINT	WINAPI	GameThread(LPVOID lParam);
 
-	public:
-		// -----------------------
-		// 외부에서 사용 가능한 함수
-		// -----------------------
-
-		// 세션 셋팅
-		//
-		// Parameter : stSession* 포인터, Max 수(최대 접속 가능 유저 수)
-		// return : 없음
-		void SetSession(stSession* pSession, int Max);
-
+		// Send 스레드
+		static UINT WINAPI	SendThread(LPVOID lParam);
 
 
 	protected:
 		// -----------------------
-		// 상속에서만 호출 가능한 함수
+		// 상속 관계에서만 호출 가능한 함수
 		// -----------------------
 
 		// 서버 시작
@@ -209,52 +380,59 @@ namespace Library_Jingyu
 		// 서버 스탑.
 		void Stop();
 
-		public:
-			// -----------------------
-			// 순수 가상함수
-			// -----------------------
+		// 세션 셋팅
+		//
+		// Parameter : cSession* 포인터, Max 수(최대 접속 가능 유저 수), HeadCode, XORCode1, XORCode2
+		// return : 없음
+		void SetSession(cSession* pSession, int Max, BYTE HeadCode, BYTE XORCode1, BYTE XORCode2);
 
-			// AuthThread에서 1Loop마다 1회 호출.
-			// 1루프마다 정기적으로 처리해야 하는 일을 한다.
-			// 
-			// parameter : 없음
-			// return : 없음
-			virtual void OnAuth_Update() = 0;
 
-			// GameThread에서 1Loop마다 1회 호출.
-			// 1루프마다 정기적으로 처리해야 하는 일을 한다.
-			// 
-			// parameter : 없음
-			// return : 없음
-			virtual void OnGame_Update() = 0;			
+	private:
+		// -----------------------
+		// 순수 가상함수
+		// -----------------------
 
-			// 새로운 유저 접속 시, Auth에서 호출된다.
-			//
-			// parameter : 접속한 유저의 IP, Port
-			// return false : 클라이언트 접속 거부
-			// return true : 접속 허용
-			virtual bool OnConnectionRequest(TCHAR* IP, USHORT port) = 0;			
+		// AuthThread에서 1Loop마다 1회 호출.
+		// 1루프마다 정기적으로 처리해야 하는 일을 한다.
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnAuth_Update() = 0;
 
-			// 워커 스레드가 깨어날 시 호출되는 함수.
-			// GQCS 바로 하단에서 호출
-			// 
-			// parameter : 없음
-			// return : 없음
-			virtual void OnWorkerThreadBegin() = 0;
+		// GameThread에서 1Loop마다 1회 호출.
+		// 1루프마다 정기적으로 처리해야 하는 일을 한다.
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnGame_Update() = 0;
 
-			// 워커 스레드가 잠들기 전 호출되는 함수
-			// GQCS 바로 위에서 호출
-			// 
-			// parameter : 없음
-			// return : 없음
-			virtual void OnWorkerThreadEnd() = 0;
+		// 새로운 유저 접속 시, Auth에서 호출된다.
+		//
+		// parameter : 접속한 유저의 IP, Port
+		// return false : 클라이언트 접속 거부
+		// return true : 접속 허용
+		virtual bool OnConnectionRequest(TCHAR* IP, USHORT port) = 0;
 
-			// 에러 발생 시 호출되는 함수.
-			//
-			// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
-			//			 : 에러 코드에 대한 스트링
-			// return : 없음
-			virtual void OnError(int error, const TCHAR* errorStr) = 0;
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadBegin() = 0;
+
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadEnd() = 0;
+
+		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
+		virtual void OnError(int error, const TCHAR* errorStr) = 0;
 
 	
 
