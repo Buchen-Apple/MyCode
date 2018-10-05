@@ -91,6 +91,22 @@ namespace Library_Jingyu
 		m_lAuthToGameFlag = TRUE;
 	}
 
+
+	// Auth 스레드에서 처리
+	void CMMOServer::cSession::OnAuth_ClientJoin() {}
+	void CMMOServer::cSession::OnAuth_ClientLeave() {}
+	void CMMOServer::cSession::OnAuth_Packet(CProtocolBuff_Net* Packet) {}
+
+	// Game 스레드에서 처리
+	void CMMOServer::cSession::OnGame_ClientJoin() {}
+	void CMMOServer::cSession::OnGame_ClientLeave() {}
+	void CMMOServer::cSession::OnGame_Packet(CProtocolBuff_Net* Packet) {}
+
+	// Release용
+	void CMMOServer::cSession::OnGame_ClientRelease() {}
+
+
+
 }
 
 
@@ -111,10 +127,8 @@ namespace Library_Jingyu
 
 	// 헤더 사이즈
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER	5
-
-
-
-		// 헤더 구조체
+	   
+	// 헤더 구조체
 #pragma pack(push, 1)
 	struct CMMOServer::stProtocolHead
 	{
@@ -328,17 +342,8 @@ namespace Library_Jingyu
 		// 리시브 큐 초기화
 		DeleteSession->m_RecvQueue.ClearBuffer();
 
-		// SendFlag 초기화
-		DeleteSession->m_lSendFlag = FALSE;		
-
 		// 모드 초기화
-		DeleteSession->m_euMode = euSessionModeState::MODE_NONE;
-
-		// 로그아웃 Flag 초기화
-		DeleteSession->m_lLogoutFlag = FALSE;
-
-		// Auth TO Game Flag 초기화
-		DeleteSession->m_lAuthToGameFlag = FALSE;		
+		DeleteSession->m_euMode = euSessionModeState::MODE_NONE;		
 
 		// 접속 중 유저 수 감소
 		InterlockedDecrement(&m_ullJoinUserCount);
@@ -809,10 +814,11 @@ namespace Library_Jingyu
 
 
 			// ------------------
-			// IP와 포트 알아오기.
+			// 일감에 정보 세싵ㅇ
 			// ------------------
 			InetNtop(AF_INET, &clientaddr.sin_addr, NowWork->m_tcIP, 30);
 			NowWork->m_usPort = ntohs(clientaddr.sin_port);	
+			NowWork->m_clienet_Socket = client_sock;
 
 
 			// Auth에게 전달
@@ -832,20 +838,28 @@ namespace Library_Jingyu
 		ULONGLONG ullUniqueSessionID = 0;
 
 		// 인덱스 보관 변수
-		WORD wIndex;		
+		WORD wIndex;	
 
-		// AUTH모드에서 한 번에 처리하는 패킷의 수. 
-		const int PACKET_WORK_COUNT = 1;
+		// --------- 필요한 정보들 로컬로 받아두기
+
+		// AUTH모드에서 1명의 유저에게, 1프레임에 처리하는 패킷의 최대 수. 
+		const int PACKET_WORK_COUNT = (int)CMMOServer::euDEFINE::eu_AUTH_PACKET_COUNT;
 
 		// 최대 접속 가능 유저, 로컬로 받아두기
-		int iMaxUser = g_This->m_iMaxJoinUser;
+		const int MAX_USER = g_This->m_iMaxJoinUser;
+
+		// Sleep 인자로 받아두기
+		const int SLEEP_VALUE = (int)CMMOServer::euDEFINE::eu_AUTH_SLEEP;
+
+		// 1프레임에 처리하는 Accept Socket Queue의 수
+		const int NEWUSER_PACKET_COUNT = (int)CMMOServer::euDEFINE::eu_AUTH_NEWUSER_PACKET_COUNT;
 
 		while (1)
 		{
 			// ------------------
-			// 1미리 세컨드마다 1회씩 일어난다.
+			// iSleepValuea 만큼 자다가 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(g_This->m_hAuthExitEvent, 1);
+			DWORD Ret = WaitForSingleObject(g_This->m_hAuthExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -864,20 +878,24 @@ namespace Library_Jingyu
 			// ------------------
 			// Part 1. 신규 접속자 패킷 처리
 			// ------------------
-			int Size = g_This->m_pASQ->GetInNode();
+			int iSize = g_This->m_pASQ->GetInNode();
 
-			int i = 0;
+			// 사이즈가 NEWUSER_PACKET_COUNT보다 크다면 NEWUSER_PACKET_COUNT로 만든다.
+			if (iSize > NEWUSER_PACKET_COUNT)
+				iSize = NEWUSER_PACKET_COUNT;
+
 			stAuthWork* NowWork;
 
 			// 일감큐에 일이 있을때만 일을 한다.
-			while (i < Size)
+			// 하나 처리할 때 마다 iSize를 1씩 차감시킨다.
+			while (iSize > 0)
 			{				
 				// 1. 일감 디큐
 				if (g_This->m_pASQ->Dequeue(NowWork) == -1)
 					cMMOServer_Dump->Crash();				
 
 				// 2. 최대 접속자 수 이상 접속 불가
-				if (iMaxUser <= g_This->m_ullJoinUserCount)
+				if (MAX_USER <= g_This->m_ullJoinUserCount)
 				{
 					closesocket(NowWork->m_clienet_Socket);
 
@@ -936,6 +954,15 @@ namespace Library_Jingyu
 				StringCchCopy(g_This->m_stSessionArray[wIndex]->m_IP, _MyCountof(g_This->m_stSessionArray[wIndex]->m_IP), NowWork->m_tcIP);
 				g_This->m_stSessionArray[wIndex]->m_prot = NowWork->m_usPort;
 
+				// -- SendFlag 초기화
+				g_This->m_stSessionArray[wIndex]->m_lSendFlag = FALSE;
+
+				// -- 로그아웃 Flag 초기화
+				g_This->m_stSessionArray[wIndex]->m_lLogoutFlag = FALSE;
+
+				// -- Auth TO Game Flag 초기화
+				g_This->m_stSessionArray[wIndex]->m_lAuthToGameFlag = FALSE;
+
 				// 4) 셋팅이 모두 끝났으면 Auth 상태로 변경
 				g_This->m_stSessionArray[wIndex]->m_euMode = euSessionModeState::MODE_AUTH;
 
@@ -985,33 +1012,42 @@ namespace Library_Jingyu
 				else if (ret == 1)
 					shutdown(g_This->m_stSessionArray[wIndex]->m_Client_sock, SD_BOTH);
 
-				++i;
+
+				--iSize;
 			}
 
 
 
 			// ------------------
-			// Part 2. AUTH모드 세션들 패킷 처리 + Logout Flag 처리 1차
+			// Part 2. AUTH모드 세션들 패킷 처리 + Logout Flag 처리
 			// ------------------
-			i = 0;
-			while (i < iMaxUser)
-			{
-				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_AUTH)
-				{
+			int iIndex = MAX_USER - 1;
 
-					// LogOutFlag가 TRUE라면 
-					if (g_This->m_stSessionArray[i]->m_lLogoutFlag = TRUE)
+			// While문 한번에 iIndex 1 차감.
+			// 배열의 가장 뒤부터 처리한다. (ex. 최대 유저 수가 17000이면, 16999번째 배열부터 시작)
+			while (iIndex > 0)
+			{
+				cSession* NowSession = g_This->m_stSessionArray[iIndex];
+
+				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
+				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH)
+				{
+					// LogOutFlag가 TRUE이고, SendFlag가 FALSE라면
+					if (NowSession->m_lLogoutFlag == TRUE && NowSession->m_lSendFlag == FALSE)
 					{
-						// 모드를 MODE_LOGOUT_IN_AUTH로 변경
-						g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_LOGOUT_IN_AUTH;
+						// 나갔다고 알려준다.
+						// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
+						NowSession->OnAuth_ClientLeave();
+
+						// MODE_WAIT_LOGOUT으로 모드 변경
+						NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;					
 					}
 
 					// LogOutFlag가 FALSE인 유저만 정상 로직 처리
 					else
 					{
 						// 1. CompleteRecvPacket 큐의 사이즈 확인.
-						int iQSize = g_This->m_stSessionArray[i]->m_CRPacketQueue->GetNodeSize();
+						int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
 
 						// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
 						if (iQSize > 0)
@@ -1022,28 +1058,27 @@ namespace Library_Jingyu
 
 							CProtocolBuff_Net* NowPacket;
 
-							int TempCount = 0;
-							while (TempCount < iQSize)
+							while (iQSize > 0)
 							{
 								// 노드 빼기
-								if (g_This->m_stSessionArray[i]->m_CRPacketQueue->Dequeue(NowPacket) == -1)
+								if (NowSession->m_CRPacketQueue->Dequeue(NowPacket) == -1)
 									cMMOServer_Dump->Crash();
 
 								// 패킷 처리
-								g_This->m_stSessionArray[i]->OnAuth_Packet(NowPacket);
+								NowSession->OnAuth_Packet(NowPacket);
 
 								// 패킷 래퍼런스 카운트 1 감소
 								CProtocolBuff_Net::Free(NowPacket);
 
-								// 반복문 카운트 증가.
-								TempCount++;
+								// 패킷 1개 처리했으니 남은 수 감소.
+								--iQSize;
 							}
 						}
 					}
 				}				
 				
 
-				++i;
+				--iIndex;
 			}
 
 
@@ -1056,40 +1091,30 @@ namespace Library_Jingyu
 
 
 			// ------------------
-			// Part 4. Logout Flag 처리 2차 + AUTH에서 GAME으로 모드 전환
+			// Part 4. AUTH에서 GAME으로 모드 전환
 			// ------------------
-			i = 0;
-			while (i < iMaxUser)
+			iIndex = MAX_USER - 1;
+			while (iIndex > 0)
 			{
-				// 해당 유저가 MODE_LOGOUT_IN_AUTH인지 확인 ---------------------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_LOGOUT_IN_AUTH)
+				cSession* NowSession = g_This->m_stSessionArray[iIndex];
+
+				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
+				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH)
 				{
-					// SendFlag가 FALSE인지 확인
-					if (InterlockedOr(&g_This->m_stSessionArray[i]->m_lSendFlag, 0) == FALSE)
-					{
-						// 나갔다고 알려준다.
-						// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
-						g_This->m_stSessionArray[i]->OnAuth_ClientLeave();
-
-						// MODE_WAIT_LOGOUT으로 모드 변경
-						g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
-					}
-
-					// 혹은 Auth TO Game 플래그 확인
+					// Auth TO Game 플래그 확인
 					// AUTH에서 GAME으로 모드 전환
-					else if (g_This->m_stSessionArray[i]->m_lAuthToGameFlag == TRUE)
+					if (NowSession->m_lAuthToGameFlag == TRUE)
 					{
 						// 나갔다고 알려준다.
 						// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
-						g_This->m_stSessionArray[i]->OnAuth_ClientLeave();
+						NowSession->OnAuth_ClientLeave();
 
 						// MODE_AUTH_TO_GAME으로 모드 변경
-						g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
-
+						NowSession->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
 					}
 				}
 
-				++i;
+				--iIndex;
 			}		
 					   	
 		}
@@ -1102,18 +1127,26 @@ namespace Library_Jingyu
 	{
 		CMMOServer* g_This = (CMMOServer*)lParam;
 
-		// GAME모드에서 한 번에 처리하는 패킷의 수. 
-		const int PACKET_WORK_COUNT = 1;
+		// ------- 필요한 정보들 인자로 받아두기 -------
+
+		// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+		const int PACKET_WORK_COUNT = (int)CMMOServer::euDEFINE::eu_GAME_PACKET_COUNT;
 
 		// 최대 접속 가능 유저, 로컬로 받아두기
-		int iMaxUser = g_This->m_iMaxJoinUser;
+		int MAX_USER = g_This->m_iMaxJoinUser;
+
+		// Sleep 인자로 받아두기
+		const int SLEEP_VALUE = (int)CMMOServer::euDEFINE::eu_GAME_SLEEP;
+
+		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경될 수 있는 유저 수
+		const int NEWUSER_PACKET_COUNT = (int)CMMOServer::euDEFINE::eu_GAME_NEWUSER_JOIN_COUNT;
 
 		while (1)
 		{
 			// ------------------
-			// 1미리 세컨드마다 1회씩 일어난다.
+			// SLEEP_VALUE만큼 자다가 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(g_This->m_hGameExitEvent, 1);
+			DWORD Ret = WaitForSingleObject(g_This->m_hGameExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -1131,44 +1164,59 @@ namespace Library_Jingyu
 			// ------------------
 			// Part 1. Game 모드로 전환
 			// ------------------
-			int i = 0;
-			while (i < iMaxUser)
+			int iIndex = MAX_USER - 1;
+			int iModeChangeCount = NEWUSER_PACKET_COUNT;			
+			while (iIndex > 0)
 			{
+				cSession* NowSession = g_This->m_stSessionArray[iIndex];
+
 				// 유저가 MODE_AUTH_TO_GAME 모드인지 확인 -----------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_AUTH_TO_GAME)
+				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH_TO_GAME)
 				{
 					// 맞다면, OnGame_ClientJoint 호출
-					g_This->m_stSessionArray[i]->OnGame_ClientJoin();
+					NowSession->OnGame_ClientJoin();
 
 					// 모드 변경
-					g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_GAME;
+					NowSession->m_euMode = euSessionModeState::MODE_GAME;
+
+					// 모드 체인지 유저 수가 0이 되면 이번 프레임에 모드전환은 종료.
+					// 여기서 너무 정체되면 다른 로직까지 문제가 갈 가능성
+					--iModeChangeCount;
+					if (iModeChangeCount == 0)
+						break;
 				}
 
-				++i;
+				--iIndex;
 			}
 
 
+
 			// ------------------
-			// Part 2. Game 모드 세션들 패킷 처리 + Logout Flag 처리 1차
+			// Part 2. Game 모드 세션들 패킷 처리 + Logout Flag 처리
 			// ------------------
-			i = 0;
-			while (i < iMaxUser)
+			iIndex = MAX_USER - 1;
+			while (iIndex > 0)
 			{
+				cSession* NowSession = g_This->m_stSessionArray[iIndex];
+
 				// 유저가 MODE_GAME 모드인지 확인 -----------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_GAME)
+				if (NowSession->m_euMode == euSessionModeState::MODE_GAME)
 				{
-					// LogOutFlag가 TRUE라면 
-					if (g_This->m_stSessionArray[i]->m_lLogoutFlag = TRUE)
+					// LogOutFlag가 TRUE이고, SendFlag가 FALSE라면
+					if (NowSession->m_lLogoutFlag == TRUE && NowSession->m_lSendFlag == FALSE)
 					{
-						// 모드를 MODE_LOGOUT_IN_GAME로 변경
-						g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_LOGOUT_IN_GAME;
+						// Game모드에서 나갔음을 알려준다.
+						NowSession->OnGame_ClientLeave();
+
+						// 맞다면, MODE_WAIT_LOGOUT으로 모드 변경
+						NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
 					}
 
 					// LogOutFlag가 FALSE인 유저만 정상 로직 처리
 					else
 					{
 						// 1. CompleteRecvPacket 큐의 사이즈 확인.
-						int iQSize = g_This->m_stSessionArray[i]->m_CRPacketQueue->GetNodeSize();
+						int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
 
 						// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
 						if (iQSize > 0)
@@ -1179,79 +1227,54 @@ namespace Library_Jingyu
 
 							CProtocolBuff_Net* NowPacket;
 
-							int TempCount = 0;
-							while (TempCount < iQSize)
+							while (iQSize > 0)
 							{
 								// 노드 빼기
-								if (g_This->m_stSessionArray[i]->m_CRPacketQueue->Dequeue(NowPacket) == -1)
+								if (NowSession->m_CRPacketQueue->Dequeue(NowPacket) == -1)
 									cMMOServer_Dump->Crash();								
 
 								// 패킷 처리
-								g_This->m_stSessionArray[i]->OnGame_Packet(NowPacket);
+								NowSession->OnGame_Packet(NowPacket);
 
 								// 패킷 래퍼런스 카운트 1 감소
 								CProtocolBuff_Net::Free(NowPacket);
 
-								// 반복문 카운트 증가.
-								TempCount++;
+								// 패킷 1개 처리했으니 남은 수 감소.
+								--iQSize;
 							}
 						}
 					}
 					
 				}
 
-				++i;
+				--iIndex;
 			}
-
-
+			
 
 			// ------------------
 			// Part 3. Game 모드의 업데이트 처리
 			// ------------------
-			g_This->OnGame_Update();
+			g_This->OnGame_Update();			
 
 
 			// ------------------
-			// Part 4. Logout Flag 처리 2차
+			// Part 4. Release 절차
 			// ------------------
-			i = 0;
-			while (i < iMaxUser)
+			iIndex = MAX_USER - 1;
+			while (iIndex > 0)
 			{
-				// 유저가 MODE_LOGOUT_IN_GAME 모드인지 확인 -----------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_LOGOUT_IN_GAME)
-				{
-					// SendFlag가 FALSE인지 확인
-					if (InterlockedOr(&g_This->m_stSessionArray[i]->m_lSendFlag, 0) == FALSE)
-					{
-						// Game모드에서 나갔음을 알려준다.
-						g_This->m_stSessionArray[i]->OnGame_ClientLeave();
+				cSession* NowSession = g_This->m_stSessionArray[iIndex];
 
-						// 맞다면, MODE_WAIT_LOGOUT으로 모드 변경
-						g_This->m_stSessionArray[i]->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
-					}
-
-				}
-
-				++i;
-			}
-
-
-			// ------------------
-			// Part 5. Release 절차
-			// ------------------
-			i = 0;
-			while (i < iMaxUser)
-			{
 				// 유저가 MODE_WAIT_LOGOUT 모드인지 확인 -----------------
-				if (g_This->m_stSessionArray[i]->m_euMode == euSessionModeState::MODE_WAIT_LOGOUT)
+				if (NowSession->m_euMode == euSessionModeState::MODE_WAIT_LOGOUT)
 				{	
 					// Release
 					// 내부에서 OnGame_ClientRelease 호출
-					g_This->InDisconnect(&(*g_This->m_stSessionArray[i]));
+					g_This->InDisconnect(NowSession);
 					
 				}
 
-				++i;
+				--iIndex;
 			}
 		}
 
@@ -1298,11 +1321,16 @@ namespace Library_Jingyu
 				// ------------------
 				// SendFlag(1번인자)를 TRUE(2번인자)로 변경.
 				// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
-				if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+				/*if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
 				{
 					++iArrayIndex;
 					continue;
-				}
+				}*/
+
+				// SendFlag가 FALSE면 TRUE로 바꾼다.
+				if (NowSession->m_lSendFlag == FALSE)
+					NowSession->m_lSendFlag = TRUE;
+
 
 				// ------------------
 				// 유저의 모드 확인
@@ -1375,7 +1403,12 @@ namespace Library_Jingyu
 						if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 						{
 							// 로그아웃 플래그 변경
-							NowSession->m_lLogoutFlag = TRUE;
+							NowSession->m_lLogoutFlag = TRUE;	
+
+							// 샌드 가능 상태로 돌림.
+							// 여기서 바꿔줘야, 다른곳에서 WAIT_LOGOUT으로 바꿔줄 수 있다.
+							// WSASend에 실패하면 완료통지가 안뜨기 때문에, SendFlag를 바꿀 곳이 없다.
+							NowSession->m_lSendFlag = FALSE;
 						}
 
 						// 에러가 버퍼 부족이라면
@@ -1447,7 +1480,7 @@ namespace Library_Jingyu
 		// 그리고 미리 Max만큼 만들어두기
 		m_stEmptyIndexStack = new CLF_Stack<WORD>;
 		for (int i = 0; i < MaxConnect; ++i)
-			m_stEmptyIndexStack->Push(i);
+			m_stEmptyIndexStack->Push(i);	
 
 
 		// 윈속 초기화
@@ -1520,8 +1553,8 @@ namespace Library_Jingyu
 		m_hSendHandle = new HANDLE[m_iS_ThreadCount];
 		for (int i = 0; i < m_iS_ThreadCount; ++i)
 		{
-			m_hAcceptHandle[i] = (HANDLE)_beginthreadex(NULL, 0, SendThread, this, 0, NULL);
-			if (m_hAcceptHandle == NULL)
+			m_hSendHandle[i] = (HANDLE)_beginthreadex(NULL, 0, SendThread, this, 0, NULL);
+			if (m_hSendHandle == NULL)
 			{
 				// 윈도우 에러, 내 에러 보관
 				m_iOSErrorCode = errno;
@@ -1544,8 +1577,8 @@ namespace Library_Jingyu
 		m_hAuthHandle = new HANDLE[m_iAuth_ThreadCount];
 		for (int i = 0; i < m_iAuth_ThreadCount; ++i)
 		{
-			m_hAcceptHandle[i] = (HANDLE)_beginthreadex(NULL, 0, AuthThread, this, 0, NULL);
-			if (m_hAcceptHandle == NULL)
+			m_hAuthHandle[i] = (HANDLE)_beginthreadex(NULL, 0, AuthThread, this, 0, NULL);
+			if (m_hAuthHandle == NULL)
 			{
 				// 윈도우 에러, 내 에러 보관
 				m_iOSErrorCode = errno;
@@ -1569,8 +1602,8 @@ namespace Library_Jingyu
 		m_hGameHandle = new HANDLE[m_iGame_ThreadCount];
 		for (int i = 0; i < m_iGame_ThreadCount; ++i)
 		{
-			m_hAcceptHandle[i] = (HANDLE)_beginthreadex(NULL, 0, GameThread, this, 0, NULL);
-			if (m_hAcceptHandle == NULL)
+			m_hGameHandle[i] = (HANDLE)_beginthreadex(NULL, 0, GameThread, this, 0, NULL);
+			if (m_hGameHandle == NULL)
 			{
 				// 윈도우 에러, 내 에러 보관
 				m_iOSErrorCode = errno;
@@ -1935,6 +1968,8 @@ namespace Library_Jingyu
 	// return : 없음
 	void CMMOServer::SetSession(cSession* pSession, int Max, BYTE HeadCode, BYTE XORCode1, BYTE XORCode2)
 	{
+		m_stSessionArray = new cSession*[Max];
+
 		// 세션 배열 셋팅
 		int iIndex = 0;
 		while (iIndex < Max)

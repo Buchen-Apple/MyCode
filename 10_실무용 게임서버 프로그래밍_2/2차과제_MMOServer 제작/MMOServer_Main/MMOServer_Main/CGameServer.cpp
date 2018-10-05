@@ -58,7 +58,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnAuth_Packet(CProtocolBuff_Net* Packet)
 	{
-
+		// 어떤 패킷을 받으면 GAME모드로 변경.
 	}
 
 

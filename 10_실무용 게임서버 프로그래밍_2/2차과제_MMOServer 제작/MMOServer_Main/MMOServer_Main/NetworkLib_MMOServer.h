@@ -21,10 +21,6 @@ namespace Library_Jingyu
 		// 한 번에 샌드할 수 있는 WSABUF의 카운트
 #define dfSENDPOST_MAX_WSABUF			300
 
-		// Max User 카운트. 파일에서 읽어오는것과는 다름.
-		// 이 서버의 진짜 MAX User. 이 이상은 설정도 못함.
-#define MAX_USER						17000
-
 	protected:
 		// enum 전방선언
 		enum class euError : int
@@ -63,15 +59,27 @@ namespace Library_Jingyu
 			MODE_AUTH,				// 연결 후 인증모드 상태
 			MODE_AUTH_TO_GAME,		// 게임모드로 전환
 			MODE_GAME,				// 인증 후 게임모드 상태
-			MODE_LOGOUT_IN_AUTH,	// 인증모드에서 종료 준비
-			MODE_LOGOUT_IN_GAME,	// 게임모드에서 종료 준비
-			MODE_WAIT_LOGOUT		//최종 종료
+			MODE_WAIT_LOGOUT		// 최종 종료
+		};
+
+		// 각 스레드에서 처리하는 패킷의 수 enum
+		enum class euDEFINE
+		{
+			// ******* AUTH 스레드용 *******
+			eu_AUTH_PACKET_COUNT = 1,			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+			eu_AUTH_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
+			eu_AUTH_NEWUSER_PACKET_COUNT = 5,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
+
+
+			// ******* GAME 스레드용 *******
+			eu_GAME_PACKET_COUNT = 100,			// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+			eu_GAME_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
+			eu_GAME_NEWUSER_JOIN_COUNT = 5,		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수			
 		};
 
 
-
 		// ------------------
-		// 이너 클래스 전방선언
+		// 이너 클래스
 		// ------------------
 
 		// 세션 클래스
@@ -157,21 +165,21 @@ namespace Library_Jingyu
 
 		protected:
 			// -----------------
-			// 순수 가상함수
+			// 가상함수
 			// -----------------
 
 			// Auth 스레드에서 처리
-			virtual void OnAuth_ClientJoin() = 0;
-			virtual void OnAuth_ClientLeave() = 0;
-			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet) = 0;
+			virtual void OnAuth_ClientJoin();
+			virtual void OnAuth_ClientLeave();
+			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
 
 			// Game 스레드에서 처리
-			virtual void OnGame_ClientJoin() = 0;
-			virtual void OnGame_ClientLeave() = 0;
-			virtual void OnGame_Packet(CProtocolBuff_Net* Packet) = 0;
+			virtual void OnGame_ClientJoin();
+			virtual void OnGame_ClientLeave();
+			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
 
 			// Release용
-			virtual void OnGame_ClientRelease() = 0;
+			virtual void OnGame_ClientRelease();
 
 
 		protected:
@@ -261,7 +269,7 @@ namespace Library_Jingyu
 
 		// ----- 세션 관리용 -------
 		// 세션 관리 배열
-		cSession* m_stSessionArray[MAX_USER];
+		cSession** m_stSessionArray;
 
 		// 미사용 인덱스 관리 스택
 		CLF_Stack<WORD>* m_stEmptyIndexStack;

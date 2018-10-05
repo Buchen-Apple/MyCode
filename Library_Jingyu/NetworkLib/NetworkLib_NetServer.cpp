@@ -1384,11 +1384,6 @@ namespace Library_Jingyu
 			// ------------------
 			// send 가능 상태인지 체크
 			// ------------------
-			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
-			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
-			/*if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-				break;	*/
-
 			// 1. SendFlag(1번인자)가 를 TRUE(2번인자)로 변경.
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
 			if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
