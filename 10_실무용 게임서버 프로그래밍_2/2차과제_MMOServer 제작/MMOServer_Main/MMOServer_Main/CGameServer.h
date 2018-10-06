@@ -29,6 +29,8 @@ namespace Library_Jingyu
 			CGameSession();
 			virtual ~CGameSession();
 
+			INT64 m_Int64AccountNo;
+
 
 		private:
 			// -----------------
@@ -37,7 +39,7 @@ namespace Library_Jingyu
 
 			// Auth 스레드에서 처리
 			virtual void OnAuth_ClientJoin();
-			virtual void OnAuth_ClientLeave();
+			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
 
 			// Game 스레드에서 처리
@@ -47,6 +49,24 @@ namespace Library_Jingyu
 
 			// Release용
 			virtual void OnGame_ClientRelease();
+
+			
+			// -----------------
+			// 패킷 처리 함수
+			// -----------------
+
+			// 로그인 요청 
+			// 
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Auth_LoginPacket(CProtocolBuff_Net* Packet);
+
+			// 테스트용 에코 요청
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_EchoTest(CProtocolBuff_Net* Packet);
+
 		};
 
 
@@ -76,10 +96,6 @@ namespace Library_Jingyu
 
 		// Config 변수
 		stConfigFile m_stConfig;
-
-		// 덤프용
-		CCrashDump* m_GameServerDump;
-
 
 	private:
 		// -----------------------
@@ -116,7 +132,11 @@ namespace Library_Jingyu
 		// return : 없음
 		void GameServerStop();
 
-
+		// 출력용 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ShowPrintf();
 
 	
 	protected:

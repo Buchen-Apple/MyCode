@@ -68,13 +68,13 @@ namespace Library_Jingyu
 			// ******* AUTH 스레드용 *******
 			eu_AUTH_PACKET_COUNT = 1,			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
 			eu_AUTH_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
-			eu_AUTH_NEWUSER_PACKET_COUNT = 5,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
+			eu_AUTH_NEWUSER_PACKET_COUNT = 50,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
 
 
 			// ******* GAME 스레드용 *******
-			eu_GAME_PACKET_COUNT = 100,			// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+			eu_GAME_PACKET_COUNT = 100,		// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
 			eu_GAME_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
-			eu_GAME_NEWUSER_JOIN_COUNT = 5,		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수			
+			eu_GAME_NEWUSER_JOIN_COUNT = 50,		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수			
 		};
 
 
@@ -170,7 +170,7 @@ namespace Library_Jingyu
 
 			// Auth 스레드에서 처리
 			virtual void OnAuth_ClientJoin();
-			virtual void OnAuth_ClientLeave();
+			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
 
 			// Game 스레드에서 처리
@@ -194,7 +194,7 @@ namespace Library_Jingyu
 			// return : 없음
 			void Disconnect();
 
-			// 외부에서, 해다 유저에게 어떤 데이터를 보내고 싶을때 호출하는 함수.
+			// 외부에서, 유저에게 어떤 데이터를 보내고 싶을때 호출하는 함수.
 			// SendPacket은 그냥 아무때나 하면 된다.
 			// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
 			//
@@ -301,9 +301,10 @@ namespace Library_Jingyu
 		CMMOServer();
 		virtual ~CMMOServer();
 
+
 	public:
 		// -----------------------
-		// 외부에서 사용 가능한 함수
+		// 게터 함수
 		// -----------------------
 
 		// 서버 작동중인지 확인
@@ -311,6 +312,30 @@ namespace Library_Jingyu
 		// Parameter : 없음
 		// return : 작동중일 시 true.
 		bool GetServerState();
+
+		// 접속 중인 세션 수 얻기
+		//
+		// Parameter : 없음
+		// return : 접속자 수 (ULONGLONG)
+		ULONGLONG GetClientCount();
+
+		// Accept Socket Queue 안의 일감 수 얻기
+		//
+		// Parameter : 없음
+		// return : 일감 수(LONG)
+		LONG GetASQ_Count();
+
+		// Accept Socket Queue Pool의 총 청크 수 얻기
+		// 
+		// Parameter : 없음
+		// return : 총 청크 수 (LONG)
+		LONG GetChunkCount();
+
+		// Accept Socket Queue Pool의 밖에서 사용중인 청크 수 얻기
+		// 
+		// Parameter : 없음
+		// return : 밖에서 사용중인 청크 수 (LONG)
+		LONG GetOutChunkCount();
 
 
 	private:

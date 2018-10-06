@@ -1,6 +1,19 @@
 #include "pch.h"
 #include "CGameServer.h"
 #include "Parser\Parser_Class.h"
+#include "Protocol_Set\CommonProtocol.h"
+#include "Log\Log.h"
+
+
+extern ULONGLONG g_ullAcceptTotal_MMO;
+extern LONG	  g_lAcceptTPS_MMO;
+extern LONG	g_lSendPostTPS_MMO;
+extern LONG	g_lRecvTPS_MMO;
+
+extern LONG g_lAllocNodeCount;
+
+extern LONG g_lAuthModeUserCount;
+extern LONG g_lGameModeUserCount;
 
 
 
@@ -10,6 +23,13 @@
 // ------------------
 namespace Library_Jingyu
 {
+	// 덤프용
+	CCrashDump* g_GameServerDump = CCrashDump::GetInstance();
+
+	// 로그용
+	CSystemLog* g_GameServerLog = CSystemLog::GetInstance();
+
+
 	// -----------------------
 	// 생성자와 소멸자
 	// -----------------------
@@ -19,6 +39,7 @@ namespace Library_Jingyu
 		:CMMOServer::cSession()
 	{
 		// 할거 없음
+		m_Int64AccountNo = 0x0fffffffffffffff;
 	}
 
 	// 소멸자
@@ -30,8 +51,7 @@ namespace Library_Jingyu
 	// -----------------
 	// 가상함수
 	// -----------------
-
-
+	
 	// --------------- AUTH 모드용 함수
 
 	// 유저가 Auth 모드로 변경됨
@@ -40,16 +60,16 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnAuth_ClientJoin()
 	{
-
+		// 할거 없음
 	}
 
 	// 유저가 Auth 모드에서 나감
 	//
-	// Parameter : 없음
+	// Parameter : Game모드로 변경된것인지 알려주는 Flag. 디폴트 false.
 	// return : 없음
-	void CGameServer::CGameSession::OnAuth_ClientLeave()
+	void CGameServer::CGameSession::OnAuth_ClientLeave(bool bGame)
 	{
-
+		// 할거 없음
 	}
 
 	// Auth 모드의 유저에게 packet이 옴
@@ -58,7 +78,41 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnAuth_Packet(CProtocolBuff_Net* Packet)
 	{
-		// 어떤 패킷을 받으면 GAME모드로 변경.
+		// 패킷 처리
+		try
+		{
+			// 1. 타입 빼기
+			WORD Type;
+			Packet->GetData((char*)&Type, 2);
+
+			// 2. 타입에 따라 분기 처리
+			switch (Type)
+			{
+				// 로그인 요청
+			case en_PACKET_CS_GAME_REQ_LOGIN:
+				Auth_LoginPacket(Packet);
+				break;
+
+				// 하트비트
+			case en_PACKET_CS_GAME_REQ_HEARTBEAT:
+				break;
+
+				// 그 외에는 문제있음.
+			default:				
+				throw CException(_T("OnAuth_Packet() --> Type Error!!"));
+				break;
+			}
+		}
+		catch (CException& exc)
+		{
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				(TCHAR*)exc.GetExceptionText());	
+
+			// 덤프
+			g_GameServerDump->Crash();
+		}
+
 	}
 
 
@@ -71,7 +125,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnGame_ClientJoin()
 	{
-
+		// 할거 없음
 	}
 
 	// 유저가 Game모드에서 나감
@@ -80,7 +134,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnGame_ClientLeave()
 	{
-
+		// 할거 없음
 	}
 
 	// Game 모드의 유저에게 packet이 옴
@@ -89,6 +143,41 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnGame_Packet(CProtocolBuff_Net* Packet)
 	{
+		// 타입에 따라 패킷 처리
+		try
+		{
+			// 1. 타입 빼기
+			WORD Type;
+			Packet->GetData((char*)&Type, 2);
+
+			// 2. 타입에 따라 분기문 처리
+			switch (Type)
+			{
+				// 테스트용 에코 요청
+			case en_PACKET_CS_GAME_REQ_ECHO:
+				Game_EchoTest(Packet);
+				break;
+
+				// 하트비트
+			case en_PACKET_CS_GAME_REQ_HEARTBEAT:
+				break;
+
+				// 이 외에는 문제 있음
+			default:
+				throw CException(_T("OnGame_Packet() --> Type Error!!"));
+				break;
+			}
+
+		}
+		catch (CException& exc)
+		{
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				(TCHAR*)exc.GetExceptionText());
+
+			// 덤프
+			g_GameServerDump->Crash();
+		}
 
 	}
 
@@ -102,8 +191,94 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnGame_ClientRelease()
 	{
+		// AccountNo 초기화
+		m_Int64AccountNo = 0x0fffffffffffffff;
 
 	}
+
+	
+
+
+	// -----------------
+	// 패킷 처리 함수
+	// -----------------
+
+	// 로그인 요청 
+	//
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CGameServer::CGameSession::Auth_LoginPacket(CProtocolBuff_Net* Packet)
+	{
+		// 1. 마샬링
+		INT64 AccountNo;
+		char SessionKey[64];
+		int Version;
+
+		Packet->GetData((char*)&AccountNo, 8);
+		Packet->GetData(SessionKey, 64);
+		Packet->GetData((char*)&Version, 4);
+
+		// 2. 검증작업 -----------
+		// 지금은 없음
+
+		// 3. 값 셋팅
+		m_Int64AccountNo = AccountNo;
+
+		// 4. 로그인 응답 패킷 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		// 타입
+		WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
+		SendBuff->PutData((char*)&Type, 2);
+
+		// Status
+		BYTE Status = 1;
+		SendBuff->PutData((char*)&Status, 1);
+
+		// AccountNo
+		SendBuff->PutData((char*)&AccountNo, 8);
+
+		// SendPacket
+		SendPacket(SendBuff);		
+
+		// 5. AUTH 에서 GAME으로 모드 변경
+		SetMode_GAME();
+	}
+	   
+	// 테스트용 에코 요청
+	//
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CGameServer::CGameSession::Game_EchoTest(CProtocolBuff_Net* Packet)
+	{
+		// 1. 마샬링
+		INT64 AccountNo;
+		LONGLONG SendTick;
+
+		Packet->GetData((char*)&AccountNo, 8);
+		Packet->GetData((char*)&SendTick, 8);
+
+		// 2. AccountNo 확인하기
+		// 로그인요청이 오지 않은 유저라면, 밖으로 예외 던짐
+		if (AccountNo != m_Int64AccountNo)
+		{
+			throw CException(_T("Game_EchoTest() --> AccountNo Error!!"));
+			return;
+		}
+
+		// 2. 그대로 다시 보내기
+		WORD Type = en_PACKET_CS_GAME_RES_ECHO;
+
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&AccountNo, 8);
+		SendBuff->PutData((char*)&SendTick, 8);
+
+		SendPacket(SendBuff);
+	}
+
+
 }
 
 // ---------------
@@ -118,12 +293,13 @@ namespace Library_Jingyu
 	CGameServer::CGameServer()
 		:CMMOServer()
 	{
-		m_GameServerDump = CCrashDump::GetInstance();
-
-		// 파일 읽어오기
 		// ------------------- Config정보 셋팅		
 		if (SetFile(&m_stConfig) == false)
-			m_GameServerDump->Crash();
+			g_GameServerDump->Crash();
+
+		// ------------------- 로그 저장할 파일 셋팅
+		g_GameServerLog->SetDirectory(L"GameServer");
+		g_GameServerLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);		
 	}
 
 	CGameServer::~CGameServer()
@@ -138,13 +314,23 @@ namespace Library_Jingyu
 	bool CGameServer::GameServerStart()
 	{
 		// 1. 세션 셋팅
-		m_cGameSession = new CGameSession[m_stConfig.MaxJoinUser];
-		SetSession(m_cGameSession, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2);
+		m_cGameSession = new CGameSession[m_stConfig.MaxJoinUser];	
+
+		int i = 0;
+		while (i < m_stConfig.MaxJoinUser)
+		{
+			SetSession(&m_cGameSession[i], m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2);			
+			++i;
+		}
+		
 		
 		// 2. 서버 시작
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, 
 			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
-			return false;			
+			return false;	
+
+		// 서버 오픈 로그 찍기		
+		g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -163,6 +349,68 @@ namespace Library_Jingyu
 		// 2. 세션 삭제
 		delete[] m_cGameSession;
 	}
+
+	// 출력용 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CGameServer::ShowPrintf()
+	{
+
+		// 화면 출력할 것 셋팅
+		/*
+		Total SessionNum : 					- MMOServer 의 세션수
+		AuthMode SessionNum :				- Auth 모드의 유저 수
+		GameMode SessionNum (Auth + Game) :	- Game 모드의 유저 수 (Auth + Game모드 유저 수)
+
+		PacketPool_Net : 		- 외부에서 사용 중인 Net 직렬화 버퍼의 수	
+		Accept Socket Queue :	- Accept Socket Queue 안의 일감 수
+
+		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+		Accept TPS :		- Accept 처리 횟수
+		Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+		Recv TPS			- 초당 Recv완료 횟수. (패킷 1개가 완성되었을 때 증가. RecvProc에서 패킷에 넣기 전에 1씩 증가)		
+
+		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		ASQPool_ChunkAlloc_Count : - Accept Socket Queue에 들어가는 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+		*/
+
+		LONG AccpetTPS = g_lAcceptTPS_MMO;
+		LONG SendTPS = g_lSendPostTPS_MMO;
+		LONG RecvTPS = g_lRecvTPS_MMO;
+		InterlockedExchange(&g_lAcceptTPS_MMO, 0);
+		InterlockedExchange(&g_lSendPostTPS_MMO, 0);
+		InterlockedExchange(&g_lRecvTPS_MMO, 0);
+
+		printf("========================================================\n"
+				"Total SessionNum : %lld\n"
+				"AuthMode SessionNum : %d\n"
+				"GameMode SessionNum : %d (Auth + Game : %d)\n\n"
+
+				"PacketPool_Net : %d\n"
+				"Accept Socket Queue : %d\n\n"
+
+				"Accept Total : %lld\n"
+				"Accept TPS : %d\n"
+				"Send TPS : %d\n"
+				"Recv TPS : %d\n\n"
+
+				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
+				"ASQPool_ChunkAlloc_Count : %d (Out : %d)\n\n"
+
+			"========================================================\n\n",
+
+
+			// ----------- 게임 서버용
+			GetClientCount(), g_lAuthModeUserCount, g_lGameModeUserCount, g_lAuthModeUserCount+g_lGameModeUserCount,
+			g_lAllocNodeCount, GetASQ_Count(),
+			g_ullAcceptTotal_MMO, AccpetTPS, SendTPS, RecvTPS,
+			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
+			GetChunkCount(), GetOutChunkCount() 
+			);
+	}
+
 
 
 
@@ -313,7 +561,11 @@ namespace Library_Jingyu
 	//			 : 에러 코드에 대한 스트링
 	// return : 없음
 	void CGameServer::OnError(int error, const TCHAR* errorStr)
-	{}
+	{
+		// 로그 찍기 (로그 레벨 : 에러)
+		g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+			errorStr, error);
+	}
 
 
 
