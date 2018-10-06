@@ -340,11 +340,6 @@ namespace Library_Jingyu
 	// return : 없음
 	void CMMOServer::InDisconnect(cSession* DeleteSession)
 	{
-		// SendFlag를 TRUE로 만든다.
-		// 근데, 이미 TRUE였다면, 아직 Send중이니 그냥 나간다.
-		if (InterlockedExchange(&DeleteSession->m_lSendFlag, TRUE) == TRUE)		
-			return;		
-
 		// 세션 ID 초기화
 		DeleteSession->m_ullSessionID = 0xffffffffffffffff;
 
@@ -1114,9 +1109,17 @@ namespace Library_Jingyu
 				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
 				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH)
 				{
-					// LogOutFlag가 TRUE이고, SendFlag가 FALSE라면
-					if (NowSession->m_lLogoutFlag == TRUE && NowSession->m_lSendFlag == FALSE)
+					// LogOutFlag가 TRUE라면
+					if (NowSession->m_lLogoutFlag == TRUE)
 					{
+						// SendFlag를 TRUE로 만든다.
+						// 근데, 이미 TRUE였다면, 아직 Send중이니 continue;
+						if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+						{
+							--iIndex;
+							continue;
+						}
+
 						// Auth 모드 유저 수 감소
 						--g_lAuthModeUserCount;
 
@@ -1299,9 +1302,17 @@ namespace Library_Jingyu
 				// 유저가 MODE_GAME 모드인지 확인 -----------------
 				if (NowSession->m_euMode == euSessionModeState::MODE_GAME)
 				{
-					// LogOutFlag가 TRUE이고, SendFlag가 FALSE라면
-					if (NowSession->m_lLogoutFlag == TRUE && NowSession->m_lSendFlag == FALSE)
+					// LogOutFlag가 TRUE라면
+					if (NowSession->m_lLogoutFlag == TRUE)
 					{
+						// SendFlag를 TRUE로 만든다.
+						// 근데, 이미 TRUE였다면, 아직 Send중이니 continue;
+						if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+						{
+							--iIndex;
+							continue;
+						}
+
 						// Game 모드 유저 수 감소
 						--g_lGameModeUserCount;
 
@@ -1421,6 +1432,7 @@ namespace Library_Jingyu
 			while (iArrayIndex < iMaxUser)
 			{
 				cSession* NowSession = SessionArray[iArrayIndex];
+				
 
 				// ------------------
 				// send 가능 상태인지 체크
@@ -1451,7 +1463,16 @@ namespace Library_Jingyu
 
 					++iArrayIndex;
 					continue;
-				}
+				}		
+
+				if (NowSession->m_lLogoutFlag == TRUE)
+				{
+					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
+					NowSession->m_lSendFlag = FALSE;
+
+					++iArrayIndex;
+					continue;
+				}				
 
 
 				// ------------------
