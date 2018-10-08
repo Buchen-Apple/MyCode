@@ -259,6 +259,9 @@ namespace Library_Jingyu
 		HANDLE* m_hAuthHandle;
 		HANDLE* m_hGameHandle;
 
+		// 릴리즈 스레드
+		HANDLE m_hReleaseHandle;
+
 		// IOCP 핸들
 		HANDLE m_hIOCPHandle;
 
@@ -295,6 +298,7 @@ namespace Library_Jingyu
 		HANDLE m_hAuthExitEvent;
 		HANDLE m_hGameExitEvent;
 		HANDLE m_hSendExitEvent;
+		HANDLE m_hReleaseExitEvent;
 
 
 	public:
@@ -398,6 +402,9 @@ namespace Library_Jingyu
 
 		// Send 스레드
 		static UINT WINAPI	SendThread(LPVOID lParam);		
+
+		// Release 스레드
+		static UINT WINAPI	ReleaseThread(LPVOID lParam);
 
 
 	protected:
