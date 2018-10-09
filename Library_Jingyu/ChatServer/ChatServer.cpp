@@ -1324,6 +1324,11 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer::ServerStop()
 	{
+		// 모니터링 클라 종료
+		if (m_Monitor_LanClient->GetClinetState() == true)
+			m_Monitor_LanClient->Stop();
+
+
 		// 넷서버 스탑 (엑셉트, 워커 종료)
 		Stop();
 

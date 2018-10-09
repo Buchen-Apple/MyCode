@@ -3,9 +3,12 @@ c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver �
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\pch.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\mmoserver_main.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\ringbuff.obj
+c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\protocolbuff_objectpool.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\protocolbuff(net)_objectpool.obj
+c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\pdhcheck.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\parser_class.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\networklib_mmoserver.obj
+c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\networklib_lanclient.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\cgameserver.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\log.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\2차과제_mmoserver 제작\mmoserver_main\mmoserver_main\x64\release\crashdump.obj

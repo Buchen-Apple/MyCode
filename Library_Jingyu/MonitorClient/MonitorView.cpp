@@ -864,6 +864,18 @@ namespace Library_Jingyu
 			if (iMax < 10)
 				iMax = 10;
 
+			// iMax가 10보단 크고, 99보다 작다면, Max +5를 진짜 Max로 잡는다.
+			else if (iMax < 99)
+				iMax = iMax + 5;
+
+			//iMax가 99보단 크고, 999보다 작다면, Max +20를 진짜 Max로 잡는다.
+			else if (iMax < 999)
+				iMax = iMax + 20;
+
+			//iMax가 999보단 크고, 9999보다 작다면, Max +500를 진짜 Max로 잡는다.
+			else if (iMax < 9999)
+				iMax = iMax + 500;
+
 			// 그리드에 표시할 숫자 지정
 			Greedint[0] = iMax / 4;							// 첫 그리드에 표시될 숫자
 			Greedint[1] = Greedint[0] + Greedint[0];		// 두 번째 그리드에 표시될 숫자

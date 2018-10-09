@@ -23,7 +23,7 @@ namespace Library_Jingyu
 	// 생성자와 소멸자
 	// -----------------------
 	CMonitorClient::CMonitorClient()
-		:CNetClient();
+		:CNetClient()
 	{
 		// ------------------- 파일 읽어오기
 		if (SetFile(&m_stConfig) == false)

@@ -3,12 +3,15 @@
   CrashDump.cpp
   Log.cpp
   CGameServer.cpp
+  NetworkLib_LanClient.cpp
   NetworkLib_MMOServer.cpp
   Parser_Class.cpp
+  PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
+  ProtocolBuff_ObjectPool.cpp
   RingBuff.cpp
   MMOServer_Main.cpp
   코드를 생성하고 있습니다.
-  All 248 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 346 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   MMOServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\2차과제_MMOServer 제작\MMOServer_Main\x64\Release\MMOServer_Main.exe

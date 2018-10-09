@@ -2,7 +2,7 @@
   CrashDump.cpp
   Log.cpp
   MonitorClinet.cpp
-c:\git_public\library_jingyu\monitorclient\monitorclinet.cpp(197): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
+c:\git_public\library_jingyu\monitorclient\monitorclinet.cpp(198): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   MonitorView.cpp
   NetworkLib_NetClient.cpp
   Parser_Class.cpp

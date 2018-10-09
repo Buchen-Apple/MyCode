@@ -165,7 +165,7 @@ bool Parser::SkipNoneCommand(TCHAR TempSkipWord)
 bool Parser::GetNextWord()
 {
 	int i = 0;
-	TCHAR cTempWord[4096];
+	TCHAR cTempWord[8192];
 	bool bFlag = false;
 
 	// 단어 시작 위치를 찾는다. true면 계속 스킵된다.

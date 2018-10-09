@@ -67,7 +67,7 @@ namespace Library_Jingyu
 		{
 			// ******* AUTH 스레드용 *******
 			eu_AUTH_PACKET_COUNT = 1,			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
-			eu_AUTH_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
+			eu_AUTH_SLEEP = 100,				// Sleep하는 시간(밀리세컨드)	
 			eu_AUTH_NEWUSER_PACKET_COUNT = 50,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
 
 

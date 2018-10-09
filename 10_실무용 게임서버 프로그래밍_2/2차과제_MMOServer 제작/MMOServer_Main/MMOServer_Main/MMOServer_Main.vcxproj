@@ -166,9 +166,12 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\MMOGameServer\CGameServer.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanClient.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_MMOServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\PDHClass\PDHCheck.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
     <ClCompile Include="MMOServer_Main.cpp" />
     <ClCompile Include="pch.cpp">

@@ -4,6 +4,9 @@
 #include "Protocol_Set\CommonProtocol.h"
 #include "Log\Log.h"
 #include "CPUUsage\CPUUsage.h"
+#include "PDHClass\PDHCheck.h"
+
+#include <process.h>
 
 
 extern ULONGLONG g_ullAcceptTotal_MMO;
@@ -12,6 +15,7 @@ extern LONG	g_lSendPostTPS_MMO;
 extern LONG	g_lRecvTPS_MMO;
 
 extern LONG g_lAllocNodeCount;
+extern LONG g_lAllocNodeCount_Lan;
 
 extern LONG g_lAuthModeUserCount;
 extern LONG g_lGameModeUserCount;
@@ -19,6 +23,8 @@ extern LONG g_lGameModeUserCount;
 extern LONG g_lAuthFPS;
 extern LONG g_lGameFPS;
 
+LONG g_lShowAuthFPS;
+LONG g_lShowGameFPS;
 
 
 // ------------------
@@ -287,7 +293,7 @@ namespace Library_Jingyu
 
 // ---------------
 // CGameServer
-// CMMOServer를 상속받는 게임 서버
+// CMMOServer를 상속받는 게임 서버  (배틀서버)
 // ---------------
 namespace Library_Jingyu
 {
@@ -303,11 +309,17 @@ namespace Library_Jingyu
 
 		// ------------------- 로그 저장할 파일 셋팅
 		g_GameServerLog->SetDirectory(L"GameServer");
-		g_GameServerLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);		
+		g_GameServerLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);	
+
+		// 모니터링 서버와 통신하기 위한 LanClient 동적할당
+		m_Monitor_LanClient = new CGame_MinitorClient;
+		m_Monitor_LanClient->ParentSet(this);
 	}
 
 	CGameServer::~CGameServer()
 	{
+		// 모니터링 서버와 통신하는 LanClient 동적해제
+		delete m_Monitor_LanClient;
 	}
 
 	// GameServerStart
@@ -325,13 +337,17 @@ namespace Library_Jingyu
 		{
 			SetSession(&m_cGameSession[i], m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2);			
 			++i;
-		}
+		}		
 		
-		
-		// 2. 서버 시작
+		// 2. 게임 서버 시작
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, 
 			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
 			return false;	
+
+		// 3. 모니터링 서버와 연결되는, 랜 클라이언트 가동
+		if (m_Monitor_LanClient->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.MonitorClientCreateWorker,
+			m_stConfig.MonitorClientActiveWorker, m_stConfig.MonitorClientNodelay) == false)
+			return false;
 
 		// 서버 오픈 로그 찍기		
 		g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -346,7 +362,11 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::GameServerStop()
 	{
-		// 1. 서버 종료
+		// 1. 모니터링 클라 종료
+		if (m_Monitor_LanClient->GetClinetState() == true)
+			m_Monitor_LanClient->ClientStop();
+
+		// 2. 서버 종료
 		if (GetServerState() == true)
 			Stop();
 
@@ -365,6 +385,7 @@ namespace Library_Jingyu
 
 		// 화면 출력할 것 셋팅
 		/*
+		Monitor Connect :					- 모니터링 서버와 연결 여부. 1이면 연결됨.
 		Total SessionNum : 					- MMOServer 의 세션수
 		AuthMode SessionNum :				- Auth 모드의 유저 수
 		GameMode SessionNum (Auth + Game) :	- Game 모드의 유저 수 (Auth + Game모드 유저 수)
@@ -388,7 +409,7 @@ namespace Library_Jingyu
 
 		*/
 
-		LONG AccpetTPS = g_lAcceptTPS_MMO;
+		/*LONG AccpetTPS = g_lAcceptTPS_MMO;
 		LONG SendTPS = g_lSendPostTPS_MMO;
 		LONG RecvTPS = g_lRecvTPS_MMO;
 		LONG AuthFPS = g_lAuthFPS;
@@ -397,12 +418,19 @@ namespace Library_Jingyu
 		InterlockedExchange(&g_lSendPostTPS_MMO, 0);
 		InterlockedExchange(&g_lRecvTPS_MMO, 0);
 		InterlockedExchange(&g_lAuthFPS, 0);
-		InterlockedExchange(&g_lGameFPS, 0);
+		InterlockedExchange(&g_lGameFPS, 0);*/
+
+		LONG AccpetTPS = InterlockedExchange(&g_lAcceptTPS_MMO, 0);
+		LONG SendTPS = InterlockedExchange(&g_lSendPostTPS_MMO, 0);
+		LONG RecvTPS = InterlockedExchange(&g_lRecvTPS_MMO, 0);
+		g_lShowAuthFPS = InterlockedExchange(&g_lAuthFPS, 0);
+		g_lShowGameFPS = InterlockedExchange(&g_lGameFPS, 0);
 
 		// 출력 전에, 프로세스 사용량 갱신
 		ProcessUsage.UpdateCpuTime();
 
 		printf("========================================================\n"
+				"Monitor Connect : %d\n"
 				"Total SessionNum : %lld\n"
 				"AuthMode SessionNum : %d\n"
 				"GameMode SessionNum : %d (Auth + Game : %d)\n\n"
@@ -426,10 +454,11 @@ namespace Library_Jingyu
 
 
 			// ----------- 게임 서버용
+			m_Monitor_LanClient->GetClinetState(),
 			GetClientCount(), g_lAuthModeUserCount, g_lGameModeUserCount, g_lAuthModeUserCount+g_lGameModeUserCount,
 			g_lAllocNodeCount, GetASQ_Count(),
 			g_ullAcceptTotal_MMO, AccpetTPS, SendTPS, RecvTPS,
-			AuthFPS, GameFPS,
+			g_lShowAuthFPS, g_lShowGameFPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			GetChunkCount(), GetOutChunkCount(),
 
@@ -476,7 +505,7 @@ namespace Library_Jingyu
 		}
 
 		////////////////////////////////////////////////////////
-		// ChatServer config 읽어오기
+		// GameServer config 읽어오기
 		////////////////////////////////////////////////////////
 
 		// 구역 지정 -------------------------
@@ -526,6 +555,38 @@ namespace Library_Jingyu
 		// 로그 레벨
 		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
 			return false;
+			   
+
+		////////////////////////////////////////////////////////
+		// 모니터링 LanClient config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MONITORLANCLIENT")) == false)
+			return false;
+
+		// IP
+		if (Parser.GetValue_String(_T("MonitorServerIP"), pConfig->MonitorServerIP) == false)
+			return false;
+
+		// Port
+		if (Parser.GetValue_Int(_T("MonitorServerPort"), &pConfig->MonitorServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientCreateWorker"), &pConfig->MonitorClientCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientActiveWorker"), &pConfig->MonitorClientActiveWorker) == false)
+			return false;
+
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("MonitorClientNodelay"), &pConfig->MonitorClientNodelay) == false)
+			return false;
+
+
 
 		return true;
 	}
@@ -593,6 +654,277 @@ namespace Library_Jingyu
 		g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);
 	}
+
+
+
+}
+
+
+// ---------------
+// CGame_MinitorClient
+// CLanClienet를 상속받는 모니터링 클라
+// ---------------
+namespace Library_Jingyu
+{
+	// -----------------------
+	// 생성자와 소멸자
+	// -----------------------
+	CGame_MinitorClient::CGame_MinitorClient()
+		:CLanClient()
+	{
+		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
+		//
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+	}
+
+	CGame_MinitorClient::~CGame_MinitorClient()
+	{
+		// 아직 연결이 되어있으면, 연결 해제
+		if (GetClinetState() == true)
+			ClientStop();
+
+		// 이벤트 삭제
+		CloseHandle(m_hMonitorThreadExitEvent);
+	}
+
+
+
+	// -----------------------
+	// 외부에서 사용 가능한 함수
+	// -----------------------
+
+	// 시작 함수
+	// 내부적으로, 상속받은 CLanClient의 Start호출.
+	//
+	// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+	// return : 성공 시 true , 실패 시 falsel 
+	bool CGame_MinitorClient::ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay)
+	{
+		// 모니터링 서버에 연결
+		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
+			return false;
+
+		// 모니터링 서버로 정보 전송할 스레드 생성
+		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
+
+		return true;
+	}
+
+	// 종료 함수
+	// 내부적으로, 상속받은 CLanClient의 Stop호출.
+	// 추가로, 리소스 해제 등
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CGame_MinitorClient::ClientStop()
+	{
+		// 1. 모니터링 서버 정보전송 스레드 종료
+		SetEvent(m_hMonitorThreadExitEvent);
+
+		// 종료 대기
+		if (WaitForSingleObject(m_hMonitorThread, INFINITE) == WAIT_FAILED)
+		{
+			DWORD Error = GetLastError();
+			printf("MonitorThread Exit Error!!! (%d) \n", Error);
+		}
+
+		// 2. 스레드 핸들 반환
+		CloseHandle(m_hMonitorThread);
+
+		// 3. 모니터링 서버와 연결 종료
+		Stop();
+	}
+	
+	// 게임서버의 this를 입력받는 함수
+	// 
+	// Parameter : 게임 서버의 this
+	// return : 없음
+	void CGame_MinitorClient::ParentSet(CGameServer* ChatThis)
+	{
+		m_GameServer_this = ChatThis;
+	}
+
+
+
+
+	// -----------------------
+	// 내부에서만 사용하는 기능 함수
+	// -----------------------
+
+	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+	UINT	WINAPI CGame_MinitorClient::MonitorThread(LPVOID lParam)
+	{
+		// this 받아두기
+		CGame_MinitorClient* g_This = (CGame_MinitorClient*)lParam;
+
+		// 종료 신호 이벤트 받아두기
+		HANDLE* hEvent = &g_This->m_hMonitorThreadExitEvent;
+
+		// CPU 사용율 체크 클래스 (채팅서버 소프트웨어)
+		CCpuUsage_Process CProcessCPU;
+
+		// PDH용 클래스
+		CPDH	CPdh;
+
+		while (1)
+		{
+			// 1초에 한번 깨어나서 정보를 보낸다.
+			DWORD Check = WaitForSingleObject(*hEvent, 1000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("MoniterThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+
+			// 그게 아니라면, 일을 한다.
+
+			// 프로세서 CPU 사용율, PDH 정보 갱신
+			CProcessCPU.UpdateCpuTime();
+			CPdh.SetInfo();
+
+			// 게임서버가 On일 경우, 패킷을 보낸다.
+			if (g_This->m_GameServer_this->GetServerState() == true)
+			{
+				// 타임스탬프 구하기
+				int TimeStamp = (int)(time(NULL));
+
+				// 1. 게임서버 ON		
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON, TRUE, TimeStamp);
+
+				// 2. 게임서버 CPU 사용률 (커널 + 유저)
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_CPU, (int)CProcessCPU.ProcessTotal(), TimeStamp);
+
+				// 3. 게임서버 메모리 유저 커밋 사용량 (Private) MByte
+				int Data = (int)(CPdh.Get_UserCommit() / 1024 / 1024);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_MEMORY_COMMIT, Data, TimeStamp);
+
+				// 4. 게임서버 패킷풀 사용량
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_PACKET_POOL, g_lAllocNodeCount + g_lAllocNodeCount_Lan, TimeStamp);
+
+				// 5. Auth 스레드 초당 루프 수
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_AUTH_FPS, g_lShowAuthFPS, TimeStamp);
+
+				// 6. Game 스레드 초당 루프 수
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_GAME_FPS, g_lShowGameFPS, TimeStamp);
+
+				// 7. 게임서버 접속 세션전체
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SESSION_ALL, (int)g_This->m_GameServer_this->GetClientCount(), TimeStamp);
+
+				// 8. Auth 스레드 모드 인원
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SESSION_AUTH, g_lAuthModeUserCount, TimeStamp);
+
+				// 9. Game 스레드 모드 인원
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SESSION_GAME, g_lGameModeUserCount, TimeStamp);
+
+				// 10. 대기방 수
+				
+				// 11. 플레이 방 수
+			}
+
+		}
+
+		return 0;
+	}
+
+	// 모니터링 서버로 데이터 전송
+	//
+	// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+	// return : 없음
+	void CGame_MinitorClient::InfoSend(BYTE DataType, int DataValue, int TimeStamp)
+	{
+		WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&DataType, 1);
+		SendBuff->PutData((char*)&DataValue, 4);
+		SendBuff->PutData((char*)&TimeStamp, 4);
+
+		SendPacket(m_ullSessionID, SendBuff);
+	}
+
+
+	// -----------------------
+	// 순수 가상함수
+	// -----------------------
+
+	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CGame_MinitorClient::OnConnect(ULONGLONG SessionID)
+	{
+		m_ullSessionID = SessionID;
+
+		// 모니터링 서버(Lan)로 로그인 패킷 보냄
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_SS_MONITOR_LOGIN;
+		int ServerNo = dfSERVER_NO;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ServerNo, 4);
+
+		SendPacket(SessionID, SendBuff);
+	}
+
+	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CGame_MinitorClient::OnDisconnect(ULONGLONG SessionID)
+	{}
+
+	// 패킷 수신 완료 후 호출되는 함수.
+	//
+	// parameter : 유저 세션키, CProtocolBuff_Lan*
+	// return : 없음
+	void CGame_MinitorClient::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{}
+
+	// 패킷 송신 완료 후 호출되는 함수
+	//
+	// parameter : 유저 세션키, Send 한 사이즈
+	// return : 없음
+	void CGame_MinitorClient::OnSend(ULONGLONG SessionID, DWORD SendSize)
+	{}
+
+	// 워커 스레드가 깨어날 시 호출되는 함수.
+	// GQCS 바로 하단에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CGame_MinitorClient::OnWorkerThreadBegin()
+	{}
+
+	// 워커 스레드가 잠들기 전 호출되는 함수
+	// GQCS 바로 위에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CGame_MinitorClient::OnWorkerThreadEnd()
+	{}
+
+	// 에러 발생 시 호출되는 함수.
+	//
+	// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+	//			 : 에러 코드에 대한 스트링
+	// return : 없음
+	void CGame_MinitorClient::OnError(int error, const TCHAR* errorStr)
+	{}
 
 
 
