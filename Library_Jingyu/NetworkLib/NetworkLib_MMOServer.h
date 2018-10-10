@@ -20,7 +20,7 @@ namespace Library_Jingyu
 
 		// 한 번에 샌드할 수 있는 WSABUF의 카운트
 #define dfSENDPOST_MAX_WSABUF			300
-
+			   
 	protected:
 		// enum 전방선언
 		enum class euError : int
@@ -62,12 +62,13 @@ namespace Library_Jingyu
 			MODE_WAIT_LOGOUT		// 최종 종료
 		};
 
+		/*
 		// 각 스레드에서 처리하는 패킷의 수 enum
 		enum class euDEFINE
 		{
 			// ******* AUTH 스레드용 *******
 			eu_AUTH_PACKET_COUNT = 1,			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
-			eu_AUTH_SLEEP = 100,				// Sleep하는 시간(밀리세컨드)	
+			eu_AUTH_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
 			eu_AUTH_NEWUSER_PACKET_COUNT = 50,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
 
 
@@ -79,6 +80,7 @@ namespace Library_Jingyu
 			// ******* RELEAE 스레드용 *******
 			eu_RELEASE_SLEEP = 1					// Sleep하는 시간(밀리세컨드)	
 		};
+		*/
 
 
 		// ------------------
@@ -139,7 +141,8 @@ namespace Library_Jingyu
 			LONG	m_lSendFlag;
 
 			// Send버퍼. 락프리큐 구조. 패킷버퍼(직렬화 버퍼)의 포인터를 다룬다.
-			CLF_Queue<CProtocolBuff_Net*>* m_SendQueue;
+			//CLF_Queue<CProtocolBuff_Net*>* m_SendQueue;
+			CNormalQueue<CProtocolBuff_Net*>* m_SendQueue;
 
 			// Recv overlapped구조체
 			OVERLAPPED m_overRecvOverlapped;
@@ -231,11 +234,33 @@ namespace Library_Jingyu
 			USHORT m_usPort;
 		};
 
+		// 파일에서 읽어오기 용 구조체
+		struct stConfigFile
+		{
+			// ******* AUTH 스레드용 *******
+			int AuthPacket_Count;			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+			int AuthSleep;					// Sleep하는 시간(밀리세컨드)	
+			int AuthNewUser_PacketCount;	// 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
+
+
+			// ******* GAME 스레드용 *******
+			int GamePacket_Count;				// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
+			int GameSleep;						// Sleep하는 시간(밀리세컨드)	
+			int GameNewUser_PacketCount;		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수	
+
+
+			// ******* RELEAE 스레드용 *******
+			int ReleaseSleep;					// Sleep하는 시간(밀리세컨드)			
+		};
+
 
 	private:
 		// ------------------
 		// 멤버 변수
 		// ------------------
+
+		// Config 변수
+		stConfigFile m_stConfig;
 
 		// Accept Socket Queue의 Pool
 		CMemoryPoolTLS<stAuthWork>* m_pAcceptPool;
@@ -350,6 +375,13 @@ namespace Library_Jingyu
 		// 내부에서만 사용하는 함수
 		// -----------------------
 
+		// 파일에서 Config 정보 읽어오기
+		// 
+		// Parameter : config 구조체
+		// return : 정상적으로 셋팅 시 true
+		//		  : 그 외에는 false
+		bool SetFile(stConfigFile* pConfig);
+			   
 		// Start에서 에러가 날 시 호출하는 함수.
 		//
 		// Parameter : 워커스레드의 수

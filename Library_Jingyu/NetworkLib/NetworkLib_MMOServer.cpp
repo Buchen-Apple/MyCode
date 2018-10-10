@@ -9,6 +9,7 @@
 #include "NetworkLib_MMOServer.h"
 #include "Log\Log.h"
 #include "CrashDump\CrashDump.h"
+#include "Parser\Parser_Class.h"
 
 
 ULONGLONG g_ullAcceptTotal_MMO;
@@ -32,7 +33,8 @@ namespace Library_Jingyu
 	// 생성자
 	CMMOServer::cSession::cSession()
 	{
-		m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(0, false);
+		//m_SendQueue = new CLF_Queue<CProtocolBuff_Net*>(0, false);
+		m_SendQueue = new CNormalQueue<CProtocolBuff_Net*>;
 		m_CRPacketQueue = new CNormalQueue<CProtocolBuff_Net*>;
 		m_lIOCount = 0;
 		m_lSendFlag = FALSE;
@@ -154,6 +156,11 @@ namespace Library_Jingyu
 	// 생성자
 	CMMOServer::CMMOServer()
 	{
+		// ------------------- Config정보 셋팅		
+		if (SetFile(&m_stConfig) == false)
+			cMMOServer_Dump->Crash();
+
+
 		// 서버 가동상태 false로 시작 
 		m_bServerLife = false;
 
@@ -257,6 +264,78 @@ namespace Library_Jingyu
 	// -----------------------
 	// 내부에서만 사용하는 함수
 	// -----------------------
+	
+	// 파일에서 Config 정보 읽어오기
+	// 
+	// Parameter : config 구조체
+	// return : 정상적으로 셋팅 시 true
+	//		  : 그 외에는 false
+	bool CMMOServer::SetFile(stConfigFile* pConfig)
+	{
+		Parser Parser;
+
+		// 파일 로드
+		try
+		{
+			Parser.LoadFile(_T("MMOGameServer_Config.ini"));
+		}
+		catch (int expn)
+		{
+			if (expn == 1)
+			{
+				printf("File Open Fail...\n");
+				return false;
+			}
+			else if (expn == 2)
+			{
+				printf("FileR Read Fail...\n");
+				return false;
+			}
+		}
+
+		////////////////////////////////////////////////////////
+		// MMOServer config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MMOSERVER")) == false)
+			return false;
+
+		// Auth 스레드의, 유저 1명당 패킷 처리 수 
+		if (Parser.GetValue_Int(_T("AuthPacketCount"), &pConfig->AuthPacket_Count) == false)
+			return false;
+
+		// Auth 스레드 슬립 
+		if (Parser.GetValue_Int(_T("AuthSleep"), &pConfig->AuthSleep) == false)
+			return false;
+
+		// Auth 스레드의, 1프레임에 Accept Socket Queue에서 빼는 패킷 수
+		if (Parser.GetValue_Int(_T("AuthNewUSerPacketCount"), &pConfig->AuthNewUser_PacketCount) == false)
+			return false;
+
+
+
+		// Game 스레드의, 유저 1명당 패킷 처리 수 
+		if (Parser.GetValue_Int(_T("GamePacketCount"), &pConfig->GamePacket_Count) == false)
+			return false;
+
+		// Game 스레드 슬립
+		if (Parser.GetValue_Int(_T("GameSleep"), &pConfig->GameSleep) == false)
+			return false;
+
+		// 1프레임에 AUTH_IN_GAME 에서 GAME으로 변경되는 수
+		if (Parser.GetValue_Int(_T("GameNewUSerPacketCount"), &pConfig->GameNewUser_PacketCount) == false)
+			return false;
+
+
+
+		// Release 스레드 슬립
+		if (Parser.GetValue_Int(_T("ReleaseSleep"), &pConfig->ReleaseSleep) == false)
+			return false;
+
+		return true;
+	}
+
 
 	// Start에서 에러가 날 시 호출하는 함수.
 	//
@@ -381,7 +460,8 @@ namespace Library_Jingyu
 			}
 
 			// 샌드 큐 비우기
-			UseSize = DeleteSession->m_SendQueue->GetInNode();
+			//UseSize = DeleteSession->m_SendQueue->GetInNode();
+			UseSize = DeleteSession->m_SendQueue->GetNodeSize();
 			while (UseSize > 0)
 			{
 				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
@@ -905,16 +985,16 @@ namespace Library_Jingyu
 		// --------- 필요한 정보들 로컬로 받아두기
 
 		// AUTH모드에서 1명의 유저에게, 1프레임에 처리하는 패킷의 최대 수. 
-		const int PACKET_WORK_COUNT = (int)CMMOServer::euDEFINE::eu_AUTH_PACKET_COUNT;
+		const int PACKET_WORK_COUNT = g_This->m_stConfig.AuthPacket_Count;
 
 		// 최대 접속 가능 유저, 로컬로 받아두기
 		const int MAX_USER = g_This->m_iMaxJoinUser;
 
 		// Sleep 인자로 받아두기
-		const int SLEEP_VALUE = (int)CMMOServer::euDEFINE::eu_AUTH_SLEEP;
+		const int SLEEP_VALUE = g_This->m_stConfig.AuthSleep;
 
 		// 1프레임에 처리하는 Accept Socket Queue의 수
-		const int NEWUSER_PACKET_COUNT = (int)CMMOServer::euDEFINE::eu_AUTH_NEWUSER_PACKET_COUNT;
+		const int NEWUSER_PACKET_COUNT = g_This->m_stConfig.AuthNewUser_PacketCount;
 
 		// 종료 이벤트
 		HANDLE* ExitEvent = &g_This->m_hAuthExitEvent;
@@ -1209,16 +1289,16 @@ namespace Library_Jingyu
 		// ------- 필요한 정보들 인자로 받아두기 -------
 
 		// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
-		const int PACKET_WORK_COUNT = (int)CMMOServer::euDEFINE::eu_GAME_PACKET_COUNT;
+		const int PACKET_WORK_COUNT = g_This->m_stConfig.GamePacket_Count;
 
 		// 최대 접속 가능 유저, 로컬로 받아두기
 		int MAX_USER = g_This->m_iMaxJoinUser;
 
 		// Sleep 인자로 받아두기
-		const int SLEEP_VALUE = (int)CMMOServer::euDEFINE::eu_GAME_SLEEP;
+		const int SLEEP_VALUE = g_This->m_stConfig.GameSleep;
 
 		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경될 수 있는 유저 수
-		const int NEWUSER_PACKET_COUNT = (int)CMMOServer::euDEFINE::eu_GAME_NEWUSER_JOIN_COUNT;
+		const int NEWUSER_PACKET_COUNT = g_This->m_stConfig.GameNewUser_PacketCount;
 
 		// 종료 이벤트
 		HANDLE* ExitEvent = &g_This->m_hGameExitEvent;
@@ -1426,7 +1506,8 @@ namespace Library_Jingyu
 				// ------------------
 				// SendBuff에 데이터가 있는지 확인
 				// ------------------
-				int UseSize = NowSession->m_SendQueue->GetInNode();
+				//int UseSize = NowSession->m_SendQueue->GetInNode();
+				int UseSize = NowSession->m_SendQueue->GetNodeSize();
 				if (UseSize == 0)
 				{
 					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
@@ -1533,7 +1614,7 @@ namespace Library_Jingyu
 		int MAX_USER = g_This->m_iMaxJoinUser;
 
 		// Sleep 인자로 받아두기
-		const int SLEEP_VALUE = (int)CMMOServer::euDEFINE::eu_RELEASE_SLEEP;
+		const int SLEEP_VALUE = g_This->m_stConfig.ReleaseSleep;
 
 		// 종료 이벤트
 		HANDLE* ExitEvent = &g_This->m_hReleaseExitEvent;

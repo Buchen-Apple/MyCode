@@ -236,6 +236,7 @@ namespace Library_Jingyu
 					// 이걸로, 몇 번이나 안왔는지 체크 후 빨간화면 만들기를 한다.
 					if (DataIndex + 1 == dfMONITOR_DATA_TYPE_MATCH_SERVER_ON ||
 						DataIndex + 1 == dfMONITOR_DATA_TYPE_MASTER_SERVER_ON ||
+						DataIndex + 1 == dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON ||
 						DataIndex + 1 == dfMONITOR_DATA_TYPE_CHAT_SERVER_ON)
 					{
 						// 증가 후, 값이 3이 되었다면, 3번동안 On 메시지가 안온것.
@@ -365,6 +366,7 @@ namespace Library_Jingyu
 			// 타입이, 서버 On/Off라면, 받는 순간, 기존의 ZeroCount를 0으로 만들고, 받은 값을 바로 반영한다.
 			if (DataType + 1 == dfMONITOR_DATA_TYPE_MATCH_SERVER_ON ||
 				DataType + 1 == dfMONITOR_DATA_TYPE_MASTER_SERVER_ON ||
+				DataType + 1 == dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON ||
 				DataType + 1 == dfMONITOR_DATA_TYPE_CHAT_SERVER_ON)
 			{
 				LastData[DataType].m_ZeroCount = 0;
