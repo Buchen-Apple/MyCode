@@ -61,27 +61,7 @@ namespace Library_Jingyu
 			MODE_GAME,				// 인증 후 게임모드 상태
 			MODE_WAIT_LOGOUT		// 최종 종료
 		};
-
-		/*
-		// 각 스레드에서 처리하는 패킷의 수 enum
-		enum class euDEFINE
-		{
-			// ******* AUTH 스레드용 *******
-			eu_AUTH_PACKET_COUNT = 1,			// 1프레임동안, 1명의 유저당 몇 개의 패킷을 처리할 것인가
-			eu_AUTH_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
-			eu_AUTH_NEWUSER_PACKET_COUNT = 50,   // 1프레임동안, Accept Socket Queue에서 빼는 패킷의 수. (즉, 1프레임에 None에서 Auth로 변경되는 유저 수)
-
-
-			// ******* GAME 스레드용 *******
-			eu_GAME_PACKET_COUNT = 200,			// 1프레임에, 1명의 유저당 몇 개의 패킷을 처리할 것인가
-			eu_GAME_SLEEP = 1,					// Sleep하는 시간(밀리세컨드)	
-			eu_GAME_NEWUSER_JOIN_COUNT = 50,	// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수	
-
-			// ******* RELEAE 스레드용 *******
-			eu_RELEASE_SLEEP = 1					// Sleep하는 시간(밀리세컨드)	
-		};
-		*/
-
+		
 
 		// ------------------
 		// 이너 클래스
@@ -249,8 +229,11 @@ namespace Library_Jingyu
 			int GameNewUser_PacketCount;		// 1프레임 동안, AUTH_IN_GAME에서 GAME으로 변경되는 유저의 수	
 
 
-			// ******* RELEAE 스레드용 *******
-			int ReleaseSleep;					// Sleep하는 시간(밀리세컨드)			
+			// ******* RELEASE 스레드용 *******
+			int ReleaseSleep;					// Sleep하는 시간(밀리세컨드)	
+
+			// ******* SEND 스레드용 *******
+			int SendSleep;					// Sleep하는 시간(밀리세컨드)	
 		};
 
 

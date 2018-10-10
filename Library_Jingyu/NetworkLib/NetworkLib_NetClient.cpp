@@ -733,10 +733,10 @@ namespace Library_Jingyu
 					// timeval 셋팅. 500m/s  대기
 					TIMEVAL tval;
 					tval.tv_sec = 0;
-					tval.tv_usec = 500000;
+					tval.tv_usec = 5000000;
 
 					// Select()
-					DWORD retval = select(0, 0, &wset, &exset, &tval);
+					int retval = select(0, 0, &wset, &exset, &tval);
 
 
 
@@ -751,14 +751,16 @@ namespace Library_Jingyu
 					else if (retval == 0)
 					{
 						printf("Select Timeout..\n");
-						int Error = WSAGetLastError();
-						printf("%d\n", Error);
+						Check = WSAGetLastError();
+						printf("%d\n", Check);
 
 					}
 
 					// 반응이 있다면, 예외셋에 반응이 왔는지 체크
 					else if (exset.fd_count > 0)
 					{
+						Check = WSAGetLastError();
+
 						//예외셋 반응이면 실패한 것.
 						printf("Select ---> exset problem..\n");
 					}
