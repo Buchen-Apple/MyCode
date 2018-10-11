@@ -433,6 +433,9 @@ namespace Library_Jingyu
 		// 내가 TRUE로 만들었다면 로직 진행
 		if (InterlockedExchange(&DeleteSession->m_lSendFlag, TRUE) == FALSE)
 		{
+			// 모드 초기화
+			DeleteSession->m_euMode = euSessionModeState::MODE_NONE;
+
 			// 세션 ID 초기화
 			DeleteSession->m_ullSessionID = 0xffffffffffffffff;
 
@@ -477,10 +480,7 @@ namespace Library_Jingyu
 			}
 
 			// 리시브 큐 초기화
-			DeleteSession->m_RecvQueue.ClearBuffer();
-
-			// 모드 초기화
-			DeleteSession->m_euMode = euSessionModeState::MODE_NONE;
+			DeleteSession->m_RecvQueue.ClearBuffer();			
 
 			// 릴리즈 되었다고 알려준다.
 			DeleteSession->OnGame_ClientRelease();
@@ -1460,153 +1460,6 @@ namespace Library_Jingyu
 			else if (Ret == WAIT_OBJECT_0)
 				break;
 
-			/*
-			// ------------------
-			// 모든 유저를 대상으로 샌드 시도
-			// ------------------
-			int iArrayIndex = 0;
-			while (iArrayIndex < iMaxUser)
-			{
-				cSession* NowSession = SessionArray[iArrayIndex];
-
-				// ------------------
-				// 패킷 포인터 배열 카운트가 0인지 체크
-				// 0이 아니면, 아직 이전 Send에 대한 완료통지가 안왔거나, WSASend를 걸었는데 저쪽에서 접속을 끊어서, 종료될 유저.
-				// 저쪽에서 연결을 끊으면, GQCS에서 튀어나오는데, 워커에서 어떤 로직도 타지 않고 I/O카운트만 1 줄이고 끝남.
-				// ------------------
-				if (NowSession->m_iWSASendCount != 0)
-				{
-					++iArrayIndex;
-					continue;
-				}
-
-				// ------------------
-				// send 가능 상태인지 체크
-				// ------------------
-				// SendFlag(1번인자)를 TRUE(2번인자)로 변경.
-				// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)라는것.
-				// 즉, Release를 탈 유저.
-				if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
-				{
-					++iArrayIndex;
-					continue;
-				}
-
-
-
-
-				// ------------------
-				// 유저의 모드 확인
-				// ------------------
-				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.
-				if (NowSession->m_euMode != euSessionModeState::MODE_AUTH &&
-					NowSession->m_euMode != euSessionModeState::MODE_GAME)
-				{
-					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
-					NowSession->m_lSendFlag = FALSE;
-
-					++iArrayIndex;
-					continue;
-				}
-
-
-				// ------------------
-				// SendBuff에 데이터가 있는지 확인
-				// ------------------
-				//int UseSize = NowSession->m_SendQueue->GetInNode();
-				int UseSize = NowSession->m_SendQueue->GetNodeSize();
-				if (UseSize == 0)
-				{
-					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
-					NowSession->m_lSendFlag = FALSE;
-
-					++iArrayIndex;
-					continue;
-				}
-
-
-				// ------------------
-				// 데이터가 있다면 Send하기
-				// ------------------
-
-				// 1. WSABUF 셋팅.
-				WSABUF wsabuf[dfSENDPOST_MAX_WSABUF];
-
-				if (UseSize > dfSENDPOST_MAX_WSABUF)
-					UseSize = dfSENDPOST_MAX_WSABUF;
-
-				if (NowSession->m_iWSASendCount > 0)
-					cMMOServer_Dump->Crash();
-
-				int iPacketIndex = UseSize - 1;
-				while (iPacketIndex >= 0)
-				{
-					if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[iPacketIndex]) == -1)
-						cMMOServer_Dump->Crash();
-
-					wsabuf[iPacketIndex].buf = NowSession->m_PacketArray[iPacketIndex]->GetBufferPtr();
-					wsabuf[iPacketIndex].len = NowSession->m_PacketArray[iPacketIndex]->GetUseSize();
-
-					--iPacketIndex;
-				}
-
-				NowSession->m_iWSASendCount = UseSize;
-
-				// 2. Overlapped 구조체 초기화
-				ZeroMemory(&NowSession->m_overSendOverlapped, sizeof(NowSession->m_overSendOverlapped));
-
-				// 3. WSASend()
-				DWORD SendBytes = 0, flags = 0;
-				InterlockedIncrement(&NowSession->m_lIOCount);
-
-				// 4. 에러 처리
-				if (WSASend(NowSession->m_Client_sock, wsabuf, UseSize, &SendBytes, flags, &NowSession->m_overSendOverlapped, NULL) == SOCKET_ERROR)
-				{
-					int Error = WSAGetLastError();
-
-					// 비동기 입출력이 시작된게 아니라면
-					if (Error != WSA_IO_PENDING)
-					{
-						// 샌드 가능 상태로 돌림.
-						// WSASend에 실패하면 완료통지가 안뜨기 때문에, SendFlag를 바꿀 곳이 없다.
-						NowSession->m_lSendFlag = FALSE;
-
-						if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
-						{
-							// 로그아웃 플래그 변경
-							NowSession->m_lLogoutFlag = TRUE;
-						}
-
-						// 에러가 버퍼 부족이라면
-						if (Error == WSAENOBUFS)
-						{
-							// 내 에러, 윈도우에러 보관
-							g_This->m_iOSErrorCode = Error;
-							g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WSAENOBUFS;
-
-							// 에러 스트링 만들고
-							TCHAR tcErrorString[300];
-							StringCchPrintf(tcErrorString, 300, _T("WSANOBUFS. UserID : %lld, [%s:%d]"),
-								NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
-
-							// 로그 찍기 (로그 레벨 : 에러)
-							cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
-								tcErrorString, (int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
-
-							// 에러 함수 호출
-							g_This->OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
-
-							// 끊는다.
-							shutdown(NowSession->m_Client_sock, SD_BOTH);
-						}
-					}
-				}
-
-				++iArrayIndex;
-			}
-			*/
-
-
 			
 			// ------------------
 			// 모든 유저를 대상으로 샌드 시도
@@ -1615,6 +1468,7 @@ namespace Library_Jingyu
 			while (iArrayIndex >= 0)
 			{
 				cSession* NowSession = SessionArray[iArrayIndex];
+				
 				
 				// ------------------
 				// 패킷 포인터 배열 카운트가 0인지 체크
@@ -1625,7 +1479,8 @@ namespace Library_Jingyu
 				{
 					--iArrayIndex;
 					continue;
-				}				
+				}	
+				
 
 				// ------------------
 				// send 가능 상태인지 체크
@@ -1640,11 +1495,6 @@ namespace Library_Jingyu
 				}	
 
 				
-
-
-				// ------------------
-				// 유저의 모드 확인
-				// ------------------
 				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.
 				if (NowSession->m_euMode != euSessionModeState::MODE_AUTH &&
 					NowSession->m_euMode != euSessionModeState::MODE_GAME)
@@ -1654,7 +1504,7 @@ namespace Library_Jingyu
 
 					--iArrayIndex;
 					continue;
-				}								
+				}					
 
 
 				// ------------------
@@ -1715,13 +1565,12 @@ namespace Library_Jingyu
 					if (Error != WSA_IO_PENDING)
 					{
 						// 샌드 가능 상태로 돌림.
-						// WSASend에 실패하면 완료통지가 안뜨기 때문에, SendFlag를 바꿀 곳이 없다.
 						NowSession->m_lSendFlag = FALSE;
 
 						if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 						{		
 							// 로그아웃 플래그 변경
-							NowSession->m_lLogoutFlag = TRUE;							
+							NowSession->m_lLogoutFlag = TRUE;	
 						}
 
 						// 에러가 버퍼 부족이라면

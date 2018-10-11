@@ -5,6 +5,9 @@
 #include "NetworkLib\NetworkLib_LanClinet.h"
 #include "CrashDump\CrashDump.h"
 
+#include <unordered_set>
+
+using namespace std;
 
 // ---------------
 // CGameServer
@@ -32,6 +35,9 @@ namespace Library_Jingyu
 			virtual ~CGameSession();
 
 			INT64 m_Int64AccountNo;
+			
+			// GameServer의 포인터
+			CGameServer* m_pParent;
 
 
 		private:
@@ -109,6 +115,14 @@ namespace Library_Jingyu
 		// 모니터링 클라
 		CGame_MinitorClient* m_Monitor_LanClient;
 
+		// U_set 자료구조.
+		// 접속 중인 유저의 AccountNo 관리용.
+		// 있는지 없는지 확인만 하기 때문에 Set 사용
+		unordered_set<INT64> m_setAccount;
+
+		// U_set 용 락
+		SRWLOCK m_setSrwl;
+
 
 	private:
 		// -----------------------
@@ -121,6 +135,26 @@ namespace Library_Jingyu
 		// return : 정상적으로 셋팅 시 true
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
+		
+		// AccountNo 자료구조 "검색용"
+		//
+		// Parameter : AccountNO(INT64)
+		// return : 있을 시 true, 없을 시 false
+		bool AccountNO_Find(INT64 AccountNo);
+		
+		// AccountNo 자료구조 "추가"
+		//
+		// Parameter : AccountNO(INT64)
+		// return : 이미 자료구조에 존재할 시 false, 
+		//			존재하며 정상적으로 추가될 시 true
+		bool AccountNO_Insert(INT64 AccountNo);
+
+		// AccountNo 자료구조 "검색 후 삭제"
+		//
+		// Parameter : AccountNO(INT64)
+		// return : 없음.
+		//			자료구조에 존재하지 않을 시 Crash
+		void AccountNO_Erase(INT64 AccountNo);
 
 
 

@@ -26,6 +26,9 @@ extern LONG g_lGameFPS;
 LONG g_lShowAuthFPS;
 LONG g_lShowGameFPS;
 
+// 중복 로그인으로 인해, 보내고 끊기를 할 시 1씩 증가
+LONG g_DuplicateCount;	
+
 
 // ------------------
 // CGameSession의 함수
@@ -201,9 +204,11 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnGame_ClientRelease()
 	{
+		// 자료구조에서 제거
+		//m_pParent->AccountNO_Erase(m_Int64AccountNo);
+
 		// AccountNo 초기화
 		m_Int64AccountNo = 0x0fffffffffffffff;
-
 	}
 
 	
@@ -219,7 +224,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::Auth_LoginPacket(CProtocolBuff_Net* Packet)
 	{
-		// 1. 마샬링
+		// 마샬링	----------------------
 		INT64 AccountNo;
 		char SessionKey[64];
 		int Version;
@@ -228,13 +233,47 @@ namespace Library_Jingyu
 		Packet->GetData(SessionKey, 64);
 		Packet->GetData((char*)&Version, 4);
 
-		// 2. 검증작업 -----------
-		// 지금은 없음
+		
+		// AccountNo 자료구조에 추가.	----------------------
+		// 이미 있으면(false 리턴) 중복 로그인으로 처리
+		/*
+		if (m_pParent->AccountNO_Insert(AccountNo) == false)
+		{
+			// 로그인 실패 패킷 보내고 끊기.
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
-		// 3. 값 셋팅
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// Status
+			BYTE Status = 0;		// 실패
+			SendBuff->PutData((char*)&Status, 1);
+
+			// AccountNo
+			SendBuff->PutData((char*)&AccountNo, 8);
+
+			InterlockedIncrement(&g_DuplicateCount);
+
+			// SendPacket
+			SendPacket(SendBuff, TRUE);
+
+			return;
+		}
+		*/
+
+
+		// 3. m_Int64AccountNo의 값이 0x0fffffffffffffff이 아니면, 뭔가 이상함.
+		// 코드 잘못이라고 밖에 못 봄.
+		if(m_Int64AccountNo != 0x0fffffffffffffff)
+		{
+			throw CException(_T("Auth_LoginPacket() --> AccountNo Error!!"));
+		}
+
+		// 4. 값 셋팅
 		m_Int64AccountNo = AccountNo;
 
-		// 4. 로그인 응답 패킷 보내기
+		// 5. 로그인 응답 패킷 보내기
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		// 타입
@@ -251,7 +290,7 @@ namespace Library_Jingyu
 		// SendPacket
 		SendPacket(SendBuff);		
 
-		// 5. AUTH 에서 GAME으로 모드 변경
+		// 6. AUTH 에서 GAME으로 모드 변경
 		SetMode_GAME();
 	}
 	   
@@ -269,10 +308,14 @@ namespace Library_Jingyu
 		Packet->GetData((char*)&SendTick, 8);
 
 		// 2. AccountNo 확인하기
-		// 로그인요청이 오지 않은 유저라면, 밖으로 예외 던짐
+		// 다르면 로그 남기고 접속 끊음.
 		if (AccountNo != m_Int64AccountNo)
 		{
-			throw CException(_T("Game_EchoTest() --> AccountNo Error!!"));
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_GameServerLog->LogSave(L"GameServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s : AccountNo : %lld",
+				L"Game_EchoTest --> AccountNo Error", AccountNo);
+
+			Disconnect();	
 			return;
 		}
 
@@ -314,6 +357,13 @@ namespace Library_Jingyu
 		// 모니터링 서버와 통신하기 위한 LanClient 동적할당
 		m_Monitor_LanClient = new CGame_MinitorClient;
 		m_Monitor_LanClient->ParentSet(this);
+
+		// U_set의 reserve 셋팅.
+		// 미리 공간 잡아둔다.
+		m_setAccount.reserve(m_stConfig.MaxJoinUser);
+
+		// U_set용 SRW락 초기화
+		InitializeSRWLock(&m_setSrwl);
 	}
 
 	CGameServer::~CGameServer()
@@ -330,11 +380,15 @@ namespace Library_Jingyu
 	bool CGameServer::GameServerStart()
 	{
 		// 1. 세션 셋팅
-		m_cGameSession = new CGameSession[m_stConfig.MaxJoinUser];	
+		m_cGameSession = new CGameSession[m_stConfig.MaxJoinUser];			
 
 		int i = 0;
 		while (i < m_stConfig.MaxJoinUser)
 		{
+			// GameServer의 포인터 셋팅
+			m_cGameSession[i].m_pParent  = this;
+
+			// 엔진에 세션 셋팅
 			SetSession(&m_cGameSession[i], m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2);			
 			++i;
 		}		
@@ -404,21 +458,12 @@ namespace Library_Jingyu
 		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 		ASQPool_ChunkAlloc_Count : - Accept Socket Queue에 들어가는 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
+		DuplicateCount :	- 중복 로그인으로 인해 보내고 끊기를 할 시 1씩 증가
+
 		----------------------------------------------------
 		CPU usage [MMOServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
 
-		*/
-
-		/*LONG AccpetTPS = g_lAcceptTPS_MMO;
-		LONG SendTPS = g_lSendPostTPS_MMO;
-		LONG RecvTPS = g_lRecvTPS_MMO;
-		LONG AuthFPS = g_lAuthFPS;
-		LONG GameFPS = g_lGameFPS;
-		InterlockedExchange(&g_lAcceptTPS_MMO, 0);
-		InterlockedExchange(&g_lSendPostTPS_MMO, 0);
-		InterlockedExchange(&g_lRecvTPS_MMO, 0);
-		InterlockedExchange(&g_lAuthFPS, 0);
-		InterlockedExchange(&g_lGameFPS, 0);*/
+		*/		
 
 		LONG AccpetTPS = InterlockedExchange(&g_lAcceptTPS_MMO, 0);
 		LONG SendTPS = InterlockedExchange(&g_lSendPostTPS_MMO, 0);
@@ -448,6 +493,8 @@ namespace Library_Jingyu
 
 				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 				"ASQPool_ChunkAlloc_Count : %d (Out : %d)\n\n"
+				
+				"DuplicateCount : %d\n\n"
 
 			"========================================================\n\n"
 			"CPU usage [MMOServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
@@ -461,6 +508,7 @@ namespace Library_Jingyu
 			g_lShowAuthFPS, g_lShowGameFPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			GetChunkCount(), GetOutChunkCount(),
+			g_DuplicateCount,
 
 			// ----------- 프로세스 사용량 
 			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel()
@@ -591,6 +639,80 @@ namespace Library_Jingyu
 		return true;
 	}
 
+	// AccountNo 자료구조 "검색용"
+	//
+	// Parameter : AccountNO(INT64)
+	// return : 있을 시 true, 없을 시 false
+	bool CGameServer::AccountNO_Find(INT64 AccountNo)
+	{		
+		AcquireSRWLockShared(&m_setSrwl);		// Shared 락 ------------------
+
+		// 1. 검색
+		auto Find = m_setAccount.find(AccountNo);
+
+		// 2. 만약, 없는 AccountNo라면 false 리턴
+		if (Find == m_setAccount.end())
+		{
+			ReleaseSRWLockShared(&m_setSrwl);		// Shared 언락  ------------------ 
+			return false;
+		}
+
+		ReleaseSRWLockShared(&m_setSrwl);		// Shared 언락  ------------------ 
+
+		// 3. 있다면 true 리턴
+		return true;
+	}
+
+	// AccountNo 자료구조 "추가"
+	//
+	// Parameter : AccountNO(INT64)
+	// return : 이미 자료구조에 존재할 시 false, 
+	//			존재하며 정상적으로 추가될 시 true
+	bool CGameServer::AccountNO_Insert(INT64 AccountNo)
+	{
+		AcquireSRWLockExclusive(&m_setSrwl);		// Exclusive 락 ------------------
+
+		// 1. 추가
+		auto ret = m_setAccount.insert(AccountNo);
+
+		// 2. 만약, 이미 있다면 중복된 유저. return false.
+		if (ret.second == false)
+		{
+			ReleaseSRWLockExclusive(&m_setSrwl);		// Exclusive 언락  ------------------ 
+			return false;
+		}
+
+		// 3. 없다면, 잘 추가된것. true 리턴
+		ReleaseSRWLockExclusive(&m_setSrwl);		// Exclusive 언락  ------------------ 
+		return true;
+	}
+
+	// AccountNo 자료구조 "삭제"
+	//
+	// Parameter : AccountNO(INT64)
+	// return : 없음.
+	//			자료구조에 존재하지 않을 시 Crash
+	void CGameServer::AccountNO_Erase(INT64 AccountNo)
+	{
+		AcquireSRWLockExclusive(&m_setSrwl);		// Exclusive 락 ------------------
+
+		// 1. 검색
+		auto Find = m_setAccount.find(AccountNo);
+
+		// 2. 만약, 없다면 말이안됨. 
+		if (Find == m_setAccount.end())
+		{
+			ReleaseSRWLockExclusive(&m_setSrwl);	//  Exclusive \언락 ------------------
+
+			// 말이 안됨. 크래시
+			g_GameServerDump->Crash();
+		}
+
+		// 3. 있다면 Set에서 제거	
+		m_setAccount.erase(Find);
+
+		ReleaseSRWLockExclusive(&m_setSrwl);	// ---------------- Unlock
+	}
 
 
 
