@@ -210,7 +210,7 @@ namespace Library_Jingyu
 			// ref 카운트가 0이 되면 메모리풀에 반환
 			CProtocolBuff_Lan::Free(payloadBuff);
 			return;
-		}
+		}		
 
 		// 2. 헤더를 넣어서, 패킷 완성하기
 		payloadBuff->SetProtocolBuff_HeaderSet();
@@ -223,11 +223,11 @@ namespace Library_Jingyu
 		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff_Lan::Free(payloadBuff);
 
-		// 5. SendPost시도
-		SendPost(NowSession);
+		// 5. PQCS
+		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)NowSession, &NowSession->m_overPQCSOverlapped);
 
-		// 6. 세션 락 해제(락 아니지만 락처럼 사용)
-		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 이 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
+		// 6. 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
+		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
 		// 근데 따로 리턴값 받지 않고 있음
 		GetSessionUnLOCK(NowSession);
 	}
@@ -443,10 +443,56 @@ namespace Library_Jingyu
 			g_This->OnWorkerThreadBegin();
 
 			// -----------------
+			// PQCS 요청 로직
+			// -----------------
+			if (&stNowSession->m_overPQCSOverlapped == overlapped)
+			{
+				// 1. 락 ---------------------------
+				// I/O 카운트 1 증가.	
+				if (InterlockedIncrement(&stNowSession->m_lIOCount) == 1)
+				{
+					// I/O 카운트가 1이라면 다시 --
+					// 감소한 값이 0이면서, inDIsconnect 호출
+					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					{
+						g_This->InDisconnect(stNowSession);
+						g_This->ConnectFunc();
+					}
+
+					continue;
+				}
+
+				// Release Flag 체크
+				if (stNowSession->m_lReleaseFlag == TRUE)
+				{
+					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					{
+						g_This->InDisconnect(stNowSession);
+						g_This->ConnectFunc();
+					}
+
+					continue;
+				}
+
+				// 2. SendPost 시도
+				g_This->SendPost(stNowSession);
+
+				// 3. 락 해제 (락 아니지만 락처럼 사용)
+				// I/O 카운트 1 감소
+				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+				{
+					g_This->InDisconnect(stNowSession);
+					g_This->ConnectFunc();
+				}
+
+				continue;
+			}
+
+			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			else if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);
@@ -956,7 +1002,7 @@ namespace Library_Jingyu
 				}
 
 				// 에러가 버퍼 부족이라면, I/O카운트 차감이 끝이 아니라 끊어야한다.
-				if (Error == WSAENOBUFS)
+				else if (Error == WSAENOBUFS)
 				{
 					// 내 에러, 윈도우에러 보관
 					m_iOSErrorCode = Error;
@@ -1001,11 +1047,6 @@ namespace Library_Jingyu
 			// ------------------
 			// send 가능 상태인지 체크
 			// ------------------
-			// 1. SendFlag(1번인자)가 0(3번인자)과 같다면, SendFlag(1번인자)를 1(2번인자)으로 변경
-			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
-			//if (InterlockedCompareExchange(&NowSession->m_lSendFlag, TRUE, FALSE) == TRUE)
-			//	return true;
-
 			// 1. SendFlag(1번인자)가 를 TRUE(2번인자)로 변경.
 			// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)이었다는 것.
 			if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
@@ -1040,8 +1081,9 @@ namespace Library_Jingyu
 			while (i < UseSize)
 			{
 				if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[i]) == -1)
-					cLanClientDump->Crash();
+					cLanClientDump->Crash();				
 
+				// WSABUF에 복사
 				wsabuf[i].buf = NowSession->m_PacketArray[i]->GetBufferPtr();
 				wsabuf[i].len = NowSession->m_PacketArray[i]->GetUseSize();
 
@@ -1074,7 +1116,7 @@ namespace Library_Jingyu
 					}
 
 					// 에러가 버퍼 부족이라면
-					if (Error == WSAENOBUFS)
+					else if (Error == WSAENOBUFS)
 					{
 						// 내 에러, 윈도우에러 보관
 						m_iOSErrorCode = Error;

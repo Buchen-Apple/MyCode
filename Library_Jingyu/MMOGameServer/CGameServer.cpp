@@ -340,6 +340,10 @@ namespace Library_Jingyu
 // ---------------
 namespace Library_Jingyu
 {
+
+	// Net 직렬화 버퍼 1개의 크기 (Byte)
+	LONG g_lNET_BUFF_SIZE = 200;
+
 	// -----------------
 	// 생성자와 소멸자
 	// -----------------
@@ -389,7 +393,7 @@ namespace Library_Jingyu
 			m_cGameSession[i].m_pParent  = this;
 
 			// 엔진에 세션 셋팅
-			SetSession(&m_cGameSession[i], m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2);			
+			SetSession(&m_cGameSession[i], m_stConfig.MaxJoinUser);			
 			++i;
 		}		
 		
@@ -434,9 +438,6 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::ShowPrintf()
 	{
-		// 해당 프로세스의 사용량 체크할 클래스
-		static CCpuUsage_Process ProcessUsage;
-
 		// 화면 출력할 것 셋팅
 		/*
 		Monitor Connect :					- 모니터링 서버와 연결 여부. 1이면 연결됨.
@@ -461,7 +462,6 @@ namespace Library_Jingyu
 		DuplicateCount :	- 중복 로그인으로 인해 보내고 끊기를 할 시 1씩 증가
 
 		----------------------------------------------------
-		CPU usage [MMOServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
 
 		*/		
 
@@ -470,9 +470,6 @@ namespace Library_Jingyu
 		LONG RecvTPS = InterlockedExchange(&g_lRecvTPS_MMO, 0);
 		g_lShowAuthFPS = InterlockedExchange(&g_lAuthFPS, 0);
 		g_lShowGameFPS = InterlockedExchange(&g_lGameFPS, 0);
-
-		// 출력 전에, 프로세스 사용량 갱신
-		ProcessUsage.UpdateCpuTime();
 
 		printf("========================================================\n"
 				"Monitor Connect : %d\n"
@@ -496,9 +493,7 @@ namespace Library_Jingyu
 				
 				"DuplicateCount : %d\n\n"
 
-			"========================================================\n\n"
-			"CPU usage [MMOServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
-
+			"========================================================\n\n",
 
 			// ----------- 게임 서버용
 			m_Monitor_LanClient->GetClinetState(),
@@ -508,10 +503,8 @@ namespace Library_Jingyu
 			g_lShowAuthFPS, g_lShowGameFPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			GetChunkCount(), GetOutChunkCount(),
-			g_DuplicateCount,
+			g_DuplicateCount	
 
-			// ----------- 프로세스 사용량 
-			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel()
 			);
 	}
 
@@ -889,6 +882,9 @@ namespace Library_Jingyu
 		// CPU 사용율 체크 클래스 (채팅서버 소프트웨어)
 		CCpuUsage_Process CProcessCPU;
 
+		// CPU 사용율 체크 클래스 (하드웨어)
+		CCpuUsage_Processor CProcessorCPU;
+
 		// PDH용 클래스
 		CPDH	CPdh;
 
@@ -912,16 +908,43 @@ namespace Library_Jingyu
 
 			// 그게 아니라면, 일을 한다.
 
-			// 프로세서 CPU 사용율, PDH 정보 갱신
+			// 프로세서, 프로세스 CPU 사용율, PDH 정보 갱신
+			CProcessorCPU.UpdateCpuTime();
 			CProcessCPU.UpdateCpuTime();
 			CPdh.SetInfo();
 
-			// 게임서버가 On일 경우, 패킷을 보낸다.
-			if (g_This->m_GameServer_this->GetServerState() == true)
-			{
-				// 타임스탬프 구하기
-				int TimeStamp = (int)(time(NULL));
+			// ----------------------------------
+			// 하드웨어 정보 보내기 (프로세서)
+			// ----------------------------------
+			int TimeStamp = (int)(time(NULL));
 
+			// 1. 하드웨어 CPU 사용률 전체
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL, (int)CProcessorCPU.ProcessorTotal(), TimeStamp);
+
+			// 2. 하드웨어 사용가능 메모리 (MByte)
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_AVAILABLE_MEMORY, (int)CPdh.Get_AVA_Mem(), TimeStamp);
+
+			// 3. 하드웨어 이더넷 수신 바이트 (KByte)
+			int iData = (int)(CPdh.Get_Net_Recv() / 1024);
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NETWORK_RECV, iData, TimeStamp);
+
+			// 4. 하드웨어 이더넷 송신 바이트 (KByte)
+			iData = (int)(CPdh.Get_Net_Send() / 1024);
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NETWORK_SEND, iData, TimeStamp);
+
+			// 5. 하드웨어 논페이지 메모리 사용량 (MByte)
+			iData = (int)(CPdh.Get_NonPaged_Mem() / 1024 / 1024);
+			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_NONPAGED_MEMORY, iData, TimeStamp);
+
+
+
+			// ----------------------------------
+			// 게임서버 정보 보내기
+			// ----------------------------------
+
+			// 게임서버가 On일 경우, 게임서버 정보 보낸다.
+			if (g_This->m_GameServer_this->GetServerState() == true)
+			{			
 				// 1. 게임서버 ON		
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON, TRUE, TimeStamp);
 

@@ -78,14 +78,7 @@ namespace Library_Jingyu
 
 			// Auth To Game Falg
 			// true면 Game모드로 전환될 유저
-			LONG m_lAuthToGameFlag;
-
-			// 유저의 모드 상태
-			euSessionModeState m_euMode;
-
-			// 로그아웃 플래그
-			// true면 로그아웃 될 유저.
-			LONG m_lLogoutFlag;
+			LONG m_lAuthToGameFlag;	
 
 			// CompleteRecvPacket(Queue)
 			CNormalQueue<CProtocolBuff_Net*>* m_CRPacketQueue;
@@ -117,6 +110,13 @@ namespace Library_Jingyu
 			// Send한 직렬화 버퍼들 저장할 포인터 변수
 			CProtocolBuff_Net* m_PacketArray[dfSENDPOST_MAX_WSABUF];
 
+			// 유저의 모드 상태
+			euSessionModeState m_euMode;
+
+			// 로그아웃 플래그
+			// true면 로그아웃 될 유저.
+			LONG m_lLogoutFlag;
+
 			// Send가능 상태인지 체크. 1이면 Send중, 0이면 Send중 아님
 			LONG	m_lSendFlag;
 
@@ -131,16 +131,7 @@ namespace Library_Jingyu
 			CRingBuff m_RecvQueue;
 
 			// 마지막 패킷 저장소
-			void* m_LastPacket = nullptr;
-
-			// 헤더 코드
-			BYTE m_bCode;
-
-			// XOR1 코드
-			BYTE m_bXORCode_1;
-
-			// XOR2 코드
-			BYTE m_bXORCode_2;
+			void* m_LastPacket = nullptr;			
 
 		public:
 			// -----------------
@@ -234,13 +225,31 @@ namespace Library_Jingyu
 
 			// ******* SEND 스레드용 *******
 			int SendSleep;					// Sleep하는 시간(밀리세컨드)	
+			int CreateSendThreadCount;		// 생성할 샌드스레드 수
+
 		};
 
+		// Send 스레드에서 처리할 Index의 Start와 End 보관 구조체
+		struct stSendConfig
+		{
+			int m_iStartIndex;
+			int m_iEndIndex;
+		};
 
 	private:
 		// ------------------
 		// 멤버 변수
 		// ------------------
+
+		// Send 스레드 Index 보관 변수
+		// 설정파일에서 읽어온 최대 샌드 스레드 수 만큼 동적할당
+		stSendConfig* m_stSendConfig;
+
+		// Send 스레드 카운트
+		// 각 샌드스레드는 InterlockedIncrement로 해당 카운트를 올려서 사용.
+		// TLS와 같은 구조
+		// 최초에는 -1
+		LONG m_lSendConfigIndex;
 
 		// Config 변수
 		stConfigFile m_stConfig;
@@ -252,7 +261,7 @@ namespace Library_Jingyu
 		CLF_Queue<stAuthWork*>* m_pASQ;
 
 
-		// Net서버의 Config들.
+		// MMO서버의 Config들.
 		BYTE m_bCode;
 		BYTE m_bXORCode_1;
 		BYTE m_bXORCode_2;
@@ -260,14 +269,14 @@ namespace Library_Jingyu
 		// 리슨소켓
 		SOCKET m_soListen_sock;
 
-		// 워커, 엑셉트, 샌드, 어스, 게임 스레드 핸들 배열
+		// 워커, 엑셉트, 샌드, 어스, 게임 스레드 핸들
 		HANDLE*	m_hAcceptHandle;
 		HANDLE* m_hWorkerHandle;
 		HANDLE* m_hSendHandle;
 		HANDLE* m_hAuthHandle;
 		HANDLE* m_hGameHandle;
 
-		// 릴리즈 스레드
+		// 릴리즈 스레드 핸들
 		HANDLE m_hReleaseHandle;
 
 		// IOCP 핸들
@@ -375,12 +384,6 @@ namespace Library_Jingyu
 		// Stop() 함수에서 사용.
 		void Reset();
 
-		// 내부에서 실제로 유저를 끊는 함수.
-		//
-		// Parameter : 끊을 세션 포인터
-		// return : 없음
-		void InDisconnect(cSession* DeleteSession);
-
 		// RecvProc 함수.
 		// 완성된 패킷을 인자로받은 Session의 CompletionRecvPacekt (Queue)에 넣는다.
 		//
@@ -440,9 +443,9 @@ namespace Library_Jingyu
 
 		// 세션 셋팅
 		//
-		// Parameter : cSession* 포인터, Max 수(최대 접속 가능 유저 수), HeadCode, XORCode1, XORCode2
+		// Parameter : cSession* 포인터, Max 수(최대 접속 가능 유저 수)
 		// return : 없음
-		void SetSession(cSession* pSession, int Max, BYTE HeadCode, BYTE XORCode1, BYTE XORCode2);
+		void SetSession(cSession* pSession, int Max);
 
 
 	private:

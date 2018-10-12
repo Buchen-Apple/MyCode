@@ -106,7 +106,7 @@ namespace Library_Jingyu
 		ULONGLONG m_ullJoinUserCount;
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
-		bool m_bServerLife;
+		bool m_bServerLife;		
 
 
 	private:
@@ -154,9 +154,10 @@ namespace Library_Jingyu
 
 		// SendPost함수
 		//
-		// return true : 성공적으로 WSASend() 완료 or 어쨋든 종료된 유저는 아님
-		// return false : I/O카운트가 0이되어서 종료된 유저임
-		bool SendPost(stSession* NowSession);
+		// return 0 : 성공적으로 WSASend() 완료 or WSASend가 실패했지만 종료된 유저는 아님.
+		// return 1 : SendFlag가 TRUE(누가 이미 샌드중)임.
+		// return 2 : I/O카운트가 0이되어서 종료된 유저
+		int SendPost(stSession* NowSession);
 
 		// 내부에서 실제로 유저를 끊는 함수.
 		void InDisconnect(stSession* NowSession);

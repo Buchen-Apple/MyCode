@@ -26,6 +26,10 @@ namespace Library_Jingyu
 
 	// 로그 찍을 전역변수 하나 받기.
 	CSystemLog* cLoginLibLog = CSystemLog::GetInstance();
+
+	// 직렬화 버퍼 1개의 크기
+	// 각 서버에 전역 변수로 존재해야 함.
+	LONG g_lNET_BUFF_SIZE = 200;
 	
 
 	/////////////////////////////
@@ -1298,8 +1302,7 @@ namespace Library_Jingyu
 			// ----------------------------------
 			// 하드웨어 정보 보내기 (프로세서)
 			// ----------------------------------
-			int TimeStamp = (int)(time(NULL));
-			WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;			
+			int TimeStamp = (int)(time(NULL));		
 
 			// 1. 하드웨어 CPU 사용률 전체
 			g_This->InfoSend(dfMONITOR_DATA_TYPE_SERVER_CPU_TOTAL, (int)CProcessorCPU.ProcessorTotal(), TimeStamp);

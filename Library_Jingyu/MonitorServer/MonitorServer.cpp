@@ -19,6 +19,10 @@ namespace Library_Jingyu
 	// 로그 찍을 전역변수 하나 받기.
 	CSystemLog* cMonitorLibLog = CSystemLog::GetInstance();
 
+	// 직렬화 버퍼 1개의 크기
+	// 각 서버에 전역 변수로 존재해야 함.
+	LONG g_lNET_BUFF_SIZE = 512;
+
 	// -----------------
 	// 생성자
 	// -----------------

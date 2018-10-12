@@ -9,7 +9,8 @@ namespace Library_Jingyu
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
 	// 직렬화 버퍼 1개의 크기
-#define BUFF_SIZE 512
+	// 각 서버에 전역 변수로 존재해야 함.
+	extern LONG g_lNET_BUFF_SIZE;
 
 	// NetServer Packet 헤더 사이즈.
 #define dfNETWORK_PACKET_HEADER_SIZE_NETSERVER 5
@@ -35,8 +36,8 @@ namespace Library_Jingyu
 	// 사이즈 지정 안한 생성자
 	CProtocolBuff_Net::CProtocolBuff_Net()
 	{
-		m_Size = BUFF_SIZE;
-		m_pProtocolBuff = new char[BUFF_SIZE];
+		m_Size = g_lNET_BUFF_SIZE;
+		m_pProtocolBuff = new char[g_lNET_BUFF_SIZE];
 		m_Front = 0;
 		m_Rear = dfNETWORK_PACKET_HEADER_SIZE_NETSERVER; // 처음 앞에 5바이트는 헤더를 넣어야 하기 때문에 rear를 2로 설정해둔다.
 		m_RefCount = 1;	// 레퍼런스 카운트 1으로 초기화 (생성되었으니 카운트 1이 되어야 한다.)	

@@ -81,12 +81,9 @@ namespace Library_Jingyu
 
 		// 2. 인자로 받은 Flag가 true라면, 마지막 패킷의 주소를 보관
 		if (LastFlag == TRUE)
-			m_LastPacket = payloadBuff;
+			m_LastPacket = payloadBuff;		
 
-		// 3. 헤더를 넣어서, 패킷 완성하기		
-		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
-
-		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
+		// 3. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 차후, 문제가 생기면 패킷 래퍼런스 카운트 증가시키는 것 고려
 		m_SendQueue->Enqueue(payloadBuff);
 	}
@@ -160,6 +157,8 @@ namespace Library_Jingyu
 		if (SetFile(&m_stConfig) == false)
 			cMMOServer_Dump->Crash();
 
+		// 값을 -1로 셋팅
+		m_lSendConfigIndex = -1;
 
 		// 서버 가동상태 false로 시작 
 		m_bServerLife = false;
@@ -339,6 +338,11 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("SendSleep"), &pConfig->SendSleep) == false)
 			return false;
 
+		// Send 스레드 생성 수
+		if (Parser.GetValue_Int(_T("MaxSendThread"), &pConfig->CreateSendThreadCount) == false)
+			return false;
+
+
 		return true;
 	}
 
@@ -422,80 +426,7 @@ namespace Library_Jingyu
 		m_iMaxJoinUser = 0;
 		m_ullJoinUserCount = 0;
 	}
-
-	// 내부에서 실제로 유저를 끊는 함수.
-	//
-	// Parameter : 끊을 세션 포인터
-	// return : 없음
-	void CMMOServer::InDisconnect(cSession* DeleteSession)
-	{
-		// SendFlag를 TRUE로 만든다.
-		// 내가 TRUE로 만들었다면 로직 진행
-		if (InterlockedExchange(&DeleteSession->m_lSendFlag, TRUE) == FALSE)
-		{
-			// 모드 초기화
-			DeleteSession->m_euMode = euSessionModeState::MODE_NONE;
-
-			// 세션 ID 초기화
-			DeleteSession->m_ullSessionID = 0xffffffffffffffff;
-
-			// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
-			int i = DeleteSession->m_iWSASendCount - 1;
-			while (i >= 0)
-			{
-				CProtocolBuff_Net::Free(DeleteSession->m_PacketArray[i]);
-				--i;
-			}
-
-			// SendCount 초기화
-			DeleteSession->m_iWSASendCount = 0;
-
-			// CompleteRecvPacket 비우기
-			CProtocolBuff_Net* DeletePacket;
-
-			int UseSize = DeleteSession->m_CRPacketQueue->GetNodeSize();
-			while (UseSize > 0)
-			{
-				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
-				if (DeleteSession->m_CRPacketQueue->Dequeue(DeletePacket) == -1)
-					cMMOServer_Dump->Crash();
-
-				CProtocolBuff_Net::Free(DeletePacket);
-
-				--UseSize;
-			}
-
-			// 샌드 큐 비우기
-			//UseSize = DeleteSession->m_SendQueue->GetInNode();
-			UseSize = DeleteSession->m_SendQueue->GetNodeSize();
-			while (UseSize > 0)
-			{
-				// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
-				if (DeleteSession->m_SendQueue->Dequeue(DeletePacket) == -1)
-					cMMOServer_Dump->Crash();
-
-				CProtocolBuff_Net::Free(DeletePacket);
-
-				--UseSize;
-			}
-
-			// 리시브 큐 초기화
-			DeleteSession->m_RecvQueue.ClearBuffer();			
-
-			// 릴리즈 되었다고 알려준다.
-			DeleteSession->OnGame_ClientRelease();
-
-			// 클로즈 소켓
-			closesocket(DeleteSession->m_Client_sock);
-
-			// 미사용 인덱스 스택에 반납
-			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);
-
-			// 접속 중 유저 수 감소
-			InterlockedDecrement(&m_ullJoinUserCount);
-		}
-	}
-	
+	   	
 	// RecvProc 함수.
 	// 완성된 패킷을 인자로받은 Session의 CompletionRecvPacekt (Queue)에 넣는다.
 	//
@@ -625,7 +556,7 @@ namespace Library_Jingyu
 
 
 			// 11. 완성된 패킷을 CompletionRecvPacekt (Queue)에 넣는다.
-			InterlockedAdd(&g_lRecvTPS_MMO, 1);
+			InterlockedIncrement(&g_lRecvTPS_MMO);
 			NowSession->m_CRPacketQueue->Enqueue(PayloadBuff);
 		}
 
@@ -707,7 +638,7 @@ namespace Library_Jingyu
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 					// 로그 찍기 (로그 레벨 : 에러)
-					cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// 에러 함수 호출
@@ -1201,26 +1132,9 @@ namespace Library_Jingyu
 				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
 				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH)
 				{
-					// LogOutFlag가 TRUE라면 로직 진행
-					if (NowSession->m_lLogoutFlag == TRUE)
-					{						
-						// Auth 모드 유저 수 감소
-						--g_lAuthModeUserCount;
-
-						// 나갔다고 알려준다.
-						// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
-						NowSession->OnAuth_ClientLeave();
-
-						// MODE_WAIT_LOGOUT으로 모드 변경
-						NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
-
-						// 인덱스 증가 후 while문 처음으로 돌아간다.
-						--iIndex;
-						continue;
-					}				
-					
-					// LogOutFlag가 FALSE라면 정상 로직 처리
-					else
+					// LogOutFlag 체크
+					// FALSE라면 정상 로직 처리
+					if (NowSession->m_lLogoutFlag == FALSE)
 					{
 						// 1. CompleteRecvPacket 큐의 사이즈 확인.
 						int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
@@ -1250,22 +1164,41 @@ namespace Library_Jingyu
 								--iQSize;
 							}
 						}
+
+						// Auth TO Game 플래그 확인
+						// AUTH에서 GAME으로 모드 전환
+						if (NowSession->m_lAuthToGameFlag == TRUE)
+						{
+							// Auth 모드 유저 수 감소
+							--g_lAuthModeUserCount;
+
+							// 나갔다고 알려준다.
+							// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
+							NowSession->OnAuth_ClientLeave(true);
+
+							// MODE_AUTH_TO_GAME으로 모드 변경
+							NowSession->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
+						}
 					}
 
-					// Auth TO Game 플래그 확인
-					// AUTH에서 GAME으로 모드 전환
-					if (NowSession->m_lAuthToGameFlag == TRUE)
+					// TRUE라면 끊길 유저
+					else
 					{
-						// Auth 모드 유저 수 감소
-						--g_lAuthModeUserCount;
+						// SendFlag 체크
+						if (NowSession->m_lSendFlag == FALSE)
+						{
+							// Auth 모드 유저 수 감소
+							--g_lAuthModeUserCount;
 
-						// 나갔다고 알려준다.
-						// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
-						NowSession->OnAuth_ClientLeave(true);
+							// 나갔다고 알려준다.
+							// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
+							NowSession->OnAuth_ClientLeave();
 
-						// MODE_AUTH_TO_GAME으로 모드 변경
-						NowSession->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
+							// MODE_WAIT_LOGOUT으로 모드 변경
+							NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
+						}
 					}
+							
 				}				
 				
 				--iIndex;
@@ -1277,7 +1210,7 @@ namespace Library_Jingyu
 			// ------------------
 			g_This->OnAuth_Update();			
 
-			InterlockedAdd(&g_lAuthFPS, 1);
+			InterlockedIncrement(&g_lAuthFPS);
 					   	
 		}
 
@@ -1341,9 +1274,9 @@ namespace Library_Jingyu
 
 				// Part 1. Game 모드로 전환
 				// 유저가 MODE_AUTH_TO_GAME 모드인지 확인 -----------------
-				// 그리고 모드 체인지 유저 수가 0이 아닌지 체크.
-				if (iModeChangeCount > 0 && 
-					NowSession->m_euMode == euSessionModeState::MODE_AUTH_TO_GAME)
+				// 그리고 모드 체인지 유저 수가 0보다 큰지 체크
+				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH_TO_GAME &&
+					iModeChangeCount > 0)
 				{
 					// Game 모드 유저 수 증가
 					++g_lGameModeUserCount;
@@ -1363,21 +1296,9 @@ namespace Library_Jingyu
 				// 유저가 MODE_GAME 모드인지 확인 -----------------
 				if (NowSession->m_euMode == euSessionModeState::MODE_GAME)
 				{
-					// LogOutFlag가 TRUE라면, 로직 진행
-					if (NowSession->m_lLogoutFlag == TRUE)
-					{						
-						// Game 모드 유저 수 감소
-						--g_lGameModeUserCount;
-
-						// Game모드에서 나갔음을 알려준다.
-						NowSession->OnGame_ClientLeave();
-
-						// 맞다면, MODE_WAIT_LOGOUT으로 모드 변경
-						NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
-					}
-
-					// LogOutFlag가 FALSE인 유저만 정상 로직 처리
-					else
+					// LogOutFlag 체크
+					// FALSE라면 정상 로직 처리
+					if (NowSession->m_lLogoutFlag == FALSE)
 					{
 						// 1. CompleteRecvPacket 큐의 사이즈 확인.
 						int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
@@ -1407,7 +1328,25 @@ namespace Library_Jingyu
 								--iQSize;
 							}
 						}
+
 					}
+
+					// LogOutFlag가 TRUE라면 끊길 유저. 
+					else
+					{
+						// SendFlag 체크
+						if (NowSession->m_lSendFlag == FALSE)
+						{
+							// Game 모드 유저 수 감소
+							--g_lGameModeUserCount;
+
+							// Game모드에서 나갔음을 알려준다.
+							NowSession->OnGame_ClientLeave();
+
+							// 맞다면, MODE_WAIT_LOGOUT으로 모드 변경
+							NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
+						}
+					}					
 				}				
 
 				--iIndex;
@@ -1418,7 +1357,7 @@ namespace Library_Jingyu
 			// ------------------
 			g_This->OnGame_Update();								   			
 
-			InterlockedAdd(&g_lGameFPS, 1);
+			InterlockedIncrement(&g_lGameFPS);
 		}
 
 		return 0;
@@ -1432,6 +1371,11 @@ namespace Library_Jingyu
 		// 최대 접속 가능 유저, 로컬로 받아두기
 		int iMaxUser = g_This->m_iMaxJoinUser;
 
+		// 해당 샌드 스레드가 처리할 인덱스의 Start와 End 받기
+		LONG Index = InterlockedIncrement(&g_This->m_lSendConfigIndex);
+		int iStartIndex = g_This->m_stSendConfig[Index].m_iStartIndex;
+		int iEndIndex = g_This->m_stSendConfig[Index].m_iEndIndex;
+
 		// 종료 이벤트
 		HANDLE* ExitEvent = &g_This->m_hSendExitEvent;
 
@@ -1440,6 +1384,11 @@ namespace Library_Jingyu
 
 		// Sleep 인자로 받아두기
 		const int SLEEP_VALUE = g_This->m_stConfig.SendSleep;
+
+		// Encode할 변수들 받아두기
+		BYTE Head = g_This->m_bCode;
+		BYTE XORCode1 = g_This->m_bXORCode_1;
+		BYTE XORCode2 = g_This->m_bXORCode_2;
 
 		while (1)
 		{
@@ -1462,12 +1411,14 @@ namespace Library_Jingyu
 
 			
 			// ------------------
-			// 모든 유저를 대상으로 샌드 시도
+			// Start와 End Index를 기준으로 Send 시도
 			// ------------------
-			int iArrayIndex = iMaxUser-1;
-			while (iArrayIndex >= 0)
+			int TempStartIndex = iStartIndex;
+			int TempEndIndex = iEndIndex;
+
+			while (TempEndIndex >= TempStartIndex)
 			{
-				cSession* NowSession = SessionArray[iArrayIndex];
+				cSession* NowSession = SessionArray[TempEndIndex];
 				
 				
 				// ------------------
@@ -1477,7 +1428,7 @@ namespace Library_Jingyu
 				// ------------------
 				if (NowSession->m_iWSASendCount != 0)
 				{
-					--iArrayIndex;
+					--TempEndIndex;
 					continue;
 				}	
 				
@@ -1488,11 +1439,19 @@ namespace Library_Jingyu
 				// SendFlag(1번인자)를 TRUE(2번인자)로 변경.
 				// 여기서 TRUE가 리턴되는 것은, 이미 NowSession->m_SendFlag가 1(샌드 중)라는것.
 				// 즉, Release를 탈 유저.
-				if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+				//if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == TRUE)
+				//{
+				//	--TempEndIndex;
+				//	continue;
+				//}	
+
+				if (NowSession->m_lSendFlag == TRUE)
 				{
-					--iArrayIndex;
+					--TempEndIndex;
 					continue;
-				}	
+				}
+
+				NowSession->m_lSendFlag = TRUE;
 
 				
 				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.
@@ -1502,7 +1461,7 @@ namespace Library_Jingyu
 					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
 					NowSession->m_lSendFlag = FALSE;
 
-					--iArrayIndex;
+					--TempEndIndex;
 					continue;
 				}					
 
@@ -1517,7 +1476,7 @@ namespace Library_Jingyu
 					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
 					NowSession->m_lSendFlag = FALSE;
 
-					--iArrayIndex;
+					--TempEndIndex;
 					continue;
 				}
 
@@ -1541,6 +1500,10 @@ namespace Library_Jingyu
 					if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[iPacketIndex]) == -1)
 						cMMOServer_Dump->Crash();
 
+					// 헤더를 넣어서, 패킷 완성하기		
+					NowSession->m_PacketArray[iPacketIndex]->Encode(Head, XORCode1, XORCode2);
+
+					// WSABUF에 포인터 복사
 					wsabuf[iPacketIndex].buf = NowSession->m_PacketArray[iPacketIndex]->GetBufferPtr();
 					wsabuf[iPacketIndex].len = NowSession->m_PacketArray[iPacketIndex]->GetUseSize();
 
@@ -1564,9 +1527,8 @@ namespace Library_Jingyu
 					// 비동기 입출력이 시작된게 아니라면
 					if (Error != WSA_IO_PENDING)
 					{
-						// 샌드 가능 상태로 돌림.
-						NowSession->m_lSendFlag = FALSE;
-
+						// I/O카운트 1 감소
+						// 0이면 삭제될 유저.
 						if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
 						{		
 							// 로그아웃 플래그 변경
@@ -1574,7 +1536,7 @@ namespace Library_Jingyu
 						}
 
 						// 에러가 버퍼 부족이라면
-						if (Error == WSAENOBUFS)
+						else if (Error == WSAENOBUFS)
 						{
 							// 내 에러, 윈도우에러 보관
 							g_This->m_iOSErrorCode = Error;
@@ -1586,7 +1548,7 @@ namespace Library_Jingyu
 								NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 							// 로그 찍기 (로그 레벨 : 에러)
-							cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
+							cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 								tcErrorString, (int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 							// 에러 함수 호출
@@ -1595,10 +1557,13 @@ namespace Library_Jingyu
 							// 끊는다.
 							shutdown(NowSession->m_Client_sock, SD_BOTH);
 						}
+
+						// 샌드 가능 상태로 돌림.
+						NowSession->m_lSendFlag = FALSE;
 					}
 				}
 
-				--iArrayIndex;
+				--TempEndIndex;
 			}
 			
 					
@@ -1623,8 +1588,14 @@ namespace Library_Jingyu
 		// 종료 이벤트
 		HANDLE* ExitEvent = &g_This->m_hReleaseExitEvent;
 
+		// 현재 접속중인 유저 수
+		ULONGLONG* ullJoinUserCount = &g_This->m_ullJoinUserCount;		
+
 		// 세션 관리 배열
 		cSession** SessionArray = g_This->m_stSessionArray;
+
+		// 미사용 인덱스 관리 스택
+		CLF_Stack<WORD>* EmptyIndexStack = g_This->m_stEmptyIndexStack;
 
 		while (1)
 		{
@@ -1655,11 +1626,131 @@ namespace Library_Jingyu
 
 				// Part 1. Release 처리
 				// 유저가 MODE_WAIT_LOGOUT 모드인지 확인 -----------------
+				
 				if (NowSession->m_euMode == euSessionModeState::MODE_WAIT_LOGOUT)
 				{
-					// Release
-					// 내부에서 OnGame_ClientRelease 호출
-					g_This->InDisconnect(NowSession);
+					/*
+					// SendFlag를 TRUE로 만든다.
+					// 내가 TRUE로 만들었다면 로직 진행
+					if (InterlockedExchange(&NowSession->m_lSendFlag, TRUE) == FALSE)
+					{
+						// 모드 초기화
+						NowSession->m_euMode = euSessionModeState::MODE_NONE;
+
+						// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
+						int i = NowSession->m_iWSASendCount - 1;
+						while (i >= 0)
+						{
+							CProtocolBuff_Net::Free(NowSession->m_PacketArray[i]);
+							--i;
+						}
+
+						// SendCount 초기화
+						NowSession->m_iWSASendCount = 0;
+
+						// CompleteRecvPacket 비우기
+						CProtocolBuff_Net* DeletePacket;
+
+						int UseSize = NowSession->m_CRPacketQueue->GetNodeSize();
+						while (UseSize > 0)
+						{
+							// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+							if (NowSession->m_CRPacketQueue->Dequeue(DeletePacket) == -1)
+								cMMOServer_Dump->Crash();
+
+							CProtocolBuff_Net::Free(DeletePacket);
+
+							--UseSize;
+						}
+
+						// 샌드 큐 비우기
+						//UseSize = DeleteSession->m_SendQueue->GetInNode();
+						UseSize = NowSession->m_SendQueue->GetNodeSize();
+						while (UseSize > 0)
+						{
+							// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+							if (NowSession->m_SendQueue->Dequeue(DeletePacket) == -1)
+								cMMOServer_Dump->Crash();
+
+							CProtocolBuff_Net::Free(DeletePacket);
+
+							--UseSize;
+						}
+
+						// 리시브 큐 초기화
+						NowSession->m_RecvQueue.ClearBuffer();
+
+						// 릴리즈 되었다고 알려준다.
+						NowSession->OnGame_ClientRelease();
+
+						// 클로즈 소켓
+						closesocket(NowSession->m_Client_sock);
+
+						// 미사용 인덱스 스택에 반납
+						g_This->m_stEmptyIndexStack->Push(NowSession->m_lIndex);
+
+						// 접속 중 유저 수 감소
+						InterlockedDecrement(&g_This->m_ullJoinUserCount);
+					}	
+					*/
+					
+					// 모드 초기화
+					NowSession->m_euMode = euSessionModeState::MODE_NONE;
+
+					// 해당 세션의 'Send 직렬화 버퍼(Send했던 직렬화 버퍼 모음. 아직 완료통지 못받은 직렬화버퍼들)'에 있는 데이터를 Free한다.
+					int i = NowSession->m_iWSASendCount - 1;
+					while (i >= 0)
+					{
+						CProtocolBuff_Net::Free(NowSession->m_PacketArray[i]);
+						--i;
+					}
+
+					// SendCount 초기화
+					NowSession->m_iWSASendCount = 0;
+
+					// CompleteRecvPacket 비우기
+					CProtocolBuff_Net* DeletePacket;
+
+					int UseSize = NowSession->m_CRPacketQueue->GetNodeSize();
+					while (UseSize > 0)
+					{
+						// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+						if (NowSession->m_CRPacketQueue->Dequeue(DeletePacket) == -1)
+							cMMOServer_Dump->Crash();
+
+						CProtocolBuff_Net::Free(DeletePacket);
+
+						--UseSize;
+					}
+
+					// 샌드 큐 비우기
+					//UseSize = DeleteSession->m_SendQueue->GetInNode();
+					UseSize = NowSession->m_SendQueue->GetNodeSize();
+					while (UseSize > 0)
+					{
+						// 디큐 후, 직렬화 버퍼 메모리풀에 Free한다.
+						if (NowSession->m_SendQueue->Dequeue(DeletePacket) == -1)
+							cMMOServer_Dump->Crash();
+
+						CProtocolBuff_Net::Free(DeletePacket);
+
+						--UseSize;
+					}
+
+					// 리시브 큐 초기화
+					NowSession->m_RecvQueue.ClearBuffer();
+
+					// 클로즈 소켓
+					closesocket(NowSession->m_Client_sock);
+
+					// 릴리즈 되었다고 알려준다.
+					NowSession->OnGame_ClientRelease();					
+
+					// 미사용 인덱스 스택에 반납
+					EmptyIndexStack->Push(NowSession->m_lIndex);
+
+					// 접속 중 유저 수 감소
+					InterlockedDecrement(ullJoinUserCount);
 				}
 
 				--iIndex;
@@ -1705,6 +1796,24 @@ namespace Library_Jingyu
 		m_stEmptyIndexStack = new CLF_Stack<WORD>;
 		for (int i = 0; i < MaxConnect; ++i)
 			m_stEmptyIndexStack->Push(i);	
+
+
+		// ------------------- SendConfig 셋팅
+		m_stSendConfig = new stSendConfig[m_stConfig.CreateSendThreadCount];
+
+		int Value = MaxConnect / m_stConfig.CreateSendThreadCount;
+
+		int Start = 0;
+		int End = Value -1;
+
+		for (int i = 0; i < m_stConfig.CreateSendThreadCount; ++i)
+		{
+			m_stSendConfig[i].m_iStartIndex = Start;
+			m_stSendConfig[i].m_iEndIndex = End;
+
+			Start = End + 1;
+			End = End + Value;
+		}
 
 
 		// 윈속 초기화
@@ -1773,7 +1882,7 @@ namespace Library_Jingyu
 		
 
 		// Send 스레드 생성
-		m_iS_ThreadCount = 1;
+		m_iS_ThreadCount = m_stConfig.CreateSendThreadCount;
 		m_hSendHandle = new HANDLE[m_iS_ThreadCount];
 		for (int i = 0; i < m_iS_ThreadCount; ++i)
 		{
@@ -2029,7 +2138,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2073,7 +2182,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Auth Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Auth Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2102,7 +2211,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Game Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Game Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2130,7 +2239,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Send Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Send Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2158,7 +2267,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Release Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Release Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2188,7 +2297,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2254,19 +2363,16 @@ namespace Library_Jingyu
 	   
 	// 세션 셋팅
 	//
-	// Parameter : cSession* 포인터, Max 수(최대 접속 가능 유저 수), HeadCode, XORCode1, XORCode2
+	// Parameter : cSession* 포인터, Max 수(최대 접속 가능 유저 수)
 	// return : 없음
-	void CMMOServer::SetSession(cSession* pSession, int Max, BYTE HeadCode, BYTE XORCode1, BYTE XORCode2)
+	void CMMOServer::SetSession(cSession* pSession, int Max)
 	{
 		static int iIndex = 0;	
 
 		if(m_stSessionArray == nullptr)
 			m_stSessionArray = new cSession*[Max];
 
-		m_stSessionArray[iIndex] = pSession;
-		m_stSessionArray[iIndex]->m_bCode = HeadCode;
-		m_stSessionArray[iIndex]->m_bXORCode_1 = XORCode1;
-		m_stSessionArray[iIndex]->m_bXORCode_2 = XORCode2;		
+		m_stSessionArray[iIndex] = pSession;	
 
 		++iIndex;
 	}
