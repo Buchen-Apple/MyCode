@@ -82,7 +82,28 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGameServer::CGameSession::OnAuth_ClientLeave(bool bGame)
 	{
-		// 할거 없음 
+		
+		// 게임일 경우, 로그인 응답 패킷 보냄
+		if (bGame == true)
+		{
+			// Alloc
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// Status
+			BYTE Status = 1;
+			SendBuff->PutData((char*)&Status, 1);
+
+			// AccountNo
+			SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+
+			// SendPacket
+			SendPacket(SendBuff);
+		}
+		
 	}
 
 	// Auth 모드의 유저에게 packet이 옴
@@ -273,7 +294,10 @@ namespace Library_Jingyu
 		// 4. 값 셋팅
 		m_Int64AccountNo = AccountNo;
 
-		// 5. 로그인 응답 패킷 보내기
+		/*
+		// 로그인 응답 패킷 보내기
+
+		// Alloc
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		// 타입
@@ -288,9 +312,10 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&AccountNo, 8);
 
 		// SendPacket
-		SendPacket(SendBuff);		
+		SendPacket(SendBuff);
+		*/
 
-		// 6. AUTH 에서 GAME으로 모드 변경
+		// 5. 정상이면, 모드를 AUTH_TO_GAME으로 변경 요청.	
 		SetMode_GAME();
 	}
 	   

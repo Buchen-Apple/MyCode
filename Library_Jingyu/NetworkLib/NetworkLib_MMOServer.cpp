@@ -1453,8 +1453,18 @@ namespace Library_Jingyu
 
 				NowSession->m_lSendFlag = TRUE;
 
+				// LogoutFlag가 TRUE라면 로그아웃 될 유저.
+				// 이걸로, InDisconnect 중에 Send 안되도록 명확히 방어.
+				if (NowSession->m_lLogoutFlag == TRUE)
+				{
+					// WSASend 안걸었기 때문에, 샌드 가능 상태로 다시 돌림.
+					NowSession->m_lSendFlag = FALSE;
+
+					--TempEndIndex;
+					continue;
+				}
 				
-				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.
+				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.				
 				if (NowSession->m_euMode != euSessionModeState::MODE_AUTH &&
 					NowSession->m_euMode != euSessionModeState::MODE_GAME)
 				{
@@ -1463,8 +1473,7 @@ namespace Library_Jingyu
 
 					--TempEndIndex;
 					continue;
-				}					
-
+				}	
 
 				// ------------------
 				// SendBuff에 데이터가 있는지 확인
