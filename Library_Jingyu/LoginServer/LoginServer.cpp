@@ -16,6 +16,8 @@ extern LONG g_lAllocNodeCount;
 extern LONG g_lAllocNodeCount_Lan;
 LONG g_lStruct_PlayerCount;
 
+extern LONG g_lSemCount;
+
 
 // ----------------------------------
 // LoginServer(NetServer)
@@ -64,6 +66,8 @@ namespace Library_Jingyu
 			Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 			Player_ChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
+			SemCount : - GQCS에서 121에러가 뜨면 1씩 증가
+
 			----------------------------------------------------
 			SessionNum : 	- LanServer 의 세션수
 			PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
@@ -97,6 +101,8 @@ namespace Library_Jingyu
 				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 				"Player_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
+				"SemCount : %d\n\n"
+
 				"------------------------------------------------\n"
 				"SessionNum : %lld\n"
 				"PacketPool_Lan : %d\n\n"
@@ -112,6 +118,7 @@ namespace Library_Jingyu
 				g_ullAcceptTotal, AccpetTPS, SendTPS,
 				CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 				m_MPlayerTLS->GetAllocChunkCount(), m_MPlayerTLS->GetOutChunkCount(),
+				g_lSemCount,
 
 				// ----------- 로그인 랜 서버용
 				m_cLanS->GetClientCount(), g_lAllocNodeCount_Lan,

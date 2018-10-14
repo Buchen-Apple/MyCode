@@ -20,6 +20,8 @@ ULONGLONG g_ullAcceptTotal;
 LONG	  g_lAcceptTPS;
 LONG	g_lSendPostTPS;
 
+LONG g_lSemCount;
+
 
 namespace Library_Jingyu
 {
@@ -741,7 +743,16 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
+			{
+				if (overlapped != nullptr)
+				{
+					if (GetLastError() == 121)
+					{
+						InterlockedIncrement(&g_lSemCount);
+					}
+				}
+			}
 					
 			// --------------
 			// 완료 체크
