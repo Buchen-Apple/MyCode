@@ -1462,7 +1462,7 @@ namespace Library_Jingyu
 
 					--TempEndIndex;
 					continue;
-				}
+				}				
 				
 				// 모드가 Auth 혹은 Game이어야 함. 아니면 종료될 유저.				
 				if (NowSession->m_euMode != euSessionModeState::MODE_AUTH &&
@@ -1473,7 +1473,7 @@ namespace Library_Jingyu
 
 					--TempEndIndex;
 					continue;
-				}	
+				}					
 
 				// ------------------
 				// SendBuff에 데이터가 있는지 확인
