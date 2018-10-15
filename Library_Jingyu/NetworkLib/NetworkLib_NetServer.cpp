@@ -745,9 +745,12 @@ namespace Library_Jingyu
 			// GQCS 대기
 			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
 			{
+				// 오버랩이 null이 아니고
 				if (overlapped != nullptr)
 				{
-					if (GetLastError() == 121)
+					// 샌드에 대한 통지이며 에러가 121이라면
+					if (&stNowSession->m_overSendOverlapped == overlapped && 
+						GetLastError() == 121)
 					{
 						InterlockedIncrement(&g_lSemCount);
 					}
