@@ -107,9 +107,6 @@ namespace Library_Jingyu
 			// Recv버퍼. 일반 링버퍼. 
 			CRingBuff m_RecvQueue;
 
-			// PQCS overlapped 구조체
-			OVERLAPPED m_overPQCSOverlapped;
-
 			// 생성자 
 			stSession()
 			{
@@ -173,6 +170,9 @@ namespace Library_Jingyu
 
 		// 클라이언트 접속 여부. true면 접속중, false면 접속중 아님
 		bool m_bClienetConnect;
+
+		// PQCS overlapped 구조체
+		OVERLAPPED m_overPQCSOverlapped;
 
 
 	private:

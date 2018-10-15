@@ -108,6 +108,9 @@ namespace Library_Jingyu
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;		
 
+		// PQCS overlapped 구조체
+		OVERLAPPED m_overPQCSOverlapped;
+
 
 	private:
 		// ----------------------
