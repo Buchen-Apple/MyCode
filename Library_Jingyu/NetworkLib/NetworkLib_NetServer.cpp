@@ -104,11 +104,6 @@ namespace Library_Jingyu
 
 		// PQCS overlapped 구조체
 		OVERLAPPED m_overPQCSOverlapped;
-
-		// 워커에서 PQCS를 시도했는지 체크하는 Flag
-		// TRUE면 워커에서 PQCS 시도중. FALSE면 아님.
-		LONG m_lPQCSFlag;
-
 		// 마지막 패킷 저장소
 		void* m_LastPacket = nullptr;
 
@@ -119,7 +114,6 @@ namespace Library_Jingyu
 			m_lIOCount = 0;
 			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
-			m_lPQCSFlag = FALSE;
 			m_iWSASendCount = 0;
 		}
 
@@ -788,26 +782,21 @@ namespace Library_Jingyu
 			// -----------------
 			// PQCS 요청 로직
 			// -----------------
-			if (&stNowSession->m_overPQCSOverlapped == overlapped)
+			if (&stNowSession->m_overPQCSOverlapped == overlapped && cbTransferred == 0)
 			{
-				// 1. PQCS Flag 체크
-				// 여기서 TRUE가 리턴되는 것은, 이미 stNowSession->m_lPQCSFlag가 1(PQCS중)이었다는 것.
-				if (InterlockedExchange(&stNowSession->m_lPQCSFlag, TRUE) == TRUE)
-				{
-					// 그렇다면 다시 PQCS를 건다.
-					PostQueuedCompletionStatus(g_This->m_hIOCPHandle, 0, (ULONG_PTR)stNowSession, &stNowSession->m_overPQCSOverlapped);
-					continue;
-				}
+				//  1. SendPost()
+				g_This->SendPost(stNowSession);				
 
-				//  2. SendPost()
-				g_This->SendPost(stNowSession);
+				// 2. SendPacket에서 증가시켰던 I/O 카운트 감소
+				LONG Ret;
 
-				// 3. PQCSFlag 되돌림
-				stNowSession->m_lPQCSFlag = FALSE;
+				Ret = InterlockedDecrement(&stNowSession->m_lIOCount);
 
-				// 4. SendPacket에서 증가시켰던 I/O 카운트 감소
-				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					g_This->InDisconnect(stNowSession);					
+				if (Ret == 0)
+					g_This->InDisconnect(stNowSession);
+
+				else if (Ret < 0)
+					cNetDump->Crash();
 
 				continue;
 			}
