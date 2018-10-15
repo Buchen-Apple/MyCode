@@ -105,6 +105,10 @@ namespace Library_Jingyu
 		// PQCS overlapped 구조체
 		OVERLAPPED m_overPQCSOverlapped;
 
+		// 워커에서 PQCS를 시도했는지 체크하는 Flag
+		// TRUE면 워커에서 PQCS 시도중. FALSE면 아님.
+		LONG m_lPQCSFlag;
+
 		// 마지막 패킷 저장소
 		void* m_LastPacket = nullptr;
 
@@ -115,6 +119,7 @@ namespace Library_Jingyu
 			m_lIOCount = 0;
 			m_lReleaseFlag = TRUE;
 			m_lSendFlag = FALSE;
+			m_lPQCSFlag = FALSE;
 			m_iWSASendCount = 0;
 		}
 
@@ -743,19 +748,8 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
-			{
-				// 오버랩이 null이 아니고
-				if (overlapped != nullptr)
-				{
-					// 샌드에 대한 통지이며 에러가 121이라면
-					if (&stNowSession->m_overSendOverlapped == overlapped && 
-						GetLastError() == 121)
-					{
-						InterlockedIncrement(&g_lSemCount);
-					}
-				}
-			}
+			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+
 					
 			// --------------
 			// 완료 체크
@@ -796,10 +790,22 @@ namespace Library_Jingyu
 			// -----------------
 			if (&stNowSession->m_overPQCSOverlapped == overlapped)
 			{
-				//  1. SendPost()
+				// 1. PQCS Flag 체크
+				// 여기서 TRUE가 리턴되는 것은, 이미 stNowSession->m_lPQCSFlag가 1(PQCS중)이었다는 것.
+				if (InterlockedExchange(&stNowSession->m_lPQCSFlag, TRUE) == TRUE)
+				{
+					// 그렇다면 다시 PQCS를 건다.
+					PostQueuedCompletionStatus(g_This->m_hIOCPHandle, 0, (ULONG_PTR)stNowSession, &stNowSession->m_overPQCSOverlapped);
+					continue;
+				}
+
+				//  2. SendPost()
 				g_This->SendPost(stNowSession);
 
-				// 2. SendPacket에서 증가시켰던 I/O 카운트 감소
+				// 3. PQCSFlag 되돌림
+				stNowSession->m_lPQCSFlag = FALSE;
+
+				// 4. SendPacket에서 증가시켰던 I/O 카운트 감소
 				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
 					g_This->InDisconnect(stNowSession);					
 
@@ -965,8 +971,7 @@ namespace Library_Jingyu
 
 				break;
 			}
-
-			g_ullAcceptTotal++;	// 테스트용!!
+					
 			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
 
 			// ------------------
@@ -991,7 +996,7 @@ namespace Library_Jingyu
 				continue;				
 			}
 
-
+			g_ullAcceptTotal++;	// 테스트용!!
 
 			// ------------------
 			// IP와 포트 알아오기.
