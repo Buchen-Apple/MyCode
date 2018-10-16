@@ -223,8 +223,8 @@ namespace Library_Jingyu
 		// 4. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff_Lan::Free(payloadBuff);
 
-		// 5. PQCS
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)NowSession->m_ullSessionID, &m_overPQCSOverlapped);
+		// 5. SendPost()
+		SendPost(NowSession);		
 
 		// 6. 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
@@ -395,8 +395,6 @@ namespace Library_Jingyu
 		stSession* stNowSession;
 		OVERLAPPED* overlapped;
 
-		OVERLAPPED* PQCSoverlapped = &g_This->m_overPQCSOverlapped;
-
 		while (1)
 		{
 			// 변수들 초기화
@@ -445,29 +443,10 @@ namespace Library_Jingyu
 			g_This->OnWorkerThreadBegin();
 
 			// -----------------
-			// PQCS 요청 로직
-			// -----------------
-			if (PQCSoverlapped == overlapped)
-			{
-				// 1. LOCK ----------------
-				stSession* NowSession = g_This->GetSessionLOCK((ULONGLONG)stNowSession);
-				if (NowSession == nullptr)
-					continue;
-
-				// 2. SendPost()
-				g_This->SendPost(NowSession);
-
-				// 3. UNLOCK ----------------
-				g_This->GetSessionUnLOCK(NowSession);
-
-				continue;
-			}
-
-			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			else if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);

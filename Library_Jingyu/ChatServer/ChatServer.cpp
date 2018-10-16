@@ -562,7 +562,7 @@ namespace Library_Jingyu
 			// 2) 토큰 체크	-----------------------------------
 			// 30초 이상 유지되고 있는 토큰은 erase한다.		
 
-			AcquireSRWLockShared(&g_this->m_Logn_LanClient->srwl);	// 락 ----------------
+			AcquireSRWLockExclusive(&g_this->m_Logn_LanClient->srwl);	// 락 ----------------
 
 			// 토큰 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
 			if (g_this->m_Logn_LanClient->m_umapTokenCheck.size() > 0)
@@ -593,7 +593,7 @@ namespace Library_Jingyu
 				}
 			}
 
-			ReleaseSRWLockShared(&g_this->m_Logn_LanClient->srwl);	// 언 락 ----------------
+			ReleaseSRWLockExclusive(&g_this->m_Logn_LanClient->srwl);	// 언 락 ----------------
 		}
 
 		printf("JobAddThread Exit!!\n");

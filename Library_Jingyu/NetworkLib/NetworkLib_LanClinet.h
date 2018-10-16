@@ -171,10 +171,6 @@ namespace Library_Jingyu
 		// 클라이언트 접속 여부. true면 접속중, false면 접속중 아님
 		bool m_bClienetConnect;
 
-		// PQCS overlapped 구조체
-		OVERLAPPED m_overPQCSOverlapped;
-
-
 	private:
 		// ----------------------
 		// private 함수들

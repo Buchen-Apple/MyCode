@@ -79,7 +79,14 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 2. 인자로 받은 Flag가 true라면, 마지막 패킷의 주소를 보관
+		// 2. 보내고 끊을 유저라면, 더 이상 패킷 넣지 않는다.
+		if (m_LastPacket != nullptr)
+		{
+			CProtocolBuff_Net::Free(payloadBuff);
+			return;
+		}
+
+		// 3. 인자로 받은 Flag가 true라면, 마지막 패킷의 주소를 보관
 		if (LastFlag == TRUE)
 			m_LastPacket = payloadBuff;		
 
@@ -736,16 +743,10 @@ namespace Library_Jingyu
 				// 리시브 큐가 꽉찼으면 접속 끊는다.
 				if (g_This->RecvPost(stNowSession) == 1)
 				{
-					// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 로그아웃 플래그 변경
-					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					{
-						stNowSession->m_lLogoutFlag = TRUE;
-						continue;
-					}
+					cMMOServer_Dump->Crash();
 
-					// 0이 아니라면 서버측에서 접속 끊는다.
-					shutdown(stNowSession->m_Client_sock, SD_BOTH);
-					continue;
+					// 셧다운
+					shutdown(stNowSession->m_Client_sock, SD_BOTH);					
 				}
 
 			}
@@ -768,11 +769,11 @@ namespace Library_Jingyu
 					bool Flag = false;
 					while (i < stNowSession->m_iWSASendCount)
 					{
-						CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
-
-						// 마지막 패킷이 잘 갔으면, falg를 True로 바꾼다.
+						// 마지막 패킷이 잘 갔으면, flag를 True로 바꾼다.
 						if (stNowSession->m_PacketArray[i] == stNowSession->m_LastPacket)
 							Flag = true;
+
+						CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
 
 						++i;
 					}
@@ -782,16 +783,16 @@ namespace Library_Jingyu
 					// 보낸게 잘 갔으면, 해당 유저는 접속을 끊는다.
 					if (Flag == true)
 					{
-						// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 로그아웃 플래그 변경
-						if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-						{
-							stNowSession->m_lLogoutFlag = TRUE;	
-							continue;
-						}
-
-						// 0이 아니라면 서버측에서 접속 끊는다.
+						// 셧다운 날림
+						// 아래에서 I/O카운트를 1 감소시켜서 0이 되도록 유도
 						shutdown(stNowSession->m_Client_sock, SD_BOTH);
-						continue;
+					}
+
+					// 보낸게 잘 안갔으면 SendFlag만 변경
+					else
+					{
+						// 샌드 가능 상태로 변경
+						stNowSession->m_lSendFlag = FALSE;
 					}
 				}
 
@@ -806,11 +807,12 @@ namespace Library_Jingyu
 						++i;
 					}
 
-					stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.	
-				}
+					// 보낸 카운트 0으로 만듬.	
+					stNowSession->m_iWSASendCount = 0; 
 
-				// 3. 샌드 가능 상태로 변경
-				stNowSession->m_lSendFlag = FALSE;				
+					// 샌드 가능 상태로 변경
+					stNowSession->m_lSendFlag = FALSE;
+				}						
 			}
 
 			// -----------------

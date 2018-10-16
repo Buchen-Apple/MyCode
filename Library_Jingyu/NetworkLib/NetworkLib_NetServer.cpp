@@ -22,6 +22,8 @@ LONG	g_lSendPostTPS;
 
 LONG g_lSemCount;
 
+LONG g_lDisconnecetCount;
+
 
 namespace Library_Jingyu
 {
@@ -59,6 +61,8 @@ namespace Library_Jingyu
 	// 세션 구조체
 	struct CNetServer::stSession
 	{
+		DWORD WSAGetLastErrorValue;
+
 		// 세션과 연결된 소켓
 		SOCKET m_Client_sock;
 
@@ -502,18 +506,18 @@ namespace Library_Jingyu
 			// ref 카운트가 0이 되면 메모리풀에 반환
 			CProtocolBuff_Net::Free(payloadBuff);
 			return;
-		}
+		}		
 
-		// 1. m_LastPacket가 nullptr이 아니라면, 보내고 끊을 유저. 큐에 넣지 않는다.
+		// 1. 보내고 끊을 유저라면, 더 이상 패킷 넣지 않는다.
 		if (NowSession->m_LastPacket != nullptr)
 		{
 			CProtocolBuff_Net::Free(payloadBuff);
 			return;
 		}
 
-		// 2. 인자로 받은 Flag가 true라면, 마지막 패킷의 주소를 보관
+		// 2. 인자로 받은 Flag가 true라면, m_LastPacket에 지금 패킷을 넣는다.
 		if (LastFlag == TRUE)
-			NowSession->m_LastPacket = payloadBuff;		
+			NowSession->m_LastPacket = payloadBuff;				
 
 		// 3. 헤더를 넣어 패킷 완성
 		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
@@ -525,9 +529,9 @@ namespace Library_Jingyu
 
 		// 5. 직렬화 버퍼 레퍼런스 카운트 1 감소. 0 되면 메모리풀에 반환
 		CProtocolBuff_Net::Free(payloadBuff);
-		
-		// 6. PQCS
-		PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)NowSession->m_ullSessionID, &m_overPQCSOverlapped);
+
+		// 6. 샌드 포스트
+		SendPost(NowSession);		
 
 		// 7. 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
@@ -546,6 +550,8 @@ namespace Library_Jingyu
 		stSession* DeleteSession = GetSessionLOCK(SessionID);
 		if (DeleteSession == nullptr)
 			return;
+
+		cNetDump->Crash();
 
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
@@ -651,20 +657,20 @@ namespace Library_Jingyu
 			}			
 
 			// 큐 초기화
-			DeleteSession->m_RecvQueue.ClearBuffer();			
-
-			// 클로즈 소켓
-			closesocket(DeleteSession->m_Client_sock);
-
-			// 접속 중 유저 수 감소
-			InterlockedDecrement(&m_ullJoinUserCount);
+			DeleteSession->m_RecvQueue.ClearBuffer();					
 
 			// 컨텐츠 쪽에 종료된 유저 알려줌 
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 			OnClientLeave(sessionID);
 
+			// 클로즈 소켓
+			closesocket(DeleteSession->m_Client_sock);
+
 			// 미사용 인덱스 스택에 반납
-			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);			
+			m_stEmptyIndexStack->Push(DeleteSession->m_lIndex);		
+
+			// 접속 중 유저 수 감소
+			InterlockedDecrement(&m_ullJoinUserCount);
 		}
 		
 		return;	
@@ -740,8 +746,7 @@ namespace Library_Jingyu
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
 			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
-
-					
+		
 			// --------------
 			// 완료 체크
 			// --------------
@@ -775,32 +780,46 @@ namespace Library_Jingyu
 			// GQCS 깨어날 시 함수호출
 			g_This->OnWorkerThreadBegin();
 
-
+			/*
 			// -----------------
 			// PQCS 요청 로직
 			// -----------------
 			if (PQCSoverlapped == overlapped)
-			{
-				// 1. LOCK ----------------
-				stSession* NowSession = g_This->GetSessionLOCK((ULONGLONG)stNowSession);
-				if (NowSession == nullptr)
-					continue;
+			{				
+				ULONGLONG TempSessionID = (ULONGLONG)stNowSession;
+								
+				// 1. SessionID로 세션 알아오기	
+				stSession* NowSession = &g_This->m_stSessionArray[(WORD)TempSessionID];
 
-				// 2. SendPost()
+				
+				// 2. 내가 원하던 세션이 맞는지 체크
+				if (NowSession->m_ullSessionID != TempSessionID)
+				{
+					// 아니라면 I/O 카운트 1 감소
+					// 감소한 값이 0이면서, inDIsconnect 호출
+					if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+						g_This->InDisconnect(NowSession);
+
+					continue;
+				}					
+
+				// 3. SendPost()
 				g_This->SendPost(NowSession);
 
-				// 3. UNLOCK ----------------
-				g_This->GetSessionUnLOCK(NowSession);
-
+				// 4. I/O 카운트 1 감소
+				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
+					g_This->InDisconnect(NowSession);
+				
 				continue;
 			}
+			*/
 
 
 			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			else if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);
@@ -812,16 +831,10 @@ namespace Library_Jingyu
 				// 리시브 큐가 꽉찼으면 접속 끊는다.
 				if (g_This->RecvPost(stNowSession) == 1)
 				{
-					// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 InDisconnect.
-					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					{
-						g_This->InDisconnect(stNowSession);
-						continue;
-					}
+					cNetDump->Crash();
 
-					// 0이 아니라면 서버측에서 접속 끊는다.
-					shutdown(stNowSession->m_Client_sock, SD_BOTH);
-					continue;
+					// 셧다운
+					shutdown(stNowSession->m_Client_sock, SD_BOTH);					
 				}
 
 			}
@@ -837,7 +850,7 @@ namespace Library_Jingyu
 				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
-				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);		
+				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);	
 
 				// 2. 보내고 끊을 유저일 경우 로직
 				if (stNowSession->m_LastPacket != nullptr)
@@ -847,11 +860,11 @@ namespace Library_Jingyu
 					bool Flag = false;
 					while (i < stNowSession->m_iWSASendCount)
 					{
-						CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
-
-						// 마지막 패킷이 잘 갔으면, falg를 True로 바꾼다.
+						// 마지막 패킷이 잘 갔으면, flag를 True로 바꾼다.
 						if (stNowSession->m_PacketArray[i] == stNowSession->m_LastPacket)
 							Flag = true;
+
+						CProtocolBuff_Net::Free(stNowSession->m_PacketArray[i]);
 
 						++i;
 					}
@@ -861,16 +874,16 @@ namespace Library_Jingyu
 					// 보낸게 잘 갔으면, 해당 유저는 접속을 끊는다.
 					if (Flag == true)
 					{
-						// I/O 카운트 감소시켰는데 0이되면 shutdown날릴것도 없이 InDisconnect.
-						if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-						{
-							g_This->InDisconnect(stNowSession);
-							continue;
-						}
+						// 셧다운 날림
+						// 아래에서 I/O카운트를 1 감소시켜서 0이 되도록 유도
+						shutdown(stNowSession->m_Client_sock, SD_BOTH);						
+					}
 
-						// 0이 아니라면 서버측에서 접속 끊는다.
-						shutdown(stNowSession->m_Client_sock, SD_BOTH);
-						continue;
+					// 보낸게 잘 안갔으면 SendFlag만 변경
+					else
+					{
+						// 샌드 가능 상태로 변경
+						stNowSession->m_lSendFlag = FALSE;
 					}
 				}
 
@@ -886,14 +899,10 @@ namespace Library_Jingyu
 					}
 
 					stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.	
-				}
-												
 
-				// 4. 샌드 가능 상태로 변경
-				stNowSession->m_lSendFlag = FALSE;				
-
-				// 5. 다시 샌드 시도
-				g_This->SendPost(stNowSession);
+					// 샌드 가능 상태로 변경
+					stNowSession->m_lSendFlag = FALSE;
+				}					
 			}
 
 			// -----------------
@@ -1018,16 +1027,18 @@ namespace Library_Jingyu
 
 			g_This->m_stSessionArray[iIndex].m_ullSessionID = MixKey;
 			g_This->m_stSessionArray[iIndex].m_lIndex = iIndex;
+			
+			// -- 소켓
+			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;	
 
 			// -- LastPacket 초기화
 			g_This->m_stSessionArray[iIndex].m_LastPacket = nullptr;
-			
-			// -- 소켓
-			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;						
 
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
+
+			g_This->m_stSessionArray[iIndex].WSAGetLastErrorValue = 0;
 
 			// -- SendFlag 초기화
 			g_This->m_stSessionArray[iIndex].m_lSendFlag = FALSE;
@@ -1083,7 +1094,10 @@ namespace Library_Jingyu
 			// I/O카운트 감소시켰는데 0이 아니라면, ret 체크.
 			// ret가 1이라면 접속 끊는다.
 			else if (ret == 1)
+			{
+				cNetDump->Crash();
 				shutdown(g_This->m_stSessionArray[iIndex].m_Client_sock, SD_BOTH);
+			}
 		}
 
 		return 0;
@@ -1308,6 +1322,7 @@ namespace Library_Jingyu
 	// return 0 : 성공적으로 WSARecv() 완료
 	// return 1 : RecvQ가 꽉찬 유저
 	// return 2 : I/O 카운트가 0이되어 삭제된 유저
+	// return 3 : 삭제는 안됐는데 WSARecv 실패
 	int CNetServer::RecvPost(stSession* NowSession)
 	{
 		// ------------------
@@ -1386,6 +1401,11 @@ namespace Library_Jingyu
 					// 끊어야하니 셧다운 호출
 					shutdown(NowSession->m_Client_sock, SD_BOTH);		
 				}
+
+				NowSession->WSAGetLastErrorValue = Error;
+
+				return 3;
+
 			}
 		}
 

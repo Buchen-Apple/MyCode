@@ -153,6 +153,7 @@ namespace Library_Jingyu
 		// return 0 : 성공적으로 WSARecv() 완료
 		// return 1 : RecvQ가 꽉찬 유저
 		// return 2 : I/O 카운트가 0이되어 삭제된 유저
+		// return 3 : 삭제는 안됐는데 WSARecv 실패
 		int RecvPost(stSession* NowSession);
 
 		// SendPost함수
