@@ -1,6 +1,6 @@
 ﻿  pch.cpp
   ChatServer.cpp
-c:\git_public\library_jingyu\chatserver\chatserver.cpp(758): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
+c:\git_public\library_jingyu\chatserver\chatserver.cpp(762): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
   CPUUsage.cpp
   CrashDump.cpp
   Log.cpp

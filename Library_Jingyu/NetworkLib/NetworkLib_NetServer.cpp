@@ -869,7 +869,11 @@ namespace Library_Jingyu
 						++i;
 					}
 
-					stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.
+					// 보낸 카운트 0으로 만듬.
+					stNowSession->m_iWSASendCount = 0;  
+
+					// 샌드 가능 상태로 변경
+					stNowSession->m_lSendFlag = FALSE;
 
 					// 보낸게 잘 갔으면, 해당 유저는 접속을 끊는다.
 					if (Flag == true)
@@ -877,14 +881,7 @@ namespace Library_Jingyu
 						// 셧다운 날림
 						// 아래에서 I/O카운트를 1 감소시켜서 0이 되도록 유도
 						shutdown(stNowSession->m_Client_sock, SD_BOTH);						
-					}
-
-					// 보낸게 잘 안갔으면 SendFlag만 변경
-					else
-					{
-						// 샌드 가능 상태로 변경
-						stNowSession->m_lSendFlag = FALSE;
-					}
+					}					
 				}
 
 				// 3. 보내고 끊을 유저가 아닐 경우 로직
@@ -898,10 +895,14 @@ namespace Library_Jingyu
 						++i;
 					}
 
-					stNowSession->m_iWSASendCount = 0;  // 보낸 카운트 0으로 만듬.	
+					// 보낸 카운트 0으로 만듬.	
+					stNowSession->m_iWSASendCount = 0;  
 
 					// 샌드 가능 상태로 변경
 					stNowSession->m_lSendFlag = FALSE;
+
+					// Send 다시 시도
+					g_This->SendPost(stNowSession);
 				}					
 			}
 

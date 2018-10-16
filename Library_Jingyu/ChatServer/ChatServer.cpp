@@ -30,6 +30,8 @@ LONG g_lTokenNotFound;
 
 LONG ChatLoginCount;	// 실제 로그인 패킷까지 처리된 유저 카운트.
 
+LONG g_lJobThreadTokenEraseCount;
+
 // ------------- 공격 테스트용
 int m_SectorPosError;
 
@@ -577,6 +579,8 @@ namespace Library_Jingyu
 					// 인서트 된 지 30초 이상이 되었다면
 					if ((ullCheckTime - Tokenbegin->second->m_ullInsertTime) >= 30000)
 					{
+						g_lJobThreadTokenEraseCount++;
+
 						auto EraseToken = Tokenbegin->second;
 
 						// 맵에서 제거
@@ -584,7 +588,7 @@ namespace Library_Jingyu
 
 						// Free
 						g_this->m_Logn_LanClient->m_MTokenTLS->Free(EraseToken);
-						InterlockedAdd(&g_lTokenNodeCount, -1);
+						InterlockedDecrement(&g_lTokenNodeCount);
 
 					}
 
@@ -696,8 +700,8 @@ namespace Library_Jingyu
 		ErasePlayer->m_wSectorX = TEMP_SECTOR_POS;
 		
 		// 로그인 패킷까지 처리된 유저였다면, 로그인 유저 카운트 1 감소
-		if(ErasePlayer->m_bLoginCheck == true)
-			InterlockedAdd(&ChatLoginCount, -1);
+		if (ErasePlayer->m_bLoginCheck == true)
+			InterlockedDecrement(&ChatLoginCount);
 		
 		// 4) Player Free()
 		m_PlayerPool->Free(ErasePlayer);
@@ -705,7 +709,7 @@ namespace Library_Jingyu
 		// 5) 마지막 패킷 시간관리 자료구조에서 삭제.
 		EraseLastTime(SessionID);
 
-		InterlockedAdd(&g_lUpdateStruct_PlayerCount, -1);
+		InterlockedIncrement(&g_lUpdateStruct_PlayerCount);
 
 	}
 
@@ -966,7 +970,7 @@ namespace Library_Jingyu
 		// 토큰을 못찾았으면 g_lTokenNotFound 카운트 증가
 		if (FindToken == m_Logn_LanClient->m_umapTokenCheck.end())
 		{
-			InterlockedAdd(&g_lTokenNotFound, 1);
+			InterlockedIncrement(&g_lTokenNotFound);
 			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
 			return;
 		}
@@ -985,7 +989,7 @@ namespace Library_Jingyu
 
 			// stToken* Free
 			m_Logn_LanClient->m_MTokenTLS->Free(retToken);
-			InterlockedAdd(&g_lTokenNodeCount, -1);
+			InterlockedDecrement(&g_lTokenNodeCount);
 
 			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답) 
 			// 성공패킷
@@ -1000,7 +1004,7 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&AccountNo, 8);
 
 			// 로그인 패킷까지 처리된 유저 카운트 1 증가
-			InterlockedAdd(&ChatLoginCount, 1);
+			InterlockedIncrement(&ChatLoginCount);
 
 			// 클라에게 패킷 보내기(정확히는 NetServer의 샌드버퍼에 넣기)
 			SendPacket(SessionID, SendBuff);
@@ -1013,7 +1017,7 @@ namespace Library_Jingyu
 			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
 			
 			// g_lTokenMiss 카운트 증가
-			InterlockedAdd(&g_lTokenMiss, 1);
+			InterlockedIncrement(&g_lTokenMiss);
 
 			// 클라이언트에게 보낼 패킷 조립 (로그인 요청 응답) 
 			// 실패패킷
@@ -1197,6 +1201,7 @@ namespace Library_Jingyu
 
 		TokenMiss : 		- 토큰키가 다른 유저가 채팅서버로 들어옴
 		TokenNotFound : 	- 토큰키를 찾지 못함
+		TokenEraseCount :	- JobThread에서 토큰을 삭제할 시 1씩 증가하는 카운트.
 
 		----------------------------------------------------
 		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
@@ -1212,12 +1217,9 @@ namespace Library_Jingyu
 
 		*/
 
-		LONG AccpetTPS = g_lAcceptTPS;
-		LONG UpdateTPS = g_lUpdateTPS;
-		LONG SendTPS = g_lSendPostTPS;
-		InterlockedExchange(&g_lUpdateTPS, 0);
-		InterlockedExchange(&g_lAcceptTPS, 0);
-		InterlockedExchange(&g_lSendPostTPS, 0);
+		LONG UpdateTPS = InterlockedExchange(&g_lUpdateTPS, 0);
+		LONG AccpetTPS = InterlockedExchange(&g_lAcceptTPS, 0);
+		LONG SendTPS = InterlockedExchange(&g_lSendPostTPS, 0);
 
 		// 출력 전에, 프로세스 사용량 갱신
 		ProcessUsage.UpdateCpuTime();
@@ -1251,7 +1253,8 @@ namespace Library_Jingyu
 			"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
 
 			"TokenMiss : %d\n"
-			"TokenNotFound : %d\n\n"
+			"TokenNotFound : %d\n"
+			"TokenEraseCount : %d\n\n"
 
 			"------------------------------------------------\n"
 			"PacketPool_Lan : %d\n\n"
@@ -1275,7 +1278,7 @@ namespace Library_Jingyu
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_MessagePool->GetAllocChunkCount(), m_MessagePool->GetOutChunkCount(),
 			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
-			g_lTokenMiss, g_lTokenNotFound,
+			g_lTokenMiss, g_lTokenNotFound, g_lJobThreadTokenEraseCount,
 
 			// ----------- 랜 클라이언트용
 			g_lAllocNodeCount_Lan,
@@ -1695,7 +1698,7 @@ namespace Library_Jingyu
 			NewToken->m_ullInsertTime = GetTickCount64();
 			memcpy_s(NewToken->m_cToken, 64, Token, 64);
 
-			InterlockedAdd(&g_lTokenNodeCount, 1);
+			InterlockedIncrement(&g_lTokenNodeCount);
 
 			m_umapTokenCheck.insert(make_pair(AccountNo, NewToken));
 		}
