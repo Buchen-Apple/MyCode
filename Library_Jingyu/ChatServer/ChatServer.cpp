@@ -562,7 +562,7 @@ namespace Library_Jingyu
 
 
 			// 2) 토큰 체크	-----------------------------------
-			// 30초 이상 유지되고 있는 토큰은 erase한다.		
+			// 3분 이상 유지되고 있는 토큰은 erase한다.		
 
 			AcquireSRWLockExclusive(&g_this->m_Logn_LanClient->srwl);	// 락 ----------------
 
@@ -576,8 +576,8 @@ namespace Library_Jingyu
 
 				while (Tokenbegin != Tokenend)
 				{
-					// 인서트 된 지 30초 이상이 되었다면
-					if ((ullCheckTime - Tokenbegin->second->m_ullInsertTime) >= 30000)
+					// 인서트 된 지 3분 이상이 되었다면
+					if ((ullCheckTime - Tokenbegin->second->m_ullInsertTime) >= 180000)
 					{
 						g_lJobThreadTokenEraseCount++;
 
