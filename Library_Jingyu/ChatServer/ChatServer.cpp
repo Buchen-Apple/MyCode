@@ -467,8 +467,8 @@ namespace Library_Jingyu
 
 				// 3. 일감 Free
 				g_this->m_MessagePool->Free(NowWork);
-				InterlockedAdd(&g_lUpdateStructCount, -1);
-				InterlockedAdd(&g_lUpdateTPS, 1);
+				InterlockedDecrement(&g_lUpdateStructCount);
+				InterlockedIncrement(&g_lUpdateTPS);
 			}
 
 		}
@@ -624,7 +624,7 @@ namespace Library_Jingyu
 		// 1) Player Alloc()
 		stPlayer* JoinPlayer = m_PlayerPool->Alloc();
 
-		InterlockedAdd(&g_lUpdateStruct_PlayerCount, 1);
+		InterlockedIncrement(&g_lUpdateStruct_PlayerCount);
 
 		// 2) 셋팅
 		// SessionID
@@ -709,7 +709,7 @@ namespace Library_Jingyu
 		// 5) 마지막 패킷 시간관리 자료구조에서 삭제.
 		EraseLastTime(SessionID);
 
-		InterlockedIncrement(&g_lUpdateStruct_PlayerCount);
+		InterlockedDecrement(&g_lUpdateStruct_PlayerCount);
 
 	}
 
@@ -1432,7 +1432,7 @@ namespace Library_Jingyu
 		// 2. 패킷 시간 갱신(접속만 하고 로그인 패킷을 안보내는 유저도 있을 수 있기때문에. 걸러내기 용도)
 		InsertLastTime(SessionID);
 
-		InterlockedAdd(&g_lUpdateStructCount, 1);
+		InterlockedIncrement(&g_lUpdateStructCount);
 
 		// 2. 타입 넣기
 		NowMessage->m_wType = TYPE_JOIN;
@@ -1458,7 +1458,7 @@ namespace Library_Jingyu
 		// 1. 일감 Alloc
 		st_WorkNode* NowMessage = m_MessagePool->Alloc();
 
-		InterlockedAdd(&g_lUpdateStructCount, 1);
+		InterlockedIncrement(&g_lUpdateStructCount);
 
 		// 2. Type채우기
 		// 여기 타입은 [접속, 종료, 패킷] 총 3 개 중 하나이다.
@@ -1489,7 +1489,7 @@ namespace Library_Jingyu
 		// 이미 있는 유저는 시간 갱신.
 		InsertLastTime(SessionID);
 
-		InterlockedAdd(&g_lUpdateStructCount, 1);
+		InterlockedIncrement(&g_lUpdateStructCount);
 
 		// 2. Type채우기
 		// 여기 타입은 [접속, 종료, 패킷] 총 3 개 중 하나이다.
