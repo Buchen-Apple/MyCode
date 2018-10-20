@@ -118,6 +118,13 @@ class CshDB_Info_Contents
         return $instance;
     }
 
+    // 연결된 DB 객체 얻기 (Slave)
+    function DB_ConnectObject()
+    {
+        return $this->shDB_Info_ConnectDB;
+    }
+
+
     // 쿼리 날리기
     //
     // Parameter : Query, AccountNO(디폴트 -1)
@@ -229,10 +236,9 @@ class CshDB_Index_Contents
             $errorstring = 'Unable to connect to MySQL(Index_SlaveConnect Function) : ' . mysqli_connect_error($this->shDB_Index_ConnectDB). ' ErrorNo : ' .  mysqli_connect_errno($this->shDB_Index_ConnectDB);
             LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
 
-            require_once('/../LIBRARY/_Clenup.php');
-
-            // 실패 시 exit
-            exit;
+            // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Slave연결 에러)
+            global $cnf_DB_INDEX_SLAVE_CONNECT_ERROR;
+            OnError($cnf_DB_INDEX_SLAVE_CONNECT_ERROR);  
         }        
 
 
@@ -260,10 +266,9 @@ class CshDB_Index_Contents
             $errorstring = 'Unable to connect to MySQL(Index_SlaveConnect Function) : ' . mysqli_connect_error($this->shDB_Index_ConnectDB_MASTER). ' ErrorNo : ' .  mysqli_connect_errno($this->shDB_Index_ConnectDB_MASTER);
             LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
 
-            require_once('/../LIBRARY/_Clenup.php');
-
-            // 실패 시 exit
-            exit;
+             // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Master연결 에러)
+             global $cnf_DB_INDEX_MASETER_CONNECT_ERROR;
+             OnError($cnf_DB_INDEX_MASETER_CONNECT_ERROR);  
         }   
     }
 
@@ -309,6 +314,18 @@ class CshDB_Index_Contents
         // 그렇다고 int형이 참조자가 나간다거나 그런건 아님
         // 동적할당했으니 그냥 당연한거..
         return $instance;
+    }
+
+    // 연결된 DB 객체 얻기 (Slave)
+    function DB_ConnectObject()
+    {
+        return $this->shDB_Index_ConnectDB;
+    }
+
+    // 연결된 DB 객체 얻기 (Slave)
+    function DB_ConnectObject_MASTER()
+    {
+         return $this->shDB_Index_ConnectDB_MASTER;
     }
 
     // Slave에게 쿼리 날리기
@@ -390,19 +407,16 @@ class CshDB_Index_Contents
 // ---------------------------------
 // 에러 발생 시, 실패패킷 전송 후 exit하는 함수
 //
-// Parameter : returnCode, accountNo(디폴트 -1). email(디폴트 -1), dbno(디폴트 -1)
+// Parameter : returnCode(실패 result)
 // return : 없음
 // ---------------------------------
-function OnError($result, $accountNo = -1, $email = -1, $dbno = -1)
+function OnError($result, $AccountNo = -1)
 {
-    // 이메일 중복 result 만들기
-    $Response['result'] = $result;
-    $Response['accountno'] = $accountNo; // 아직 유저 no 모름.
-    $Response['email'] = $email;
-    $Response['dbno'] = $dbno;
 
-    // 전송
-    ResponseJSON($Response, $accountNo);
+    $Response['result'] = $result;
+
+    // 실패 패킷 전송
+    ResponseJSON($Response, $AccountNo);
 
     // ---------------------------------------
     // cleanup 체크.
@@ -424,19 +438,19 @@ function OnError($result, $accountNo = -1, $email = -1, $dbno = -1)
 // -------------------------------------------------------------------
 // shDB_Info.available 테이블에서 가장 여유분이 많은 dbno를 알아온다.
 // 
-// Parameter : 요청자의 email
+// Parameter : 없음
 // return : 성공 시 fetch한 데이터 (result 아님)
 //        : 실패 시 내부에서 응답패킷 보낸 후 exit
 // -------------------------------------------------------------------
-function GetAvailableDBno($email)
+function GetAvailableDBno()
 {
     $shDB_Info = CshDB_Info_Contents::getInstance(); // 생성과 동시에 연결된다.  
     $Result = $shDB_Info->DB_Query("SELECT * FROM `shDB_Info`.`available` ORDER BY `available` DESC limit 1");
     if($Result === false)
     {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB Index 할당 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE, -1, $email, -1);  
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR);  
     }
 
     $dbData = mysqli_fetch_Assoc($Result);
@@ -445,12 +459,14 @@ function GetAvailableDBno($email)
     return $dbData;
 }
 
+// -------------------------------------------------------------------
 // shDB_Index.Allocate 테이블에 유저 추가하기
 // '마스터'한테 Write한다.
 //
 // Parameter : 요청자의 email, dbno
 // return : 성공 시, 해당 유저에게 할당된 AccountNo 리턴.
 //          문제 발생 시, 상황에 맞춰 실패 응답을 클라에게 보낸 후 exit
+// -------------------------------------------------------------------
 function UserInsert($email, $dbno)
 {
     // 1. shDB_Index의 싱글톤 알아옴.
@@ -463,9 +479,9 @@ function UserInsert($email, $dbno)
     // 만약, 무언가의 이유로 실패했다면, 실패 패킷 전송 후 php 종료
     if($Result === false)
     {
-         // 실패 패킷 전송 후 php 종료하기 (인덱스 할당 에러)
-         global $cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE;
-         OnError($cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE, -1, $email, $dbno);  
+         // 실패 패킷 전송 후 php 종료하기 (DB 쿼리 에러)
+         global $cnf_DB_QUERY_ERROR;
+         OnError($cnf_DB_QUERY_ERROR);  
     }
 
     $Data = mysqli_fetch_Assoc($Result);
@@ -481,16 +497,16 @@ function UserInsert($email, $dbno)
 
         // 실패 패킷 전송 후 php 종료하기
         global $cnf_CONTENT_ERROR_CREATE_EMAIL_DUPLICATE;
-        OnError($cnf_CONTENT_ERROR_CREATE_EMAIL_DUPLICATE, -1, $email, $dbno);           
+        OnError($cnf_CONTENT_ERROR_CREATE_EMAIL_DUPLICATE);           
     }        
 
 
     // 3. 존재하지 않는다면 Insert (Master에게 Write)
     if($shDB_Index->DB_Query_MASTER("INSERT INTO `shDB_Index`.`allocate`(`email`, `dbno`) VALUES ('$email', $dbno )") === false)
     {
-        // 실패했다면, 실패 패킷 전송 후 php 종료하기 (인덱스 할당 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE, -1, $email, $dbno);  
+        // 실패했다면, 실패 패킷 전송 후 php 종료하기 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR);  
     }
 
     // 4. 해당 유저에게 할당된 AccountNo 리턴
@@ -509,113 +525,280 @@ function UserInsert($email, $dbno)
 function DataSet($dbno, $DBAvailable, $email, $AccountNo)
 {
     // 1. dbno를 이용해, shDB_Info.dbconnect에서 db의 정보를 가져온다.
+    $Data = array_combine(array('dbno', 'accountno'), array($dbno, $AccountNo));
+    $dbInfoData = shDB_Data_ConnectInfo($Data);
+
+    // 2. shDB_Data에 Connect
+    $shDB_Data = shDB_Data_Conenct($dbInfoData);
+
+    // 3. account 테이블에 Insert
+    if(DB_Query("INSERT INTO `{$dbInfoData['dbname']}`.`account`(`accountno`, `email`) VALUES ($AccountNo, '$email' )", $shDB_Data, $AccountNo) === false)
+    {
+        // 만약, 에러가 1062(중복값)라면, 중복 응답 리턴.
+        if(mysqli_errno($shDB_Data) == 1062)
+        {
+            // 시스템로그 남김
+            $errorstring = 'DataSet--> accountTBL Value Duplicate.';
+            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
+
+            // 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
+            global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
+            OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo);  
+        }
+
+        // 그게 아니라면 DB 쿼리 에러
+        else
+        {
+            // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+            global $cnf_DB_QUERY_ERROR;
+            OnError($cnf_DB_QUERY_ERROR, $AccountNo);  
+        }
+    }
+
+
+    // 4.contents 테이블에 Insert
+    if(DB_Query("INSERT INTO `{$dbInfoData['dbname']}`.`contents`(`accountno`) VALUES ($AccountNo)", $shDB_Data, $AccountNo) === false)
+    {
+        // 만약, 에러가 1062(중복값)라면, 중복 응답 리턴.
+        if(mysqli_errno($shDB_Data) == 1062)
+        {
+            // 시스템로그 남김
+            $errorstring = 'DataSet--> contentsTBL Value Duplicate.';
+            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
+
+            // 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
+            global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
+            OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo);  
+        }
+
+        // 그게 아니라면 DB 쿼리 에러
+        else
+        {
+            // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+            global $cnf_DB_QUERY_ERROR;
+            OnError($cnf_DB_QUERY_ERROR, $AccountNo);  
+        } 
+    }
+
+
+    // 5. 이번에 유저를 접속시킨 dbno의 available을 1 감소.  
     $shDB_Info = CshDB_Info_Contents::getInstance();
-    $Result = $shDB_Info->DB_Query("SELECT * FROM `shDB_Info`.`dbconnect` WHERE dbno = $dbno");
+    if($shDB_Info->DB_Query("UPDATE `shDB_Info`.`available` SET available = $DBAvailable - 1 WHERE dbno = $dbno") === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR, $AccountNo);  
+    }
+
+
+    // 6. 연결했던 DB Disconenct
+    DB_Disconnect($shDB_Data);
+}
+
+
+// -------------------------------------------------------------------
+// 인자로 받은 accountno 혹은 email을 이용해 해당 유저의 dbno와 AccountNo를 알아온다.
+//
+// Parameter : Key, Value
+// return : 해당 유저의 dbno, AccountNo 리턴 (밖에서는 $Data['dbno'], $Data['accountno']와 같은 형식으로 사용.)
+//        : 실패 시, 적절한 실패 응답을 클라에게 보낸다.
+// -------------------------------------------------------------------
+function SearchUser($TempKey, $TempValue)
+{ 
+    $shDB_Index = CshDB_Index_Contents::getInstance();
+
+    // 1. Update 쿼리문을 만든다.
+    // Key, Value 안전하게 가져오기
+    $Key = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $TempKey);
+    $Value = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $TempValue);    
+
+    // 쿼리문 만들기
+    if($Key == 'accountno')
+        $Query = "SELECT `accountno`, `dbno` FROM `shDB_Index`.`allocate` WHERE accountno = $Value";
+
+    else if($Key == 'email')
+        $Query = "SELECT `accountno`,`dbno` FROM `shDB_Index`.`allocate` WHERE email = '$Value'";
+
+    // 둘 다 아니면 파라미터 에러
+    else
+    {
+        // 시스템로그 남김
+        $errorstring = 'SearchUser -> ParameterError. Value : ' . "$Value";
+        LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
+        
+        // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
+        global $cnf_CONTENT_ERROR_PARAMETER;
+        OnError($cnf_CONTENT_ERROR_PARAMETER);  
+    }  
+
+
+
+   // 2. shDB_Index.allocate로 쿼리문 날림  
+   $Result = $shDB_Index->DB_Query($Query);
+   if($Result === false)
+   {
+       // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+       global $cnf_DB_QUERY_ERROR;
+       OnError($cnf_DB_QUERY_ERROR);        
+   }   
+
+    $Data = mysqli_fetch_Assoc($Result);   
+
+
+
+    // 3. 회원가입되지 않은 유저라면, 에러 리턴.
+    if($Data === null)
+    {
+         // 실패 패킷 전송 후 php 종료하기 회원가입 자체가 안되어 있음)
+         global $cnf_CONTENT_ERROR_SELECT_NOT_CREATE_USER;
+         OnError($cnf_CONTENT_ERROR_SELECT_NOT_CREATE_USER); 
+    }   
+    
+    mysqli_free_result($Result);
+
+    // 4. dbno와 AccountNo 리턴    
+    return $Data;
+}
+
+
+// -------------------------------------------------------------------
+// dbno를 이용해 해당 유저의 정보가 있는 shDB_Data의 접속 정보를 알아온다. (db의 Ip, Port 등..)
+// 
+// Parameter : Data(dbno와 accountno가 배열로 들어있다)
+// return : 성공 시, 접속 정보가 들어있는 array
+//        : 실패 시, 내부에서 실패 패킷 보낸다.
+// -------------------------------------------------------------------
+function shDB_Data_ConnectInfo($Data)
+{
+    $shDB_Info = CshDB_Info_Contents::getInstance();
+
+    // dbno를 이용해, shDB_Info.dbconnect에서 db의 정보를 가져온다. (Slave 에게) 
+    $Result = $shDB_Info->DB_Query("SELECT * FROM `shDB_Info`.`dbconnect` WHERE dbno = {$Data['dbno']}");
     if($Result === false)
     {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR, $Data['accountno']);  
     }
 
     $dbInfoData = mysqli_fetch_Assoc($Result);
     mysqli_free_result($Result); 
 
-    
-    // 2. 찾아온 DB로 커넥트 
-    $shDB_Data;
-    if(DB_Connect($shDB_Data, $dbInfoData['ip'], $dbInfoData['id'], $dbInfoData['pass'], $dbInfoData['dbname'], $dbInfoData['port']) === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-
-    // 3. account 테이블에, 동일한 accountno나 email이 존재하는지 확인
-    $Query = "SELECT EXISTS (select * from `{$dbInfoData['dbname']}`.`account` where accountno =  $AccountNo OR email = '$email') as success";
-    $Result = DB_Query($Query, $shDB_Data, $AccountNo);
-    if($Result === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-    $Data = mysqli_fetch_Assoc($Result);
-    mysqli_free_Result($Result);
-
-    // 이미, 존재한다면 실패 패킷 만들어서 클라에게 응답.
-    if($Data['success'] == 1)
-    {
-        // 시스템로그 남김
-        $errorstring = 'accountTBL Duplicate : ' . " / [Query] {$Query}";
-        LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);            
-
-        // 실패 패킷 전송 후 php 종료하기
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }  
-
-
-    // 4. 존재하지 않는다면, account 테이블에 Insert
-    if(DB_Query("INSERT INTO `{$dbInfoData['dbname']}`.`account`(`accountno`, `email`) VALUES ($AccountNo, '$email' )", $shDB_Data, $AccountNo) === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-
-    // 5. Contents 테이블에, 동일한 accountno이 존재하는지 확인
-    $Query = "SELECT EXISTS (select * from `{$dbInfoData['dbname']}`.`contents` where accountno =  $AccountNo) as success";
-    $Result = DB_Query($Query, $shDB_Data, $AccountNo);
-    if($Result === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-    $Data = mysqli_fetch_Assoc($Result);
-    mysqli_free_Result($Result);
-
-     // 이미, 존재한다면 실패 패킷 만들어서 클라에게 응답.
-     if($Data['success'] == 1)
-     {
-         // 시스템로그 남김
-         $errorstring = 'contentsTBL Duplicate : ' . " / [Query] {$Query}";
-         LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);            
- 
-         // 실패 패킷 전송 후 php 종료하기
-         global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-         OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-     }  
-    
-
-    // 6. 존재하지 않는다면, contents 테이블에 Insert
-    if(DB_Query("INSERT INTO `{$dbInfoData['dbname']}`.`contents`(`accountno`) VALUES ($AccountNo)", $shDB_Data, $AccountNo) === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-    // 7. 이번에 유저를 접속시킨 dbno의 available을 1 감소.    
-    if($shDB_Info->DB_Query("UPDATE `shDB_Info`.`available` SET available = $DBAvailable - 1 WHERE dbno = $dbno") === false)
-    {
-        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 데이터 삽입 에러)
-        global $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT;
-        OnError($cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT, $AccountNo, $email, $dbno);  
-    }
-
-
-    // 8. 연결했던 DB Disconenct
-    DB_Disconnect($shDB_Data);
+    return $dbInfoData;
 }
 
 
+// -------------------------------------------------------------------
+// 인자로 받은 정보를 이용해 shDB_Data에 Connect 하기
+//
+// Parameter : DB 정보
+// return : 연결된 DB 변수
+// -------------------------------------------------------------------
+function shDB_Data_Conenct($dbInfoData)
+{
+    // 1. 찾아온 DB로 커넥트 
+    $shDB_Data;
+    if(DB_Connect($shDB_Data, $dbInfoData['ip'], $dbInfoData['id'], $dbInfoData['pass'], $dbInfoData['dbname'], $dbInfoData['port']) === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DBData 연결 에러)
+        global $cnf_DB_DATA_CONNECT_ERROR;
+        OnError($cnf_DB_DATA_CONNECT_ERROR,$Data['accountno']);  
+    }
 
+    return $shDB_Data;
+}
+
+// -------------------------------------------------------------------
+// 해당 db에 accountNo가 있는지 확인. (이미 연결되었다는 가정)
+// shDB_Data 전용
+//
+// Parameter : accountNo, 연결된 DB 변수(Out), DB 이름, 테이블 이름
+// return : 없음
+//        : 실패 시, 내부에서 적절한 실패 응답 보낸 후 Exit;
+// -------------------------------------------------------------------
+function shDB_Data_AccountNoCheck($accountNo, &$shDB_Data, $dbname, $TBLName)
+{ 
+    // 1. shDB_Data.$TBLName에 해당 accountNo가 있는지 확인 (Slave 에게)
+    $Query = "SELECT EXISTS (SELECT * FROM `$dbname`.`$TBLName` WHERE accountno = $accountNo) AS success";
+    $Result = DB_Query($Query , $shDB_Data, $accountNo);
+    $AccountNoCheck = mysqli_fetch_Assoc($Result);
+
+    mysqli_free_Result($Result);
+
+    // 존재하지 않는다면, shDB_Index.allocate에서 해당 accountno의 유저 삭제.
+    // 정상 삭제 후 실패 패킷 리턴.
+    if($AccountNoCheck['success'] == 0)
+    {
+        // 시스템로그 남김
+        $errorstring = "shDB_Data_AccountNoCheck--> Not Found AccountNo!! IndexDB Rollback";
+        LOG_System($accountNo, $_SERVER['PHP_SELF'], $errorstring);   
+        
+        // shDB_Index.allocate 롤백. (Master에게)
+        $shDB_Index = CshDB_Index_Contents::getInstance();
+        if($shDB_Index->DB_Query_MASTER("DELETE FROM `shDB_Index`.`allocate` WHERE `accountno` = $accountNo") === false)
+        {
+            // Master에게 쿼리 남기다 실패하면 실패 패킷 전송 후 php 종료 (DB 쿼리 에러)
+            global $cnf_DB_QUERY_ERROR;
+            OnError($cnf_DB_QUERY_ERROR); 
+        }
+
+        // 롤백이 잘 됐으면, 실패 패킷 전송 후 php 종료하기 (AccountNo가 없음)
+        global $cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO;
+        OnError($cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO);           
+    }   
+}
+
+// -------------------------------------------------------------------
+// shDB_Data에 인자로 받은 데이터를 Update
+// 
+// Parameter : accountNo, 연결된 DB 변수(Out), DB 이름, 테이블 이름, Update할 데이터의 Key/Value 배열
+// return : 없음
+// -------------------------------------------------------------------
+function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_Body)
+{
+    // 1. Update 구문에서 Set 할 Text 제작.
+    // 밖에서 Next할 떄 있다고 했으니 무조건 파라미터 1개는 있다고 가정
+    $Key = mysqli_real_escape_string($shDB_Data, key($Content_Body));
+    $Value = mysqli_real_escape_string($shDB_Data, current($Content_Body));
+    $SetText = "`$Key` = '$Value'";
+
+    while(true)
+    {
+        // next가 없으면, 다 뺀것.
+        if(next($Content_Body) === false)
+            break;
+
+        next($Content_Body);
+        
+        $Key = mysqli_real_escape_string($shDB_Data, key($Content_Body));
+        $Value = mysqli_real_escape_string($shDB_Data, current($Content_Body));
+        $SetText .= " ,`$Key` = '$Value'";
+    }
+   
+
+    // 2. Update 쿼리문 만들어서 날리기
+    $Result = DB_Query("UPDATE `$dbname`.`$TBLName` SET $SetText WHERE accountno =  $accountNo" , $shDB_Data, $accountNo);
+
+    // 3. 쿼리 날리는데 실패했으면, 실패 이유에 따라 응답패킷 보낸다.
+    if($Result === false)
+    {
+        // -- 컬럼이 존재하지 않을 경우 (1054 에러)
+        if(mysqli_errno($shDB_Data) == 1054)
+        {
+            // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
+            global $cnf_DB_NOT_FOUND_COLUMN;
+            OnError($cnf_DB_NOT_FOUND_COLUMN, 2);  
+        }        
+
+        // 그 외는 DB 쿼리 에러
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR, $accountNo);  
+    }
+
+    // true가 리턴되면 잘 된것.
+    // Update는 true, false만 리턴되기 때문에 result하면 안됨.
+
+}
 
 
 

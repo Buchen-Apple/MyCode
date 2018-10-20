@@ -13,36 +13,36 @@ require_once('_LOG_Profile.php');
 // 1. 프로파일링 객체 생성
 $PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER['PHP_SELF']);  
 
-
 // 2. 게임로그 객체 생성
 $GameLog = GAMELog::getInstance($cnf_GAME_LOG_URL); 
 
+// 3. 지정된 DB에 연결 후, system의 버전 정보 얻어오기
+$g_StartUpDB = null;
+if(DB_Connect($g_StartUpDB, $StartUP_DB_IP, $StartUP_DB_ID, $StartUP_DB_Password, $StartUP_DB_Name, $StartUP_DB_PORT) === false)
+{
+    // DB 연결 실패
+}
 
-// 3. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
+// 4. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
 $Body = explode("\r\n", file_get_contents('php://input'));
 
+// Major, Minor 가져오기
+$Major = mysqli_real_escape_string($g_StartUpDB, $Body[0]);
+$Minor = mysqli_real_escape_string($g_StartUpDB, $Body[1]);
 
-// 4. 지정된 DB에 연결 후, system의 버전 정보 얻어오기
-$g_StartUpDB = null;
-DB_Connect($g_StartUpDB, $StartUP_DB_IP, $StartUP_DB_ID, $StartUP_DB_Password, $StartUP_DB_Name, $StartUP_DB_PORT, $Body[2]);
-
+// 5. DB에서 major, minor 가져오기
 $Query = "SELECT * FROM `systemDB`";
-$g_StartResult = DB_Query($Query, $g_StartUpDB, $Body[2]);
+$g_StartResult = DB_Query($Query, $g_StartUpDB);
 
-// major / minor
 $DBVersion = mysqli_fetch_Assoc($g_StartResult);
 
 // 리소스 해제
-//mysqli_free_result($g_StartResult);
-
-// SystemDB와 연결 해제
-//DB_Disconnect($g_StartUpDB);
+mysqli_free_result($g_StartResult);
 
 
-
-// 5. 클라가 보낸 버전과 비교
+// 6. 클라가 보낸 버전과 비교
 // 다르면 접속 끊음.
-if($DBVersion['VersionMajor'] != $Body[0] || $DBVersion['VersionMinor'] != $Body[1])
+if($DBVersion['VersionMajor'] != $Major || $DBVersion['VersionMinor'] != $Minor)
 {
     $Response['resultCode'] = 9000;
     $Response['resultMsg'] = 'DISCORDANCE VERSION!'; // 버전 불일치
@@ -52,6 +52,10 @@ if($DBVersion['VersionMajor'] != $Body[0] || $DBVersion['VersionMinor'] != $Body
 
     exit;
 }
+
+
+// 7. SystemDB와 연결 해제
+DB_Disconnect($g_StartUpDB);
 
 
 

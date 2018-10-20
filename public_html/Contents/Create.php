@@ -14,21 +14,30 @@ require_once('/../LIBRARY/_Content_Library.php');
 
 // 1. 컨텐츠 부분 decoding
 // 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
-if(count($Body) < 4)
+if(isset($Body[3]) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
      global $cnf_CONTENT_ERROR_PARAMETER;
-     OnError($cnf_CONTENT_ERROR_PARAMETER, -1, -1, -1);  
+     OnError($cnf_CONTENT_ERROR_PARAMETER);  
 }
 
 $Content_Body = json_decode($Body[3], true);
-$email = $Content_Body['email'];
 
+// 파라미터가 이메일이 맞는지 체크
+if(filter_var($Content_Body['email'], FILTER_VALIDATE_EMAIL) === false)
+{
+    // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
+    global $cnf_CONTENT_ERROR_PARAMETER;
+    OnError($cnf_CONTENT_ERROR_PARAMETER);  
+}
 
+// 이메일이 맞다면, escape로 안전하게 가져옴.
+$shDB_Index = CshDB_Index_Contents::getInstance();
+$email = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $Content_Body['email']);
 
 
 // 2. shDB_Info.available 테이블에서 가장 여유분이 많은 dbno를 알아온다.
-$dbData = GetAvailableDBno($email);
+$dbData = GetAvailableDBno();
 
 
 
