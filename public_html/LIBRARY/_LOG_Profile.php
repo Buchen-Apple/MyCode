@@ -187,7 +187,7 @@ class Profiling
     // --------------
     // 프로파일링 로그 저장
     // --------------
-    function LOG_Save($AccountNo = 0)
+    function LOG_Save($AccountNo = -1)
     {
         // 로그 저장 FLAG가 FALSE라면, 로그 저장할 때가 아니니 걍 return;
         if($this->LOG_FLAG == FALSE)

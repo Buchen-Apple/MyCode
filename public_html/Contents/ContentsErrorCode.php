@@ -38,7 +38,10 @@ $cnf_CONTENT_ERROR_CREATE_DB_DATA_INSERT = -3;
 $cnf_CONTENT_ERROR_SELECT_NOT_CREATE_USER = -10;
 
 // Index.allocate에는 있으나, data.account에 없음. 롤백 후 해당 에러 리턴
-$cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO  =   -11;
+$cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_ACCOUNTTBL  =   -11;
+
+// Index.allocate에는 있으나, data.contents에 없음. 롤백 후 해당 에러 리턴
+$cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_CONTENTSTBL  =   -12;
 
 
 
@@ -59,6 +62,9 @@ $cnf_DB_QUERY_ERROR   =   -60;
 
 // Update 컬럼 오류 (존재하지 않는 컬럼)
 $cnf_DB_NOT_FOUND_COLUMN    =   -61;
+
+// Update/Select 테이블 오류 (존재하지 않는 테이블)
+$cnf_DB_NOT_FOUNT_TABLE =   -62;
 
 
 

@@ -2,7 +2,7 @@
 
 
 // ******************************
-// shDB_Data.account에 정보를 Update 한다.
+// shDB_Data.Contents에 정보를 Update 한다.
 // ******************************
 
 // ---------------------------------------
@@ -60,11 +60,11 @@ $shDB_Data = shDB_Data_Conenct($DBInfo);
 
 // 4. 해당 DB의 TBL에, 인자로 던진 AccountNo가 존재하는지 확인
 // 이미 존재한다면 내부에서 롤백 후 실패 응답까지 보낸 후 exit
-shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
+shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'contents');
 
 
 // 5. 해당 DB의 TBL에, Update
-shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account', $Content_Body);
+shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'contents', $Content_Body);
 
 
 // 6. Disconenct

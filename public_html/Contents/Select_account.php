@@ -1,8 +1,7 @@
 <?php
 
-
 // ******************************
-// shDB_Data.account에 정보를 Update 한다.
+// shDB_Data.account에서 정보를 Select해서 클라에게 돌려준다.
 // ******************************
 
 // ---------------------------------------
@@ -43,15 +42,6 @@ if($DataKey  == 'email')
 // Key, Value를 인자로 던진다.
 $Data = SearchUser($DataKey , current($Content_Body));
 
-// 배열을 다음칸으로 이동
-// 만약, accountNo외에 파라미터가 하나도 없으면 파라미터 에러
-if(next($Content_Body) === false)
-{
-    // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-    global $cnf_CONTENT_ERROR_PARAMETER;
-    OnError($cnf_CONTENT_ERROR_PARAMETER, $Data['accountno']);  
-}
-
 
 // 3. 접속할 shDB_Data 알아온 후 Conenct
 $DBInfo = shDB_Data_ConnectInfo($Data['dbno'], $Data['accountno']);
@@ -63,8 +53,9 @@ $shDB_Data = shDB_Data_Conenct($DBInfo);
 shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
 
 
-// 5. 해당 DB의 TBL에, Update
-shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account', $Content_Body);
+// 5. accountTBL에서 정보 Select.
+$SelectData = shDB_Data_Select($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
+
 
 
 // 6. Disconenct
@@ -73,6 +64,12 @@ DB_Disconnect($shDB_Data);
 
 // 7. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_CONTENT_COMPLETE;
+$Response['accountno'] = $SelectData['accountno'];
+$Response['email'] = $SelectData['email'];
+$Response['password'] = $SelectData['password'];
+$Response['sessionkey'] = $SelectData['sessionkey'];
+$Response['nick'] = $SelectData['nick'];
+
 
 
 // 8. 결과 돌려주기
@@ -84,10 +81,14 @@ ResponseJSON($Response, $Data['accountno']);
 // cleanup 체크.
 // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
 // 이 안에서 프로파일링 저장 시 accountno를 쓰기때문에, 그 전용으로 만든다. accountno를 모르는 경우에는 이 변수자체를 안만든다.
-$ClearAccountNo = $Data['accountno'];
+$ClearAccountNo = $SelectData['accountno'];
 require_once('/../LIBRARY/_Clenup.php');
 // --------------------------------------
 
 echo 'LastOk'; // <<< 테스트용  
+
+
+
+
 
 ?>

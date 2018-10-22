@@ -5,7 +5,7 @@
 
 // DB Connect
 //
-// Parameter : DB변수(out), IP, ID, Pass, Name, Port, AccountNO(디폴트 -1)
+// Parameter : DB변수(out), IP, ID, Pass, Name, Port, AccountNo(디폴트 -1)
 // return : 연결 성공 시 true
 //        : 연결 실패 시 false. 
 function DB_Connect(&$ConnectDB, $DB_IP, $DB_ID, $DB_Password, $DB_Name, $DB_Port, $AccountNo = -1)

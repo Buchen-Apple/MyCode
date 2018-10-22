@@ -30,6 +30,7 @@ $Body = explode("\r\n", file_get_contents('php://input'));
 $Major = mysqli_real_escape_string($g_StartUpDB, $Body[0]);
 $Minor = mysqli_real_escape_string($g_StartUpDB, $Body[1]);
 
+
 // 5. DB에서 major, minor 가져오기
 $Query = "SELECT * FROM `systemDB`";
 $g_StartResult = DB_Query($Query, $g_StartUpDB);
@@ -38,6 +39,10 @@ $DBVersion = mysqli_fetch_Assoc($g_StartResult);
 
 // 리소스 해제
 mysqli_free_result($g_StartResult);
+
+// SystemDB와 연결 해제
+DB_Disconnect($g_StartUpDB);
+
 
 
 // 6. 클라가 보낸 버전과 비교
@@ -54,8 +59,7 @@ if($DBVersion['VersionMajor'] != $Major || $DBVersion['VersionMinor'] != $Minor)
 }
 
 
-// 7. SystemDB와 연결 해제
-DB_Disconnect($g_StartUpDB);
+
 
 
 
