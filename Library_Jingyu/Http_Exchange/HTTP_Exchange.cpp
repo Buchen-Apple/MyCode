@@ -1,17 +1,25 @@
-#include "stdafx.h"
+#include "pch.h"
 
 #pragma comment(lib,"ws2_32")
 #include <Ws2tcpip.h>
 
 #include "HTTP_Exchange.h"
+#include "Log/Log.h"
+#include "CrashDump/CrashDump.h"
 
 
 namespace Library_Jingyu
 {
+
+#define _Mycountof(Array)	sizeof(Array) / sizeof(TCHAR)
+
+	CCrashDump* g_HTTP_Dump = CCrashDump::GetInstance();
+	CSystemLog* g_HTTP_Log = CSystemLog::GetInstance();
+
+
 	// 생성자
-	// 최초 생성 시, 서버 포트를 전달받음.
-	// [호스트(IP나 도메인 둘 중 아무거나), 서버 포트, Host가 도메인인지 여부] 총 3개를 입력받음
-	// true면 도메인. false면 IP
+	// 
+	// Parameter : 호스트(IP or 도메인), HostPort, Host가 도메인인지 여부 (false면 IP. 기본 false)	
 	HTTP_Exchange::HTTP_Exchange(TCHAR* Host, USHORT Server_Port, bool DomainCheck)
 	{
 		// ---------------------------
@@ -37,11 +45,30 @@ namespace Library_Jingyu
 		else
 			_tcscpy_s(m_tIP, _Mycountof(m_tIP), Host);
 
+
+		// -------------
+		// TCP 소켓 생성
+		// -------------
+		WSADATA wsa;
+		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+		{
+			fputs("윈속 초기화 중 실패\n", stdout);
+			g_HTTP_Dump->Crash();
+		}
+
 	}
 
-	// Request / Response까지 해주는 함수.
-	// [Path, 전달할 Body, (out)UTF-16로 리턴받을 TCHAR형 변수]
-	// 총 3개를 입력받음
+	// 소멸자
+	HTTP_Exchange::~HTTP_Exchange()
+	{
+		WSACleanup();
+	}
+
+
+	// http로 Request, Response하는 함수
+	//
+	// Parameter : Path, 전달할 Body, (out)Response결과를 받을 TCHAR형 변수 (UTF-16)
+	// return : 성공 시 true, 실패 시 false
 	bool HTTP_Exchange::HTTP_ReqANDRes(TCHAR* Path, TCHAR* RquestBody, TCHAR* ReturnBuff)
 	{
 		// -----------------
@@ -81,7 +108,6 @@ namespace Library_Jingyu
 
 
 
-
 		// -----------------
 		// 만든 데이터를 UTF-8로 변환
 		// -----------------
@@ -92,194 +118,39 @@ namespace Library_Jingyu
 		int len = (int)_tcslen(HTTP_Data);
 
 		WideCharToMultiByte(CP_UTF8, 0, HTTP_Data, (int)_tcslen(HTTP_Data), utf8_HTTP_Data, len, NULL, NULL);
-
-
-
-
-		// -------------
-		// TCP 소켓 생성
-		// -------------
-		WSADATA wsa;
-		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-		{
-			fputs("윈속 초기화 중 실패\n", stdout);
-			return false;
-		}
-
-		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-
-
-		// -------------
-		// Time_Wait을 남기지 않기 위해 Linger옵션 설정.
-		// -------------
-		LINGER optval;
-		optval.l_onoff = 1;
-		optval.l_linger = 0;
-		setsockopt(sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
-
-
-
-
-		// -----------------
-		// 웹 서버와 connect (논블락)
-		// -----------------
-		// 논블락 소켓으로 변경
-		ULONG on = 1;
-		DWORD check = ioctlsocket(sock, FIONBIO, &on);
-		if (check == SOCKET_ERROR)
-		{
-			printf("NoneBlock Change Fail...\n");
-			return 0;
-		}
-
-		SOCKADDR_IN clientaddr;
-		ZeroMemory(&clientaddr, sizeof(clientaddr));
-		clientaddr.sin_family = AF_INET;
-		clientaddr.sin_port = htons(m_usServer_Port);
-		InetPton(AF_INET, m_tIP, &clientaddr.sin_addr.S_un.S_addr);
-
-		// connect 시도
-		while (1)
-		{
-			connect(sock, (SOCKADDR*)&clientaddr, sizeof(clientaddr));
-
-			DWORD Check = WSAGetLastError();
-
-			// 우드블럭이 뜬 경우
-			if (Check == WSAEWOULDBLOCK)
-			{
-				// 쓰기셋, 예외셋, 셋팅
-				FD_SET wset;
-				FD_SET exset;
-				wset.fd_count = 0;
-				exset.fd_count = 0;
-
-				wset.fd_array[wset.fd_count] = sock;
-				wset.fd_count++;
-
-				exset.fd_array[exset.fd_count] = sock;
-				exset.fd_count++;
-
-				// timeval 셋팅. 500m/s  대기
-				TIMEVAL tval;
-				tval.tv_sec = 0;
-				tval.tv_usec = 500000;
-
-				// Select()
-				DWORD retval = select(0, 0, &wset, &exset, &tval);
-
-				
-
-				// 에러 발생여부 체크
-				if (retval == SOCKET_ERROR)
-				{
-					printf("Select error..(%d)\n", WSAGetLastError());
-
-					LINGER optval;
-					optval.l_onoff = 1;
-					optval.l_linger = 0;
-					setsockopt(sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
-
-					closesocket(sock);
-					WSACleanup();
-					return false;
-
-				}
-
-				// 타임아웃 체크
-				else if (retval == 0)
-				{
-					printf("Select Timeout..\n");
-					printf("%d\n", WSAGetLastError());
-
-					LINGER optval;
-					optval.l_onoff = 1;
-					optval.l_linger = 0;
-					setsockopt(sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval));
-
-					closesocket(sock);
-					WSACleanup();
-					return false;
-					
-				}
-
-				// 반응이 있다면, 예외셋에 반응이 왔는지 체크
-				else if (exset.fd_count > 0)
-				{
-					//예외셋 반응이면 실패한 것.
-					printf("Select ---> exset problem..\n");					
-
-					closesocket(sock);
-					WSACleanup();
-					return false;
-				}
-
-				// 쓰기셋에 반응이 왔는지 체크
-				// 여기까지 오면 사실 그냐 성공이지만 한번 더 체크해봄
-				else if (wset.fd_count > 0)
-				{
-					// 다시 소켓을 블락으로 바꾼 후 break;
-					// 논블락 소켓으로 변경
-					ULONG on = 0;
-					DWORD check = ioctlsocket(sock, FIONBIO, &on);
-					if (check == SOCKET_ERROR)
-					{
-						printf("NoneBlock Change Fail...\n");
-						return false;
-					}
-
-					break;
-
-				}
-				
-			}			
-		}
-
-
-
-
-		// -----------------
-		// 웹 서버와 connect
-		// -----------------
-		//SOCKADDR_IN clientaddr;
-		//ZeroMemory(&clientaddr, sizeof(clientaddr));
-		//clientaddr.sin_family = AF_INET;
-		//clientaddr.sin_port = htons(m_usServer_Port);
-		//InetPton(AF_INET, m_tIP, &clientaddr.sin_addr.S_un.S_addr);
-
-		//if (connect(sock, (SOCKADDR*)&clientaddr, sizeof(clientaddr)) == SOCKET_ERROR)
-		//{
-		//	_tprintf(L"Connect Fail...(%d)\n", WSAGetLastError());
-		//	return false;
-		//}
 		
 
 
+		// -------------
+		// 웹 서버로 연결하기
+		// -------------
+		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		HTTP_Connect(sock);		   		 
 
 
 
 		// ---------------------------
 		// Recv / Send 시간 설정 (소켓 옵션 설정)
 		// ---------------------------
-		int Optval = 3000;
+		int Optval = 5000;
 
 		if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&Optval, sizeof(Optval)) == SOCKET_ERROR)
 		{
 			fputs("SO_SNDTIMEO 설정 중 실패\n", stdout);
+
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
 			return false;
 		}
 
 		if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char*)&Optval, sizeof(Optval)) == SOCKET_ERROR)
 		{
 			fputs("SO_RCVTIMEO 설정 중 실패\n", stdout);
+
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
 			return false;
 		}
-
-		
-
-		
-
 
 
 
@@ -290,6 +161,9 @@ namespace Library_Jingyu
 		if (send(sock, utf8_HTTP_Data, (int)strlen(utf8_HTTP_Data), 0) == SOCKET_ERROR)
 		{
 			_tprintf(L"send Fail...(%d)\n", WSAGetLastError());
+
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
 			return false;
 		}
 
@@ -301,7 +175,11 @@ namespace Library_Jingyu
 		// -----------------
 		char Json_Buff[2000];
 		if (HTTP_Recv(sock, Json_Buff, 2000) == false)
+		{
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
 			return false;
+		}
 
 
 
@@ -325,17 +203,14 @@ namespace Library_Jingyu
 		// -----------------
 		
 		closesocket(sock);
-		WSACleanup();
-
 		return true;
-
-
 	}
 
 
-	// HTTP_ReqANDRes() 함수 안에서 호출
-	// Host에는 도메인이 들어있음.
-	// Host도메인을 IP로 변경헤서 "IP"에 저장.
+	// 도메인을 IP로 변경
+	//
+	// Parameter : (out)변환된 Ip를 저장할 변수, 도메인
+	// return : 성공 시 true, 실패 시 false
 	bool HTTP_Exchange::DomainToIP(TCHAR* IP, TCHAR* Host)
 	{
 		SOCKADDR_IN* SockAddr;
@@ -364,15 +239,10 @@ namespace Library_Jingyu
 
 	}
 
-	// HTTP_ReqANDRes()함수 안에서 호출.
-	// 연결된 웹서버가 보내는 데이터를 모두 받음
-	// UTF-8의 형태로 Return Buff에 넣어줌
-	// 
-	// 전달받는 인자값
-	// [웹서버와 연결된 Socket, (out)UTF-8로 리턴받을 char형 변수]
-	// 
-	// 리턴값
-	// ture : 정상적으로 모두 받음 / false : 무언가 문제가 생겨서 다 못받음.
+	// 연결된 웹 서버에게 Recv 하는 함수
+	//
+	// Parameter : 웹서버와 연결된 Socket, (out)리턴받을 char형 변수(UTF-8), char형 변수의 size
+	// return : 정상적으로 모두 받을 시 true
 	bool HTTP_Exchange::HTTP_Recv(SOCKET sock, char* ReturnBuff, int BuffSize)
 	{
 		while (1)
@@ -468,5 +338,169 @@ namespace Library_Jingyu
 
 		return true;
 
+	}
+
+
+	// 웹 서버로 Connect하는 함수
+	//
+	// Parameter : 할당된 소켓
+	// return : 성공 시 true, 실패 시 false
+	bool HTTP_Exchange::HTTP_Connect(SOCKET sock)
+	{
+		// -----------------
+		// 웹 서버와 connect (논블락)
+		// -----------------
+		// 논블락 소켓으로 변경
+		ULONG on = 1;
+		if (ioctlsocket(sock, FIONBIO, &on) == SOCKET_ERROR)
+		{
+			printf("NoneBlock Change Fail...\n");
+			g_HTTP_Dump->Crash();
+			return false;
+		}
+
+		SOCKADDR_IN clientaddr;
+		ZeroMemory(&clientaddr, sizeof(clientaddr));
+		clientaddr.sin_family = AF_INET;
+		clientaddr.sin_port = htons(m_usServer_Port);
+		InetPton(AF_INET, m_tIP, &clientaddr.sin_addr.S_un.S_addr);
+
+		// connect 시도
+		int iReConnectCount = 0;
+		while (1)
+		{
+			connect(sock, (SOCKADDR*)&clientaddr, sizeof(clientaddr));
+
+			DWORD Check = WSAGetLastError();
+
+			// 이미 연결된 경우
+			if (Check == WSAEISCONN)
+			{
+				break;
+			}
+
+			// 우드블럭이 뜬 경우
+			else if (Check == WSAEWOULDBLOCK)
+			{
+				// 쓰기셋, 예외셋, 셋팅
+				FD_SET wset;
+				FD_SET exset;
+				wset.fd_count = 0;
+				exset.fd_count = 0;
+
+				wset.fd_array[wset.fd_count] = sock;
+				wset.fd_count++;
+
+				exset.fd_array[exset.fd_count] = sock;
+				exset.fd_count++;
+
+				// timeval 셋팅. 500m/s  대기
+				TIMEVAL tval;
+				tval.tv_sec = 0;
+				tval.tv_usec = 500000;
+
+				// Select()
+				DWORD retval = select(0, 0, &wset, &exset, &tval);
+
+
+				// 에러 발생여부 체크
+				if (retval == SOCKET_ERROR)
+				{
+					printf("Select error..(%d)\n", WSAGetLastError());					
+
+					closesocket(sock);
+					g_HTTP_Dump->Crash();
+					return false;
+
+				}
+
+				// 타임아웃 체크
+				else if (retval == 0)
+				{
+					printf("Select Timeout..\n");
+
+					// 5회 재시도한다.
+					iReConnectCount++;
+					if (iReConnectCount == 5)
+					{
+						closesocket(sock);
+						g_HTTP_Dump->Crash();
+					}
+
+					continue;
+				}
+
+				// 반응이 있다면, 예외셋에 반응이 왔는지 체크
+				else if (exset.fd_count > 0)
+				{
+					//예외셋 반응이면 실패한 것.
+					printf("Select ---> exset problem..\n");
+
+					closesocket(sock);
+					g_HTTP_Dump->Crash();
+					return false;
+				}
+
+				// 쓰기셋에 반응이 왔는지 체크
+				// 여기까지 오면 사실 그냥 성공이지만 한번 더 체크해봄
+				else if (wset.fd_count > 0)
+				{
+					break;
+				}
+
+				// 여기까지 오면 뭔지 모를 에러..
+				else
+				{
+					printf("Select ---> UnknownError..(retval %d, LastError : %d)\n", retval, WSAGetLastError());
+
+					closesocket(sock);
+					g_HTTP_Dump->Crash();
+					return false;
+				}
+
+			}
+
+			// 이 외 에러가 떴으면 Crash
+			else
+			{
+				printf("Connect ---> UnknownError..(%d)\n", Check);
+
+				closesocket(sock);
+				g_HTTP_Dump->Crash();
+				return false;
+			}
+		}
+
+		// -------------
+		// 다시 소켓을 블락으로 변경
+		// -------------
+		on = 0;
+		if (ioctlsocket(sock, FIONBIO, &on) == SOCKET_ERROR)
+		{
+			printf("NoneBlock Change Fail...\n");
+
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
+			return false;
+		}
+
+
+
+		// -------------
+		// Time_Wait을 남기지 않기 위해 Linger옵션 설정.
+		// -------------
+		LINGER optval;
+		optval.l_onoff = 1;
+		optval.l_linger = 0;
+		if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval)) == SOCKET_ERROR)
+		{
+			printf("Linger Fail...\n");
+
+			closesocket(sock);
+			g_HTTP_Dump->Crash();
+			return false;
+		}
+
+		return true;
 	}
 }

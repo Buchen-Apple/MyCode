@@ -19,33 +19,38 @@ namespace Library_Jingyu
 
 	public:
 		// 생성자
-		// 최초 생성 시, 서버 포트를 전달받음.
-		// [호스트(IP나 도메인 둘 중 아무거나), 서버 포트, Host가 도메인인지 여부] 총 3개를 입력받음
-		// true면 도메인. false면 IP]
+		// 
+		// Parameter : 호스트(IP or 도메인), HostPort, Host가 도메인인지 여부 (false면 IP. 기본 false)	
 		HTTP_Exchange(TCHAR* Host, USHORT Server_Port, bool DomainCheck = false);
 
-		// Request / Response까지 해주는 함수.
-		// [웹서버 URL, 전달할 Body, (out)UTF-16로 리턴받을 TCHAR형 변수, URL이 도메인인지 여부. true면 도메인. false면 IP]
-		// 총 4개를 입력받음
+		// 소멸자
+		~HTTP_Exchange();
+
+		// http로 Request, Response하는 함수
+		//
+		// Parameter : Path, 전달할 Body, (out)Response결과를 받을 TCHAR형 변수 (UTF-16)
+		// return : 성공 시 true, 실패 시 false
 		bool HTTP_ReqANDRes(TCHAR* Path, TCHAR* RquestBody, TCHAR* ReturnBuff);
 
 
 	private:
-		// HTTP_ReqANDRes() 함수 안에서 호출
-		// Host에는 도메인이 들어있음.
-		// Host도메인을 IP로 변경헤서 "IP"에 저장.
+		// 도메인을 IP로 변경
+		//
+		// Parameter : (out)변환된 Ip를 저장할 변수, 도메인
+		// return : 성공 시 true, 실패 시 false
 		bool DomainToIP(TCHAR* IP, TCHAR* Host);
 
-		// HTTP_ReqANDRes()함수 안에서 호출.
-		// 연결된 웹서버가 보내는 데이터를 모두 받음
-		// UTF-8의 형태로 Return Buff에 넣어줌
-		// 
-		// 전달받는 인자값
-		// [웹서버와 연결된 Socket, (out)UTF-8로 리턴받을 char형 변수]
-		// 
-		// 리턴값
-		// ture : 정상적으로 모두 받음 / false : 무언가 문제가 생겨서 다 못받음.
+		// 연결된 웹 서버에게 Recv 하는 함수
+		//
+		// Parameter : 웹서버와 연결된 Socket, (out)리턴받을 char형 변수(UTF-8), char형 변수의 size
+		// return : 정상적으로 모두 받을 시 true
 		bool HTTP_Recv(SOCKET sock, char* ReturnBuff, int BuffSize);
+
+		// 웹 서버로 Connect하는 함수
+		//
+		// Parameter : 
+		// return : 성공 시 true, 실패 시 false
+		bool HTTP_Connect(SOCKET sock);
 
 	};
 }
