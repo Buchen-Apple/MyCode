@@ -1,10 +1,6 @@
 <?php
 
-if(true)
-{
-    $Test = 128;
-}
+phpinfo();
 
-$abc = $Test;
 
 ?>

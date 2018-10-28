@@ -39,24 +39,27 @@ function LOG_System($AccountNo, $Action, $Message, $Level = 1)
     // 만약, 아직 회원가입 안한? 혹은 AccountNo가 발급되지 않은 유저?
     if($AccountNo < 0)
     {
-        if(array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER))
-            $AccountNo = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        $_SERVER = $GLOBALS["_SERVER"];
 
-        else if(array_key_exists('REMOTE_ADDR', $_SERVER))
-            $AccountNo = $_SERVER['REMOTE_ADDR'];
+        if(array_key_exists("HTTP_X_FORWARDED_FOR", $_SERVER))
+            $AccountNo = $_SERVER["HTTP_X_FORWARDED_FOR"];
+
+        else if(array_key_exists("REMOTE_ADDR", $_SERVER))
+            $AccountNo = $_SERVER["REMOTE_ADDR"];
 
         else
-            $AccountNo = 'local';
+            $AccountNo = "local";
     }
-
    
     $postField = array('AccountNo' => $AccountNo, 'Action' => $Action, 'Message' => $Message);
 
-    http_request($cnf_SYSTEM_LOG_URL, $postField, 'POST');
+    http_request($cnf_SYSTEM_LOG_URL, $postField, 'POST');    
 
     // $PF가 true라면(존재한다면) 프로파일링 종료
     if($PF)
         $PF->stopCheck(PF_LOG);   
+
+    return true;
 }
 
 

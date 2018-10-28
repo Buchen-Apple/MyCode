@@ -3,12 +3,19 @@
 // 시스템 로그 남기는 서버.
 // $AccountNo, $Action, $Message 가 넘어온다.
 // ---------------------------
-
-require_once('/../LIBRARY/_DB_Config.php');
+$_SERVER = $GLOBALS["_SERVER"];
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Config.php");
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Library.php");
 
 // 1. DB와 연결
 // 여기서마저 연결하다가 오류나면, 이젠 아파치의 error로그를 볼 수 밖에 없음.
-$LogSave_DB = mysqli_connect($Log_DB_IP, $Log_DB_ID, $Log_DB_Password, $Log_DB_Name, $Log_DB_PORT);
+
+$ret = DB_Connect($LogSave_DB, $Log_DB_IP, $Log_DB_ID, $Log_DB_Password, $Log_DB_Name, $Log_DB_PORT);
+if($ret === false)
+{
+    exit;
+}
+
 
 // 테이블 이름 설정
 // 월 별로 테이블 새로 생성하기 위해 이름을 date에 따라 결정

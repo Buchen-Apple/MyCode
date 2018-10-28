@@ -3,6 +3,9 @@
 // DB Library
 // -------------------------------
 
+
+require_once('_LOG_GameAndSystem.php');
+
 // DB Connect
 //
 // Parameter : DB변수(out), IP, ID, Pass, Name, Port, AccountNo(디폴트 -1)
@@ -13,7 +16,15 @@ function DB_Connect(&$ConnectDB, $DB_IP, $DB_ID, $DB_Password, $DB_Name, $DB_Por
     $ConnectDB = mysqli_connect($DB_IP, $DB_ID, $DB_Password, $DB_Name, $DB_Port);
 
     if(!$ConnectDB)
-    {        
+    {                
+        $errno = mysqli_connect_errno($ConnectDB);
+        $errStr = mysqli_connect_error($ConnectDB);
+
+        $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
+        $txt = "$errno : $errStr\n";
+        fwrite($myfile, $txt);
+        fclose($myfile);
+
         // DB 연결중 문제가 생겼으면 시스템로그 남김
         $errorstring = 'Unable to connect to MySQL : ' . mysqli_connect_error($ConnectDB). ' ErrorNo : ' .  mysqli_connect_errno($ConnectDB);
         LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
@@ -43,7 +54,7 @@ function DB_Query($Query, &$ConnectDB, $AccountNo = -1)
     global $PF;
 
     // 쿼리문, 시스템 로그에 남기기
-    LOG_System($AccountNo, $_SERVER['PHP_SELF'], $Query);
+    //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $Query);
 
     // 쿼리문 프로파일링 시작
     $PF->startCheck(PF_MYSQL_QUERY);    
@@ -131,7 +142,7 @@ function DB_TransactionQuery($qurArray, &$ConnectDB, $AccountNo = -1)
     $PF->stopCheck(PF_MYSQL_QUERY, $profilingString);     // 쿼리 시간수집 프로파일링 끝 -----------
 
     // 쿼리문, 시스템 로그에 남기기
-    LOG_System($AccountNo, $_SERVER['PHP_SELF'], $profilingString);
+    //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $profilingString);
     
     return $insert_ID;
 }
@@ -153,7 +164,7 @@ function DB_TransactionFail($profilingString, &$ConnectDB, $AccountNo = -1)
     $GameLog->SaveLog();
 
     // 현재까지 쿼리 저장
-    LOG_System($AccountNo, $_SERVER['PHP_SELF'], $profilingString);
+    //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $profilingString);
 }
 
 

@@ -53,7 +53,6 @@ function ERROR_Handler($errno, $errstr, $errfile, $errline)
     $ErrorMsg = "($errno) FILE: $errfile / LINE: $errline / MSG:  $errstr";
 
     // 만든 에러를 DB에 저장
-    // function LOG_System($AccountNo, $Action, $Message, $Level = 1)
     LOG_System($g_AccountNo, 'Error_Handler',  $ErrorMsg);
     exit;
 }

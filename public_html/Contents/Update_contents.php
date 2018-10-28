@@ -8,8 +8,9 @@
 // ---------------------------------------
 // startUp 체크.
 // 이 안에서는 [클라가 보낸 데이터 받기, DB 연결, 버전처리, 프로파일러 생성, 게임로그 생성]를 한다.
-require_once('/../LIBRARY/_StartUp.php');
-require_once('/../LIBRARY/_Content_Library.php');
+$_SERVER = $GLOBALS["_SERVER"];
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
+require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
 // ---------------------------------------
 
 // 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
@@ -26,34 +27,45 @@ if(isset($Body[0]) === false)
 
 $Content_Body = json_decode($Body[0], true);
 
-// 가장 상단에는 Accountno 혹은 email이와야한다.
-// email이 왔다면, email 형태가 맞는지 체크한다.
-$DataKey = key($Content_Body);
-if($DataKey  == 'email')
+// accountno가 왔는지 체크
+if(isset($Content_Body['accountno']) === false)
 {
-    // 파라미터가 이메일이 맞는지 체크
-    if(filter_var(current($Content_Body), FILTER_VALIDATE_EMAIL) === false)
+    // 안왔으면 email이 왔는지 체크
+    if(isset($Content_Body['email']) === true)
+    {
+        // 이메일이 왔다면, 이메일 형태가 맞는지 확인
+        if(filter_var(current($Content_Body), FILTER_VALIDATE_EMAIL) === false)
+        {
+            // 형태가 다르면 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
+            global $cnf_CONTENT_ERROR_PARAMETER;
+            OnError($cnf_CONTENT_ERROR_PARAMETER);  
+        }
+    }
+
+    // 이메일 마저도 안왔으면 파라미터 에러 리턴.
+    else
     {
         // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
         global $cnf_CONTENT_ERROR_PARAMETER;
         OnError($cnf_CONTENT_ERROR_PARAMETER);  
     }
+
+    // 이메일이 잘 왔으면 DataKey를 email로 설정.
+    $DataKey = 'email';
+}
+else
+{
+    $DataKey = 'accountno';
 }
 
 
 // 3. 해당 유저가 저장되어있는 dbno와 해당 유저의 accountNo를 알아온다.
 // Value가 Email일 수도 있기 때문에 AccountNo도 같이 리턴 받는다.
 // Key, Value를 인자로 던진다.
-$Data = SearchUser($DataKey , current($Content_Body));
+$Data = SearchUser($DataKey , $Content_Body[$DataKey]);
 
-// 배열을 다음칸으로 이동
-// 만약, accountNo외에 파라미터가 하나도 없으면 파라미터 에러
-if(next($Content_Body) === false)
-{
-    // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-    global $cnf_CONTENT_ERROR_PARAMETER;
-    OnError($cnf_CONTENT_ERROR_PARAMETER, $Data['accountno']);  
-}
+// email 혹은 accountno 파라미터 삭제. 
+unset($Content_Body[$DataKey]);
 
 
 // 4. 접속할 shDB_Data 알아온 후 Conenct
@@ -73,12 +85,21 @@ shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'contents', 
 // 7. Disconenct
 DB_Disconnect($shDB_Data);
 
+// -----------------
+// 8. 연결된 것들 연결 해제 (테스트용)
+$shDB_Index = CshDB_Index_Contents::getInstance();
+$shDB_Info = CshDB_Info_Contents::getInstance();
 
-// 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
+$shDB_Index->DB_Disconnect();
+$shDB_Info->DB_Disconnect();
+// -----------------
+
+
+// 9. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_CONTENT_COMPLETE;
 
 
-// 9. 결과 돌려주기
+// 10. 결과 돌려주기
 // 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
 ResponseJSON($Response, $Data['accountno']);
 
@@ -88,9 +109,6 @@ ResponseJSON($Response, $Data['accountno']);
 // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
 // 이 안에서 프로파일링 저장 시 accountno를 쓰기때문에, 그 전용으로 만든다. accountno를 모르는 경우에는 이 변수자체를 안만든다.
 $ClearAccountNo = $Data['accountno'];
-require_once('/../LIBRARY/_Clenup.php');
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
-
-echo 'LastOk'; // <<< 테스트용  
-
 ?>

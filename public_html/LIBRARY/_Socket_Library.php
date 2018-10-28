@@ -17,6 +17,9 @@
 // $type : GET / POST
 // ---------------------------
 
+$_SERVER = $GLOBALS["_SERVER"];
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
+
 function http_request($url, $params, $type='POST')
 {
     // 1. 받은 param값들 셋팅
@@ -44,17 +47,43 @@ function http_request($url, $params, $type='POST')
     // 3. 소켓 오픈
     // http, https에 따라 소켓 접속 타임 설정.
     if($parts['scheme'] == 'http')
-        $fp = fsockopen($parts['host'], isset($parts['port'])?parts['port']:80, $errno, $errstr, 10);
-     
+    {
+        $TempHost = $parts['host'];
+        $TempPort = isset($parts['port'])?parts['port']:80;
+        $TempTime = 10;
+    }
+
     else if($parts['scheme'] == 'https')
-        $fp = fsockopen("ssl://" . $parts['host'], isset($parts['port'])?parts['port']:443, $errno, $errstr, 30);
+    {
+        $TempHost = "ssl://{$parts['host']}";
+
+        $TempPort = isset($parts['port'])?parts['port']:443;
+        $TempTime = 30;
+    }
+
+    // 그 무엇도 아니라면 파일로 에러 남김
+    else
+    {        
+        $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
+        $txt = "http_request() --> scheme Error : parts['scheme'] -> {$parts['scheme']}\n";
+        fwrite($myfile, $txt);
+        fclose($myfile);
+
+        exit;
+    }
+
+    $fp = fsockopen($TempHost, $TempPort, $errno, $errstr, $TempTime);   
 
     // 에러 처리
     if(!$fp)
     {
-        // 에러 로그 실제로는 화면 출력하면 안됨
-        echo $errstr($errno) . '<br>\n';
-        return 0;
+        // 파일로 남김
+        $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
+        $txt = "http_request() --> fsockopen() error : $TempHost : $TempPort --> $errstr ($errno) \n";
+        fwrite($myfile, $txt);
+        fclose($myfile);        
+
+        exit;
     }
 
     // 4. Get / Post인지에 따라 http 프로토콜 생성
