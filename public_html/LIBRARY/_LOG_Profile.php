@@ -261,11 +261,7 @@ class Profiling
         $out .= $post_string;
 
         // 보내기
-        $Result = fwrite($fp, $out); 
-
-        // 받기
-        // $Response = fread($fp, 1000);
-        // echo $Response;
+        $Result = fwrite($fp, $out);         
 
         // 소켓 닫기
         fclose($fp);

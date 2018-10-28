@@ -5,7 +5,7 @@
 
 // ---------------------------------------
 // startUp 체크.
-// 이 안에서는 [클라가 보낸 데이터 받기, DB 연결, 버전처리, 프로파일러 생성, 게임로그 생성]를 한다.
+// 이 안에서는 [프로파일러 생성, 게임로그 생성]를 한다.
 $_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
@@ -19,8 +19,8 @@ $Body = explode("\r\n", file_get_contents('php://input'));
 if(isset($Body[0]) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-     global $cnf_CONTENT_ERROR_PARAMETER;
-     OnError($cnf_CONTENT_ERROR_PARAMETER);  
+     global $cnf_ERROR_PARAMETER;
+     OnError($cnf_ERROR_PARAMETER);  
 }
 
 $Content_Body = json_decode($Body[0], true);
@@ -35,8 +35,8 @@ if(isset($Content_Body['accountno']) === false)
         if(filter_var(current($Content_Body), FILTER_VALIDATE_EMAIL) === false)
         {
             // 형태가 다르면 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-            global $cnf_CONTENT_ERROR_PARAMETER;
-            OnError($cnf_CONTENT_ERROR_PARAMETER);  
+            global $cnf_ERROR_PARAMETER;
+            OnError($cnf_ERROR_PARAMETER);  
         }
     }
 
@@ -44,8 +44,8 @@ if(isset($Content_Body['accountno']) === false)
     else
     {
         // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-        global $cnf_CONTENT_ERROR_PARAMETER;
-        OnError($cnf_CONTENT_ERROR_PARAMETER);  
+        global $cnf_ERROR_PARAMETER;
+        OnError($cnf_ERROR_PARAMETER);  
     }
 
     // 이메일이 잘 왔으면 DataKey를 email로 설정.
@@ -83,21 +83,11 @@ shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account', $
 // 7. Disconenct
 DB_Disconnect($shDB_Data);
 
-// -----------------
-// 8. 연결된 것들 연결 해제 (테스트용)
-$shDB_Index = CshDB_Index_Contents::getInstance();
-$shDB_Info = CshDB_Info_Contents::getInstance();
-
-$shDB_Index->DB_Disconnect();
-$shDB_Info->DB_Disconnect();
-// -----------------
+// 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
+$Response['result'] = $cnf_COMPLETE;
 
 
-// 9. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
-$Response['result'] = $cnf_CONTENT_COMPLETE;
-
-
-// 10. 결과 돌려주기
+// 9. 결과 돌려주기
 // 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
 ResponseJSON($Response, $Data['accountno']);
 

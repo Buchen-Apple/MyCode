@@ -13,7 +13,14 @@ require_once('_LOG_GameAndSystem.php');
 //        : 연결 실패 시 false. 
 function DB_Connect(&$ConnectDB, $DB_IP, $DB_ID, $DB_Password, $DB_Name, $DB_Port, $AccountNo = -1)
 {
+    global $PF;
+    // 프로파일링 시작
+    $PF->startCheck(PF_MYSQL_CONN); 
+
     $ConnectDB = mysqli_connect($DB_IP, $DB_ID, $DB_Password, $DB_Name, $DB_Port);
+
+    // 프로파일링 끝
+    $PF->stopCheck(PF_MYSQL_CONN); 
 
     if(!$ConnectDB)
     {                

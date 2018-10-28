@@ -53,7 +53,7 @@ function LOG_System($AccountNo, $Action, $Message, $Level = 1)
    
     $postField = array('AccountNo' => $AccountNo, 'Action' => $Action, 'Message' => $Message);
 
-    http_request($cnf_SYSTEM_LOG_URL, $postField, 'POST');    
+    http_request($cnf_SYSTEM_LOG_URL, $postField, false, 'POST');    
 
     // $PF가 true라면(존재한다면) 프로파일링 종료
     if($PF)
@@ -112,7 +112,7 @@ class GAMELog
         // 배열 안에, 내용이 0개 이상이라면 _Socket_Library.php에 있는 
         // http_request() 함수를 이용해서 게임 로그 서버로 json 전송.
         if(count($this->LogArray) > 0)
-            http_request($this->LOG_URL, array("LogChunk" => json_encode($this->LogArray), 'POST'));
+            http_request($this->LOG_URL, array("LogChunk" => json_encode($this->LogArray), false, 'POST'));
     }
 }
 

@@ -7,7 +7,7 @@
 
 // ---------------------------------------
 // startUp 체크.
-// 이 안에서는 [클라가 보낸 데이터 받기, DB 연결, 버전처리, 프로파일러 생성, 게임로그 생성]를 한다.
+// 이 안에서는 [프로파일러 생성, 게임로그 생성]를 한다.
 $_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
@@ -18,13 +18,12 @@ $Body = explode("\r\n", file_get_contents('php://input'));
 
 
 // 2. 컨텐츠 부분 decoding
-
 // 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
 if(isset($Body[0]) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-     global $cnf_CONTENT_ERROR_PARAMETER;
-     OnError($cnf_CONTENT_ERROR_PARAMETER);  
+     global $cnf_ERROR_PARAMETER;
+     OnError($cnf_ERROR_PARAMETER);  
 }
 
 $Content_Body = json_decode($Body[0], true);
@@ -33,8 +32,8 @@ $Content_Body = json_decode($Body[0], true);
 if(filter_var($Content_Body['email'], FILTER_VALIDATE_EMAIL) === false)
 {
     // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-    global $cnf_CONTENT_ERROR_PARAMETER;
-    OnError($cnf_CONTENT_ERROR_PARAMETER);  
+    global $cnf_ERROR_PARAMETER;
+    OnError($cnf_ERROR_PARAMETER);  
 }
 
 // 이메일이 맞다면, escape로 안전하게 가져옴.
@@ -72,24 +71,14 @@ DB_Disconnect($shDB_Data);
 // 9. 이번에 유저를 접속시킨 dbno의 available을 1 감소.  
 MinusAvailable($dbData['dbno'], $dbData['available']);
 
-// -----------------
-// 10. 연결된 것들 연결 해제 (테스트용)
-$shDB_Index = CshDB_Index_Contents::getInstance();
-$shDB_Info = CshDB_Info_Contents::getInstance();
-
-$shDB_Index->DB_Disconnect();
-$shDB_Info->DB_Disconnect();
-// -----------------
-
-
-// 11. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
-$Response['result'] = $cnf_CONTENT_COMPLETE;
+// 10. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
+$Response['result'] = $cnf_COMPLETE;
 $Response['accountno'] = intval($AccountNo); 
 $Response['email'] = $email;
 $Response['dbno'] = intval($dbData['dbno']);
 
 
-// 12. 결과 돌려주기
+// 11. 결과 돌려주기
 // 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
 ResponseJSON($Response, $AccountNo);
 

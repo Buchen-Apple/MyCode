@@ -18,9 +18,10 @@
 // $_POST['Query']			: Mysql 이 있는 경우 쿼리문
 // $_POST['Comment']		: 그 외 기타 멘트
 //------------------------------------------------------------
-
-require_once('/../LIBRARY/_DB_Config.php');
-require_once('/../LIBRARY/_LOG_GameAndSystem.php');
+$_SERVER = $GLOBALS["_SERVER"];
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Error_Handling_LIbrary.php");
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Config.php");
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_LOG_GameAndSystem.php");
 
 // 1. Param중 입력 안한 값이 있으면 0이나 None을 넣는다.
 if( !isset($_POST['IP']))					$_POST['IP'] 			= 'None';

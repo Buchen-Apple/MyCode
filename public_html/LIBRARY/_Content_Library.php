@@ -6,13 +6,13 @@
 // Select_account.php
 // Select_Contents.php 에서 사용할 Library.
 // ******************************
-$_SERVER = $GLOBALS["_SERVER"];
-require_once($_SERVER['DOCUMENT_ROOT'] ."/LIBRARY/_Error_Handling_LIbrary.php");
+require_once('_Error_Handling_LIbrary.php');
+require_once('_StartUp.php');
 require_once('_LOG_Config.php');
 require_once('_LOG_Profile.php');
 require_once('_DB_Library.php');
 require_once('_DB_Config.php');
-require_once('ContentsErrorCode.php');
+require_once('_ErrorCode.php');
 
 ////////////////////////////////////
 // 클래스
@@ -69,8 +69,15 @@ class CshDB_Info_Contents
         $this->m_PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER['PHP_SELF']);
 
         // 3. DB에 연결
+
+        // 프로파일링 시작
+        $this->m_PF->startCheck(PF_MYSQL_CONN); 
+
         // DB에 접속
         $this->shDB_Info_ConnectDB = mysqli_connect($this->shDB_Info_IP, $this->shDB_Info_ID, $this->shDB_Info_Password, $this->shDB_Info_Name, $this->shDB_Info_Port);
+
+        // 프로파일링 끝
+        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
 
         if(!$this->shDB_Info_ConnectDB)
         {   
@@ -259,8 +266,15 @@ class CshDB_Index_Contents
         $this->shDB_Index_Port = $Index_Slave_DB_PORT[$Index];
 
         // 3. Slave DB에 연결
+
+        // 프로파일링 시작
+        $this->m_PF->startCheck(PF_MYSQL_CONN); 
+
         // DB에 접속
         $this->shDB_Index_ConnectDB = mysqli_connect($this->shDB_Index_IP, $this->shDB_Index_ID, $this->shDB_Index_Password, $this->shDB_Index_Name, $this->shDB_Index_Port);
+
+        // 프로파일링 끝
+        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
 
         if(!$this->shDB_Index_ConnectDB)
         {                 
@@ -299,8 +313,15 @@ class CshDB_Index_Contents
         $this->shDB_Index_Port_MASTER = $Index_Master_DB_PORT;  
 
         // 3. Master DB에 연결
+
+        // 프로파일링 시작
+        $this->m_PF->startCheck(PF_MYSQL_CONN); 
+
         // DB에 접속
         $this->shDB_Index_ConnectDB_MASTER = mysqli_connect($this->shDB_Index_IP_MASTER, $this->shDB_Index_ID_MASTER, $this->shDB_Index_Password_MASTER, $this->shDB_Index_Name_MASTER, $this->shDB_Index_Port_MASTER);
+
+        // 프로파일링 끝
+        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
 
         if(!$this->shDB_Index_ConnectDB_MASTER)
         {       
@@ -475,39 +496,6 @@ class CshDB_Index_Contents
          }
     }
 }
-
-
-
-
-////////////////////////////////////
-// 특수 기능 함수
-////////////////////////////////////
-
-// ---------------------------------
-// 에러 발생 시, 실패패킷 전송 후 exit하는 함수
-//
-// Parameter : returnCode(실패 result)
-// return : 없음
-// ---------------------------------
-function OnError($result, $AccountNo = -1)
-{
-
-    $Response['result'] = $result;
-
-    // 실패 패킷 전송
-    ResponseJSON($Response, $AccountNo);
-
-    // ---------------------------------------
-    // cleanup 체크.
-    // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
-    $_SERVER = $GLOBALS["_SERVER"];
-    require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
-    // --------------------------------------
-
-    exit;
-}
-
-
 
 
 
@@ -714,8 +702,8 @@ function SearchUser($TempKey, $TempValue)
         LOG_System(-1, $_SERVER['PHP_SELF'], $errorstring);
         
         // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
-        global $cnf_CONTENT_ERROR_PARAMETER;
-        OnError($cnf_CONTENT_ERROR_PARAMETER);  
+        global $cnf_ERROR_PARAMETER;
+        OnError($cnf_ERROR_PARAMETER);  
     }  
 
 
@@ -835,7 +823,7 @@ function shDB_Data_AccountNoCheck($accountNo, &$shDB_Data, $dbname, $TBLName)
     if($AccountNoCheck['success'] == 0)
     {
         // 시스템로그 남김
-        $errorstring = "shDB_Data_AccountNoCheck--> Not Found AccountNo(`$dbname`.`$TBLName`)!! IndexDB Rollback";
+        $errorstring = "shDB_Data_AccountNoCheck--> Not FIND AccountNo(`$dbname`.`$TBLName`)!! IndexDB Rollback";
         LOG_System($accountNo, $_SERVER['PHP_SELF'], $errorstring);   
         
         // shDB_Index.allocate 롤백. (Master에게)
@@ -851,15 +839,15 @@ function shDB_Data_AccountNoCheck($accountNo, &$shDB_Data, $dbname, $TBLName)
         // ---검사한 테이블이 accountTBL이었을 경우
         if($TBLName = 'account')
         {
-            global $cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_ACCOUNTTBL;
-            OnError($cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_ACCOUNTTBL);      
+            global $cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_ACCOUNTTBL;
+            OnError($cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_ACCOUNTTBL);      
         }    
 
         // ---검사한 테이블이 contentsTBL이었을 경우
         else if($TBLName = 'contents')
         {
-            global $cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_CONTENTSTBL;
-            OnError($cnf_CONTENT_ERROR_NOT_FOUND_ACCOUNTNO_CONTENTSTBL);     
+            global $cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_CONTENTSTBL;
+            OnError($cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_CONTENTSTBL);     
         }
 
     }   
@@ -901,8 +889,8 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
         if(mysqli_errno($shDB_Data) == 1054)
         {
             // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
-            global $cnf_DB_NOT_FOUND_COLUMN;
-            OnError($cnf_DB_NOT_FOUND_COLUMN, $accountNo);  
+            global $cnf_DB_NOT_FIND_COLUMN;
+            OnError($cnf_DB_NOT_FIND_COLUMN, $accountNo);  
         }   
         
         // 테이블이 존재하지 않을 경우 (1146 에러)
@@ -937,8 +925,8 @@ function shDB_Data_Select($accountNo, &$shDB_Data, $dbname, $TBLName)
         if(mysqli_errno($shDB_Data) == 1054)
         {
             // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
-            global $cnf_DB_NOT_FOUND_COLUMN;
-            OnError($cnf_DB_NOT_FOUND_COLUMN, $accountNo);  
+            global $cnf_DB_NOT_FIND_COLUMN;
+            OnError($cnf_DB_NOT_FIND_COLUMN, $accountNo);  
         }      
         
         // 테이블이 존재하지 않을 경우 (1146 에러)

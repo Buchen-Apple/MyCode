@@ -7,6 +7,9 @@
 global $ClearAccountNo;
 global $PF;
 
+// 페이지 프로파일링 스탑
+$PF->stopCheck(PF_PAGE); 
+
 // ClearAccountNo 변수가 존재한다면, 해당 값을 넣는다.
 if(isset($ClearAccountNo))
 {   

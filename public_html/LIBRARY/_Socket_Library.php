@@ -20,7 +20,7 @@
 $_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 
-function http_request($url, $params, $type='POST')
+function http_request($url, $params, $RecvFlag, $type='POST')
 {
     // 1. 받은 param값들 셋팅
     // 입력된 params를 key와 value로 분리하여 
@@ -111,19 +111,30 @@ function http_request($url, $params, $type='POST')
     // fwirte함수는 전송한 바이트 수를 반환하거나 FALSE 오류 발생 시 이를 반환한다.
     $Result = fwrite($fp, $out);
 
-    // echo 'out : ' . $out;
+    // FALSE면 false 리턴
+    if($Result === false)
+        return false;
 
-    // 바로 끊어버리는 경우, 서버측에서 이를 무시하는 경우도 있음.
-    // 대표적으로 카페24.
-    // fread를 1회 호출해서 조금이라도 받는것으로 해결
-    // $Response = fread($fp, 1000);
-    // echo $Response . '<br>';
+    // 6. false가 아니면 Flag에 따라 리턴
+    if($RecvFlag === false)
+    {
+         // 소켓 닫은 후 전송한 Byte 수 리턴
+        fclose($fp);
+        return $Result;
+    }
 
-    // 6. 소켓 닫기
-    fclose($fp);
+    else
+    {
+        // 바로 끊어버리는 경우, 서버측에서 이를 무시하는 경우도 있음.
+        // 대표적으로 카페24.
+        // fread를 1회 호출해서 조금이라도 받는것으로 해결
+        $Response = fread($fp, 1000);
 
-    // 7. 결과를 함수 밖으로 리턴한다.
-    return $Result;
+        fclose($fp);
+        return $Response;
+    }
+   
 }
+
 
 ?>
