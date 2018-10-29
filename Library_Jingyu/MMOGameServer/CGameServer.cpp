@@ -26,8 +26,8 @@ extern LONG g_lGameFPS;
 LONG g_lShowAuthFPS;
 LONG g_lShowGameFPS;
 
-// 중복 로그인으로 인해, 보내고 끊기를 할 시 1씩 증가
-LONG g_DuplicateCount;	
+// GQCS에서 세마포어 리턴 시 1 증가
+extern LONG g_SemCount;
 
 
 // ------------------
@@ -516,7 +516,7 @@ namespace Library_Jingyu
 				"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 				"ASQPool_ChunkAlloc_Count : %d (Out : %d)\n\n"
 				
-				"DuplicateCount : %d\n\n"
+				"SemCount : %d\n\n"
 
 			"========================================================\n\n",
 
@@ -528,7 +528,7 @@ namespace Library_Jingyu
 			g_lShowAuthFPS, g_lShowGameFPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			GetChunkCount(), GetOutChunkCount(),
-			g_DuplicateCount	
+			g_SemCount
 
 			);
 	}

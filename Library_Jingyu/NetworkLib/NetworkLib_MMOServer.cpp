@@ -23,6 +23,9 @@ LONG g_lGameModeUserCount;
 LONG g_lAuthFPS;
 LONG g_lGameFPS;
 
+// GQCS에서 세마포어 리턴 시 1 증가
+LONG g_SemCount;
+
 
 // ------------------------
 // cSession의 함수
@@ -692,7 +695,16 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
+			{
+				if (overlapped != nullptr)
+				{
+					if (GetLastError() == ERROR_SEM_TIMEOUT)
+					{
+						InterlockedIncrement(&g_SemCount);
+					}
+				}
+			}
 
 			// --------------
 			// 완료 체크
