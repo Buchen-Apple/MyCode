@@ -2082,27 +2082,6 @@ namespace Library_Jingyu
 			}
 		}
 
-		// SO_KEEPALIVE 옵션 적용
-		BOOL bEnable = TRUE;
-		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&bEnable, sizeof(bEnable));
-		if (retval == SOCKET_ERROR)
-		{
-			// 윈도우 에러, 내 에러 보관
-			m_iOSErrorCode = WSAGetLastError();
-			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
-
-			// 각종 핸들 반환 및 동적해제 절차.
-			ExitFunc(m_iW_ThreadCount);
-
-			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() KeepAlive apply Error : NetError(%d), OSError(%d)",
-				(int)m_iMyErrorCode, m_iOSErrorCode);
-
-			// false 리턴
-			return false;
-		}
-
-
 		// 엑셉트 스레드 생성
 		m_iA_ThreadCount = AcceptThreadCount;
 		m_hAcceptHandle = new HANDLE[m_iA_ThreadCount];
