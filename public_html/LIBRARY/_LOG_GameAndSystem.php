@@ -39,8 +39,6 @@ function LOG_System($AccountNo, $Action, $Message, $Level = 1)
     // 만약, 아직 회원가입 안한? 혹은 AccountNo가 발급되지 않은 유저?
     if($AccountNo < 0)
     {
-        $_SERVER = $GLOBALS["_SERVER"];
-
         if(array_key_exists("HTTP_X_FORWARDED_FOR", $_SERVER))
             $AccountNo = $_SERVER["HTTP_X_FORWARDED_FOR"];
 
@@ -53,7 +51,7 @@ function LOG_System($AccountNo, $Action, $Message, $Level = 1)
    
     $postField = array('AccountNo' => $AccountNo, 'Action' => $Action, 'Message' => $Message);
 
-    http_request($cnf_SYSTEM_LOG_URL, $postField, false, 'POST');    
+    http_request($cnf_SYSTEM_LOG_URL, $postField);    
 
     // $PF가 true라면(존재한다면) 프로파일링 종료
     if($PF)
@@ -112,7 +110,7 @@ class GAMELog
         // 배열 안에, 내용이 0개 이상이라면 _Socket_Library.php에 있는 
         // http_request() 함수를 이용해서 게임 로그 서버로 json 전송.
         if(count($this->LogArray) > 0)
-            http_request($this->LOG_URL, array("LogChunk" => json_encode($this->LogArray), false, 'POST'));
+            http_request($this->LOG_URL, array("LogChunk" => json_encode($this->LogArray)));
     }
 }
 

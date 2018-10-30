@@ -19,22 +19,26 @@ require_once('_CURL_Library.php');
 //        : 실패 시 클라에게 에러 리턴 후 exit
 function shDBAPI_GetUserData($Request)
 { 
-    // 1. select.accountdb에게 Request (CURL 이용)
-    // $ret에는 $ret['Code'], $ret['body']로 나눠서 들어가 있음.
-    $ret = http_post("http://127.0.0.1/Contents/Select_account.php", json_encode($Request));
+    global $PF;
+    if(isset($PF))
+        $PF->startCheck(PF_EXTAPI);
 
+    // 1. select.accountdb에게 Request  (CURL 사용)  
+    $ret = http_post("http://127.0.0.1/Contents/Select_account.php", json_encode($Request));
+    
+    if(isset($PF))
+        $PF->stopCheck(PF_EXTAPI);
 
     // 2. HTTP 에러 체크
     if($ret['code'] != 200)
     {
          // 실패 응답 보낸 후 php 종료 (sbDB API 서버 HTTP 에러)
          global $cnf_SHDB_API_HTTP_ERROR;
-         OnError($cnf_SHDB_API_HTTP_ERROR);  
+         OnError($cnf_SHDB_API_HTTP_ERROR); 
     }
-
-
-    // 3. 제이슨으로 결과 가져오기
-    $retBody = json_decode($ret['body'], true);
+    
+    // 3. Body 인코딩
+    $retBody = json_decode($ret['body'], true);      
 
 
     // 4. 컨텐츠 에러 체크    

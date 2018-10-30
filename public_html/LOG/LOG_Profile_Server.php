@@ -18,7 +18,6 @@
 // $_POST['Query']			: Mysql 이 있는 경우 쿼리문
 // $_POST['Comment']		: 그 외 기타 멘트
 //------------------------------------------------------------
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Error_Handling_LIbrary.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Config.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_LOG_GameAndSystem.php");

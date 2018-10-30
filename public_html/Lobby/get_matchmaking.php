@@ -3,11 +3,9 @@
 // MatchMaking 서버(스테이트 풀)를 알아와서 돌려준다.
 // ******************************
 
-
 // ---------------------------------------
 // startUp 체크.
 // 이 안에서는 [ 프로파일러 생성, 게임로그 생성]를 한다.
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Lobby_Library.php");
 // ---------------------------------------
@@ -68,8 +66,9 @@ if(isset($Content_Body['sessionkey']) === false)
 }
 
 
+
 // 4. sbdb/Select.account.php에서 유저 정보 얻어오기
-// Reqeust 할 데이터 셋팅
+// Reqeust 데이터 셋팅
 $Request = array();
 $Request[$DataKey] = $Content_Body[$DataKey];
 

@@ -3,7 +3,6 @@
 // 시스템 로그 남기는 서버.
 // $AccountNo, $Action, $Message 가 넘어온다.
 // ---------------------------
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Config.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_DB_Library.php");
 

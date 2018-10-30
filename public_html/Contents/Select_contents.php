@@ -7,7 +7,6 @@
 // ---------------------------------------
 // startUp 체크.
 // 이 안에서는 [프로파일러 생성, 게임로그 생성]를 한다.
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
 // ---------------------------------------

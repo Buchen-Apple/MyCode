@@ -9,20 +9,17 @@
 //
 // 그래서 직접 소켓을 열고 웹서버에 데이터 전송 후 바로 종료.
 // 물론 상대 서버로 데이터를 전송하기까지는 블럭이 걸림. 하지만 웹 서버의 처리 시간까지 대기하지 않는다는 장점.
-// 
-// 결과가 필요없는 경우에만 사용(로그 서버 등..)
 //
 // $url = http:// or https:// 가 포함된 전체 url
-// $params : ['key'] = value타입으로 배열 형태로 데이터 입력. array('id' => 'test1', 'pass' => 'test1');
+// $params : 보낼 데이터. JSON 혹은 ['key'] = value타입으로 배열 형태로 데이터 입력. array('id' => 'test1', 'pass' => 'test1');
 // $type : GET / POST
 // ---------------------------
 
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 
-function http_request($url, $params, $RecvFlag, $type='POST')
+function http_request($url, $params, $type='POST')
 {
-    // 1. 받은 param값들 셋팅
+    // 받은 param값들 셋팅
     // 입력된 params를 key와 value로 분리하여 
     // post_param 이라는 배열로 key = value 타입으로 생성
     // 혹시나 value가 배열인 경우는 ,로 나열한다.
@@ -30,8 +27,8 @@ function http_request($url, $params, $RecvFlag, $type='POST')
     {
         // value가 배열이면, ','를 기준으로 나열되어 있으니 한줄로 만든다.
         if(is_array($value))
-            $value = implode(',', $value);
-        
+             $value = implode(',', $value);
+            
         $post_param[] = $key . '=' . urlencode($value);
     }
 
@@ -71,21 +68,7 @@ function http_request($url, $params, $RecvFlag, $type='POST')
 
         exit;
     }
-
-    $fp = fsockopen($TempHost, $TempPort, $errno, $errstr, $TempTime);   
-
-    // 에러 처리
-    if(!$fp)
-    {
-        // 파일로 남김
-        $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
-        $txt = "http_request() --> fsockopen() error : $TempHost : $TempPort --> $errstr ($errno) \n";
-        fwrite($myfile, $txt);
-        fclose($myfile);        
-
-        exit;
-    }
-
+   
     // 4. Get / Post인지에 따라 http 프로토콜 생성
     $ContensLength = strlen($post_string);
 
@@ -105,35 +88,34 @@ function http_request($url, $params, $RecvFlag, $type='POST')
 
     // post방식이면서, 인자로 받은 파라미터가 존재한다면, 이 뒤에 Param을 붙임
     if($type == "POST" && isset($post_string))
-        $out .= $post_string;
+        $out .= $post_string;   
 
     // 5. 만든 http 전송.
+    $fp = fsockopen($TempHost, $TempPort, $errno, $errstr, $TempTime);     
+
+    // 에러 처리
+    if(!$fp)
+    {
+        // 파일로 남김
+        $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
+        $txt = "http_request() --> fsockopen() error : $TempHost : $TempPort --> $errstr ($errno) \n";
+        fwrite($myfile, $txt);
+        fclose($myfile);        
+
+        exit;
+    }   
+
     // fwirte함수는 전송한 바이트 수를 반환하거나 FALSE 오류 발생 시 이를 반환한다.
-    $Result = fwrite($fp, $out);
+    $Result = fwrite($fp, $out); 
+    
+    fclose($fp);
 
     // FALSE면 false 리턴
     if($Result === false)
         return false;
 
-    // 6. false가 아니면 Flag에 따라 리턴
-    if($RecvFlag === false)
-    {
-         // 소켓 닫은 후 전송한 Byte 수 리턴
-        fclose($fp);
-        return $Result;
-    }
-
-    else
-    {
-        // 바로 끊어버리는 경우, 서버측에서 이를 무시하는 경우도 있음.
-        // 대표적으로 카페24.
-        // fread를 1회 호출해서 조금이라도 받는것으로 해결
-        $Response = fread($fp, 1000);
-
-        fclose($fp);
-        return $Response;
-    }
-   
+    // FALSE가 아니면 Write 한 바이트 리턴
+    return $Result;   
 }
 
 

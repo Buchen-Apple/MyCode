@@ -43,11 +43,12 @@ function http_post($url, $postFields)
 
     curl_setopt($ci, CURLOPT_URL, $url);                // 데이터를 보낼곳의 url을 curl객체에 넣기
     $Response = array();
-
+ 
+  
     // ---------------
     // HTTP 전송하기 후 결과 받기
     $Response['body'] = curl_exec($ci);
-    $Response['code'] = curl_getinfo($ci, CURLINFO_HTTP_CODE);
+    $Response['code'] = curl_getinfo($ci, CURLINFO_HTTP_CODE);   
 
     // ---------------
     // CURL 해제

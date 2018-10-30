@@ -255,6 +255,7 @@ namespace Library_Jingyu
 			if (Check == SOCKET_ERROR)
 			{
 				_tprintf(L"recv Fail...(%d)\n", WSAGetLastError());
+				g_HTTP_Dump->Crash();
 				return false;
 			}
 
@@ -284,6 +285,7 @@ namespace Library_Jingyu
 			if (strcmp(Code, "200") != 0)
 			{
 				printf("Recv Header Code Error...(%s)\n", Code);
+				g_HTTP_Dump->Crash();
 				return false;
 			}
 
@@ -315,6 +317,8 @@ namespace Library_Jingyu
 
 			int Content_Length = atoi(LengthString);
 
+			if (Content_Length == 0)
+				g_HTTP_Dump->Crash();
 
 			// HeaderEndPtr에는 헤더의 끝(\r\n\r\n)부터 들어있다.
 			// 즉, Content_Length + 4 만큼 length가 있어야 한다.
@@ -458,17 +462,7 @@ namespace Library_Jingyu
 					return false;
 				}
 
-			}
-
-			// 이 외 에러가 떴으면 Crash
-			else
-			{
-				printf("Connect ---> UnknownError..(%d)\n", Check);
-
-				closesocket(sock);
-				g_HTTP_Dump->Crash();
-				return false;
-			}
+			}			
 		}
 
 		// -------------

@@ -17,6 +17,9 @@ $PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER["PHP_SELF"]);
 // 2. 게임로그 객체 생성
 $GameLog = GAMELog::getInstance($cnf_GAME_LOG_URL); 
 
+// 페이지 프로파일링 시작
+$PF->startCheck(PF_PAGE); 
+
 
 // ResponseJSON() 함수 원형
 // 모든 php 종료 직전에, 해당 함수를 이용해 [JSON 인코딩 - 로그 - 결과전송] 절차 진행
@@ -48,13 +51,11 @@ function OnError($result, $AccountNo = -1)
     // ---------------------------------------
     // cleanup 체크.
     // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
-    $_SERVER = $GLOBALS["_SERVER"];
     require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
     // --------------------------------------
 
     exit;
 }
 
-// 페이지 프로파일링 시작
-$PF->startCheck(PF_PAGE); 
+
 ?>

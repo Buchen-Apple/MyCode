@@ -1,5 +1,4 @@
 <?php
-
 // ******************************
 // shDB_Data.account에서 정보를 Select해서 클라에게 돌려준다.
 // ******************************
@@ -7,10 +6,10 @@
 // ---------------------------------------
 // startUp 체크.
 // 이 안에서는 [프로파일러 생성, 게임로그 생성]를 한다.
-$_SERVER = $GLOBALS["_SERVER"];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
 require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
 // ---------------------------------------
+
 
 // 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
 $Body = explode("\r\n", file_get_contents('php://input'));
@@ -92,11 +91,11 @@ $Response['password'] = $SelectData['password'];
 $Response['sessionkey'] = $SelectData['sessionkey'];
 $Response['nick'] = $SelectData['nick'];
 
-
-
 // 9. 결과 돌려주기
 // 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
 ResponseJSON($Response, $Data['accountno']);
+
+
 
 
 // ---------------------------------------
@@ -106,4 +105,5 @@ ResponseJSON($Response, $Data['accountno']);
 $ClearAccountNo = $SelectData['accountno'];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
+
 ?>
