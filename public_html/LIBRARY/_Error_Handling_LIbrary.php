@@ -52,6 +52,12 @@ function ERROR_Handler($errno, $errstr, $errfile, $errline)
     // 에러 메시지 만들기
     $ErrorMsg = "($errno) FILE: $errfile / LINE: $errline / MSG:  $errstr";
 
+    // 파일로 남긴다.
+    $myfile = fopen("MYErrorfileERROR_Handler.txt", "w") or die("Unable to open file!");
+    $txt = "ERROR_Handler --> $ErrorMsg \n";
+    fwrite($myfile, $txt);
+    fclose($myfile);
+
     // 만든 에러를 DB에 저장
     LOG_System($g_AccountNo, 'Error_Handler',  $ErrorMsg);
     exit;

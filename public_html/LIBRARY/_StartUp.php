@@ -12,7 +12,7 @@ require_once('_LOG_Profile.php');
 require_once('_ErrorCode.php');
 
 // 1. 프로파일링 객체 생성
-$PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER["PHP_SELF"]);  
+$PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER["PHP_SELF"], 1);  
 
 // 2. 게임로그 객체 생성
 $GameLog = GAMELog::getInstance($cnf_GAME_LOG_URL); 
@@ -43,16 +43,16 @@ function ResponseJSON($Response, $accountNo)
 // ---------------------------------
 function OnError($result, $AccountNo = -1)
 {
-    $Response['result'] = $result;
-
-    // 실패 패킷 전송
-    ResponseJSON($Response, $AccountNo);
+    $Response['result'] = $result;   
 
     // ---------------------------------------
     // cleanup 체크.
     // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
     require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
     // --------------------------------------
+
+    // 실패 패킷 전송
+    ResponseJSON($Response, $AccountNo);
 
     exit;
 }

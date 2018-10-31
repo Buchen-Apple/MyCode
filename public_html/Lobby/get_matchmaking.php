@@ -88,6 +88,8 @@ if($Response['sessionkey'] != $Content_Body['sessionkey'])
 // 6. 메치메이킹 DB에서, 이번에 접속할 메치메이킹 서버를 알아온다.
 $ServerInfo = GetMatchMakingServer($Response['accountno']);
 
+// 
+
 // 7. 정보를 돌려준다.
 // 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
 $ClientResponse['result'] = $cnf_COMPLETE;

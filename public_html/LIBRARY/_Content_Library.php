@@ -14,494 +14,133 @@ require_once('_DB_Library.php');
 require_once('_DB_Config.php');
 require_once('_ErrorCode.php');
 
-////////////////////////////////////
-// 클래스
-////////////////////////////////////
-
-// ---------------------------------
-// shDB_Info 클래스
-// shDB_Info DB에 연결, 해제, Query 날리기 등 가능
-// ---------------------------------
-class CshDB_Info_Contents
-{
-    // shDB_Info의 Mysql 정보. (Slave)
-    private $shDB_Info_IP;
-    private $shDB_Info_ID;
-    private $shDB_Info_Password;
-    private $shDB_Info_Name;
-    private $shDB_Info_Port;
-
-    // shDB와 연결된 연결정보. (Slave)
-    private $shDB_Info_ConnectDB;
-
-    // 프로파일링 객체
-    private $m_PF; 
-
-    // 접속중 체크
-    private $ConnectCheck = false;
-
-
-    // --------------
-    // 생성자 (싱글톤이기 때문에 private 생성자)
-    // --------------
-    private function __construct()
-    {   
-        // 1. shdb_info의, 어떤 Slave에게 접속할 것인지 결정해 멤버변수에 셋팅
-        global $Info_SlaveCount;
-
-        global $Info_Slave_DB_IP;
-        global $Info_Slave_DB_ID;
-        global $Info_Slave_DB_Password;
-        global $Info_Slave_DB_PORT;
-        global $Info_Slave_DB_Name;
-       
-        $Index = rand() % $Info_SlaveCount;
-        
-        $this->shDB_Info_IP = $Info_Slave_DB_IP[$Index];
-        $this->shDB_Info_ID = $Info_Slave_DB_ID[$Index];
-        $this->shDB_Info_Password = $Info_Slave_DB_Password[$Index];
-        $this->shDB_Info_Name = $Info_Slave_DB_Name[$Index];
-        $this->shDB_Info_Port = $Info_Slave_DB_PORT[$Index];
-        
-
-        // 2. 프로파일링 얻어오기
-        global $cnf_PROFILING_LOG_URL;      
-        $this->m_PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER['PHP_SELF']);
-
-        // 3. DB에 연결
-
-        // 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_CONN); 
-
-        // DB에 접속
-        $this->shDB_Info_ConnectDB = mysqli_connect($this->shDB_Info_IP, $this->shDB_Info_ID, $this->shDB_Info_Password, $this->shDB_Info_Name, $this->shDB_Info_Port);
-
-        // 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
-
-        if(!$this->shDB_Info_ConnectDB)
-        {   
-            // 파일로 남긴다.
-            $errno =  mysqli_connect_errno($this->shDB_Index_ConnectDB);
-            $errstr = mysqli_connect_error($this->shDB_Index_ConnectDB);
-
-            $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
-            $txt = "CshDB_Info_Contents --> mysqli_connect Error : $errstr($errno)\n";
-            fwrite($myfile, $txt);
-            fclose($myfile);
-
-            // 시스템로그 남김
-            $errorstring = "Unable to connect to MySQL(Info_SlaveConnect Function) : $errstr  ErrorNo :  $errno";
-            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            // 실패 시, 실패 응답 보낸 후 php 종료 (DBInfo Slave연결 에러)
-            global $cnf_DB_INDEX_SLAVE_CONNECT_ERROR;
-            OnError($cnf_DB_INDEX_SLAVE_CONNECT_ERROR);              
-        }        
-
-        $this->ConnectCheck = true;
-    }
-
-    // ---------------
-    // 객체 복사, 객체 직렬화, 객체 역직렬화 함수들을 private로 막기
-    // 이걸 해야, 안정적. 원하지 않는 복사 등이 일어나지 않음.
-    // ---------------
-    private function __clone() {}
-    private function __sleep() {}
-    private function __wakeup() {} 
-    
-    // --------------
-    // 소멸자
-    // --------------
-    function __destruct()
-    {        
-        // 1. DB와 연결 해제한다.
-        if($this->ConnectCheck === true)
-        {
-            mysqli_close($this->shDB_Info_ConnectDB);
-            $this->ConnectCheck = false;
-        }  
-    }    
-
-
-    // ---------------------
-    // 외부에서 사용 가능 함수
-    // ---------------------
-
-    // 싱글톤 객체 얻기
-    static function getInstance()
-    {
-        static $instance;
-
-        // $instance가 존재하지 않다면, 새로 만든다.
-        if(!isset($instance))
-            $instance = new CshDB_Info_Contents();
-
-        // php 클래스는, 리턴 시 복사값이 아니라 그냥 그 변수의 참조자가 나간다.
-        // 그렇다고 int형이 참조자가 나간다거나 그런건 아님
-        // 동적할당했으니 그냥 당연한거..
-        return $instance;
-    }
-
-    // 연결된 DB 객체 얻기 (Slave)
-    function DB_ConnectObject()
-    {
-        return $this->shDB_Info_ConnectDB;
-    }
-
-
-    // 쿼리 날리기
-    //
-    // Parameter : Query, AccountNO(디폴트 -1)
-    // return : 성공 시 result 리턴
-    //        : 실패 시 false 리턴
-    function DB_Query($Query, $AccountNo = -1)
-    {
-        // 쿼리문, 시스템 로그에 남기기
-        //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $Query);
-
-        // 쿼리문 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_QUERY);    
-
-        $Result = mysqli_query($this->shDB_Info_ConnectDB, $Query);
-
-        // 쿼리문 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_QUERY, $Query);
-        if(!$Result)
-        {
-            // DB에 쿼리 날리는 중, 문제가 생겼으면 시스템로그 남김
-            $errorstring = 'DB Query Erro : ' . mysqli_error($this->shDB_Info_ConnectDB). ' ErrorNo : ' .  mysqli_errno($this->shDB_Info_ConnectDB) . " / [Query] {$Query}";
-            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            return false;
-        }
-
-        return $Result;
-    }
-
-    // 가장 최근에 Insert된 자료의 ID 반환.
-    function LAST_INSERT_ID()
-    {
-        return mysqli_insert_id($this->shDB_Info_ConnectDB);
-    }
-
-    // Disconnect 하기
-    function DB_Disconnect()
-    {
-        // DB와 연결 해제한다.
-        if($this->ConnectCheck === true)
-        {
-            mysqli_close($this->shDB_Info_ConnectDB);
-            $this->ConnectCheck = false;
-        }  
-    }
-
-
-}
-
-
-// ---------------------------------
-// shDB_Index의 클래스
-// shDB_Index DB에 연결, 해제, Query 날리기 등 가능
-// 
-// 내부에서, Master와 Slave가 따로 Connect 된다.
-// ---------------------------------
-class CshDB_Index_Contents
-{      
-    // 프로파일링 객체
-    private $m_PF; 
-
-    // ---------- Slave 정보
-    // shDB_Info의 Mysql 정보. (Slave)
-    private $shDB_Index_IP;
-    private $shDB_Index_ID;
-    private $shDB_Index_Password;
-    private $shDB_Index_Name;
-    private $shDB_Index_Port;
-  
-    // shDB와 연결된 연결정보. (Slave)
-    private $shDB_Index_ConnectDB;
-
-    // 연결 체크
-    private $ConnectCheck_SLAVE = false;
-    private $ConnectCheck_MASTER = false;
-
-
-    // ---------- Master 정보
-    // shDB_Info의 Mysql 정보. (Master)
-    private $shDB_Index_IP_MASTER;
-    private $shDB_Index_ID_MASTER;
-    private $shDB_Index_Password_MASTER;
-    private $shDB_Index_Name_MASTER;
-    private $shDB_Index_Port_MASTER;
-  
-    // shDB와 연결된 연결정보. (Master)
-    private $shDB_Index_ConnectDB_MASTER;
-
-    // --------------
-    // 생성자 (싱글톤이기 때문에 private 생성자)
-    // --------------
-    private function __construct()
-    {     
-         // 1. 프로파일링 얻어오기
-         global $cnf_PROFILING_LOG_URL;   
-         $this->m_PF = Profiling::getInstance($cnf_PROFILING_LOG_URL, $_SERVER['PHP_SELF']);
-        
-
-        // 2. shdb_Index의, 어떤 Slave에게 접속할 것인지 결정해 멤버변수에 셋팅
-        global $Index_SlaveCount;
-
-        global $Index_Slave_DB_IP;
-        global $Index_Slave_DB_ID;
-        global $Index_Slave_DB_Password;
-        global $Index_Slave_DB_PORT;
-        global $Index_Slave_DB_Name;
-       
-        $Index = rand() % $Index_SlaveCount;
-        
-        $this->shDB_Index_IP = $Index_Slave_DB_IP[$Index];
-        $this->shDB_Index_ID = $Index_Slave_DB_ID[$Index];
-        $this->shDB_Index_Password = $Index_Slave_DB_Password[$Index];
-        $this->shDB_Index_Name = $Index_Slave_DB_Name[$Index];
-        $this->shDB_Index_Port = $Index_Slave_DB_PORT[$Index];
-
-        // 3. Slave DB에 연결
-
-        // 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_CONN); 
-
-        // DB에 접속
-        $this->shDB_Index_ConnectDB = mysqli_connect($this->shDB_Index_IP, $this->shDB_Index_ID, $this->shDB_Index_Password, $this->shDB_Index_Name, $this->shDB_Index_Port);
-
-        // 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
-
-        if(!$this->shDB_Index_ConnectDB)
-        {                 
-            // 파일로 남긴다.
-            $errno =  mysqli_connect_errno($this->shDB_Index_ConnectDB);
-            $errstr = mysqli_connect_error($this->shDB_Index_ConnectDB);
-
-            $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
-            $txt = "CshDB_Index_Contents --> mysqli_connect Error : $errstr($errno)\n";
-            fwrite($myfile, $txt);
-            fclose($myfile);
-
-            // 시스템로그 남김
-            $errorstring = "Unable to connect to MySQL(Index_SlaveConnect Function) : $errstr  ErrorNo :  $errno";
-            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Slave연결 에러)
-            global $cnf_DB_INDEX_SLAVE_CONNECT_ERROR;
-            OnError($cnf_DB_INDEX_SLAVE_CONNECT_ERROR);  
-        }   
-
-        $this->ConnectCheck_SLAVE = true;
-        
-        
-        // 4. Master 셋팅
-        global $Index_Master_DB_IP;
-        global $Index_Master_DB_ID;
-        global $Index_Master_DB_Password;
-        global $Index_Master_DB_PORT;
-        global $Index_Master_DB_Name;
-
-        $this->shDB_Index_IP_MASTER = $Index_Master_DB_IP;
-        $this->shDB_Index_ID_MASTER = $Index_Master_DB_ID;
-        $this->shDB_Index_Password_MASTER = $Index_Master_DB_Password;
-        $this->shDB_Index_Name_MASTER = $Index_Master_DB_Name; 
-        $this->shDB_Index_Port_MASTER = $Index_Master_DB_PORT;  
-
-        // 3. Master DB에 연결
-
-        // 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_CONN); 
-
-        // DB에 접속
-        $this->shDB_Index_ConnectDB_MASTER = mysqli_connect($this->shDB_Index_IP_MASTER, $this->shDB_Index_ID_MASTER, $this->shDB_Index_Password_MASTER, $this->shDB_Index_Name_MASTER, $this->shDB_Index_Port_MASTER);
-
-        // 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_CONN); 
-
-        if(!$this->shDB_Index_ConnectDB_MASTER)
-        {       
-             // 파일로 남긴다.         
-            $errno =  mysqli_connect_errno($this->shDB_Index_ConnectDB);
-            $errstr = mysqli_connect_error($this->shDB_Index_ConnectDB);
-
-            $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
-            $txt = "CshDB_Index_Contents --> mysqli_connect Error : $errstr($errno)\n";
-            fwrite($myfile, $txt);
-            fclose($myfile);
-
-            // 시스템로그 남김
-            $errorstring = "Unable to connect to MySQL(Index_MasterConnect Function) : $errstr  ErrorNo :  $errno";
-            LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Master연결 에러)
-            global $cnf_DB_INDEX_MASETER_CONNECT_ERROR;
-            OnError($cnf_DB_INDEX_MASETER_CONNECT_ERROR);  
-        }   
-
-        $this->ConnectCheck_MASTER = true;
-    }
-
-     // ---------------
-    // 객체 복사, 객체 직렬화, 객체 역직렬화 함수들을 private로 막기
-    // 이걸 해야, 안정적. 원하지 않는 복사 등이 일어나지 않음.
-    // ---------------
-    private function __clone() {}
-    private function __sleep() {}
-    private function __wakeup() {} 
-
-
-
-     // --------------
-    // 소멸자
-    // --------------
-    function __destruct()
-    {
-        // 1. Slave DB와 연결 해제한다.
-        if($this->ConnectCheck_SLAVE === true)
-        {
-            mysqli_close($this->shDB_Index_ConnectDB);
-            $this->ConnectCheck_SLAVE = false;
-        }
-
-        // 2. Master DB와 연결 해제한다.
-        if($this->ConnectCheck_MASTER === true)
-        {
-            mysqli_close($this->shDB_Index_ConnectDB_MASTER);
-            $this->ConnectCheck_MASTER = false;
-        }
-
-    }    
-
-
-    // ---------------------
-    // 외부에서 사용 가능 함수
-    // ---------------------
-
-    // 싱글톤 객체 얻기
-    static function getInstance()
-    {
-        static $instance;
-
-        // $instance가 존재하지 않다면, 새로 만든다.
-        if(!isset($instance))
-            $instance = new CshDB_Index_Contents();
-
-        // php 클래스는, 리턴 시 복사값이 아니라 그냥 그 변수의 참조자가 나간다.
-        // 그렇다고 int형이 참조자가 나간다거나 그런건 아님
-        // 동적할당했으니 그냥 당연한거..
-        return $instance;
-    }
-
-    // 연결된 DB 객체 얻기 (Slave)
-    function DB_ConnectObject()
-    {
-        return $this->shDB_Index_ConnectDB;
-    }
-
-    // 연결된 DB 객체 얻기 (Slave)
-    function DB_ConnectObject_MASTER()
-    {
-         return $this->shDB_Index_ConnectDB_MASTER;
-    }
-
-    // Slave에게 쿼리 날리기
-    //
-    // parameter : 쿼리, AccountNo(디폴트 -1)
-    // return : 성공 시, result 리턴. 
-    //          실패 시 false 리턴
-    function DB_Query($Query, $AccountNo = -1)
-    {
-        // 쿼리문, 시스템 로그에 남기기
-        //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $Query);
-
-        // 쿼리문 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_QUERY);    
-
-        $Result = mysqli_query($this->shDB_Index_ConnectDB, $Query);
-
-        // 쿼리문 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_QUERY, $Query);
-        if(!$Result)
-        {
-            // DB에 쿼리 날리는 중, 문제가 생겼으면 시스템로그 남김
-            //$errorstring = 'DB Query Erro : ' . mysqli_error($this->shDB_Index_ConnectDB). ' ErrorNo : ' .  mysqli_errno($this->shDB_Index_ConnectDB) . " / [Query] {$Query}";
-            //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            return false;             
-        }
-
-        return $Result;
-    }
-
-    // Master에게 쿼리 날리기
-    //
-    // parameter : 쿼리, AccountNo(디폴트 -1)
-    // return : 성공 시, result 리턴. 
-    //          실패 시 false 리턴
-    function DB_Query_MASTER($Query, $AccountNo = -1)
-    {
-        // 쿼리문, 시스템 로그에 남기기
-        //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $Query);
-
-        // 쿼리문 프로파일링 시작
-        $this->m_PF->startCheck(PF_MYSQL_QUERY);    
-
-        $Result = mysqli_query($this->shDB_Index_ConnectDB_MASTER, $Query);
-
-        // 쿼리문 프로파일링 끝
-        $this->m_PF->stopCheck(PF_MYSQL_QUERY, $Query);
-        if(!$Result)
-        {
-            // DB에 쿼리 날리는 중, 문제가 생겼으면 시스템로그 남김
-            //$errorstring = 'DB Query Erro : ' . mysqli_error($this->shDB_Index_ConnectDB_MASTER). ' ErrorNo : ' .  mysqli_errno($this->shDB_Index_ConnectDB_MASTER) . " / [Query] {$Query}";
-            //LOG_System($AccountNo, $_SERVER['PHP_SELF'], $errorstring);
-
-            return false;
-        }
-
-        return $Result;
-
-    }
-
-    // 가장 최근에 Insert된 자료의 ID 반환. (마스터 기준.)
-    // 슬레이브에게는 Insert하지 않으니 의미 없음!
-    //
-    // return : Master에 가장 최근에 Insert한 ID.
-    function LAST_INSERT_ID()
-    {
-        return mysqli_insert_id($this->shDB_Index_ConnectDB_MASTER);
-    } 
-
-    
-    // Disconnect 하기
-    function DB_Disconnect()
-    {
-         // 1. Slave DB와 연결 해제한다.
-         if($this->ConnectCheck_SLAVE === true)
-         {
-             mysqli_close($this->shDB_Index_ConnectDB);
-             $this->ConnectCheck_SLAVE = false;
-         }
- 
-         // 2. Master DB와 연결 해제한다.
-         if($this->ConnectCheck_MASTER === true)
-         {
-             mysqli_close($this->shDB_Index_ConnectDB_MASTER);
-             $this->ConnectCheck_MASTER = false;
-         }
-    }
-}
-
 
 
 ////////////////////////////////////
 // 컨텐츠 기능 함수
 ////////////////////////////////////
+
+// -------------------------------------------------------------------
+// shDB_Index의 Slave 중 하나에 Connect하는 함수
+//
+// Parameter : 없음
+// return : 연결된 DB. 실패 시 내부에서 클라에게 에러 리턴
+// -------------------------------------------------------------------
+function shDB_Index_Slave_Connect()
+{
+    // 1. shdb_Index의, 어떤 Slave에게 접속할 것인지 결정
+    global $Index_SlaveCount;
+    global $Index_Slave_DB_IP;
+    global $Index_Slave_DB_ID;
+    global $Index_Slave_DB_Password;
+    global $Index_Slave_DB_PORT;
+    global $Index_Slave_DB_Name;  
+
+    $Index = rand() % $Index_SlaveCount;   
+    
+    // 2. Master DB에 연결
+    $shDB_Index_ConnectDB;
+    if(DB_Connect($shDB_Index_ConnectDB, $Index_Slave_DB_IP[$Index], $Index_Slave_DB_ID[$Index], $Index_Slave_DB_Password[$Index], $Index_Slave_DB_Name[$Index], $Index_Slave_DB_PORT[$Index]) === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Slave연결 에러)
+        global $cnf_DB_INDEX_SLAVE_CONNECT_ERROR;
+        OnError($cnf_DB_INDEX_SLAVE_CONNECT_ERROR);    
+    }    
+
+    // 3. 결과 리턴
+    return $shDB_Index_ConnectDB; 
+}
+
+
+// -------------------------------------------------------------------
+// shDB_Index의 Master에 Connect하는 함수
+//
+// Parameter : 없음
+// return : 연결된 DB. 실패 시 내부에서 클라에게 에러 리턴
+// -------------------------------------------------------------------
+function shDB_Index_Master_Connect()
+{
+    // 1. Master 셋팅
+    global $Index_Master_DB_IP;
+    global $Index_Master_DB_ID;
+    global $Index_Master_DB_Password;
+    global $Index_Master_DB_PORT;
+    global $Index_Master_DB_Name; 
+
+    // 2. Master DB에 연결
+    $shDB_Index_ConnectDB;
+    if(DB_Connect($shDB_Index_ConnectDB, $Index_Master_DB_IP, $Index_Master_DB_ID, $Index_Master_DB_Password, $Index_Master_DB_Name, $Index_Master_DB_PORT) === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DBIndex Master연결 에러)
+        global $cnf_DB_INDEX_MASETER_CONNECT_ERROR;
+        OnError($cnf_DB_INDEX_MASETER_CONNECT_ERROR);   
+    }    
+
+    // 3. 결과 리턴
+    return $shDB_Index_ConnectDB;   
+}
+
+// -------------------------------------------------------------------
+// shDB_Info의 Slave 중 하나에 Connect하는 함수
+//
+// Parameter : 없음
+// return : 연결된 DB. 실패 시 내부에서 클라에게 에러 리턴
+// -------------------------------------------------------------------
+function shDB_Info_Slave_Connect()
+{
+    // 1. shdb_info의, 어떤 Slave에게 접속할 것인지 결정
+    global $Info_SlaveCount;
+    global $Info_Slave_DB_IP;
+    global $Info_Slave_DB_ID;
+    global $Info_Slave_DB_Password;
+    global $Info_Slave_DB_PORT;
+    global $Info_Slave_DB_Name;  
+
+    $Index = rand() % $Info_SlaveCount;      
+
+    // 2. DB에 접속
+    $shDB_Info_ConnectDB;
+    if(DB_Connect($shDB_Info_ConnectDB, $Info_Slave_DB_IP[$Index], $Info_Slave_DB_ID[$Index], $Info_Slave_DB_Password[$Index], $Info_Slave_DB_Name[$Index], $Info_Slave_DB_PORT[$Index]) === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DBInfo Slave연결 에러. 따로 에러 없어서 그냥 DBIndexSlave 연결 에러로 보냄)
+        global $cnf_DB_INDEX_SLAVE_CONNECT_ERROR;
+        OnError($cnf_DB_INDEX_SLAVE_CONNECT_ERROR);      
+    }    
+
+    // 3. 결과 리턴
+    return $shDB_Info_ConnectDB;
+}
+
+// -------------------------------------------------------------------
+// shDB_Info의 Master 에 Connect하는 함수
+//
+// Parameter : 없음
+// return : 연결된 DB. 실패 시 내부에서 클라에게 에러 리턴
+// -------------------------------------------------------------------
+function shDB_Info_Master_Connect()
+{
+    // 1. shdb_info의 Master 셋팅
+    global $Info_Master_DB_IP;
+    global $Info_Master_DB_ID;
+    global $Info_Master_DB_Password;
+    global $Info_Master_DB_PORT;
+    global $Info_Master_DB_Name;    
+
+    // 3. DB에 접속
+    $shDB_Info_ConnectDB;
+    if(DB_Connect($shDB_Info_ConnectDB, $Info_Master_DB_IP, $Info_Master_DB_ID, $Info_Master_DB_Password, $Info_Master_DB_Name, $Info_Master_DB_PORT) === false)
+    {
+         // 실패 시, 실패 응답 보낸 후 php 종료 (DBInfo Master연결 에러. 따로 없어서 그냥 DBIndex Master 연결 에러 보냄)
+         global $cnf_DB_INDEX_MASETER_CONNECT_ERROR;
+         OnError($cnf_DB_INDEX_MASETER_CONNECT_ERROR);      
+    }    
+
+    // 4. 결과 리턴
+    return $shDB_Info_ConnectDB;
+}
+
+
+
 
 // -------------------------------------------------------------------
 // shDB_Info.available 테이블에서 가장 여유분이 많은 dbno를 알아온다.
@@ -512,19 +151,25 @@ class CshDB_Index_Contents
 // -------------------------------------------------------------------
 function GetAvailableDBno()
 {
-    $shDB_Info = CshDB_Info_Contents::getInstance(); // 생성과 동시에 연결된다.  
-    $Result = $shDB_Info->DB_Query("SELECT * FROM `shDB_Info`.`available` ORDER BY `available` DESC limit 1");
+    // 1. shDB_Info의 Slave에게 연결
+    $shDB_Info = shDB_Info_Slave_Connect();
+
+    // 2. 쿼리 날리기
+    $Result = DB_Query("SELECT * FROM `shDB_Info`.`available` ORDER BY `available` DESC limit 1", $shDB_Info);
+    DB_Disconnect($shDB_Info);
+
     if($Result === false)
     {
         // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
         global $cnf_DB_QUERY_ERROR;
         OnError($cnf_DB_QUERY_ERROR);  
-    }
+    }   
 
+    // 3. 결과 뽑아오기
     $dbData = mysqli_fetch_Assoc($Result);
     mysqli_free_result($Result); 
 
-    // 만약, available 찾아온 db의 available 수치가 0일 경우
+    // 4. 만약, available 찾아온 db의 available 수치가 0일 경우
     if($dbData['available'] == 0)
     {
          // 실패 응답 보낸 후 php 종료 (DB Index 할당 에러)
@@ -532,6 +177,7 @@ function GetAvailableDBno()
          OnError($cnf_CONTENT_ERROR_CREATE_DB_INDEX_ALLOCATE);  
     }
 
+    // 5. 결과 리턴
     return $dbData;
 }
 
@@ -539,32 +185,37 @@ function GetAvailableDBno()
 // shDB_Index.Allocate 테이블에 유저 추가하기
 // '마스터'한테 Write한다.
 //
-// Parameter : 요청자의 email, dbno
+// Parameter : 요청자의 email, dbno, (out)요청자의 email을 안전하게 가져온 후 보관할 변수
 // return : 성공 시, 해당 유저에게 할당된 AccountNo 리턴.
 //          문제 발생 시, 상황에 맞춰 실패 응답을 클라에게 보낸 후 exit
 // -------------------------------------------------------------------
-function UserInsert($email, $dbno)
+function UserInsert($Tempemail, $dbno, &$safeEmail)
 {
-    // 1. shDB_Index의 싱글톤 알아옴.
-    $shDB_Index = CshDB_Index_Contents::getInstance();
+    // 1. shDB_Index의 Slave에 연결 후, TempEmail을 안전하게 가져오기.
+    // 밖에서는 연결된 DB까 없기 때문에 못가져옴.
+    $shDB_Index_Slave = shDB_Index_Slave_Connect();
+    $email = mysqli_real_escape_string($shDB_Index_Slave, $Tempemail);   
+    $safeEmail = $email;
     
     // 2. email을 이용해 존재하는지 확인. (Slave에게 read)
-    $Query = "SELECT EXISTS (select * from `shdb_index`.`allocate` where email=  '$email') as success";
-    $Result = $shDB_Index->DB_Query($Query);
+    $Query = "SELECT EXISTS (select * from `shdb_index`.`allocate` where email = '$email') as success";
+    $Result = DB_Query($Query, $shDB_Index_Slave);
+
+    DB_Disconnect($shDB_Index_Slave);
 
     // 만약, 무언가의 이유로 실패했다면, 실패 패킷 전송 후 php 종료
     if($Result === false)
-    {
-         // 실패 패킷 전송 후 php 종료하기 (DB 쿼리 에러)
-         global $cnf_DB_QUERY_ERROR;
-         OnError($cnf_DB_QUERY_ERROR);  
+    { 
+        // 실패 패킷 전송 후 php 종료하기 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR);  
     }
 
+    // 3. 데이터 빼오기
     $Data = mysqli_fetch_Assoc($Result);
-
     mysqli_free_Result($Result);
 
-    // 이미, 존재한다면 실패 패킷 만들어서 클라에게 응답.
+    // 4. 이미, 존재한다면 실패 패킷 만들어서 클라에게 응답.
     if($Data['success'] == 1)
     {
         // 이미 가입된 이메일의 유저가 또 가입요청을 했음. 시스템로그 남김
@@ -577,16 +228,28 @@ function UserInsert($email, $dbno)
     }        
 
 
-    // 3. 존재하지 않는다면 Insert (Master에게 Write)
-    if($shDB_Index->DB_Query_MASTER("INSERT INTO `shDB_Index`.`allocate`(`email`, `dbno`) VALUES ('$email', $dbno )") === false)
+    // 5. 존재하지 않는다면 Insert (Master에게 Write).
+    // shDB_Index_Master의 Master에 연결
+    $shDB_Index_Master = shDB_Index_Master_Connect();
+    $Result = DB_Query("INSERT INTO `shDB_Index`.`allocate`(`email`, `dbno`) VALUES ('$email', $dbno )", $shDB_Index_Master);
+
+    if($Result === false)
     {
+        DB_Disconnect($shDB_Index_Master);
+
         // 실패했다면, 실패 패킷 전송 후 php 종료하기 (DB 쿼리 에러)
         global $cnf_DB_QUERY_ERROR;
         OnError($cnf_DB_QUERY_ERROR);  
     }
 
-    // 4. 해당 유저에게 할당된 AccountNo 리턴
-    return $shDB_Index->LAST_INSERT_ID();
+    // 6. 해당 유저에게 할당된 AccountNo 알아오기
+    $LastAccountNo = mysqli_insert_id($shDB_Index_Master);
+
+    // 7. Master DB 연결 해제
+    DB_Disconnect($shDB_Index_Master);
+
+    // 8. LastAccountNo 리턴
+    return $LastAccountNo;
 }
 
 
@@ -602,9 +265,12 @@ function shDB_Data_CreateInsert($shDB_Data, $dbName, $email, $AccountNo)
 {   
     // 1. account 테이블에 Insert
     if(DB_Query("INSERT INTO `$dbName`.`account`(`accountno`, `email`) VALUES ($AccountNo, '$email' )", $shDB_Data, $AccountNo) === false)
-    {
+    {        
+        $Error = mysqli_errno($shDB_Data);
+        DB_Disconnect($shDB_Data);
+
         // 만약, 에러가 1062(중복값)라면, 중복 응답 리턴.
-        if(mysqli_errno($shDB_Data) == 1062)
+        if($Error == 1062)
         {
             // 시스템로그 남김
             $errorstring = 'DataSet--> accountTBL Value Duplicate.';
@@ -628,8 +294,11 @@ function shDB_Data_CreateInsert($shDB_Data, $dbName, $email, $AccountNo)
     // 2.contents 테이블에 Insert
     if(DB_Query("INSERT INTO `$dbName`.`contents`(`accountno`) VALUES ($AccountNo)", $shDB_Data, $AccountNo) === false)
     {
+        $Error = mysqli_errno($shDB_Data);
+        DB_Disconnect($shDB_Data);
+
         // 만약, 에러가 1062(중복값)라면, 중복 응답 리턴.
-        if(mysqli_errno($shDB_Data) == 1062)
+        if($Error == 1062)
         {
             // 시스템로그 남김
             $errorstring = 'DataSet--> contentsTBL Value Duplicate.';
@@ -658,15 +327,19 @@ function shDB_Data_CreateInsert($shDB_Data, $dbName, $email, $AccountNo)
 // -----------------------------------------------------------------
 function MinusAvailable($dbno, $Available)
 {
-     // dbno의 available을 1 감소.  
-     $shDB_Info = CshDB_Info_Contents::getInstance();
-     if($shDB_Info->DB_Query("UPDATE `shDB_Info`.`available` SET available = $Available - 1 WHERE dbno = $dbno") === false)
-     {
-         // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
-         global $cnf_DB_QUERY_ERROR;
-         OnError($cnf_DB_QUERY_ERROR, $AccountNo);  
-     }   
+    // 1. shDB_Info의 Master에게 연결
+    $shDB_Info_Master = shDB_Info_Master_Connect();
+    
+    // 2., dbno의 available을 1 감소.  
+    $Result = DB_Query("UPDATE `shDB_Info`.`available` SET available = $Available - 1 WHERE dbno = $dbno", $shDB_Info_Master);
+    DB_Disconnect($shDB_Info_Master);
 
+    if($Result === false)
+    {
+        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR, $AccountNo);  
+    }   
 }
 
 
@@ -680,12 +353,13 @@ function MinusAvailable($dbno, $Available)
 // -------------------------------------------------------------------
 function SearchUser($TempKey, $TempValue)
 { 
-    $shDB_Index = CshDB_Index_Contents::getInstance();
+    // 1. shDB_Index의 Slave로 Connect
+    $shDB_Index = shDB_Index_Slave_Connect();
 
-    // 1. Update 쿼리문을 만든다.
+    // 2. Update 쿼리문을 만든다.
     // Key, Value 안전하게 가져오기
-    $Key = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $TempKey);
-    $Value = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $TempValue);    
+    $Key = mysqli_real_escape_string($shDB_Index, $TempKey);
+    $Value = mysqli_real_escape_string($shDB_Index, $TempValue);    
 
     // 쿼리문 만들기
     if($Key == 'accountno')
@@ -697,6 +371,8 @@ function SearchUser($TempKey, $TempValue)
     // 둘 다 아니면 파라미터 에러
     else
     {
+        DB_Disconnect($shDB_Index);
+
         // 시스템로그 남김
         $errorstring = 'SearchUser -> ParameterError. Value : ' . "$Value";
         LOG_System(-1, $_SERVER['PHP_SELF'], $errorstring);
@@ -707,20 +383,17 @@ function SearchUser($TempKey, $TempValue)
     }  
 
 
+    // 2. shDB_Index.allocate로 쿼리문 날림  
+    $Result = DB_Query($Query, $shDB_Index);
+    DB_Disconnect($shDB_Index);
 
-   // 2. shDB_Index.allocate로 쿼리문 날림  
-   $Result = $shDB_Index->DB_Query($Query);
-   if($Result === false)
-   {     
-
+    if($Result === false)
+    {     
        // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
        global $cnf_DB_QUERY_ERROR;
        OnError($cnf_DB_QUERY_ERROR);        
-   }   
-
+    }   
     $Data = mysqli_fetch_Assoc($Result);   
-
-
 
     // 3. 회원가입되지 않은 유저라면, 에러 리턴.
     if($Data === null)
@@ -743,7 +416,7 @@ function SearchUser($TempKey, $TempValue)
         OnError($cnf_CONTENT_ERROR_SELECT_NOT_CREATE_USER); 
     }   
     
-    mysqli_free_result($Result);
+    mysqli_free_result($Result);    
 
     // 4. dbno와 AccountNo 리턴    
     return $Data;
@@ -759,10 +432,13 @@ function SearchUser($TempKey, $TempValue)
 // -------------------------------------------------------------------
 function shDB_Data_ConnectInfo($dbno, $accountno)
 {
-    $shDB_Info = CshDB_Info_Contents::getInstance();
+    // 1. shDB_Info의 Slave에게 연결
+    $shDB_Info = shDB_Info_Slave_Connect();
 
-    // dbno를 이용해, shDB_Info.dbconnect에서 db의 정보를 가져온다. (Slave 에게) 
-    $Result = $shDB_Info->DB_Query("SELECT * FROM `shDB_Info`.`dbconnect` WHERE dbno = $dbno");
+    // 2. dbno를 이용해, shDB_Info.dbconnect에서 db의 정보를 가져온다. (Slave 에게) 
+    $Result = DB_Query("SELECT * FROM `shDB_Info`.`dbconnect` WHERE dbno = $dbno", $shDB_Info, $accountno);
+    DB_Disconnect($shDB_Info);
+
     if($Result === false)
     {
         // 실패 시, 실패 응답 보낸 후 php 종료 (DB 쿼리 에러)
@@ -770,9 +446,11 @@ function shDB_Data_ConnectInfo($dbno, $accountno)
         OnError($cnf_DB_QUERY_ERROR, $accountno);  
     }
 
+    // 3. 결과 빼오기
     $dbInfoData = mysqli_fetch_Assoc($Result);
     mysqli_free_result($Result); 
 
+    // 4. 접속 정보가 들어있는 array 리턴
     return $dbInfoData;
 }
 
@@ -806,34 +484,46 @@ function shDB_Data_Conenct($dbInfoData)
 // shDB_Data 전용
 //
 // Parameter : accountNo, 연결된 DB 변수(Out), DB 이름, 테이블 이름
-// return : 없음
+// return : 없음. php가 종료 안되면 그냥 있는것으로 판단.
 //        : 실패 시, 내부에서 적절한 실패 응답 보낸 후 Exit;
 // -------------------------------------------------------------------
 function shDB_Data_AccountNoCheck($accountNo, &$shDB_Data, $dbname, $TBLName)
 { 
     // 1. shDB_Data.$TBLName에 해당 accountNo가 있는지 확인 (Slave 에게)
-    $Query = "SELECT EXISTS (SELECT * FROM `$dbname`.`$TBLName` WHERE accountno = $accountNo) AS success";
-    $Result = DB_Query($Query , $shDB_Data, $accountNo);
-    $AccountNoCheck = mysqli_fetch_Assoc($Result);
+    $Result = DB_Query("SELECT EXISTS (SELECT * FROM `$dbname`.`$TBLName` WHERE accountno = $accountNo) AS success" , $shDB_Data, $accountNo);
+    if($Result === false)
+    {
+        DB_Disconnect($shDB_Data);
 
+        // Master에게 쿼리 남기다 실패하면 실패 패킷 전송 후 php 종료 (DB 쿼리 에러)
+        global $cnf_DB_QUERY_ERROR;
+        OnError($cnf_DB_QUERY_ERROR);
+    }
+
+    $AccountNoCheck = mysqli_fetch_Assoc($Result);
     mysqli_free_Result($Result);
 
     // 존재하지 않는다면, shDB_Index.allocate에서 해당 accountno의 유저 삭제.
     // 정상 삭제 후 실패 패킷 리턴.
     if($AccountNoCheck['success'] == 0)
     {
+        DB_Disconnect($shDB_Data);
+
         // 시스템로그 남김
         $errorstring = "shDB_Data_AccountNoCheck--> Not FIND AccountNo(`$dbname`.`$TBLName`)!! IndexDB Rollback";
         LOG_System($accountNo, $_SERVER['PHP_SELF'], $errorstring);   
         
         // shDB_Index.allocate 롤백. (Master에게)
-        $shDB_Index = CshDB_Index_Contents::getInstance();
-        if($shDB_Index->DB_Query_MASTER("DELETE FROM `shDB_Index`.`allocate` WHERE `accountno` = $accountNo") === false)
+        $shDB_Index = shDB_Index_Master_Connect();
+        $Result = DB_Query("DELETE FROM `shDB_Index`.`allocate` WHERE `accountno` = $accountNo", $shDB_Index, $accountNo);
+        DB_Disconnect($shDB_Index);
+
+        if($Result === false)
         {
             // Master에게 쿼리 남기다 실패하면 실패 패킷 전송 후 php 종료 (DB 쿼리 에러)
             global $cnf_DB_QUERY_ERROR;
             OnError($cnf_DB_QUERY_ERROR); 
-        }
+        }            
 
         // 롤백이 잘 됐으면, 실패 패킷 전송 후 php 종료하기 (accountTBL에 accountno가 없음 or ContentsTBL에 AccountNo가 없음)
         // ---검사한 테이블이 accountTBL이었을 경우
@@ -885,8 +575,11 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
     // 3. 쿼리 날리는데 실패했으면, 실패 이유에 따라 응답패킷 보낸다.
     if($Result === false)
     {
+        $Error = mysqli_errno($shDB_Data);
+        DB_Disconnect($shDB_Data);
+
         // -- 컬럼이 존재하지 않을 경우 (1054 에러)
-        if(mysqli_errno($shDB_Data) == 1054)
+        if($Error == 1054)
         {
             // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
             global $cnf_DB_NOT_FIND_COLUMN;
@@ -894,7 +587,7 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
         }   
         
         // 테이블이 존재하지 않을 경우 (1146 에러)
-        else if(mysqli_errno($shDB_Data) == 1146)
+        else if($Error == 1146)
         {
             // 실패 응답 보낸 후 php 종료 (테이블 존재하지 않음)
             global $cnf_DB_NOT_FOUNT_TABLE;
@@ -921,8 +614,11 @@ function shDB_Data_Select($accountNo, &$shDB_Data, $dbname, $TBLName)
     // 2. 쿼리 날리는데 실패했으면, 실패 이유에 따라 응답패킷 보낸다.
     if($Result === false)
     {
+        $Error = mysqli_errno($shDB_Data);
+        DB_Disconnect($shDB_Data);
+
         // -- 컬럼이 존재하지 않을 경우 (1054 에러)
-        if(mysqli_errno($shDB_Data) == 1054)
+        if($Error == 1054)
         {
             // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
             global $cnf_DB_NOT_FIND_COLUMN;
@@ -930,7 +626,7 @@ function shDB_Data_Select($accountNo, &$shDB_Data, $dbname, $TBLName)
         }      
         
         // 테이블이 존재하지 않을 경우 (1146 에러)
-        else if(mysqli_errno($shDB_Data) == 1146)
+        else if($Error == 1146)
         {
             // 실패 응답 보낸 후 php 종료 (컬럼 존재하지 않음)
             global $cnf_DB_NOT_FOUNT_TABLE;

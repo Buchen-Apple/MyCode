@@ -9,6 +9,13 @@ $Log_DB_PORT = 3306;
 $Log_DB_Name = 'log_db';
 
 
+// shDB_Info의 Master 주소
+$Info_Master_DB_IP = '127.0.0.1';
+$Info_Master_DB_ID = 'root';
+$Info_Master_DB_Password = '034689';
+$Info_Master_DB_PORT = 3306;
+$Info_Master_DB_Name = 'shdb_info';
+
 
 // shDB_Info의 Slave가 있는 주소
 // Slave만 추가되면 코드 수정없이(설정파일만 수정) 그 Slave에도 갈 수 있어야 한다.

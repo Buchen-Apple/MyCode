@@ -193,7 +193,6 @@ class Profiling
         if($this->LOG_FLAG == FALSE)
             return;
 
-
         // function_exists("함수이름") : ( ) 안의 함수가 존재하는 함수인지 알아내는 함수. 존재하면 true반환 
         if(function_exists("getrusage"))
         {
@@ -246,11 +245,25 @@ class Profiling
         $post_string = implode('&', $post_params);
         $parts = parse_url($URL);
 
-        $fp = fsockopen($parts['host'], isset($parts['port']) ? $parts['port'] : 80, $errno, $error, 30);
+        if(isset($parts['port']))
+            $TempPort = $parts['port'];
+        
+        else
+            $TempPort = 80;
 
-        // 소켓 못열었으면 리턴 0
+        $fp = fsockopen($parts['host'], $TempPort, $errno, $error, 10);
+
+        // 소켓 못열었으면 파일로 저장
         if(!$fp)
-            return 0;
+        {        
+            // 파일로 남김
+            $myfile = fopen("MYErrorfile_Profile.txt", "w") or die("Unable to open file!");
+            $txt = "Profile_http_request() --> fsockopen() error : {$parts['host']} : $TempPort --> $errstr ($errno) \n";
+            fwrite($myfile, $txt);
+            fclose($myfile);     
+
+            exit;
+        }
 
         // HTTP 프로토콜 생성
         $out = "POST " . $parts['path'] . " HTTP//1.1\r\n";

@@ -118,9 +118,24 @@ namespace Library_Jingyu
 		// 연결
 		ConnectFunc();
 
-		// 서버 오픈 로그 찍기		
-		// 이건, 상속받는 쪽에서 찍는걸로 수정. 랜클라 자체는 독립적으로 작동하지 않음.
-		// cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		// Connect 스레드 생성
+		hConnectHandle = (HANDLE)_beginthreadex(0, 0, ConnectThread, this, 0, 0);
+		if (hConnectHandle == 0)
+		{
+			// 윈도우 에러, 내 에러 보관
+			m_iOSErrorCode = errno;
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_CREATE_FAIL;
+
+			// 각종 핸들 반환 및 동적해제 절차.
+			ExitFunc(m_iW_ThreadCount);
+
+			// 로그 찍기 (로그 레벨 : 에러)
+			cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> ConnectThread Create Error : NetError(%d), OSError(%d)",
+				(int)m_iMyErrorCode, m_iOSErrorCode);
+
+			// false 리턴
+			return false;
+		}
 
 		return true;
 	}
@@ -186,7 +201,8 @@ namespace Library_Jingyu
 		WSACleanup();
 
 		// 4. 클라 접속중 아님 상태로 변경
-		m_bClienetConnect = false;
+		m_lClienetConnect = FALSE;
+		m_bConnectFlag = false;
 
 		// 5. 각종 변수 초기화
 		Reset();
@@ -256,7 +272,7 @@ namespace Library_Jingyu
 	// return false : 접속중 아님
 	bool CLanClient::GetClinetState()
 	{
-		return m_bClienetConnect;
+		return m_bConnectFlag;
 	}
 
 
@@ -268,18 +284,29 @@ namespace Library_Jingyu
 	CLanClient::CLanClient()
 	{
 		// 클라 미접속 상태로 시작 
-		m_bClienetConnect = false;
+		m_lClienetConnect = FALSE;
+		m_bConnectFlag = false;
+
+		// ConnectThread 종료용 이벤트 생성
+		//
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event
+		hConnectExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	}
 
 	// 소멸자
 	CLanClient::~CLanClient()
 	{
 		// 클라가 아직 서버에 접속중이라면, 접속 해제 절차
-		if (m_bClienetConnect == true)
+		if (m_bConnectFlag == true)
 		{
-			m_bClienetConnect = false;
+			m_bConnectFlag = false;
 			Stop();
 		}
+
+		// ConnectThraed 종료용 이벤트 해제
+		CloseHandle(hConnectExitEvent);
 	}
 
 	// 실제로 접속종료 시키는 함수
@@ -330,10 +357,7 @@ namespace Library_Jingyu
 			DeleteSession->m_lSendFlag = FALSE;
 
 			// 클로즈 소켓
-			closesocket(DeleteSession->m_Client_sock);
-
-			// 접속중 아님으로 상태 변경
-			m_bClienetConnect = false;
+			closesocket(DeleteSession->m_Client_sock);			
 
 			// 접속 중 유저 수 감소
 			InterlockedDecrement(&m_ullJoinUserCount);
@@ -341,6 +365,10 @@ namespace Library_Jingyu
 			// 컨텐츠 쪽 연결이 종료되었다고 알려줌.
 			// 컨텐츠와 통신할 때는 세션키를 이용해 통신한다. 그래서 인자로 세션키를 넘겨준다.
 			OnDisconnect(sessionID);
+
+			// 접속중 아님으로 상태 변경
+			m_lClienetConnect = FALSE;
+			m_bConnectFlag = false;
 		}
 
 		return;
@@ -498,22 +526,55 @@ namespace Library_Jingyu
 		return 0;
 	}
 
+	// Connect 스레드
+	UINT WINAPI	CLanClient::ConnectThread(LPVOID lParam)
+	{
+		CLanClient* g_This = (CLanClient*)lParam;
+
+		// [종료 신호] 인자로 받아두기
+		HANDLE hEvent = g_This->hConnectExitEvent;
+
+		while (1)
+		{
+			// 100m/s에 1회 깨어난다.
+			DWORD Check = WaitForSingleObject(hEvent, 100);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("ConnectThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면업데이트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그게 아니라면, 일을 한다.
+			g_This->ConnectFunc();
+		}
+
+		return 0;
+	}
+
+
 
 	// 지정한 서버에 connect하는 함수
 	bool CLanClient::ConnectFunc()
 	{
+		// ConnectFlag가 이미 TRUE였다면, 다른 스레드가 Connect를 시도중이거나 이미 연결중인 것.
+		// 그냥 return 한다.
+		if (InterlockedExchange(&m_lClienetConnect, TRUE) == TRUE)
+			return true;
+
 		// RecvPost를 하다가 실패할 경우, InDisconnect가 되기 때문에 while문으로 반복한다.
 		while (1)
 		{
 			// ------------------
-			// 세션 구조체 생성 및 셋팅
+			// 세션 정보 셋팅
 			// ------------------
-
-			// 1) I/O 카운트 증가
-			// 삭제 방어
-			InterlockedIncrement(&m_stSession.m_lIOCount);
-
-			// 2) 정보 셋팅하기
+			// 1) 정보 셋팅하기
 			m_stSession.m_ullSessionID = InterlockedIncrement(&m_ullUniqueSessionID);
 
 
@@ -534,30 +595,12 @@ namespace Library_Jingyu
 				cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> socket() Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
+				// ConnectFlag 변경
+				m_lClienetConnect = FALSE;
+
 				// false 리턴
 				return false;
-
 			}
-
-			// 소켓의 송신버퍼 크기를 0으로 변경. 그래야 정상적으로 비동기 입출력으로 실행
-			//int optval = 0;
-			//int retval = setsockopt(m_stSession.m_Client_sock, SOL_SOCKET, SO_SNDBUF, (char*)&optval, sizeof(optval));
-			//if (optval == SOCKET_ERROR)
-			//{
-			//	// 윈도우 에러, 내 에러 보관
-			//	m_iOSErrorCode = WSAGetLastError();
-			//	m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
-
-			//	// 각종 핸들 반환 및 동적해제 절차.
-			//	ExitFunc(m_iW_ThreadCount);
-
-			//	// 로그 찍기 (로그 레벨 : 에러)
-			//	cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() SendBuff Size Change Error : NetError(%d), OSError(%d)",
-			//		(int)m_iMyErrorCode, m_iOSErrorCode);
-
-			//	// false 리턴
-			//	return false;
-			//}
 
 			// 노딜레이 옵션 사용 여부에 따라 네이글 옵션 결정 (Start에서 전달받음)
 			// true면 노딜레이 사용하겠다는 것(네이글 중지시켜야함)
@@ -579,6 +622,9 @@ namespace Library_Jingyu
 					cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
 						(int)m_iMyErrorCode, m_iOSErrorCode);
 
+					// ConnectFlag 변경
+					m_lClienetConnect = FALSE;
+
 					// false 리턴
 					return false;
 				}
@@ -594,7 +640,11 @@ namespace Library_Jingyu
 			if (check == SOCKET_ERROR)
 			{
 				printf("NoneBlock Change Fail...\n");
-				return 0;
+
+				// ConnectFlag 변경
+				m_lClienetConnect = FALSE;
+
+				return false;
 			}
 
 			SOCKADDR_IN clientaddr;
@@ -604,6 +654,8 @@ namespace Library_Jingyu
 			InetPton(AF_INET, m_tcServerIP, &clientaddr.sin_addr.S_un.S_addr);
 
 			// connect 시도
+			// 최대 n회 시도 후, 그래도 접속이 안된다면 다음에 시도.
+			int ConnectTryCount = 0;
 			while (1)
 			{
 				connect(m_stSession.m_Client_sock, (SOCKADDR*)&clientaddr, sizeof(clientaddr));
@@ -634,27 +686,25 @@ namespace Library_Jingyu
 					DWORD retval = select(0, 0, &wset, &exset, &tval);
 
 
-
 					// 에러 발생여부 체크
 					if (retval == SOCKET_ERROR)
 					{
-						printf("Select error..(%d)\n", WSAGetLastError());
-
+						// printf("Select error..(%d)\n", WSAGetLastError());
+						// 최대 n회 시도						
 					}
 
 					// 타임아웃 체크
 					else if (retval == 0)
 					{
-						printf("Select Timeout..\n");
-						printf("%d\n", WSAGetLastError());
-
+						//printf("Select Timeout..\n");
+						//printf("%d\n", WSAGetLastError());
 					}
 
 					// 반응이 있다면, 예외셋에 반응이 왔는지 체크
 					else if (exset.fd_count > 0)
 					{
 						//예외셋 반응이면 실패한 것.
-						printf("Select ---> exset problem..\n");
+						//printf("Select ---> exset problem..\n");
 					}
 
 					// 쓰기셋에 반응이 왔는지 체크
@@ -667,6 +717,11 @@ namespace Library_Jingyu
 						if (check == SOCKET_ERROR)
 						{
 							printf("NoneBlock Change Fail...\n");
+							closesocket(m_stSession.m_Client_sock);
+
+							// ConnectFlag 변경
+							m_lClienetConnect = FALSE;
+
 							return false;
 						}
 
@@ -675,7 +730,19 @@ namespace Library_Jingyu
 
 					}
 
-					// 실패했으면 다시 접속
+					// 5회 시도했는데도 안됐으면, 다음에 시도.
+					ConnectTryCount++;
+					if (ConnectTryCount == 1)
+					{
+						closesocket(m_stSession.m_Client_sock);						
+
+						// ConnectFlag 변경
+						m_lClienetConnect = FALSE;
+
+						return false;
+					}
+
+					// 5회가 안됐으면 다시 접속 시도.
 					Sleep(0);
 					continue;
 				}
@@ -684,6 +751,13 @@ namespace Library_Jingyu
 				else if (Check == WSAEISCONN)
 					break;
 			}
+
+			// ------------------			
+			// 삭제 방어
+			// ------------------
+			// I/O 카운트 증가
+			InterlockedIncrement(&m_stSession.m_lIOCount);
+
 
 			// ------------------
 			// IOCP 연결
@@ -711,7 +785,7 @@ namespace Library_Jingyu
 			// 셋팅이 모두 끝났으면 릴리즈 해제 상태로 변경.
 			m_stSession.m_lReleaseFlag = FALSE;
 
-			// 서버에 접속한 유저 수 증가
+			// 접속한 유저 수 증가
 			InterlockedIncrement(&m_ullJoinUserCount);
 
 			// ------------------
@@ -730,13 +804,12 @@ namespace Library_Jingyu
 			}
 
 			// I/O카운트가 0이되어 삭제된 것이 아니라면 정상 Connect 된 것
-			// ConClientJoin 호출
+			// OnClientJoin 호출
+			m_bConnectFlag = true;
 			OnConnect(m_stSession.m_ullSessionID);
 
 			break;
-		}
-
-		m_bClienetConnect = true;
+		}		
 
 		return true;		
 	}

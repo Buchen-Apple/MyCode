@@ -7,7 +7,7 @@
 // startUp 체크.
 // 이 안에서는 [프로파일러 생성, 게임로그 생성]를 한다.
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
-require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
+require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Content_Library.php");
 // ---------------------------------------
 
 // 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
@@ -33,20 +33,17 @@ if(filter_var($Content_Body['email'], FILTER_VALIDATE_EMAIL) === false)
     OnError($cnf_ERROR_PARAMETER);  
 }
 
-// 이메일이 맞다면, escape로 안전하게 가져옴.
-$shDB_Index = CshDB_Index_Contents::getInstance();
-$email = mysqli_real_escape_string($shDB_Index->DB_ConnectObject(), $Content_Body['email']);
-
 
 // 3. shDB_Info.available 테이블에서 가장 여유분이 많은 dbno와 available을 알아온다.
 $dbData = GetAvailableDBno();
 
 
 // 4. shDB_Index.allocate 테이블에 Insert. 
-// email, dbno를 날려서 새로운 유저 등록.
+// email, dbno를 날려서 새로운 유저 등록. 추가로, 1번 인자를 안전하게 가져와서 3번인자에 넣어준다.
 // 실패하면, 내부에서 알아서 실패패킷까지 보낸다.
 // 성공 시, 해당 유저에게 할당된 accountNo 리턴
-$AccountNo = UserInsert($email, $dbData['dbno']);
+$safeEmail;
+$AccountNo = UserInsert($Content_Body['email'], $dbData['dbno'], $safeEmail);
 
 
 // 5. dbno를 이용해, shDB_Info.dbconnect에서 db의 정보를 가져온다.
@@ -58,12 +55,10 @@ $shDB_Data = shDB_Data_Conenct($dbInfoData);
 
 
 // 7. 인자로 던진 shDB_Data의 account테이블과 contents 테이블에 정보 갱신
-shDB_Data_CreateInsert($shDB_Data, $dbInfoData['dbname'], $email, $AccountNo);
-
+shDB_Data_CreateInsert($shDB_Data, $dbInfoData['dbname'], $safeEmail, $AccountNo);
 
 // 8. 연결했던 shDB_Data에 Disconenct
 DB_Disconnect($shDB_Data);
-
 
 // 9. 이번에 유저를 접속시킨 dbno의 available을 1 감소.  
 MinusAvailable($dbData['dbno'], $dbData['available']);
@@ -71,7 +66,7 @@ MinusAvailable($dbData['dbno'], $dbData['available']);
 // 10. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
 $Response['accountno'] = intval($AccountNo); 
-$Response['email'] = $email;
+$Response['email'] = $safeEmail;
 $Response['dbno'] = intval($dbData['dbno']);
 
 

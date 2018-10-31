@@ -46,7 +46,7 @@ function http_request($url, $params, $type='POST')
     if($parts['scheme'] == 'http')
     {
         $TempHost = $parts['host'];
-        $TempPort = isset($parts['port'])?parts['port']:80;
+        $TempPort = isset($parts['port'])?$parts['port']:80;
         $TempTime = 10;
     }
 
@@ -54,7 +54,7 @@ function http_request($url, $params, $type='POST')
     {
         $TempHost = "ssl://{$parts['host']}";
 
-        $TempPort = isset($parts['port'])?parts['port']:443;
+        $TempPort = isset($parts['port'])?$parts['port']:443;
         $TempTime = 30;
     }
 
@@ -100,7 +100,7 @@ function http_request($url, $params, $type='POST')
         $myfile = fopen("MYErrorfile.txt", "w") or die("Unable to open file!");
         $txt = "http_request() --> fsockopen() error : $TempHost : $TempPort --> $errstr ($errno) \n";
         fwrite($myfile, $txt);
-        fclose($myfile);        
+        fclose($myfile);     
 
         exit;
     }   

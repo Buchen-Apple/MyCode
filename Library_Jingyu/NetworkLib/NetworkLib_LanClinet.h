@@ -168,8 +168,19 @@ namespace Library_Jingyu
 		// 무조건 1명이겠지만, stop()함수에서 모두 종료되면 워커스레드를 종료시키기 때문에, 체크용도로 보유.
 		ULONGLONG m_ullJoinUserCount;
 
-		// 클라이언트 접속 여부. true면 접속중, false면 접속중 아님
-		bool m_bClienetConnect;
+		// --------------------------
+
+		// Connect 시도 중인지 체크하는 용도. TRUE면 접속중 or 이미 누군가가 Connect 시도중, FALSE면 접속중 아님
+		LONG m_lClienetConnect;		
+
+		// Connect가 완전히 성공했는지 체크. true면 커넥트 성공
+		bool m_bConnectFlag;
+
+		// Connect 스레드 종료용 이벤트
+		HANDLE hConnectExitEvent;
+
+		// Connect 스레드 핸들
+		HANDLE hConnectHandle;
 
 	private:
 		// ----------------------
@@ -197,6 +208,9 @@ namespace Library_Jingyu
 
 		// 워커 스레드
 		static UINT	WINAPI	WorkerThread(LPVOID lParam);
+
+		// Connect 스레드
+		static UINT WINAPI	ConnectThread(LPVOID lParam);
 
 		// 중간에 무언가 에러났을때 호출하는 함수
 		// 1. 윈속 해제

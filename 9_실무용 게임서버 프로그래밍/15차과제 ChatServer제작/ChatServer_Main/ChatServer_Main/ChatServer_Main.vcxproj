@@ -167,7 +167,6 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanClient.cpp" />
-    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_NetServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\PDHClass\PDHCheck.cpp" />

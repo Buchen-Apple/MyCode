@@ -251,10 +251,11 @@ namespace Library_Jingyu
 			// --------------
 			// recv()
 			// --------------
-			DWORD Check = recv(sock, recvBuff, 1024, 0);
+			LONG Check = recv(sock, recvBuff, 1024, 0);
 			if (Check == SOCKET_ERROR)
 			{
-				_tprintf(L"recv Fail...(%d)\n", WSAGetLastError());
+				LONG Error = WSAGetLastError();
+				_tprintf(L"recv Fail...(%d)\n", Error);
 				g_HTTP_Dump->Crash();
 				return false;
 			}

@@ -3,7 +3,6 @@
   DB_Connector.cpp
   Log.cpp
   MonitorServer.cpp
-c:\git_public\library_jingyu\monitorserver\monitorserver.cpp(694): warning C4101: 'TempCount' :참조되지 않은 지역 변수입니다.
   NetworkLib_LanServer.cpp
   NetworkLib_NetServer.cpp
   Parser_Class.cpp
@@ -12,6 +11,6 @@ c:\git_public\library_jingyu\monitorserver\monitorserver.cpp(694): warning C4101
   RingBuff.cpp
   MonitorServer_Main.cpp
   코드를 생성하고 있습니다.
-  All 361 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 389 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   MonitorServer_Main.vcxproj -> C:\Git_Public\9_실무용 게임서버 프로그래밍\19차과제_Monitor서버 제작\MonitorServer_Main\x64\Release\MonitorServer_Main.exe

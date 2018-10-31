@@ -81,7 +81,6 @@ $SelectData = shDB_Data_Select($Data['accountno'], $shDB_Data, $DBInfo['dbname']
 // 7. Disconenct
 DB_Disconnect($shDB_Data);
 
-
 // 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
 $Response['accountno'] = intval($SelectData['accountno']);
@@ -92,13 +91,6 @@ $Response['die'] = intval($SelectData['die']);
 $Response['win'] = intval($SelectData['win']);
 
 
-
-
-// 9. 결과 돌려주기
-// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
-ResponseJSON($Response, $Data['accountno']);
-
-
 // ---------------------------------------
 // cleanup 체크.
 // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
@@ -106,4 +98,10 @@ ResponseJSON($Response, $Data['accountno']);
 $ClearAccountNo = $SelectData['accountno'];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
+
+
+
+// 9. 결과 돌려주기
+// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
+ResponseJSON($Response, $Data['accountno']);
 ?>

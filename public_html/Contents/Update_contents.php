@@ -76,22 +76,14 @@ $shDB_Data = shDB_Data_Conenct($DBInfo);
 // 이미 존재한다면 내부에서 롤백 후 실패 응답까지 보낸 후 exit
 shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'contents');
 
-
 // 6. 해당 DB의 TBL에, Update
 shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'contents', $Content_Body);
-
 
 // 7. Disconenct
 DB_Disconnect($shDB_Data);
 
-
 // 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
-
-
-// 9. 결과 돌려주기
-// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
-ResponseJSON($Response, $Data['accountno']);
 
 
 // ---------------------------------------
@@ -101,4 +93,10 @@ ResponseJSON($Response, $Data['accountno']);
 $ClearAccountNo = $Data['accountno'];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
+
+
+
+// 9. 결과 돌려주기
+// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
+ResponseJSON($Response, $Data['accountno']);
 ?>

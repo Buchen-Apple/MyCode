@@ -86,11 +86,6 @@ DB_Disconnect($shDB_Data);
 $Response['result'] = $cnf_COMPLETE;
 
 
-// 9. 결과 돌려주기
-// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
-ResponseJSON($Response, $Data['accountno']);
-
-
 // ---------------------------------------
 // cleanup 체크.
 // 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
@@ -98,4 +93,10 @@ ResponseJSON($Response, $Data['accountno']);
 $ClearAccountNo = $Data['accountno'];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
+
+
+
+// 9. 결과 돌려주기
+// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
+ResponseJSON($Response, $Data['accountno']);
 ?>

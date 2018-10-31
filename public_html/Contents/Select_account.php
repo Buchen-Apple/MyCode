@@ -78,10 +78,8 @@ shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'acc
 $SelectData = shDB_Data_Select($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
 
 
-
 // 7. Disconenct
 DB_Disconnect($shDB_Data);
-
 
 // 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
@@ -90,12 +88,6 @@ $Response['email'] = $SelectData['email'];
 $Response['password'] = $SelectData['password'];
 $Response['sessionkey'] = $SelectData['sessionkey'];
 $Response['nick'] = $SelectData['nick'];
-
-// 9. 결과 돌려주기
-// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
-ResponseJSON($Response, $Data['accountno']);
-
-
 
 
 // ---------------------------------------
@@ -106,4 +98,8 @@ $ClearAccountNo = $SelectData['accountno'];
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
 // --------------------------------------
 
+
+// 9. 결과 돌려주기
+// 해당 함수는 [인코딩, 로깅, 돌려줌] 까지 한다
+ResponseJSON($Response, $Data['accountno']);
 ?>
