@@ -198,6 +198,15 @@ namespace Library_Jingyu
 					Sleep(0);
 				}
 			}
+			
+			else
+			{
+				// 그 외 에러면 로그에 저장하고 크래시
+				g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"Query() --> Connect Fail... (Error : %d)(Message : %s)", mysql_errno(m_pMySQL), mysql_error(m_pMySQL));
+
+				g_DBDump->Crash();
+			}
 
 		}		
 

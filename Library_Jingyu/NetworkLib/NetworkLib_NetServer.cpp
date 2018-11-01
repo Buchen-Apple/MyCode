@@ -105,6 +105,9 @@ namespace Library_Jingyu
 
 		// Recv버퍼. 일반 링버퍼. 
 		CRingBuff m_RecvQueue;
+		
+		// PQCS overlapped구조체
+		OVERLAPPED m_overPQCSOverlapped;
 
 		// 마지막 패킷 저장소
 		void* m_LastPacket = nullptr;
@@ -531,7 +534,15 @@ namespace Library_Jingyu
 		CProtocolBuff_Net::Free(payloadBuff);
 
 		// 6. 샌드 포스트
-		SendPost(NowSession);		
+		//SendPost(NowSession);		
+
+		// 6. PQCS 건다.
+		// 샌드 flag가 false일 때, 건다.
+		if (NowSession->m_lSendFlag == FALSE)
+		{
+			InterlockedIncrement(&NowSession->m_lIOCount);
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)NowSession, &NowSession->m_overPQCSOverlapped);
+		}
 
 		// 7. 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
@@ -780,39 +791,20 @@ namespace Library_Jingyu
 			// GQCS 깨어날 시 함수호출
 			g_This->OnWorkerThreadBegin();
 
-			/*
 			// -----------------
 			// PQCS 요청 로직
 			// -----------------
-			if (PQCSoverlapped == overlapped)
-			{				
-				ULONGLONG TempSessionID = (ULONGLONG)stNowSession;
-								
-				// 1. SessionID로 세션 알아오기	
-				stSession* NowSession = &g_This->m_stSessionArray[(WORD)TempSessionID];
+			if (&stNowSession->m_overPQCSOverlapped == overlapped)
+			{		
+				// 1. SendPost()
+				g_This->SendPost(stNowSession);
 
-				
-				// 2. 내가 원하던 세션이 맞는지 체크
-				if (NowSession->m_ullSessionID != TempSessionID)
-				{
-					// 아니라면 I/O 카운트 1 감소
-					// 감소한 값이 0이면서, inDIsconnect 호출
-					if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
-						g_This->InDisconnect(NowSession);
-
-					continue;
-				}					
-
-				// 3. SendPost()
-				g_This->SendPost(NowSession);
-
-				// 4. I/O 카운트 1 감소
-				if (InterlockedDecrement(&NowSession->m_lIOCount) == 0)
-					g_This->InDisconnect(NowSession);
+				// 2. I/O 카운트 1 감소
+				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					g_This->InDisconnect(stNowSession);
 				
 				continue;
 			}
-			*/
 
 
 			// -----------------
