@@ -159,19 +159,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="MatchmakingServer.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\DB_Connector\DB_Connector.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Http_Exchange\HTTP_Exchange.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\MatchmakingServer\MatchmakingServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_NetServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
     <ClCompile Include="MatchMaking_Main.cpp" />
-    <ClCompile Include="MatchmakingServer.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

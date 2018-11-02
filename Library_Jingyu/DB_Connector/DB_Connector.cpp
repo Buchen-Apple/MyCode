@@ -141,6 +141,7 @@ namespace Library_Jingyu
 	//////////////////////////////////////////////////////////////////////
 	// 쿼리 날리고 결과셋 임시 보관
 	//
+	// Parameter : char형 쿼리 메시지, vlist 가변인자
 	//////////////////////////////////////////////////////////////////////
 	void	CDBConnector::Query(char *szStringFormat, va_list* vlist)
 	{
@@ -150,7 +151,11 @@ namespace Library_Jingyu
 		// 쿼리 글자 수 이상이면 로그찍고 끝.
 		if (retval != S_OK)
 		{
+			// 실패 시 로그 남김
+			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Query --> vlist Change Error...");
 
+			g_DBDump->Crash();
 		}		
 
 		// 2. 쿼리 날리기
@@ -199,13 +204,11 @@ namespace Library_Jingyu
 				}
 			}
 			
+			// 연결 끊긴게 아니면 에러 보관
 			else
 			{
-				// 그 외 에러면 로그에 저장하고 크래시
-				g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-					L"Query() --> Connect Fail... (Error : %d)(Message : %s)", mysql_errno(m_pMySQL), mysql_error(m_pMySQL));
-
-				g_DBDump->Crash();
+				SaveLastError();
+				return;
 			}
 
 		}		
@@ -229,7 +232,11 @@ namespace Library_Jingyu
 		// 쿼리 글자 수 이상이면 로그찍고 끝.
 		if (retval != S_OK)
 		{
+			// 실패 시 로그 남김
+			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Query_Save --> vlist Change Error...");
 
+			g_DBDump->Crash();
 		}	
 		
 		// 2. 쿼리 날리기
@@ -278,17 +285,19 @@ namespace Library_Jingyu
 				}
 			}
 
-			// 만약, 테이블이 없다면, 새로 만든다.
-
 			// 연결 끊긴게 아니면 에러 보관
 			else
+			{
 				SaveLastError();
+				return;
+			}
 		}
 		
 
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 		mysql_free_result(m_pSqlResult);
+		m_iLastError = 0;
 	}
 		
 
@@ -308,7 +317,11 @@ namespace Library_Jingyu
 		// 쿼리 글자 수 이상이면 로그찍고 끝.
 		if (retval != S_OK)
 		{
+			// 실패 시 로그 남김
+			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Query_Save(CreatTable) --> vlist Change Error...");
 
+			g_DBDump->Crash();
 		}
 
 		// 2. 쿼리 날리기
@@ -370,14 +383,17 @@ namespace Library_Jingyu
 
 			// 연결 끊긴게 아니면 에러 보관
 			else
+			{
 				SaveLastError();
+				return;
+			}
 		}
 
 
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 		mysql_free_result(m_pSqlResult);
-
+		m_iLastError = 0;
 	}
 
 	//////////////////////////////////////////////////////////////////////
@@ -397,6 +413,7 @@ namespace Library_Jingyu
 	void	CDBConnector::FreeResult()
 	{
 		mysql_free_result(m_pSqlResult);
+		m_iLastError = 0;
 	}
 
 
@@ -409,11 +426,17 @@ namespace Library_Jingyu
 		m_iLastError = mysql_errno(&m_MySQL);
 
 		// 에러 메시지 보관
-		StringCbPrintf(m_wcLastErrorMsg, _MyCountof(m_wcLastErrorMsg), 
-			L"Mysql error : %s\n", mysql_error(&m_MySQL));
+		const char* cTempError = mysql_error(m_pMySQL);
+
+		TCHAR tcError[1024];
+		int len = MultiByteToWideChar(CP_UTF8, 0, cTempError, (int)strlen(cTempError), NULL, NULL);
+		MultiByteToWideChar(CP_UTF8, 0, cTempError, (int)strlen(cTempError), tcError, len);
+
+		StringCchPrintf(m_wcLastErrorMsg, _MyCountof(m_wcLastErrorMsg), 
+			L"Mysql error : %s\n", tcError);
 
 		// 마지막으로 날렸던 쿼리 보관
-		int len = MultiByteToWideChar(CP_UTF8, 0, m_cQueryUTF8, (int)strlen(m_cQueryUTF8), NULL, NULL);
+		len = MultiByteToWideChar(CP_UTF8, 0, m_cQueryUTF8, (int)strlen(m_cQueryUTF8), NULL, NULL);
 		MultiByteToWideChar(CP_UTF8, 0, m_cQueryUTF8, (int)strlen(m_cQueryUTF8), m_wcQuery, len);
 	}	
 }

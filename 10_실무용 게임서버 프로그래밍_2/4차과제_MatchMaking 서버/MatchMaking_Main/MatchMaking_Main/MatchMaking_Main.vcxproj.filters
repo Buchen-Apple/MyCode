@@ -18,9 +18,6 @@
     <ClInclude Include="pch.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="MatchmakingServer.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -47,10 +44,13 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="MatchmakingServer.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\DB_Connector\DB_Connector.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\DB_Connector\DB_Connector.cpp">
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Http_Exchange\HTTP_Exchange.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\MatchmakingServer\MatchmakingServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
