@@ -46,9 +46,7 @@ namespace Library_Jingyu
 			_tcscpy_s(m_tIP, _Mycountof(m_tIP), Host);
 
 
-		// -------------
-		// TCP 家南 积己
-		// -------------
+		// 扩加 檬扁拳
 		WSADATA wsa;
 		if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
 		{

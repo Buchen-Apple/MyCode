@@ -3,12 +3,12 @@
   DB_Connector.cpp
   HTTP_Exchange.cpp
   Log.cpp
+  MatchmakingServer.cpp
   NetworkLib_NetServer.cpp
   Parser_Class.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
   RingBuff.cpp
   MatchMaking_Main.cpp
-  MatchmakingServer.cpp
   코드를 생성하고 있습니다.
   All 725 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.

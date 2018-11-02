@@ -16,7 +16,9 @@
 
 using namespace rapidjson;
 
-// 로그인 패킷 받았을 시, 에러. 출력용
+// 출력용 변수들 ------------------------
+
+// 로그인 패킷 받았을 시, 에러.
 LONG g_lTokenError;	
 LONG g_lAccountError;
 LONG g_lTempError;
@@ -99,16 +101,7 @@ namespace Library_Jingyu
 
 		// BindIP
 		if (Parser.GetValue_String(_T("BindIP"), pConfig->BindIP) == false)
-			return false;	
-
-		// ServerIP
-		TCHAR tcServerIP[20];
-		if (Parser.GetValue_String(_T("ServerIP"), tcServerIP) == false)
-			return false;
-
-		// ServerIP UTF-8로 변환
-		int len = WideCharToMultiByte(CP_UTF8, 0, tcServerIP, lstrlenW(tcServerIP), NULL, 0, NULL, NULL);
-		WideCharToMultiByte(CP_UTF8, 0, tcServerIP, lstrlenW(tcServerIP), pConfig->ServerIP, len, NULL, NULL);
+			return false;			
 
 		// Port
 		if (Parser.GetValue_Int(_T("Port"), &pConfig->Port) == false)
@@ -201,6 +194,15 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("VerCode"), &m_uiVer_Code) == false)
 			return false;
 
+		// ServerIP
+		TCHAR tcServerIP[20];
+		if (Parser.GetValue_String(_T("ServerIP"), tcServerIP) == false)
+			return false;
+
+		// ServerIP UTF-8로 변환
+		int len = WideCharToMultiByte(CP_UTF8, 0, tcServerIP, lstrlenW(tcServerIP), NULL, 0, NULL, NULL);
+		WideCharToMultiByte(CP_UTF8, 0, tcServerIP, lstrlenW(tcServerIP), m_cServerIP, len, NULL, NULL);
+
 		// MasterToken 
 		TCHAR tcToken[33];
 		if (Parser.GetValue_String(_T("MasterToken"), tcToken) == false)
@@ -222,7 +224,7 @@ namespace Library_Jingyu
 	{		
 		// 1. Insert 쿼리 날린다.	
 		char cQurey[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
-		m_MatchDBcon->Query_Save(cQurey, m_iServerNo, m_stConfig.ServerIP, m_stConfig.Port);
+		m_MatchDBcon->Query_Save(cQurey, m_iServerNo, m_cServerIP, m_stConfig.Port);
 
 
 		// 2. 에러 확인
@@ -251,7 +253,7 @@ namespace Library_Jingyu
 			
 			else
 			{
-				// 중복키가 아닌 에러가 발생했으면 에러 찍고 크래시
+				// 중복키가 아닌 에러가 발생했으면 로그 남긴 후 크래시
 				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
 					L"ServerInfo_DBInsert() --> Query Error. %s(%d)", m_MatchDBcon->GetLastErrorMsg(), m_MatchDBcon->GetLastError());
 
@@ -317,7 +319,6 @@ namespace Library_Jingyu
 			if (Error != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
-				// 에러가 발생했으면 에러 찍고 크래시
 				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
 					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), pMatchDBcon->GetLastError());
 
@@ -447,15 +448,14 @@ namespace Library_Jingyu
 		if (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, RequestBody) == false)
 			gMatchServerDump->Crash();
 
-		// Json데이터 파싱하기 (이미 UTF-16을 넣는중)
+		// Json데이터 파싱하기 (UTF-16)
 		GenericDocument<UTF16<>> Doc;
 		Doc.Parse(RequestBody);		
 
 
 
 		// 3. DB 결과 체크
-		int iResult;
-		iResult = Doc[_T("result")].GetInt();
+		int iResult = Doc[_T("result")].GetInt();
 
 		// 결과가 1이 아니라면, 
 		if (iResult != 1)
@@ -701,10 +701,10 @@ namespace Library_Jingyu
 			// ------------ 매치메이킹 Net 서버용
 			GetClientCount(), g_lAllocNodeCount,
 			g_lstPlayer_AllocCount, m_umapPlayer.size(),
-			g_ullAcceptTotal, g_lAcceptTPS, g_lSendPostTPS,
+			g_ullAcceptTotal, AccpetTPS, SendTPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
-			g_lTokenError, g_lAccountError, g_lTempError, g_lVerError);		
+			g_lTokenError, g_lAccountError, g_lTempError, g_lVerError );		
 
 	}
 
@@ -794,7 +794,7 @@ namespace Library_Jingyu
 		if (ErasePlayer->m_bLoginCheck == true)
 			InterlockedDecrement(&g_lLoginUser);
 
-		// 4. 정상적으로 삭제됐으면 유저 로그인 상태를 false로 만듬.
+		// 4. 유저 로그인 상태를 false로 만듬.
 		ErasePlayer->m_bLoginCheck = false;
 
 		// 5. 플레이어 구조체 반환
@@ -834,8 +834,6 @@ namespace Library_Jingyu
 					Type, SessionID);
 
 				throw CException(ErrStr);
-
-				break;
 			}
 
 		}

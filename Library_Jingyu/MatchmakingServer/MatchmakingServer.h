@@ -27,7 +27,6 @@ namespace Library_Jingyu
 		{
 			// 매치메이킹 Net서버 정보
 			TCHAR BindIP[20];
-			char ServerIP[20];
 			int Port;
 			int CreateWorker;
 			int ActiveWorker;
@@ -102,6 +101,9 @@ namespace Library_Jingyu
 		// 버전 코드
 		// 클라가 들고온 것을 비교. 파싱으로 읽어옴.
 		int m_uiVer_Code;
+
+		// 해당 PC의 공인 IP
+		char m_cServerIP[20];
 
 
 
