@@ -2,6 +2,7 @@
 #define __MATCH_MAKING_SERVER_H__
 
 #include "NetworkLib/NetworkLib_NetServer.h"
+#include "NetworkLib/NetworkLib_LanClinet.h"
 #include "DB_Connector/DB_Connector.h"
 #include "Http_Exchange/HTTP_Exchange.h"
 
@@ -18,6 +19,8 @@ namespace Library_Jingyu
 {
 	class Matchmaking_Net_Server :public CNetServer
 	{
+		// Lan클라와 friend관계
+		friend class Matchmaking_Lan_Client;
 
 		// ------------
 		// 내부 구조체
@@ -45,7 +48,7 @@ namespace Library_Jingyu
 			TCHAR DB_Password[40];
 			TCHAR DB_Name[40];
 			int  DB_Port;
-			int MatchDBHeartbeat;	// 메치메이킹 DB에 몇 밀리세컨드마다 하트비트를 쏠 것인가.
+			int MatchDBHeartbeat;	// 메치메이킹 DB에 몇 밀리세컨드마다 하트비트를 쏠 것인가.			
 		};
 
 		// 유저 관리용 구조체
@@ -63,9 +66,13 @@ namespace Library_Jingyu
 			// 실제 로그인 패킷을 받았는지 체크. true면 받음. false면 안받음
 			bool m_bLoginCheck;			
 
+			// 방 접속 성공 패킷을 받았는지 체크. true면 받음
+			bool m_bBattleRoomEnterCheck;
+
 			stPlayer()
 			{
 				m_bLoginCheck = false;	// 최초 생성시에는 flase로 시작
+				m_bBattleRoomEnterCheck = false;	// 최초 생성시에는 flase로 시작
 			}
 		};
 		
@@ -104,6 +111,9 @@ namespace Library_Jingyu
 
 		// 해당 PC의 공인 IP
 		char m_cServerIP[20];
+
+		// 매치메이킹 DB에, 몇 명의 변화가 있을 때 마다 갱신할 것인가.
+		int m_iMatchDBConnectUserChange; 
 
 
 
@@ -146,6 +156,15 @@ namespace Library_Jingyu
 		// 인자 : Net의 SessionKey, stPlayer*
 		unordered_map<ULONGLONG, stPlayer*>	m_umapPlayer;
 
+		// ClientKey를 이용해 접속한 유저들을 관리하는 자료구조
+		// umap으로 결정 
+		//
+		// 플레이어 관련 자료구조를 2개 사용하는 이유 : 마스터 서버와 Lan통신 시, ClientKey를 이용해 통신한다.
+		// 마스터 LanServer에게 응답이 오면, ClinetKey를 이용해 유저를 찾아내야 한다. 그 용도.
+		//
+		// 인자 : ClientKey, stPlayer*
+		unordered_map<UINT64, stPlayer*>	m_umapPlayer_ClientKey;
+
 		// m_umapPlayer를 관리하는 LOCK
 		SRWLOCK m_srwlPlayer;
 
@@ -175,6 +194,13 @@ namespace Library_Jingyu
 		// return : 없음
 		void ServerInfo_DBInsert();
 
+		// ClientKey 만드는 함수
+		//
+		// Parameter : 없음
+		// return : ClientKey(UINT64)
+		UINT64 CreateClientKey();
+
+
 
 	private:
 		// -------------------------------------
@@ -185,35 +211,46 @@ namespace Library_Jingyu
 		static UINT WINAPI DBHeartbeatThread(LPVOID lParam);
 
 
+
 	private:
 		// -------------------------------------
 		// 자료구조 추가,삭제,검색용 함수
 		// -------------------------------------
 
-		// Player 관리 자료구조에, 유저 추가
+		// Player 관리 자료구조 "2개"에, 유저 추가
 		// 현재 umap으로 관리중
 		// 
-		// Parameter : SessionID, stPlayer*
+		// Parameter : SessionID, ClientKey, stPlayer*
 		// return : 추가 성공 시, true
 		//		  : SessionID가 중복될 시(이미 접속중인 유저) false
-		bool InsertPlayerFunc(ULONGLONG SessionID, stPlayer* insertPlayer);
+		bool InsertPlayerFunc(ULONGLONG SessionID, UINT64 ClientKey, stPlayer* insertPlayer);
 
 		// Player 관리 자료구조에서, 유저 검색
-		// 현재 map으로 관리중
+		// !!SessionID!! 를 이용해 검색
+		// 현재 umap으로 관리중
 		// 
 		// Parameter : SessionID
 		// return : 검색 성공 시, stPalyer*
 		//		  : 검색 실패 시 nullptr
 		stPlayer* FindPlayerFunc(ULONGLONG SessionID);
 
-
-		// Player 관리 자료구조에서, 유저 제거 (검색 후 제거)
+		// Player 관리 자료구조에서, 유저 검색
+		// !!ClientKey!! 를 이용해 검색
 		// 현재 umap으로 관리중
+		// 
+		// Parameter : ClientKey
+		// return : 검색 성공 시, stPalyer*
+		//		  : 검색 실패 시 nullptr
+		stPlayer* FindPlayerFunc_ClientKey(UINT64 ClientKey);
+
+		// Player 관리 자료구조 "2개"에서, 유저 제거 (검색 후 제거)
+		// 현재 uumap으로 관리중
 		// 
 		// Parameter : SessionID
 		// return : 성공 시, 제거된 유저 stPalyer*
 		//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 		stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
+
 
 
 	private:
@@ -227,6 +264,19 @@ namespace Library_Jingyu
 		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
 		void Packet_Match_Login(ULONGLONG SessionID, CProtocolBuff_Net* Payload);
 
+		// 방 정보 요청
+		// LanClient를 통해, 마스터에게 패킷 보냄
+		//
+		// Parameter : SessionID
+		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+		void Packet_Battle_Info(ULONGLONG SessionID);
+
+		// 방 입장 성공
+		// LanClient를 통해, 마스터에게 패킷 보냄
+		//
+		// Parameter : SessionID, Payload
+		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+		void Packet_Battle_EnterOK(ULONGLONG SessionID, CProtocolBuff_Net* Payload);
 
 
 	public:
@@ -290,5 +340,70 @@ namespace Library_Jingyu
 	};
 }
 
+
+// ---------------------------------------------
+// 
+// 매치메이킹 LanClient(Master서버의 LanServer와 통신)
+//
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+	class Matchmaking_Lan_Client :public CLanClient
+	{
+		// Net서버와 friend관계
+		friend class Matchmaking_Net_Server;
+
+
+	public:
+		// -------------------------------------
+		// 외부에서 사용 가능한 함수
+		// -------------------------------------
+
+		// 매치메이킹 LanClient 시작 함수
+		//
+		// Parameter : 없음
+		// return : 실패 시 false 리턴
+		bool ClientStart();
+
+		// 매치메이킹 LanClient 종료 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ClientStop();
+
+
+	private:
+		// -----------------------
+		// Lan 클라의 가상 함수
+		// -----------------------
+
+		void OnConnect(ULONGLONG ClinetID);
+
+		void OnDisconnect(ULONGLONG ClinetID);
+
+		void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload);
+
+		void OnSend(ULONGLONG ClinetID, DWORD SendSize);
+
+		void OnWorkerThreadBegin();
+
+		void OnWorkerThreadEnd();
+
+		void OnError(int error, const TCHAR* errorStr);
+
+
+
+	public:
+		// -------------------------------------
+		// 생성자와 소멸자
+		// -------------------------------------
+
+		// 생성자
+		Matchmaking_Lan_Client();
+
+		// 소멸자
+		virtual ~Matchmaking_Lan_Client();	
+	};
+}
 
 #endif // !__MATCH_MAKING_SERVER_H__

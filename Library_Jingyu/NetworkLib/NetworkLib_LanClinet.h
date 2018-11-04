@@ -289,7 +289,8 @@ namespace Library_Jingyu
 		// return false : 접속중 아님
 		bool GetClinetState();
 
-	public:
+
+	protected:
 		// -----------------------
 		// 순수 가상함수
 		// -----------------------

@@ -166,6 +166,7 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Http_Exchange\HTTP_Exchange.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Log\Log.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
     <ClCompile Include="MatchTestClient_Main.cpp" />

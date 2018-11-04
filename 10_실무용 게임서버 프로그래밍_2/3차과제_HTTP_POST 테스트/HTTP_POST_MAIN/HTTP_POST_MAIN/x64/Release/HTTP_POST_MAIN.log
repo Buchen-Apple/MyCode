@@ -1,7 +1,11 @@
-﻿  HTTP_POST_MAIN.cpp
+﻿  pch.cpp
+  CrashDump.cpp
+  HTTP_Exchange.cpp
+  Log.cpp
+  HTTP_POST_MAIN.cpp
   코드를 생성하고 있습니다.
-  코드를 생성했습니다.
-  0 of 269 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+  6 of 269 functions ( 2.2%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     0 functions had inline decision re-evaluated but remain unchanged
+  코드를 생성했습니다.
   HTTP_POST_MAIN.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\3차과제_HTTP_POST 테스트\HTTP_POST_MAIN\x64\Release\HTTP_POST_MAIN.exe

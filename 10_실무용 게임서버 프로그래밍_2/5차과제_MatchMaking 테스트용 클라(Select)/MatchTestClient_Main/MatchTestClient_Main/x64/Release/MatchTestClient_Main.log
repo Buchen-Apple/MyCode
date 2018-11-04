@@ -1,10 +1,10 @@
-﻿  pch.cpp
-  CrashDump.cpp
-  HTTP_Exchange.cpp
-  Log.cpp
-  MatchTestClient_Main.cpp
+﻿  MatchTestClient_Main.cpp
   Network_Func.cpp
+c:\git_public\10_실무용 게임서버 프로그래밍_2\5차과제_matchmaking 테스트용 클라(select)\matchtestclient_main\matchtestclient_main\network_func.cpp(995): warning C4311: '형식 캐스트': 'Library_Jingyu::CSystemLog *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\10_실무용 게임서버 프로그래밍_2\5차과제_matchmaking 테스트용 클라(select)\matchtestclient_main\matchtestclient_main\network_func.cpp(995): warning C4302: '형식 캐스트': 'Library_Jingyu::CSystemLog *'에서 'UINT'(으)로 잘립니다.
   코드를 생성하고 있습니다.
-  All 528 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  249 of 614 functions (40.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    3 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
   MatchTestClient_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\5차과제_MatchMaking 테스트용 클라(Select)\MatchTestClient_Main\x64\Release\MatchTestClient_Main.exe

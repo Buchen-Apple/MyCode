@@ -30,6 +30,9 @@ LONG g_lLoginUser;
 // 플레이어 구조체 할당 수
 LONG g_lstPlayer_AllocCount;
 
+// 배틀 방 입장 성공 패킷을 안보내고 끊은 클라이언트의 수
+LONG g_lNot_BattleRoom_Enter;
+
 // Net 엔진에서 카운트 중인 값.
 extern ULONGLONG g_ullAcceptTotal;
 extern LONG	  g_lAcceptTPS;
@@ -177,6 +180,10 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("MatchDBHeartbeat"), &pConfig->MatchDBHeartbeat) == false)
 			return false;
 
+		// Matchmaking DB에 Connect 유저 갱신하는 변경인원
+		if (Parser.GetValue_Int(_T("MatchDBConnectUserChange"), &m_iMatchDBConnectUserChange) == false)
+			return false;
+
 
 		////////////////////////////////////////////////////////
 		// 기본 CONFIG 읽어오기
@@ -241,26 +248,31 @@ namespace Library_Jingyu
 
 				// 에러 체크
 				Error = m_MatchDBcon->GetLastError();				
-				if (Error != 0)
-				{
-					// 에러가 발생했으면 에러 찍고 크래시
-					cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-						L"ServerInfo_DBInsert() --> Query Error. %s(%d)", m_MatchDBcon->GetLastErrorMsg(), m_MatchDBcon->GetLastError());
-
+				if (Error != 0)				
 					gMatchServerDump->Crash();
-				}
 			}
 			
 			else
 			{
-				// 중복키가 아닌 에러가 발생했으면 로그 남긴 후 크래시
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-					L"ServerInfo_DBInsert() --> Query Error. %s(%d)", m_MatchDBcon->GetLastErrorMsg(), m_MatchDBcon->GetLastError());
-
+				// 중복키가 아닌 에러가 발생했으면 크래시	
 				gMatchServerDump->Crash();
 			}
 		}	
 	}
+
+	// ClientKey 만드는 함수
+	//
+	// Parameter : 없음
+	// return : ClientKey(UINT64)
+	UINT64 Matchmaking_Net_Server::CreateClientKey()
+	{
+		// 하위 4바이트에 ServerNo. 상위 4바이트에 m_ClientKeyAdd의 값이 들어간다.
+		UINT64 TempKey = InterlockedIncrement(&m_ClientKeyAdd);
+		return ((TempKey << 16) | m_iServerNo);
+	}
+
+
+
 
 
 	// -------------------------------------
@@ -332,36 +344,47 @@ namespace Library_Jingyu
 
 
 
+
 	// -------------------------------------
 	// 자료구조 추가,삭제,검색용 함수
 	// -------------------------------------
 
-	// Player 관리 자료구조에, 유저 추가
+	// Player 관리 자료구조 "2개"에, 유저 추가
 	// 현재 umap으로 관리중
 	// 
-	// Parameter : SessionID, stPlayer*
+	// Parameter : SessionID, ClientKey, stPlayer*
 	// return : 추가 성공 시, true
-	//		  : SessionID가 중복될 시(이미 접속중인 유저) false		
-	bool Matchmaking_Net_Server::InsertPlayerFunc(ULONGLONG SessionID, stPlayer* insertPlayer)
+	//		  : SessionID가 중복될 시(이미 접속중인 유저) false
+	bool Matchmaking_Net_Server::InsertPlayerFunc(ULONGLONG SessionID, UINT64 ClientKey, stPlayer* insertPlayer)
 	{
-		// 1. umap에 추가		
+		// 1. SessionID용 umap에 추가		
 		AcquireSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 락
 
-		auto ret = m_umapPlayer.insert(make_pair(SessionID, insertPlayer));
+		auto ret_A = m_umapPlayer.insert(make_pair(SessionID, insertPlayer));		
+
+		// 2. 중복된 키일 시 false 리턴.
+		if (ret_A.second == false)
+		{
+			ReleaseSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 언락
+			return false;
+		}
+		
+		// 3. ClientKey용 uamp에 추가
+		auto ret_B = m_umapPlayer_ClientKey.insert(make_pair(ClientKey, insertPlayer));
 
 		ReleaseSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 언락
 
-		// 2. 중복된 키일 시 false 리턴.
-		if (ret.second == false)
+		// 4. 중복된 키일 시 false 리턴.
+		if (ret_B.second == false)
 			return false;
 
-		// 3. 아니면 true 리턴
 		return true;
 	}
 
 
 	// Player 관리 자료구조에서, 유저 검색
 	// 현재 map으로 관리중
+	// !!SessionID!! 를 이용해 검색
 	// 
 	// Parameter : SessionID
 	// return : 검색 성공 시, stPalyer*
@@ -383,8 +406,32 @@ namespace Library_Jingyu
 		return FindPlayer->second;
 	}
 
+	// Player 관리 자료구조에서, 유저 검색
+	// !!ClientKey!! 를 이용해 검색
+	// 현재 umap으로 관리중
+	// 
+	// Parameter : ClientKey
+	// return : 검색 성공 시, stPalyer*
+	//		  : 검색 실패 시 nullptr
+	Matchmaking_Net_Server::stPlayer* Matchmaking_Net_Server::FindPlayerFunc_ClientKey(UINT64 ClientKey)
+	{
+		// 1. umap에서 검색
+		AcquireSRWLockShared(&m_srwlPlayer);		// ------- Shared 락
 
-	// Player 관리 자료구조에서, 유저 제거 (검색 후 제거)
+		auto FindPlayer = m_umapPlayer_ClientKey.find(ClientKey);
+
+		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
+
+		// 2. 검색 실패 시 nullptr 리턴
+		if (FindPlayer == m_umapPlayer_ClientKey.end())
+			return nullptr;
+
+		// 3. 검색 성공 시, 찾은 stPlayer* 리턴
+		return FindPlayer->second;
+	}
+
+
+	// Player 관리 자료구조 "2개"에서, 유저 제거 (검색 후 제거)
 	// 현재 umap으로 관리중
 	// 
 	// Parameter : SessionID
@@ -392,26 +439,36 @@ namespace Library_Jingyu
 	//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 	Matchmaking_Net_Server::stPlayer* Matchmaking_Net_Server::ErasePlayerFunc(ULONGLONG SessionID)
 	{
-		// 1. umap에서 유저 검색
+		// 1. SessionID용 umap에서 유저 검색
 		AcquireSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 락
 
-		auto FindPlayer = m_umapPlayer.find(SessionID);
-		if (FindPlayer == m_umapPlayer.end())
+		auto FindPlayer_A = m_umapPlayer.find(SessionID);
+		if (FindPlayer_A == m_umapPlayer.end())
+		{
+			ReleaseSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 언락
+			return nullptr;
+		}
+
+		// 2. ClientKey 용 umap에서 유저 검색
+		auto FindPlayer_B = m_umapPlayer_ClientKey.find(FindPlayer_A->second->m_ui64ClientKey);
+		if (FindPlayer_B == m_umapPlayer_ClientKey.end())
 		{
 			ReleaseSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 언락
 			return nullptr;
 		}
 		
-		// 2. 존재한다면, 리턴할 값 받아두기
-		stPlayer* ret = FindPlayer->second;
+		// 3. 둘 다에서 존재한다면, 리턴할 값 받아두기
+		stPlayer* ret = FindPlayer_B->second;
 
-		// 3. 맵에서 제거
-		m_umapPlayer.erase(FindPlayer);
+		// 3. SessionID용 uamp, ClinetKey용 umap에서 제거
+		m_umapPlayer.erase(FindPlayer_A);
+		m_umapPlayer_ClientKey.erase(FindPlayer_B);
 
 		ReleaseSRWLockExclusive(&m_srwlPlayer);		// ------- Exclusive 언락
 
 		return ret;
 	}
+
 
 
 
@@ -436,8 +493,19 @@ namespace Library_Jingyu
 		Payload->GetData(Token, 64);
 		Payload->GetData((char*)&Ver_Code, 4);
 
+		// 2. 플레이어 검색.		
+		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
+		if (NowPlayer == nullptr)
+			gMatchServerDump->Crash();
 
-		// 2. AccountNo로 DB에서 찾아오기
+
+		// 3. 만약 이미 Login 된 유저거나, 배틀 방에 입장된 유저라면 Crash
+		if (NowPlayer->m_bLoginCheck == true ||
+			NowPlayer->m_bBattleRoomEnterCheck == true)
+			gMatchServerDump->Crash();
+
+
+		// 4. AccountNo로 DB에서 찾아오기
 		TCHAR RequestBody[2000];
 		TCHAR Body[1000];
 
@@ -454,7 +522,7 @@ namespace Library_Jingyu
 
 
 
-		// 3. DB 결과 체크
+		// 5. DB 결과 체크
 		int iResult = Doc[_T("result")].GetInt();
 
 		// 결과가 1이 아니라면, 
@@ -488,7 +556,7 @@ namespace Library_Jingyu
 		}		
 
 
-		// 4. 결과가 1이라면, 토큰키와 버전 체크
+		// 6. 결과가 1이라면, 토큰키와 버전 체크
 		// 토큰키 비교 --------------------
 		const TCHAR* tDBToekn = Doc[_T("sessionkey")].GetString();
 
@@ -536,35 +604,18 @@ namespace Library_Jingyu
 
 
 
-		// 5. 여기까지 왔으면 정상적인 플레이어. 셋팅 시작
-		// 1) 플레이어 검색.
-		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
-		if (NowPlayer == nullptr)
-		{
-			// 검색 실패 시 로직 에러로 본다.
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"Packet_Match_Login Player Not Find. SessionID : %lld, AccountNo : %lld, ", 
-				SessionID, AccountNo);
+		// 7. 여기까지 왔으면 정상적인 플레이어. 셋팅 시작
+		// 1) AccountNo 셋팅
+		NowPlayer->m_i64AccountNo = AccountNo;	
 
-			gMatchServerDump->Crash();
-		}
-
-		// 2) AccountNo 셋팅
-		NowPlayer->m_i64AccountNo = AccountNo;
-
-		// 3) ClinetKey 셋팅
-		// 하위 4바이트에 ServerNo. 상위 4바이트에 m_ClientKeyAdd의 값이 들어간다.
-		UINT64 TempKey = InterlockedIncrement(&m_ClientKeyAdd);
-		NowPlayer->m_ui64ClientKey = ((TempKey << 16) | m_iServerNo);
-
-		// 4) 로그인 상태로 변경
+		// 2) 로그인 상태로 변경
 		NowPlayer->m_bLoginCheck = true;
 
 		// 로그인 유저 수 증가
 		InterlockedIncrement(&g_lLoginUser);
 
 
-		// 6. 정상 패킷 응답
+		// 8. 정상 패킷 응답
 		WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
 		BYTE Status = 1; // 성공
 
@@ -574,9 +625,31 @@ namespace Library_Jingyu
 		SendData->PutData((char*)&Status, 1);
 
 		SendPacket(SessionID, SendData);
+
 		return;
 	}
+	
+	// 방 정보 요청 (클라 --> 매칭 Net서버)
+	// LanClient를 통해, 마스터에게 패킷 보냄
+	//
+	// Parameter : SessionID
+	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+	void Matchmaking_Net_Server::Packet_Battle_Info(ULONGLONG SessionID)
+	{
+		// 마스터에게 정보 요청
+		// LanClient의 함수 호출 (매칭 Lan클라 -> 마스터 Lan서버)
+	}
 
+	// 방 입장 성공 (클라 --> 매칭 Net서버)
+	// LanClient를 통해, 마스터에게 패킷 보냄
+	//
+	// Parameter : SessionID, Payload
+	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+	void Matchmaking_Net_Server::Packet_Battle_EnterOK(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
+	{
+		// 마스터에게 방 입장 성공 패킷 보냄
+		// LanClient의 함수 호출 (매칭 Lan클라 -> 마스터 Lan서버)
+	}
 
 
 
@@ -645,7 +718,6 @@ namespace Library_Jingyu
 		cMatchServerLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
-
 	// 출력용 함수
 	//
 	// Parameter : 없음
@@ -671,6 +743,7 @@ namespace Library_Jingyu
 		AccountError : 		- Selecet.account.php에 쿼리 날렸는데, -10 에러가 뜸(회원가입하지 않은 유저)
 		TempError :			- Selecet.account.php에 쿼리 날렸는데, -10 외에 기타 에러가 뜸
 		VerError :			- 로그인 요청한 유저가 들고온 VerCode와 서버가 들고있는 VerCode가 다름
+		NotRoomEnter :		- 배틀 방 입장 성공 패킷을 안보내고 끊은 유저 수
 
 		*/
 
@@ -694,7 +767,8 @@ namespace Library_Jingyu
 			"TokenError : %d\n"
 			"AccountError : %d\n"
 			"TempError : %d\n"
-			"VerError : %d\n\n"
+			"VerError : %d\n"
+			"NotRoomEnter : %d\n\n"
 
 			"========================================================\n\n",
 
@@ -704,9 +778,11 @@ namespace Library_Jingyu
 			g_ullAcceptTotal, AccpetTPS, SendTPS,
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
-			g_lTokenError, g_lAccountError, g_lTempError, g_lVerError );		
+			g_lTokenError, g_lAccountError, g_lTempError, g_lVerError, g_lNot_BattleRoom_Enter);
 
 	}
+
+
 
 
 
@@ -726,27 +802,24 @@ namespace Library_Jingyu
 		stPlayer* NowPlayer = m_PlayerPool->Alloc();
 		InterlockedIncrement(&g_lstPlayer_AllocCount);
 
-		// 2. stPlayer에 SessionID 셋팅
+		// 2. stPlayer에 SessionID, ClientKey 셋팅
 		NowPlayer->m_ullSessionID = SessionID;	
+		UINT64 TempCKey = CreateClientKey();
+		NowPlayer->m_ui64ClientKey = TempCKey;
 
 		// 3. Player 관리 umap에 추가.
-		if (InsertPlayerFunc(SessionID, NowPlayer) == false)
-		{
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"OnClientJoin() --> duplication SessionID...(SessionID : %lld)", SessionID);
-
+		if (InsertPlayerFunc(SessionID, TempCKey, NowPlayer) == false)
 			gMatchServerDump->Crash();
-		}
 
 		// 4. umap에 유저 수 체크.
-		// umap의 유저수가 m_ChangeConnectUser +100 보다 많다면, 이전 값 기준 100명 이상 들어온것.
+		// umap의 유저수가 m_ChangeConnectUser +m_iMatchDBConnectUserChange 보다 많다면, 이전 값 기준 100명 이상 들어온것.
 		// 매치메이킹 DB에 하트비트 한다.	
 		// 카운트를 명확하게 하기 위해 락 사용	
 		size_t NowumapCount = (int)m_umapPlayer.size();
 		
 		AcquireSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 락 -----------
 
-		if (m_ChangeConnectUser + 100 <= NowumapCount)
+		if (m_ChangeConnectUser + m_iMatchDBConnectUserChange <= NowumapCount)
 		{
 			m_ChangeConnectUser = NowumapCount;
 			ReleaseSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 언락 -----------
@@ -764,22 +837,17 @@ namespace Library_Jingyu
 		// 1. umap에서 유저 삭제
 		stPlayer* ErasePlayer = ErasePlayerFunc(SessionID);
 		if (ErasePlayer == nullptr)
-		{
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"OnClientLeave() --> Erase Fail.. (SessionID : %lld)", SessionID);
-
 			gMatchServerDump->Crash();
-		}
 
 		// 2. umap 유저 수 체크.
-		// umap의 유저수가 m_ChangeConnectUser - 100 보다 적다면, 이전 값 기준 100명 이상 나간것.
+		// umap의 유저수가 m_ChangeConnectUser - m_iMatchDBConnectUserChange 보다 적다면, 이전 값 기준 100명 이상 나간것.
 		// 매치메이킹 DB에 하트비트 한다.	
 		// 카운트를 명확하게 하기 위해 락 사용	
 		size_t NowumapCount = m_umapPlayer.size();
 
 		AcquireSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 락 -----------
 
-		if (m_ChangeConnectUser - 100 >= NowumapCount)
+		if (m_ChangeConnectUser - m_iMatchDBConnectUserChange >= NowumapCount)
 		{
 			m_ChangeConnectUser = NowumapCount;
 			ReleaseSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 언락 -----------
@@ -797,7 +865,18 @@ namespace Library_Jingyu
 		// 4. 유저 로그인 상태를 false로 만듬.
 		ErasePlayer->m_bLoginCheck = false;
 
-		// 5. 플레이어 구조체 반환
+		// 5. 배틀 방 입장 패킷을 안보낸 유저라면, 실패 패킷을 마스터에게 보냄
+		if (ErasePlayer->m_bBattleRoomEnterCheck == false)
+		{
+			InterlockedIncrement(&g_lNot_BattleRoom_Enter);
+			// 마스터와 연결된 LanClient의 함수 호출
+		}
+
+		// 6. 배틀방 입장 플래그 변경
+		ErasePlayer->m_bBattleRoomEnterCheck = false;
+
+
+		// 7. 플레이어 구조체 반환
 		m_PlayerPool->Free(ErasePlayer);
 		InterlockedDecrement(&g_lstPlayer_AllocCount);		
 	}
@@ -821,10 +900,12 @@ namespace Library_Jingyu
 
 				// 방 정보 요청
 			case en_PACKET_CS_MATCH_REQ_GAME_ROOM:
+				Packet_Battle_Info(SessionID);
 				break;
 
 				// 배틀 서버의 방에 입장 성공 알림
 			case en_PACKET_CS_MATCH_REQ_GAME_ROOM_ENTER:
+				Packet_Battle_EnterOK(SessionID, Payload);
 				break;
 
 				// 이상한 타입의 패킷이 오면 끊는다.
@@ -849,9 +930,8 @@ namespace Library_Jingyu
 			// 접속 끊기 요청
 			//Disconnect(SessionID);
 		}
-		
-
 	}
+
 
 	void Matchmaking_Net_Server::OnSend(ULONGLONG SessionID, DWORD SendSize)
 	{}
@@ -917,7 +997,8 @@ namespace Library_Jingyu
 		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 80);
 
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
-		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);		
+		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	
+		m_umapPlayer_ClientKey.reserve(m_stConfig.MaxJoinUser);
 
 		// 시간
 		timeBeginPeriod(1);
@@ -950,4 +1031,86 @@ namespace Library_Jingyu
 		timeEndPeriod(1);
 	}
 	
+}
+
+// ---------------------------------------------
+// 
+// 매치메이킹 LanClient(Master서버의 LanServer와 통신)
+//
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+
+	// -------------------------------------
+	// 외부에서 사용 가능한 함수
+	// -------------------------------------
+
+	// 매치메이킹 LanClient 시작 함수
+	//
+	// Parameter : 없음
+	// return : 실패 시 false 리턴
+	bool Matchmaking_Lan_Client::ClientStart()
+	{
+
+	}
+
+	// 매치메이킹 LanClient 종료 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void Matchmaking_Lan_Client::ClientStop()
+	{
+
+	}
+
+
+
+
+
+
+	// -----------------------
+	// Lan 클라의 가상 함수
+	// -----------------------
+
+	void Matchmaking_Lan_Client::OnConnect(ULONGLONG ClinetID)
+	{}
+
+	void Matchmaking_Lan_Client::OnDisconnect(ULONGLONG ClinetID)
+	{}
+
+	void Matchmaking_Lan_Client::OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload)
+	{}
+
+	void Matchmaking_Lan_Client::OnSend(ULONGLONG ClinetID, DWORD SendSize)
+	{}
+
+	void Matchmaking_Lan_Client::OnWorkerThreadBegin()
+	{}
+
+	void Matchmaking_Lan_Client::OnWorkerThreadEnd()
+	{}
+
+	void Matchmaking_Lan_Client::OnError(int error, const TCHAR* errorStr)
+	{}
+
+
+
+
+
+	// -------------------------------------
+	// 생성자와 소멸자
+	// -------------------------------------
+
+	// 생성자
+	Matchmaking_Lan_Client::Matchmaking_Lan_Client()
+		:CLanClient()
+	{
+
+	}
+
+	// 소멸자
+	Matchmaking_Lan_Client::~Matchmaking_Lan_Client()
+	{
+
+	}	
 }

@@ -53,5 +53,11 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\MatchmakingServer\MatchmakingServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanClient.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
