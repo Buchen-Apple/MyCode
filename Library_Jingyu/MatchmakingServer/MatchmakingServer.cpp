@@ -185,6 +185,38 @@ namespace Library_Jingyu
 			return false;
 
 
+
+		////////////////////////////////////////////////////////
+		// MatchClient의 Config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MATCHLANCLINET")) == false)
+			return false;
+
+		// MasterServerIP
+		if (Parser.GetValue_String(_T("MasterServerIP"), pConfig->MasterServerIP) == false)
+			return false;
+
+		// MasterServerPort
+		if (Parser.GetValue_Int(_T("MasterServerPort"), &pConfig->MasterServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("ClientCreateWorker"), &pConfig->ClientCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("ClientActiveWorker"), &pConfig->ClientActiveWorker) == false)
+			return false;
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("ClientNodelay"), &pConfig->ClientNodelay) == false)
+			return false;
+
+
+
+
 		////////////////////////////////////////////////////////
 		// 기본 CONFIG 읽어오기
 		////////////////////////////////////////////////////////
@@ -478,7 +510,7 @@ namespace Library_Jingyu
 	// 패킷 처리용 함수
 	// -------------------------------------
 
-	// 매치메이킹 서버로 로그인 요청
+	// 클라의 로그인 요청 받음
 	//
 	// Parameter : SessionID, Payload
 	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
@@ -629,29 +661,68 @@ namespace Library_Jingyu
 		return;
 	}
 	
-	// 방 정보 요청 (클라 --> 매칭 Net서버)
-	// LanClient를 통해, 마스터에게 패킷 보냄
-	//
-	// Parameter : SessionID
-	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
-	void Matchmaking_Net_Server::Packet_Battle_Info(ULONGLONG SessionID)
-	{
-		// 마스터에게 정보 요청
-		// LanClient의 함수 호출 (매칭 Lan클라 -> 마스터 Lan서버)
-	}
-
 	// 방 입장 성공 (클라 --> 매칭 Net서버)
-	// LanClient를 통해, 마스터에게 패킷 보냄
+	// 마스터에게 방 입장 성공 패킷 보냄
 	//
 	// Parameter : SessionID, Payload
 	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
 	void Matchmaking_Net_Server::Packet_Battle_EnterOK(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
 	{
-		// 마스터에게 방 입장 성공 패킷 보냄
-		// LanClient의 함수 호출 (매칭 Lan클라 -> 마스터 Lan서버)
+		// 1. 마샬링
+		WORD BattleServerNo;
+		int RoomNo;
+
+		Payload->GetData((char*)&BattleServerNo, 2);
+		Payload->GetData((char*)&RoomNo, 4);
+
+
+		// 2. 유저 검색
+		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
+		if (NowPlayer == nullptr)
+			gMatchServerDump->Crash();
+
+
+		// 3. 해당 유저의 방 입장 성공 Flag 변경
+		// 만약, 이미 방 입장 성공 패킷을 보낸 유저라면 Crash()
+		if (NowPlayer->m_bBattleRoomEnterCheck == true)
+			gMatchServerDump->Crash();
+		
+		NowPlayer->m_bBattleRoomEnterCheck = true;
+
+
+		// 4. 마스터 서버에게 보낼 패킷 제작 (Lan 직렬화 버퍼 사용)
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_MAT_MAS_REQ_ROOM_ENTER_SUCCESS;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&BattleServerNo, 2);
+		SendBuff->PutData((char*)&RoomNo, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_ui64ClientKey, 8);
+
+		// 5. 마스터에게 Send
+		m_pLanClient->SendPacket(m_pLanClient->m_ullClientID, SendBuff);
 	}
 
 
+	// 방 입장 실패
+	// 마스터에게 방 입장 실패 패킷 보냄
+	//
+	// Parameter : ClinetKey
+	// return : 없음
+	void Matchmaking_Net_Server::Packet_Battle_EnterFail(UINT64 ClientKey)
+	{
+		// 1. 마스터에게 보낼 패킷 셋팅
+		WORD Type = en_PACKET_MAT_MAS_REQ_ROOM_ENTER_FAIL;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ClientKey, 8);
+
+		// 2. 마스터로 패킷 보내기
+		m_pLanClient->SendPacket(m_pLanClient->m_ullClientID, SendBuff);
+	}
 
 
 
@@ -677,6 +748,13 @@ namespace Library_Jingyu
 
 			return false;
 		}
+
+		
+
+		//------------------- 마스터와 연결되는 랜 클라 가동 및 this 전달
+		m_pLanClient->SetParent(this);
+		if (m_pLanClient->ClientStart() == false)
+			return false;
 
 		// ------------------- 넷서버 가동
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser,
@@ -869,7 +947,7 @@ namespace Library_Jingyu
 		if (ErasePlayer->m_bBattleRoomEnterCheck == false)
 		{
 			InterlockedIncrement(&g_lNot_BattleRoom_Enter);
-			// 마스터와 연결된 LanClient의 함수 호출
+			Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
 		}
 
 		// 6. 배틀방 입장 플래그 변경
@@ -899,11 +977,12 @@ namespace Library_Jingyu
 				break;
 
 				// 방 정보 요청
+				// LanClinet의 함수 호출
 			case en_PACKET_CS_MATCH_REQ_GAME_ROOM:
-				Packet_Battle_Info(SessionID);
+				m_pLanClient->Packet_Battle_Info(SessionID);
 				break;
 
-				// 배틀 서버의 방에 입장 성공 알림
+				// 배틀 서버의 방 입장 성공 알림
 			case en_PACKET_CS_MATCH_REQ_GAME_ROOM_ENTER:
 				Packet_Battle_EnterOK(SessionID, Payload);
 				break;
@@ -1000,6 +1079,9 @@ namespace Library_Jingyu
 		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	
 		m_umapPlayer_ClientKey.reserve(m_stConfig.MaxJoinUser);
 
+		// 마스터와 통신하는 Lan클라 동적할당
+		m_pLanClient = new Matchmaking_Lan_Client();
+
 		// 시간
 		timeBeginPeriod(1);
 	}
@@ -1040,6 +1122,160 @@ namespace Library_Jingyu
 // ---------------------------------------------
 namespace Library_Jingyu
 {
+	// -------------------------------------
+	// Net 서버가 호출하는 함수
+	// -------------------------------------
+
+	// 방 정보 요청 (클라 --> 매칭 Net서버)
+	// LanClient를 통해, 마스터에게 패킷 보냄
+	//
+	// Parameter : SessionID
+	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+	void Matchmaking_Lan_Client::Packet_Battle_Info(ULONGLONG SessionID)
+	{
+		// 1. 유저 검색
+		Matchmaking_Net_Server::stPlayer* NowPlayer = m_pParent->FindPlayerFunc(SessionID);
+		if (NowPlayer == nullptr)
+			gMatchServerDump->Crash();
+
+		// 2. 마스터에게 보낼 패킷 제작
+		// Lan 직렬화 버퍼 사용
+		WORD Type = en_PACKET_MAT_MAS_REQ_GAME_ROOM;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&NowPlayer->m_ui64ClientKey, 8);
+		SendBuff->PutData((char*)&NowPlayer->m_i64AccountNo, 8);
+
+		// 3. 데이터 Send
+		SendPacket(m_ullClientID, SendBuff);
+	}
+
+
+
+
+
+	// -------------------------------------
+	// 마스터에게 받은 패킷 처리용 함수
+	// -------------------------------------
+
+	// 방 정보 요청에 대한 응답
+	// 내부에서, Net서버의 SendPacket()까지 호출한다.
+	// 
+	// Parameter : CProtocolBuff_Lan*
+	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+	void Matchmaking_Lan_Client::Response_Battle_Info(CProtocolBuff_Lan* payload)
+	{
+		// 1. ClientKey와 Status 마샬링
+		UINT64 ClinetKey;
+		BYTE Status;
+
+		payload->GetData((char*)&ClinetKey, 8);
+		payload->GetData((char*)&Status, 1);
+
+		// 2. 유저 검색
+		Matchmaking_Net_Server::stPlayer* NowPlayer = m_pParent->FindPlayerFunc_ClientKey(ClinetKey);
+		if (NowPlayer == nullptr)
+			gMatchServerDump->Crash();
+
+		// 3. Status 확인
+		// 1이 아니면 모두 잘못된 것.
+		if (Status != 1)
+		{
+			// Status가 0이라면 방 얻기 실패한 것.
+			// 클라에게 방 정보 실패 결과 보냄
+			if (Status == 0)
+			{
+				// Net 직렬화 버퍼 사용.
+				CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+				WORD Type = en_PACKET_CS_MATCH_RES_GAME_ROOM;
+				BYTE SendStatus = 0;
+
+				SendBuff->PutData((char*)&Type, 2);
+				SendBuff->PutData((char*)&SendStatus, 1);
+
+				// 차후 보내고 끊어야 할지 고민..
+				m_pParent->SendPacket(NowPlayer->m_ullSessionID, SendBuff);
+
+				return;
+			}
+
+			// 여기까지 오면 1도 아니고 0도 아닌것. 규약에 없는 Status. Crash
+			else
+				gMatchServerDump->Crash();
+		}
+
+		// 4. 상태가 1이라면, 방 정보가 온 것. 나머지 마샬링
+		WORD	BattleServerNo;		
+		WCHAR	IP[16];
+		WORD	Port;		
+		int		RoomNo;
+		char	ConnectToken[32];
+		char	EnterToken[32];		
+
+		WCHAR	ChatServerIP[16];
+		WORD	ChatServerPort;
+
+		payload->GetData((char*)&BattleServerNo, 2);
+		payload->GetData((char*)&IP, 32);
+		payload->GetData((char*)&Port, 2);
+		payload->GetData((char*)&RoomNo, 4);
+		payload->GetData(ConnectToken, 32);
+		payload->GetData(EnterToken, 32);
+
+		payload->GetData((char*)&ChatServerIP, 32);
+		payload->GetData((char*)&ChatServerPort, 2);
+
+
+		// 5. 클라에게 보낼 정보 셋팅
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_MATCH_RES_GAME_ROOM;
+		BYTE SendStatus = 0;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&SendStatus, 1);
+
+		SendBuff->PutData((char*)&BattleServerNo, 2);
+		SendBuff->PutData((char*)&IP, 32);
+		SendBuff->PutData((char*)&Port, 2);
+		SendBuff->PutData((char*)&RoomNo, 4);
+		SendBuff->PutData(ConnectToken, 32);
+		SendBuff->PutData(EnterToken, 32);
+
+		SendBuff->PutData((char*)&ChatServerIP, 32);
+		SendBuff->PutData((char*)&ChatServerPort, 2);
+
+
+		// 6. 클라에게 보내기 (Net으로 보내기)
+		m_pParent->SendPacket(NowPlayer->m_ullSessionID, SendBuff);
+	}
+
+	// 로그인 요청에 대한 응답
+	// 
+	// Parameter : CProtocolBuff_Lan*
+	// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+	void Matchmaking_Lan_Client::Response_Login(CProtocolBuff_Lan* payload)
+	{
+		// 이미 로그인 상태인지 체크
+		if(m_bLoginCheck == true)
+			gMatchServerDump->Crash();
+
+		// 1. 마샬링
+		int iServerNo;
+		payload->GetData((char*)&iServerNo, 4);
+
+		// 2. 서버 확인
+		if(iServerNo != m_pParent->m_iServerNo)
+			gMatchServerDump->Crash();
+
+		// 서버가 정상적으로 맞다면 할 것 없음.
+	}
+
+
+
 
 	// -------------------------------------
 	// 외부에서 사용 가능한 함수
@@ -1051,7 +1287,18 @@ namespace Library_Jingyu
 	// return : 실패 시 false 리턴
 	bool Matchmaking_Lan_Client::ClientStart()
 	{
+		// ClientID 값 초기화
+		m_ullClientID = 0xffffffffffffffff;
 
+		// 로그인 체크 초기화
+		m_bLoginCheck = false;
+
+		// LanClient의 Start() 호출
+		// 마스터의 LanServer와 연결
+		//if (Start(m_pParent->m_stConfig.MasterServerIP, m_pParent->m_stConfig.MasterServerPort, m_pParent->m_stConfig.ClientCreateWorker, m_pParent->m_stConfig.ClientActiveWorker, m_pParent->m_stConfig.ClientNodelay) == false)
+			//return false;
+
+		return true;
 	}
 
 	// 매치메이킹 LanClient 종료 함수
@@ -1066,6 +1313,19 @@ namespace Library_Jingyu
 
 
 
+	// -------------------------------------
+	// 상속 관계에서만 사용 가능한 기능 함수
+	// -------------------------------------
+
+	// 내 부모를 채워주는 함수
+	void Matchmaking_Lan_Client::SetParent(Matchmaking_Net_Server* NetServer)
+	{
+		m_pParent = NetServer;
+	}
+
+
+
+
 
 
 	// -----------------------
@@ -1073,13 +1333,80 @@ namespace Library_Jingyu
 	// -----------------------
 
 	void Matchmaking_Lan_Client::OnConnect(ULONGLONG ClinetID)
-	{}
+	{
+		// 내 m_ullClientID가 0xffffffffffffffff인지 체크
+		if(m_ullClientID != 0xffffffffffffffff)
+			gMatchServerDump->Crash();
+
+		// 1. ClientID 받아둔다.
+		m_ullClientID = ClinetID;
+
+		// 2. 마스터 서버로 보낼 로그인 정보 셋팅
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_MAT_MAS_REQ_SERVER_ON;
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&m_pParent->m_iServerNo, 4);
+		SendBuff->PutData(m_pParent->MasterToken, 32);
+
+		// 3. 마스터 서버로 로그인 패킷 보내기
+		SendPacket(ClinetID, SendBuff);
+	}
 
 	void Matchmaking_Lan_Client::OnDisconnect(ULONGLONG ClinetID)
-	{}
+	{
+		// m_ullClientID 초기화
+		m_ullClientID = 0xffffffffffffffff;
+
+		// 로그인 Flag 초기화
+		m_bLoginCheck = false;
+	}
 
 	void Matchmaking_Lan_Client::OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload)
-	{}
+	{
+		// 내 ClientID와 인자로 받은 ClientID가 다르면 Crash
+		if(m_ullClientID != ClinetID)
+			gMatchServerDump->Crash();
+
+		// 타입 빼오기
+		WORD Type;
+		Payload->GetData((char*)&Type, 2);
+
+		// 타입에 따라 분기처리
+		try
+		{
+			switch (Type)
+			{
+				// 방 요청에 대한 응답
+			case en_PACKET_MAT_MAS_RES_GAME_ROOM:
+				Response_Battle_Info(Payload);
+				break;
+
+				// 로그인 요청에 대한 응답
+			case en_PACKET_MAT_MAS_RES_SERVER_ON:
+				Response_Login(Payload);
+				break;
+
+				// 이상한 타입의 패킷이 오면 끊는다.
+			default:
+				TCHAR ErrStr[1024];
+				StringCchPrintf(ErrStr, 1024, _T("LanClient -> OnRecv(). TypeError. Type : %d"), Type);
+
+				throw CException(ErrStr);
+			}
+
+		}
+		catch (CException& exc)
+		{
+			// 로그 찍기 (로그 레벨 : 에러)
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				(TCHAR*)exc.GetExceptionText());
+
+			// Crash
+			gMatchServerDump->Crash();
+		}
+		
+	}
 
 	void Matchmaking_Lan_Client::OnSend(ULONGLONG ClinetID, DWORD SendSize)
 	{}
@@ -1105,12 +1432,13 @@ namespace Library_Jingyu
 	Matchmaking_Lan_Client::Matchmaking_Lan_Client()
 		:CLanClient()
 	{
+		// 특별히 할 거 없음
 
 	}
 
 	// 소멸자
 	Matchmaking_Lan_Client::~Matchmaking_Lan_Client()
 	{
-
+		// 특별히 할 거 없음
 	}	
 }

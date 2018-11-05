@@ -222,7 +222,7 @@ namespace Library_Jingyu
 		// 미사용 세션 관리 스택의 노드 얻기
 		LONG GetStackNodeCount();
 
-	public:
+	protected:
 		// -----------------------
 		// 순수 가상함수
 		// -----------------------

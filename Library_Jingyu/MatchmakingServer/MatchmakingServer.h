@@ -41,14 +41,21 @@ namespace Library_Jingyu
 			int MaxJoinUser;
 			int LogLevel;
 
-
-			// 메치메이킹 DB 정보
+			// 매치메이킹 DB 정보
 			TCHAR DB_IP[20];
 			TCHAR DB_User[40];
 			TCHAR DB_Password[40];
 			TCHAR DB_Name[40];
 			int  DB_Port;
 			int MatchDBHeartbeat;	// 메치메이킹 DB에 몇 밀리세컨드마다 하트비트를 쏠 것인가.			
+
+			// 매치메이킹 LanClient 정보 (마스터와 연결)
+			TCHAR MasterServerIP[20];
+			int MasterServerPort;
+			int ClientCreateWorker;
+			int ClientActiveWorker;
+			int ClientNodelay;
+
 		};
 
 		// 유저 관리용 구조체
@@ -114,6 +121,9 @@ namespace Library_Jingyu
 
 		// 매치메이킹 DB에, 몇 명의 변화가 있을 때 마다 갱신할 것인가.
 		int m_iMatchDBConnectUserChange; 
+
+		// !! 마스터 lan서버와 통신하는 lan클라 !!
+		Matchmaking_Lan_Client* m_pLanClient;
 
 
 
@@ -258,26 +268,25 @@ namespace Library_Jingyu
 		// 패킷 처리용 함수
 		// -------------------------------------
 
-		// 매치메이킹 서버로 로그인 요청
+		// 클라의 로그인 요청 받음
 		//
 		// Parameter : SessionID, Payload
 		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
 		void Packet_Match_Login(ULONGLONG SessionID, CProtocolBuff_Net* Payload);
 
-		// 방 정보 요청
-		// LanClient를 통해, 마스터에게 패킷 보냄
-		//
-		// Parameter : SessionID
-		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
-		void Packet_Battle_Info(ULONGLONG SessionID);
-
 		// 방 입장 성공
-		// LanClient를 통해, 마스터에게 패킷 보냄
+		// 마스터에게 방 입장 성공 패킷 보냄
 		//
 		// Parameter : SessionID, Payload
 		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
 		void Packet_Battle_EnterOK(ULONGLONG SessionID, CProtocolBuff_Net* Payload);
 
+		// 방 입장 실패
+		// 마스터에게 방 입장 실패 패킷 보냄
+		//
+		// Parameter : ClinetKey
+		// return : 없음
+		void Packet_Battle_EnterFail(UINT64 ClientKey);
 
 	public:
 		// -------------------------------------
@@ -354,6 +363,52 @@ namespace Library_Jingyu
 		friend class Matchmaking_Net_Server;
 
 
+		// ------------
+		// 멤버 변수
+		// ------------
+
+		// !! 매칭 Net 서버 !!
+		Matchmaking_Net_Server* m_pParent;
+
+		// 마스터 서버와 연결된 SessionID
+		ULONGLONG m_ullClientID;
+
+		// 로그인 여부. 로그인 패킷을 정상적으로 받으면 true로 변경
+		// false면 로그인 안된 상태
+		bool m_bLoginCheck;
+
+	private:
+		// -------------------------------------
+		// Net 서버가 호출하는 함수
+		// -------------------------------------
+
+		// 방 정보 요청
+		// 마스터에게 패킷 보냄
+		//
+		// Parameter : SessionID
+		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+		void Packet_Battle_Info(ULONGLONG SessionID);
+
+
+	private:
+		// -------------------------------------
+		// 마스터에게 받은 패킷 처리용 함수
+		// -------------------------------------
+
+		// 방 정보 요청에 대한 응답
+		// 내부에서, Net서버의 SendPacket()까지 호출한다.
+		// 
+		// Parameter : CProtocolBuff_Lan*
+		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+		void Response_Battle_Info(CProtocolBuff_Lan* payload);
+
+		// 로그인 요청에 대한 응답
+		// 
+		// Parameter : CProtocolBuff_Lan*
+		// return : 없음. 문제가 생기면, 내부에서 throw 던짐
+		void Response_Login(CProtocolBuff_Lan* payload);
+
+
 	public:
 		// -------------------------------------
 		// 외부에서 사용 가능한 함수
@@ -370,6 +425,18 @@ namespace Library_Jingyu
 		// Parameter : 없음
 		// return : 없음
 		void ClientStop();
+
+
+	protected:
+		// -------------------------------------
+		// 상속 관계에서만 사용 가능한 기능 함수
+		// -------------------------------------
+		
+		// 내 부모를 채워주는 함수
+		// 
+		// Parameter : Net서버의 this
+		// return : 없음
+		void SetParent(Matchmaking_Net_Server* NetServer);
 
 
 	private:

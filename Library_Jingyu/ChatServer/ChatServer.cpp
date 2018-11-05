@@ -491,8 +491,8 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			// 대기 (10초에 1회 깨어난다)
-			DWORD Check = WaitForSingleObject(hEvent, 10000);
+			// 대기 (60초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 60000);
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
