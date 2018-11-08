@@ -80,24 +80,7 @@ namespace Library_Jingyu
 
 		// Config용 변수
 		stConfigFile m_stConfig;
-
-
-
-	private:
-		// -----------------
-		// 플레이어 관리용 자료구조
-		// -----------------	
-
-		// 매칭 랜 서버에서 관리 중인 Player 자료구조
-		// umap 사용
-		// ClientKey 이용
-		//
-		// Key : ClientKey, Value : AccountNo
-		unordered_map<UINT64, UINT64> m_Player_ClientKey_Umap;
-
-		// m_Player_ClientKey_Umap관리용 SRWLOCK
-		SRWLOCK m_srwl_Player_ClientKey_Umap;
-
+			   		 	  
 
 
 	private:
@@ -142,22 +125,6 @@ namespace Library_Jingyu
 		// return : 정상적으로 셋팅 시 true
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
-
-
-
-	private:
-		// -----------------
-		// 플레이어 관리 자료구조 함수
-		// -----------------
-
-		// 매칭에서 관리되는 플레이어 자료구조에 insert
-		//
-		// Parameter : ClinetKey, AccountNo
-		// return : 정상적으로 삽입 시, true
-		//		  : 실패 시 false;	
-		bool InsertPlayerFunc(UINT64 ClientKey, UINT64 AccountNo);
-
-
 
 
 	private:
@@ -236,6 +203,11 @@ namespace Library_Jingyu
 		// return : 없음
 		void Packet_RoomEnter_OK(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
+		// 방 입장 실패
+		//
+		// Parameterr : SessionID, Payload
+		// return : 없음
+		void Packet_RoomEnter_Fail(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
 
 
@@ -329,10 +301,15 @@ namespace Library_Jingyu
 		// 배틀서버 구조체
 		struct stBattle
 		{
+			// 배틀서버 SessionID
 			ULONGLONG m_ullSessionID;
 
 			// 배틀서버 고유번호
 			int m_iServerNo;
+
+			// 로그인 여부
+			// true면 로그인 패킷을 받은 후 set에 추가까지 되었음.
+			bool m_bLoginCheck;
 
 			// 배틀서버 접속 IP
 			WCHAR	m_tcBattleIP[16];
@@ -346,11 +323,23 @@ namespace Library_Jingyu
 			// 해당 배틀서버와 연결된 채팅서버
 			WCHAR	m_tcChatIP[16];
 			WORD	m_wChatPort;
+
+			stBattle()
+			{
+				m_bLoginCheck = false;
+			}
 		};
 		
 		// Room 구조체
 		struct stRoom
 		{
+			// 해당 룸의 Key
+			// Room_Umap에서 사용되는 Key
+			// 상위 4바이트는 BattleServerNo , 하위 4바이트는 RoomNo을 OR한 Mix값
+			UINT64 m_ui64RoomKey;
+
+			// 해당 룸의 No.
+			// 배틀 서버 별로 고유. 다른 배틀서버까지 포함하면 고유하지 않음.
 			int m_iRoomNo;
 
 			// 방에, 여유 공간이 얼마인지.
@@ -366,9 +355,15 @@ namespace Library_Jingyu
 			// 해당 룸의 락
 			SRWLOCK m_srwl_Room;
 
+			// 해당 방에 입장한 유저 관리 자료구조
+			//
+			// Key : ClientKey
+			unordered_set<UINT64> m_uset_JoinUser;
+
 			stRoom()
 			{
 				InitializeSRWLock(&m_srwl_Room);
+				m_uset_JoinUser.reserve(10);
 			}
 
 			// 해당 방의 락
@@ -387,14 +382,21 @@ namespace Library_Jingyu
 		// 플레이어 구조체
 		struct stPlayer
 		{
-			UINT64 m_ui64AccountNo;
+			UINT64 m_ui64ClinetKey;
 
 			// 해당 유저가 존재한 방이 존재하는 배틀 서버의 No
 			int m_iBattleServerNo;
 
-			// 접속 중인 방 번호.
+			// 접속 중인 룸의 번호.
 			int m_iJoinRoomNo;
+
+			// 해당 구조체가 Alloc된 매칭서버의 ServerNo
+			int m_iMatchServerNo;
+
+			// Room_Umap에 등록된 룸의 Key
+			ULONGLONG m_ullRoomKey;
 		};
+
 
 
 	private:
@@ -404,6 +406,7 @@ namespace Library_Jingyu
 
 		// !! Matching 서버 !!
 		CMatchServer_Lan* pMatchServer;
+
 		
 
 	private:
@@ -413,13 +416,13 @@ namespace Library_Jingyu
 		
 		// 배틀 랜 서버에서 관리 중인 Player 자료구조
 		// umap 사용
-		// AccountNo 이용
+		// ClientKey 이용
 		//
-		// Key : AccountNo, Value : stPlayer*
-		unordered_map<UINT64, stPlayer*> m_Player_AccountNo_Umap;
+		// Key : ClientKeyt, Value : stPlayer*
+		unordered_map<UINT64, stPlayer*> m_Player_Umap;
 
-		// m_Player_AccountNo_Umap관리용 SRWLOCK
-		SRWLOCK m_srwl_Player_AccountNo_Umap;
+		// m_Player_Umap관리용 SRWLOCK
+		SRWLOCK m_srwl_Player_Umap;
 
 		// stPlayer를 관리하는 TLSPool
 		CMemoryPoolTLS<stPlayer> *m_TLSPool_Player;
@@ -443,6 +446,19 @@ namespace Library_Jingyu
 		// stBattle을 관리하는 TLSPool
 		CMemoryPoolTLS<stBattle> *m_TLSPool_BattleServer;
 
+		// ------------------------
+
+		// Battle 서버 중, 로그인 패킷까지 받은 서버 관리용 자료구조.
+		// 존재 여부 판단용도.
+		// uset 사용
+		//
+		// Key : ServerNo (배틀서버 No)
+		unordered_set<int> m_LoginBattleServer_Uset;
+
+		// m_LoginBattleServer_Uset관리용 SRWLOCK
+		SRWLOCK m_srwl_LoginBattleServer_Uset;
+
+
 
 
 
@@ -454,8 +470,8 @@ namespace Library_Jingyu
 		// RoomNo를 이용해, 룸을 관리하는 자료구조
 		// umap 사용
 		//
-		// Key : RoomNo, Value : CPlayer*
-		unordered_map<int, stRoom*> m_Room_Umap;
+		// Key : RoomKey(상위 4바이트는 BattleServerNo , 하위 4바이트는 RoomNo을 OR한 Mix값), Value : CPlayer*
+		unordered_map<UINT64, stRoom*> m_Room_Umap;
 
 		// m_Room_Umap관리용 SRWLOCK
 		SRWLOCK m_srwl_Room_Umap;
@@ -478,6 +494,47 @@ namespace Library_Jingyu
 		CMemoryPoolTLS<stRoom> *m_TLSPool_Room;
 
 
+	private:
+		// -----------------------------------------
+		// 접속한 배틀서버 관리용 자료구조 함수
+		// -----------------------------------------
+
+		// 배틀서버 관리 자료구조에 배틀서버 Insert
+		//
+		// Parameter : SessionID, stBattle*
+		// return : 성공 시 true
+		//		  : 실패 시 false(중복키)
+		bool InsertBattleServerFunc(ULONGLONG SessionID, stBattle* InsertBattle);
+
+		// 배틀서버 관리 자료구조에서 배틀서버 erase
+		//
+		// Parameter : SessionID
+		// return : 성공 시 stBattle*
+		//		  : 실패 시 nullptr
+		stBattle* EraseBattleServerFunc(ULONGLONG SessionID);
+
+
+
+	private:
+		// -----------------------------------------
+		// 접속한 배틀서버 관리용 자료구조 함수 (Set)
+		// -----------------------------------------
+
+		// 배틀서버 Set 자료구조에 배틀서버 Insert
+		//
+		// Parameter : ServerNo
+		// return : 성공 시 true
+		//		  : 실패 시 false(중복키)
+		bool InsertBattleServerFunc_Set(int ServerNo);
+
+		// 배틀서버 Set 자료구조에서 배틀서버 erase
+		//
+		// Parameter : ServerNo
+		// return : 성공 시 true
+		//		  : 실패 시 false
+		bool EraseBattleServerFunc_Set(int ServerNo);
+
+
 
 	private:
 		// -----------------
@@ -486,26 +543,64 @@ namespace Library_Jingyu
 
 		// 플레이어 관리 자료구조에 플레이어 Insert
 		//
-		// Parameter : AccountNo, stPlayer*
+		// Parameter : ClientKey, stPlayer*
 		// return : 정상적으로 Insert 시 true
 		//		  : 실패 시 false
-		bool InsertPlayerFunc(UINT64 AccountNo, stPlayer* InsertPlayer);
+		bool InsertPlayerFunc(UINT64 ClientKey, stPlayer* InsertPlayer);
 
-		// 인자로 받은 AccountNo를 이용해 유저 검색.
+
+
+
+	private:
+		// -----------------
+		// 내부에서만 사용하는 함수
+		// -----------------
+
+		// 매칭으로 방 입장 성공 패킷이 올 시 호출되는 함수
 		// 1. RoomNo, BattleServerNo가 정말 일치하는지 확인
 		// 2. 자료구조에서 Erase
 		// 3. stPlayer*를 메모리풀에 Free
 		//
 		// !! 매칭 랜 서버에서 호출 !!
 		//
-		// Parameter : AccountNo, RoomNo, BattleServerNo
+		// Parameter : ClinetKey, RoomNo, BattleServerNo
 		//
 		// return Code
 		// 0 : 정상적으로 삭제됨
-		// 1 : 존재하지 않는 유저 (AccountNo로 유저 검색 실패
+		// 1 : 존재하지 않는 유저 (ClinetKey로 유저 검색 실패)
 		// 2 : RoomNo 불일치
 		// 3 : BattleServerNo 불일치
-		int ErasePlayerFunc(UINT64 AccountNo, int RoomNo, int BattleServerNo);
+		int RoomEnter_OK_Func(UINT64 ClinetKey, int RoomNo, int BattleServerNo);
+		
+		// 매칭으로 방 입장 실패가 올 시 호출되는 함수
+		// 1. 유저 검색
+		// 2. 해당 ClinetKey가 접속한 방 찾기
+		// 3. 찾은 방의 Set에서 해당 유저 제거
+		// 4. stPlayer*를 메모리풀에 Free
+		//
+		// !! 매칭 랜 서버에서 호출 !!
+		//
+		// Parameter : ClinetKey
+		//
+		// return Code
+		// 0 : 정상적으로 삭제됨
+		// 1 : 존재하지 않는 유저 (ClinetKey로 유저 검색 실패)
+		// 2 : Room 존재하지 않음
+		// 3 : Room 내의 자료구조(Set)에서 ClientKey로 검색 실패
+		int RoomEnter_Fail_Func(UINT64 ClinetKey);
+
+		// 매칭서버와 연결이 끊길 시, 해당 매칭서버로 인해 할당된 stPlayer*를 모두 반환하는 함수
+		//
+		// Parameter : 매칭 서버 No(int)
+		// return : 없음
+		void MatchLeave(int MatchServerNo);
+
+		// 배틀서버와 연결이 끊길 시, 해당 매칭서버의 룸을 모두 제거한다.
+		// 룸 자료구조 모두(2개)에서 제거한다.
+		//
+		// Parameter : BattleServerNo
+		// return : 없음
+		void BattleLeave(int BattleServerNo);
 
 
 
@@ -538,10 +633,11 @@ namespace Library_Jingyu
 		// 방 정보 요청 패킷 처리
 		// !! 매칭 랜 서버에서 호출 !!
 		//
-		// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, AccountNo
+		// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, 매칭서버의 No
 		// return : 없음
-		void Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, UINT64 AccountNo);
+		void Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, int MatchServerNo);
 			
+
 		
 
 

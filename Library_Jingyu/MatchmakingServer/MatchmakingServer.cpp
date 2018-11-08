@@ -303,6 +303,30 @@ namespace Library_Jingyu
 		return ((TempKey << 16) | m_iServerNo);
 	}
 
+	// 접속한 모든 유저에게 shutdown 하는 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void Matchmaking_Net_Server::AllShutdown()
+	{
+		AcquireSRWLockShared(&m_srwlPlayer);	// ----- m_umapPlayer에 Shared 락
+
+		// 모든 유저에게 Shutdown 날림.
+
+		auto itor_Now = m_umapPlayer.begin();
+		auto itor_End = m_umapPlayer.end();
+
+		while (1)
+		{
+			if (itor_Now == itor_End)
+				break;
+			
+			Disconnect(itor_Now->second->m_ullSessionID);
+			++itor_Now;
+		}
+
+		ReleaseSRWLockShared(&m_srwlPlayer);	// ----- m_umapPlayer에 Shared 언락
+	}
 
 
 
@@ -1355,6 +1379,9 @@ namespace Library_Jingyu
 
 	void Matchmaking_Lan_Client::OnDisconnect(ULONGLONG ClinetID)
 	{
+		// Net 서버와 연결된 모든 유저 접속 종료
+		m_pParent->AllShutdown();
+
 		// m_ullClientID 초기화
 		m_ullClientID = 0xffffffffffffffff;
 

@@ -175,7 +175,7 @@ namespace Library_Jingyu
 		// 인자 : ClientKey, stPlayer*
 		unordered_map<UINT64, stPlayer*>	m_umapPlayer_ClientKey;
 
-		// m_umapPlayer를 관리하는 LOCK
+		// m_umapPlayer와 m_umapPlayer_ClientKey를 관리하는 LOCK
 		SRWLOCK m_srwlPlayer;
 
 		// stPlayer 구조체를 다루는 TLS
@@ -209,6 +209,12 @@ namespace Library_Jingyu
 		// Parameter : 없음
 		// return : ClientKey(UINT64)
 		UINT64 CreateClientKey();
+
+		// 접속한 모든 유저에게 shutdown 하는 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void AllShutdown();
 
 
 
