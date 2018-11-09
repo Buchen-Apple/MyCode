@@ -17,6 +17,12 @@ LONG g_lMatch_DuplicateLogin;
 LONG g_lMatch_NotLoginPacket;
 
 
+// ----------------- 배틀용 출력 변수
+
+// 로그인 시, 토큰 에러가 난 횟수
+LONG g_lBattle_TokenError;
+
+
 // -----------------------
 //
 // 마스터 Match 서버
@@ -259,17 +265,21 @@ namespace Library_Jingyu
 		// 1. umap에서 검색
 		AcquireSRWLockShared(&m_srwl_MatchServer_Umap);		// ------- Shared 락
 
-		auto FindPlayer = m_MatchServer_Umap.find(SessionID);
-
-		ReleaseSRWLockShared(&m_srwl_MatchServer_Umap);		// ------- Shared 언락
+		auto FindPlayer = m_MatchServer_Umap.find(SessionID);		
 
 		// 2. 검색 실패 시 nullptr 리턴
 		if (FindPlayer == m_MatchServer_Umap.end())
+		{
+			ReleaseSRWLockShared(&m_srwl_MatchServer_Umap);		// ------- Shared 언락
 			return nullptr;
+		}
 
 		// 3. 검색 성공 시, 찾은 stPlayer* 리턴
-		return FindPlayer->second;
+		stMatching* ReturnData = FindPlayer->second;
 
+		ReleaseSRWLockShared(&m_srwl_MatchServer_Umap);		// ------- Shared 언락
+
+		return ReturnData;
 	}
 
 
@@ -300,7 +310,6 @@ namespace Library_Jingyu
 		ReleaseSRWLockExclusive(&m_srwl_MatchServer_Umap);		// ------- Exclusive 언락
 
 		return ret;
-
 	}
 
 
@@ -553,10 +562,17 @@ namespace Library_Jingyu
 		Payload->GetData((char*)&ClinetKey, 8);
 
 		// ------------ 배틀 랜 서버의 자료구조에서 삭제
-		// 1. 배틀의 함수 호출. 0이 리턴되어야 정상인 것.
+		// 1. 배틀의 함수 호출.
 		// Room을 체크해 카운트 증감처리
 		// 내부에서 stPlayer*를 Free까지 한다.
-		if (pBattleServer->RoomEnter_Fail_Func(ClinetKey) != 0)
+		int Ret = pBattleServer->RoomEnter_Fail_Func(ClinetKey);
+
+		// 0 : 정상
+		// 1 : 유저 없음
+		// 2 : Room 없음
+		// 3 : Room 안에 해당 유저 없음
+		// 이 중, 0, 2, 3은 정상. 1만 비정상
+		if (Ret == 1)
 			g_MasterDump->Crash();
 	}
 
@@ -625,12 +641,18 @@ namespace Library_Jingyu
 		// 타입에 따라 분기처리
 		try
 		{
+			// 자주 올 법한 패킷 순서대로 switch ~ case 구성.
+			//
+			// 방 정보 요청은 매치메이킹 서버가 하는 가장 큰 역활이며 중요도 1위. 때문에 자주 올 것으로 예상되어 1순위위로 측정
+			// 정보를 받아간 유저는 거의 다 방에 입장할 것이기 때문에 유저 방 입장 성공을 2순위로 측정
+			// 유저 방 입장 실패는 자주 발생 안한다고 가정(유저가 방 정보 받은 후 배틀방에 입장 안한 상황)
+			// 매치메이킹 서버로부터 받은 로그인 요청은, 마스터 서버가 켜진 후, 몇 번 안올것이기 때문에 가장 후순위.
 			switch (Type)
 			{
 				// 방 정보 요청
 			case en_PACKET_MAT_MAS_REQ_GAME_ROOM:
 				Relay_RoomInfo(SessionID, Payload);
-				break;
+				break;			
 
 				// 유저 방 입장 성공
 			case en_PACKET_MAT_MAS_REQ_ROOM_ENTER_SUCCESS:
@@ -640,7 +662,7 @@ namespace Library_Jingyu
 				// 유저 방 입장 실패
 			case en_PACKET_MAT_MAS_REQ_ROOM_ENTER_FAIL:
 				Packet_RoomEnter_Fail(SessionID, Payload);
-				break;
+				break;		
 
 				// 매치메이킹 로그인 요청
 			case en_PACKET_MAT_MAS_REQ_SERVER_ON:
@@ -685,6 +707,8 @@ namespace Library_Jingyu
 
 
 
+
+
 	// -----------------------
 	// 생성자와 소멸자
 	// -----------------------
@@ -703,7 +727,7 @@ namespace Library_Jingyu
 		
 		// 자료구조 공간 미리 잡아두기
 		m_MatchServer_Umap.reserve(100);
-		m_LoginMatServer_Uset.rehash(100);
+		m_LoginMatServer_Uset.reserve(100);
 
 		// 락 초기화		
 		InitializeSRWLock(&m_srwl_MatchServer_Umap);
@@ -723,7 +747,6 @@ namespace Library_Jingyu
 		// TLS 동적 해제
 		delete m_TLSPool_MatchServer;	
 	}
-
 }
 
 
@@ -760,6 +783,33 @@ namespace Library_Jingyu
 		return true;	
 	}
 
+	// 배틀 서버 관리 자료구조에서 배틀서버 Find
+	//
+	// Parameter : SessionID
+	// return : 정상적으로 찾을 시 stBattle*
+	//		  : 없을 시, nullptr
+	CBattleServer_Lan::stBattle* CBattleServer_Lan::FindBattleServerFunc(ULONGLONG SessionID)
+	{
+		AcquireSRWLockShared(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Shared 락
+
+		// 1. 검색
+		auto Ret = m_BattleServer_Umap.find(SessionID);
+
+		// 2. 없으면 nullptr
+		if (Ret == m_BattleServer_Umap.end())
+		{
+			ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Shared 언락
+			return nullptr;
+		}
+
+		// 2. 있으면 해당 포인터 리턴
+		stBattle* RetData = Ret->second;
+
+		ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Shared 언락
+
+		return RetData;
+	}
+
 	// 배틀서버 관리 자료구조에서 배틀서버 erase
 	//
 	// Parameter : SessionID
@@ -789,61 +839,6 @@ namespace Library_Jingyu
 
 		return EraseBattle;
 	}
-
-
-
-	// -----------------------------------------
-	// 접속한 배틀서버 관리용 자료구조 함수 (Set)
-	// -----------------------------------------
-
-	// 배틀서버 Set 자료구조에 배틀서버 Insert
-	//
-	// Parameter : ServerNo
-	// return : 성공 시 true
-	//		  : 실패 시 false(중복키)
-	bool CBattleServer_Lan::InsertBattleServerFunc_Set(int ServerNo)
-	{
-		AcquireSRWLockExclusive(&m_srwl_LoginBattleServer_Uset);	 // ----- 배틀서버 Set Exclusive 락
-	
-		// 1. ServerNo를 기준으로 Insert
-		auto ret = m_LoginBattleServer_Uset.insert(ServerNo);
-
-		ReleaseSRWLockExclusive(&m_srwl_LoginBattleServer_Uset);	 // ----- 배틀서버 Set Exclusive 언락
-
-		// 2. 중복 키라면 false 리턴
-		if (ret.second == false)
-			return false;
-
-
-		return true;	
-	}
-
-	// 배틀서버 Set 자료구조에서 배틀서버 erase
-	//
-	// Parameter : ServerNo
-	// return : 성공 시 true
-	//		  : 실패 시 false
-	bool CBattleServer_Lan::EraseBattleServerFunc_Set(int ServerNo)
-	{
-		AcquireSRWLockExclusive(&m_srwl_LoginBattleServer_Uset);	 // ----- 배틀서버 Set Exclusive 락
-
-		// 1. 존재 유무 검색
-		auto ret = m_LoginBattleServer_Uset.find(ServerNo);
-
-		// 없을 경우, return false
-		if (ret == m_LoginBattleServer_Uset.end())
-		{
-			ReleaseSRWLockExclusive(&m_srwl_LoginBattleServer_Uset);	 // ----- 배틀서버 Set Exclusive 언락
-			return false;
-		}
-
-		// 2. 있을 경우 Erase
-		m_LoginBattleServer_Uset.erase(ret);
-
-		ReleaseSRWLockExclusive(&m_srwl_LoginBattleServer_Uset);	 // ----- 배틀서버 Set Exclusive 언락
-		return true;
-	}
-
 
 
 
@@ -877,9 +872,9 @@ namespace Library_Jingyu
 
 
 
-	// -----------------
-	// 내부에서만 사용하는 함수
-	// -----------------
+	// -----------------------------
+	// 마스터의 매칭쪽에서 호출하는 함수
+	// -----------------------------
 
 	// 매칭으로 방 입장 성공 패킷이 올 시 호출되는 함수
 	// 1. RoomNo, BattleServerNo가 정말 일치하는지 확인
@@ -971,8 +966,9 @@ namespace Library_Jingyu
 
 		stPlayer * ErasePlayer = FIndPlayer->second;
 
-		// 룸 Key 받아두기
+		// 룸 Key와 룸 No 받아두기
 		UINT64 RoomKey = ErasePlayer->m_ullRoomKey;
+		int RoomNo = ErasePlayer->m_iJoinRoomNo;
 
 		// Player Erase
 		m_Player_Umap.erase(FIndPlayer);
@@ -982,73 +978,92 @@ namespace Library_Jingyu
 		// stPlayer* 반환
 		m_TLSPool_Player->Free(ErasePlayer);
 
-		
 
 
+		AcquireSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 락
 
-		// 2. Room 검색
-		AcquireSRWLockExclusive(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 락
-
-		auto FindRoom = m_Room_Umap.find(RoomKey);
-
-		// 존재하지 않으면 return 2
-		if (FIndPlayer == m_Player_Umap.end())
+		// 2. list 내에 방에 있을 경우, list의 0번 인덱스가 해당 유저가 입장하려고 했던 방인지 확인
+		if (m_Room_List.size() > 0)
 		{
-			ReleaseSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 언락
-			return 2;
+			stRoom* NowRoom = *(m_Room_List.begin());
+
+			// 해당 유저가 입장했던 방이 Room_list의 0번 인덱스가 맞을 경우
+			// Room 내부의 유저 수 및 set 갱신
+			if (NowRoom->m_iRoomNo == RoomNo)
+			{
+				// 1) Set에서 유저 검색
+				auto TempUser = NowRoom->m_uset_JoinUser.find(ClinetKey);
+
+				// 존재하지 않으면 return 3
+				if (TempUser == NowRoom->m_uset_JoinUser.end())
+				{
+					ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락
+					return 3;
+				}
+
+				// 2) 존재하면 Set에서 삭제.
+				NowRoom->m_uset_JoinUser.erase(TempUser);
+
+				// 3) 룸 내에 잉여 유저 수 1 증가	
+				NowRoom->m_iEmptyCount++;
+
+				// 증가했는데 1보다 작다면 말이 안됨
+				if (NowRoom->m_iEmptyCount < 1)
+					g_MasterDump->Crash();
+
+				ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락			
+			}			
 		}
 
-		stRoom* NowRoom = FindRoom->second;
 
-		NowRoom->RoomLOCK();			// ----- 룸 1개에 대한 락
-
-
-
-
-		// 3. 룸에서 해당 ClientKey의 유저 제거
-		auto TempUser = NowRoom->m_uset_JoinUser.find(ClinetKey);
-
-		// 존재하지 않으면 return 3
-		if (TempUser == NowRoom->m_uset_JoinUser.end())
-		{
-			NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
-			return 3;
-		}
-
-		// 존재하면 삭제.
-		NowRoom->m_uset_JoinUser.erase(TempUser);
-		
-
-
-
-		// 4. 룸에서 유저 수 1 증가	
-		NowRoom->m_iEmptyCount++;
-
-		// 증가했는데 1보다 작다면 말이 안됨
-		if (NowRoom->m_iEmptyCount < 1)
-			g_MasterDump->Crash();
-
-		// 1이라면, pq에 다시 넣는다.
-		if (NowRoom->m_iEmptyCount == 1)
-		{
-			NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
-
-			AcquireSRWLockExclusive(&m_srwl_Room_pq);	// ----- pq Exclusive 락
-
-			m_Room_pq.push(NowRoom);
-
-			ReleaseSRWLockExclusive(&m_srwl_Room_pq);	// ----- pq Exclusive 언락
-		}
-
+		// 3. list 내에 방이 없을 경우 umap에서 확인
 		else
-			NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
+		{
+			ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락
 
+			AcquireSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 락
 
-		ReleaseSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 언락
-				
+			// 1) 원하는 룸 검색
+			auto FindRoom = m_Room_Umap.find(RoomKey);
 
+			// 원하는 룸이 없으면 return 2 (룸 존재하지 않음)
+			// list, umap 모두에 존재하지 않는다는 것.
+			if (FindRoom == m_Room_Umap.end())
+			{
+				ReleaseSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 언락
+				return 2;
+			}
 
-		// 5. 정상 코드 리턴
+			stRoom* NowRoom = FindRoom->second;
+
+			NowRoom->RoomLOCK();			// ----- 룸 1개에 대한 락 (umap이 Shared이기 때문에 룸 락 필요.)
+
+			// 2) Set에서 유저 검색
+			auto TempUser = NowRoom->m_uset_JoinUser.find(ClinetKey);
+
+			// 존재하지 않으면 return 3
+			if (TempUser == NowRoom->m_uset_JoinUser.end())
+			{
+				ReleaseSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 언락
+				NowRoom->RoomUNLOCK();							// ----- 룸 1개에 대한 언락
+				return 3;
+			}
+
+			// 3) 존재하면 삭제.
+			NowRoom->m_uset_JoinUser.erase(TempUser);
+
+			// 4) 룸내에 잉여 유저 수 1 증가	
+			NowRoom->m_iEmptyCount++;
+
+			// 증가했는데 1보다 작다면 말이 안됨
+			if (NowRoom->m_iEmptyCount < 1)
+				g_MasterDump->Crash();
+
+			ReleaseSRWLockShared(&m_srwl_Room_Umap);		// ----- Room umap 자료구조 Shared 언락
+			NowRoom->RoomUNLOCK();							// ----- 룸 1개에 대한 언락			
+		}
+
+		// 4. 정상 코드 리턴
 		return 0;
 	}
 		
@@ -1084,87 +1099,399 @@ namespace Library_Jingyu
 		ReleaseSRWLockExclusive(&m_srwl_Player_Umap);	// ----- 플레이어 uamp Exclusive 언락
 	}
 
-	// 배틀서버와 연결이 끊길 시, 해당 매칭서버의 룸을 모두 제거한다.
+	// 방 정보 요청 패킷 처리
+	// !! 매칭 랜 서버에서 호출 !!
+	//
+	// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, 매칭서버의 No
+	// return : 없음
+	void CBattleServer_Lan::Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, int MatchServerNo)
+	{
+		int iSendRoomNo;
+		int iBattleServerNo;
+		char cSendEnterToken[32];
+		bool bSearchFlag = false;	// umap 자료구조에서 방에 대한 정보 찾았음 플래그. false면 못찾음.
+
+
+		// -------------------------- 방 정보 알아오기
+
+		AcquireSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 락
+
+		// umap 룸 자료구조에 방 있는지 확인
+		if (m_Room_Umap.size() > 0)
+		{
+			// 룸 얻기
+			auto itor_Now = m_Room_Umap.begin();
+			auto itor_End = m_Room_Umap.end();
+
+			while (1)
+			{
+				if (itor_Now == itor_End)
+					break;
+
+				// 룸을 찾았을 경우 로직
+				if (itor_Now->second->m_iEmptyCount > 0)
+				{				
+					stRoom* NowRoom = itor_Now->second;
+
+					NowRoom->RoomLOCK();		// ----- 룸 1개에 대한 락 (umap 락이 Shared이기 때문에 필요)
+
+					// 1. 룸 안의 여유 유저 수 확인
+					// 0명이면 룸 검색에서 선택되었으면 안됨. 로직 문제로 본다.
+					if (NowRoom->m_iEmptyCount == 0)
+						g_MasterDump->Crash();
+
+
+					// 2. 룸의 잉여 유저 수 감소, 룸 내 자료구조에 추가
+					NowRoom->m_iEmptyCount--;
+
+					auto ret = NowRoom->m_uset_JoinUser.insert(ClientKey);
+					if (ret.second == false)
+						g_MasterDump->Crash();
+
+
+					// 3. Room에서 필요한 정보들 받아두기
+					iSendRoomNo = NowRoom->m_iRoomNo;
+					iBattleServerNo = NowRoom->m_iBattleServerNo;
+					memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
+
+					ReleaseSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 언락
+					NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
+
+					// 4.방 찾았음 Flag 변경
+					bSearchFlag = true;
+
+					break;
+				}
+
+				++itor_Now;
+			}			
+		}
+
+		// umap에서 유저가 들어갈 수 있는 방을 못찾았거나, umap 룸 자료구조에 방이 하나도 없는 경우
+		// list에서 확인
+		if (bSearchFlag == false)
+		{
+			ReleaseSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 언락
+
+			AcquireSRWLockExclusive(&m_srwl_Room_List);	// ----- list 룸 Exclusive 락
+
+			// 1. list에 방이 있나 확인.
+			// 여기서도 없으면 마스터 내에 할당 가능한 방이 하나도 없는것.
+			if (m_Room_List.size() <= 0)
+			{
+				ReleaseSRWLockExclusive(&m_srwl_Room_List);	// ----- list 룸 Exclusive 언락
+
+				// 룸이 하나도 없으면, 방 없음 패킷 리턴
+				CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+				WORD Type = en_PACKET_MAT_MAS_RES_GAME_ROOM;
+				BYTE Status = 0;
+
+				SendBuff->PutData((char*)&Type, 2);
+				SendBuff->PutData((char*)&ClientKey, 8);
+				SendBuff->PutData((char*)&Status, 1);
+
+				SendPacket(SessionID, SendBuff);
+
+				return;
+			}
+
+
+			// 2. 가장 앞의 룸 얻기
+			stRoom* NowRoom = *(m_Room_List.begin());
+
+
+			// 3. 룸 안의 여유 유저 수 확인
+			// 0명이면 여기 있으면 안됨.
+			if (NowRoom->m_iEmptyCount == 0)
+				g_MasterDump->Crash();
+
+
+			// 4. Room에서 필요한 정보들 받아두기
+			iSendRoomNo = NowRoom->m_iRoomNo;
+			iBattleServerNo = NowRoom->m_iBattleServerNo;
+			memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
+
+
+
+			// 5. 룸의 잉여 유저 수 감소, 룸 내 자료구조에 추가
+			NowRoom->m_iEmptyCount--;
+
+			auto ret = NowRoom->m_uset_JoinUser.insert(ClientKey);
+			if (ret.second == false)
+				g_MasterDump->Crash();
+
+
+
+			// 6. 감소 후 여유 유저 수가 0명이라면, list에서 뺀 후, umap에 추가
+			if (NowRoom->m_iEmptyCount == 0)
+			{
+				AcquireSRWLockExclusive(&m_srwl_Room_Umap);	// ----- umap 룸 Exclusive 락
+
+				// list에서 pop
+				m_Room_List.pop_front();
+
+				// umap에 Insert
+				auto ret = m_Room_Umap.insert(make_pair(NowRoom->m_ui64RoomKey, NowRoom));
+				if (ret.second == false)
+					g_MasterDump->Crash();
+
+				ReleaseSRWLockExclusive(&m_srwl_Room_List);	// ----- list 룸 Exclusive 언락
+				ReleaseSRWLockExclusive(&m_srwl_Room_Umap);	// ----- umap 룸 Exclusive 언락
+			}
+
+			// 여유 유저 수가 0 이상이라면, 그냥 락만 해제하고 나간다.
+			else
+			{
+				ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- list 룸 Exclusive 언락
+			}
+		}
+
+		// ---------------------------- 패킷 응답하기
+		// 여기까지 왔으면 방을 찾았다는 것.
+
+		// 1. Send할 데이터 셋팅 --- 1차
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+		WORD Type = en_PACKET_MAT_MAS_RES_GAME_ROOM;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ClientKey, 8);
+
+
+		// 2. 해당 룸이 있는 배틀서버의 정보 알아오기
+		AcquireSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 락
+
+		auto FindBattle = m_BattleServer_Umap.find(iBattleServerNo);
+
+		// 배틀서버가 없으면 방 없음 패킷 보냄
+		// 여기서 배틀서버가 없는 것은 배틀서버가 죽었다는 것 밖에 안됨.
+		if (FindBattle == m_BattleServer_Umap.end())
+		{
+			ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
+
+			// 배틀서버가 죽었기 때문에, 방 없음 패킷 리턴
+			BYTE Status = 0;
+
+			SendBuff->PutData((char*)&Status, 1);
+
+			SendPacket(SessionID, SendBuff);
+
+			return;
+		}
+
+		stBattle* NowBattle = FindBattle->second;
+
+
+		// 3. Send할 데이터 셋팅 --- 2차
+		BYTE Status = 1;
+		SendBuff->PutData((char*)&Status, 1);
+
+		SendBuff->PutData((char*)&NowBattle->m_iServerNo, 2);
+		SendBuff->PutData((char*)NowBattle->m_tcBattleIP, 32);
+		SendBuff->PutData((char*)&NowBattle->m_wBattlePort, 2);
+		SendBuff->PutData((char*)&iSendRoomNo, 4);
+		SendBuff->PutData(NowBattle->m_cConnectToken, 32);
+		SendBuff->PutData(cSendEnterToken, 32);
+
+		SendBuff->PutData((char*)NowBattle->m_tcChatIP, 32);
+		SendBuff->PutData((char*)NowBattle->m_wChatPort, 2);
+
+		ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
+
+
+		// 4. 배틀의 플레이어 관리 자료구조에 추가
+		stPlayer* NewPlayer = m_TLSPool_Player->Alloc();
+
+		NewPlayer->m_ui64ClinetKey = ClientKey;
+		NewPlayer->m_iJoinRoomNo = iSendRoomNo;
+		NewPlayer->m_iBattleServerNo = iBattleServerNo;
+		NewPlayer->m_iMatchServerNo = MatchServerNo;
+
+
+		// 배틀의 자료구조에 추가
+		if (InsertPlayerFunc(ClientKey, NewPlayer) == false)
+			g_MasterDump->Crash();
+
+
+		// 5. 매칭 Lan서버를 통해, 방 정보 Send하기
+		SendPacket(SessionID, SendBuff);
+	}
+
+	
+
+
+	// -------------------------------
+	// 내부에서만 호출하는 함수
+	// -------------------------------
+
+	// 배틀서버와 연결이 끊길 시, 해당 배틀서버의 룸을 모두 제거한다.
 	// 룸 자료구조 모두(2개)에서 제거한다.
 	//
 	// Parameter : BattleServerNo
 	// return : 없음
 	void CBattleServer_Lan::BattleLeave(int BattleServerNo)
 	{
-		// -------------------------- Priority Queue 처리
+		// -------------------------- list 처리
 
-		// 임시 저장 공간
-		vector<stRoom*> TempPlace;
-		TempPlace.reserve(3000);
+		AcquireSRWLockExclusive(&m_srwl_Room_List);	 // ----- list 룸 Exclusive 락	
 
-		AcquireSRWLockExclusive(&m_srwl_Room_pq);	 // ----- pq 룸 Exclusive 락				
-
-		//  Priority Queue에서 해당 BattleServerNo의 룸을 뺀다.
-		size_t iPqSize = m_Room_pq.size();
-		while (1)
+		// list 내에 방이 하나 이상 있을 경우, list에서 룸 정리
+		if (m_Room_List.size() > 0)
 		{
-			if (iPqSize == 0)
-				break;
+			// list를 순회하면서, 해당 배틀서버No의 룸을 erase 한다
+			auto itor_Now = m_Room_List.begin();
+			auto itor_End = m_Room_List.end();
 
-			// 1. pop
-			stRoom* NowRoom = m_Room_pq.top();
-			m_Room_pq.pop();
+			while (1)
+			{
+				if (itor_Now == itor_End)
+					break;
 
-			// 2. ServerNo 확인
-			// 다르면 임시 저장 공간에 넣는다.
-			if (NowRoom->m_iBattleServerNo != BattleServerNo)
-				TempPlace.push_back(NowRoom);
+				// 1. 배틀서버 No 비교
+				if ((*itor_Now)->m_iBattleServerNo == BattleServerNo)
+				{
+					// 같다면, Erase
+					itor_Now = m_Room_List.erase(itor_Now);
+				}
 
-			--iPqSize;
+				// 2. 다르다면 itor_Now ++
+				else
+					++itor_Now;
+			}
+
 		}
 
-		// 임시 저장 공간에 있는 Room을 다시 모두 넣는다.
-		// 임시 저장 공간에는 배틀서버No가 다른 방들만 모여있다.
-		size_t i = 0;
-		size_t End = TempPlace.size();
-		while (1)
-		{
-			if (i < End)
-				break;
-
-			m_Room_pq.push(TempPlace[i]);
-
-			++i;
-		}	
-
-		ReleaseSRWLockExclusive(&m_srwl_Room_pq);	 // ----- pq 룸 Exclusive 언락
-
-
-
+		ReleaseSRWLockExclusive(&m_srwl_Room_List);	 // ----- list 룸 Exclusive 언락	
+			   
 
 		// -------------------------- umap 처리
 
-		AcquireSRWLockExclusive(&m_srwl_Room_Umap);	 // ----- uamp 룸 Exclusive 락
+		AcquireSRWLockExclusive(&m_srwl_Room_Umap);	 // ----- umap 룸 Exclusive 락
 
-		// 모두 순회하며, ServerNo가 같은 경우 erase 및 Free
-		auto itor_Now = m_Room_Umap.begin();
-		auto itor_End = m_Room_Umap.end();
-
-		while (1)
+		// umap 안에 방이 하나라도 있을 경우, umap에서 방 정리
+		if (m_Room_Umap.size() > 0)
 		{
-			if (itor_Now == itor_End)
-				break;
+			// 모두 순회하며, ServerNo가 같은 경우 erase 및 Free
+			auto itor_Now = m_Room_Umap.begin();
+			auto itor_End = m_Room_Umap.end();
 
-			stRoom* NowRoom = itor_Now->second;
-
-			// ServerNo가 같은 경우, Erase 및 메모리풀에 Free
-			if (NowRoom->m_iBattleServerNo == BattleServerNo)
+			while (1)
 			{
-				itor_Now = m_Room_Umap.erase(itor_Now);
-				m_TLSPool_Room->Free(NowRoom);
-			}
+				if (itor_Now == itor_End)
+					break;
 
-			else
-				++itor_Now;
+				stRoom* NowRoom = itor_Now->second;
+
+				// 1. 배틀서버 No 비교
+				if (NowRoom->m_iBattleServerNo == BattleServerNo)
+				{
+					// 같다면, Erase와 Free
+					itor_Now = m_Room_Umap.erase(itor_Now);
+					m_TLSPool_Room->Free(NowRoom);
+				}
+
+				// 2. 다르다면 itor_Now ++
+				else
+					++itor_Now;
+			}
 		}
 
-		ReleaseSRWLockExclusive(&m_srwl_Room_Umap);	 // ----- uamp 룸 Exclusive 언락
+		ReleaseSRWLockExclusive(&m_srwl_Room_Umap);	 // ----- umap 룸 Exclusive 언락
 	}
+
+	
+
+
+
+	// -------------------------------
+	// 패킷 처리 함수
+	// -------------------------------
+
+	// 배틀서버 로그인 패킷
+	//
+	// Parameter : SessionID, Payload
+	// return : 없음
+	void CBattleServer_Lan::Packet_Login(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{
+		// 1. 배틀서버 검색
+		stBattle* NowBattle = FindBattleServerFunc(SessionID);
+
+		if (NowBattle == nullptr)
+			g_MasterDump->Crash();
+
+
+		// 2. 마샬링 및 배틀서버에 복사 1차
+		Payload->GetData((char*)NowBattle->m_tcBattleIP, 32);
+		Payload->GetData((char*)&NowBattle->m_wBattlePort, 2);
+		Payload->GetData(NowBattle->m_cConnectToken, 32);
+		
+		char MasterEnterToken[32];
+		Payload->GetData(MasterEnterToken, 32);
+
+		// 3. 입장 토큰 비교
+		if (memcmp(pMatchServer->m_stConfig.BattleEnterToken, MasterEnterToken, 32) != 0)
+		{
+			// 다를 경우
+			InterlockedIncrement(&g_lBattle_TokenError);
+
+			g_MasterDump->Crash();
+
+			/*
+			// 다를 경우, 로그 찍고, 응답 없이 끊는다.
+			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Packet_Battle_Login() --> EnterToken Error. SessionID : %lld", SessionID);
+
+			Disconnect(SessionID);
+
+			return;
+			*/
+		}
+
+		// 4. 마샬링 및 배틀서버에 복사 2차
+		Payload->GetData((char*)NowBattle->m_tcChatIP, 32);
+		Payload->GetData((char*)&NowBattle->m_wChatPort, 2);
+
+		// 5. 배틀서버 No 부여. 로그인 패킷 처리 플래그 변경
+		int ServerNo = InterlockedIncrement(&m_lBattleServerNo_Add);
+		NowBattle->m_iServerNo = ServerNo;
+		NowBattle->m_bLoginCheck = true;
+
+		// 6. 응답패킷 보내기
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+		WORD Type = en_PACKET_BAT_MAS_RES_SERVER_ON;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ServerNo, 4);
+
+		SendPacket(SessionID, SendBuff);
+	}
+
+	// 토큰 재발행
+	//
+	// Parameter : SessionID, Payload
+	// return : 없음
+	void CBattleServer_Lan::Packet_TokenChange(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{
+		// 1. 배틀서버 검색
+		stBattle* NowBattle = FindBattleServerFunc(SessionID);
+
+		if (NowBattle == nullptr)
+			g_MasterDump->Crash();
+
+		// 2. 마샬링 및 새로운 토큰 배틀서버에 셋팅
+		UINT ReqSequence;
+		Payload->GetData(NowBattle->m_cConnectToken, 32);
+		Payload->GetData((char*)&ReqSequence, 4);
+
+		// 3. 응답 패킷 보내기
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_BAT_MAS_RES_CONNECT_TOKEN;
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ReqSequence, 4);
+
+		SendPacket(SessionID, SendBuff);
+	}
+
 
 
 
@@ -1208,147 +1535,6 @@ namespace Library_Jingyu
 
 
 
-
-
-	// -------------------------------
-	// 패킷 처리 함수
-	// -------------------------------
-
-	// 방 정보 요청 패킷 처리
-	// !! 매칭 랜 서버에서 호출 !!
-	//
-	// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, 매칭서버의 No
-	// return : 없음
-	void CBattleServer_Lan::Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, int MatchServerNo)
-	{
-		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
-
-		AcquireSRWLockExclusive(&m_srwl_Room_pq);	// ----- pq 룸 Exclusive 락
-
-		// 1. 마스터 서버 내에 배정 가능한 룸이 1개 이상 존재하는지 확인
-		if (m_Room_pq.empty() == true)
-		{
-			ReleaseSRWLockExclusive(&m_srwl_Room_pq);	// ----- pq 룸 Exclusive 언락
-
-			// 룸이 하나도 없으면, 방 없음 패킷 리턴
-			WORD Type = en_PACKET_MAT_MAS_RES_GAME_ROOM;
-			BYTE Status = 0;
-
-			SendBuff->PutData((char*)&Type, 2);
-			SendBuff->PutData((char*)&ClientKey, 8);
-			SendBuff->PutData((char*)&Status, 1);
-
-			SendPacket(SessionID, SendBuff);
-
-			return;
-		}
-
-
-		// 2. 룸 얻기
-		stRoom* NowRoom = m_Room_pq.top();
-
-		NowRoom->RoomLOCK();		// ----- 룸 1개에 대한 락
-
-
-		// 3. 룸 안의 여유 유저 수 확인
-		// 0명이면 여기 있으면 안됨.
-		if (NowRoom->m_iEmptyCount == 0)
-			g_MasterDump->Crash();
-
-
-		// 4. 룸의 유저 수 감소 + 룸 내 자료구조에 추가
-		NowRoom->m_iEmptyCount--;
-
-		auto ret = NowRoom->m_uset_JoinUser.insert(ClientKey);
-		if(ret.second == false)
-			g_MasterDump->Crash();
-
-
-		// 5. 감소 후 여유 유저 수가 0명이라면, pop
-		if (NowRoom->m_iEmptyCount == 0)
-			m_Room_pq.pop();
-
-		ReleaseSRWLockExclusive(&m_srwl_Room_pq);	// ----- pq 룸 Exclusive 언락
-
-
-		// 6. Room에서 필요한 정보들 받아두기
-		int iSendRoomNo = NowRoom->m_iRoomNo;
-		int iBattleServerNo = NowRoom->m_iBattleServerNo;
-		char cSendEnterToken[32];
-		memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
-
-		NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
-
-
-		// 7. Send할 데이터 셋팅 --- 1차
-		WORD Type = en_PACKET_MAT_MAS_RES_GAME_ROOM;
-
-		SendBuff->PutData((char*)&Type, 2);
-		SendBuff->PutData((char*)&ClientKey, 8);		
-
-
-		// 8. 해당 룸이 있는 배틀서버의 정보 알아오기
-		AcquireSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 락
-
-		auto FindBattle = m_BattleServer_Umap.find(iBattleServerNo);
-
-		// 배틀서버가 없으면 방 없음 패킷 보냄
-		if (FindBattle == m_BattleServer_Umap.end())
-		{
-			ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
-			
-			// 방 없음 패킷 리턴
-			BYTE Status = 0;
-
-			SendBuff->PutData((char*)&Status, 1);
-
-			SendPacket(SessionID, SendBuff);
-
-			return;			
-		}
-
-		stBattle* NowBattle = FindBattle->second;
-
-
-		// 9. Send할 데이터 셋팅 --- 2차
-		BYTE Status = 1;
-		SendBuff->PutData((char*)&Status, 1);
-
-		SendBuff->PutData((char*)&NowBattle->m_iServerNo, 2);
-		SendBuff->PutData((char*)NowBattle->m_tcBattleIP, 32);
-		SendBuff->PutData((char*)&NowBattle->m_wBattlePort, 2);
-		SendBuff->PutData((char*)&iSendRoomNo, 4);
-		SendBuff->PutData(NowBattle->m_cConnectToken, 32);
-		SendBuff->PutData(cSendEnterToken, 32);
-
-		SendBuff->PutData((char*)NowBattle->m_tcChatIP, 32);
-		SendBuff->PutData((char*)NowBattle->m_wChatPort, 2);
-
-		ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
-
-
-		// 10. 배틀의 플레이어 관리 자료구조에 추가
-		stPlayer* NewPlayer = m_TLSPool_Player->Alloc();
-
-		NewPlayer->m_ui64ClinetKey = ClientKey;
-		NewPlayer->m_iJoinRoomNo = iSendRoomNo;
-		NewPlayer->m_iBattleServerNo = iBattleServerNo;
-		NewPlayer->m_iMatchServerNo = MatchServerNo;
-
-
-		// 배틀의 자료구조에 추가
-		if(InsertPlayerFunc(ClientKey, NewPlayer) == false)
-			g_MasterDump->Crash();	
-
-
-		// 11. 매칭 Lan서버를 통해, 방 정보 Send하기
-		SendPacket(SessionID, SendBuff);
-	}
-	
-
-
-
-
 	// -----------------------
 	// 가상함수
 	// -----------------------
@@ -1376,19 +1562,9 @@ namespace Library_Jingyu
 		stBattle* EraseBattle =  EraseBattleServerFunc(SessionID);
 
 		// 2. 해당 배틀서버의 룸들 모두 삭제
-		BattleLeave(EraseBattle->m_iServerNo);
+		BattleLeave(EraseBattle->m_iServerNo);		
 
-		// 3. 만약, 로그인 상태라면 Set에서도 제거
-		if (EraseBattle->m_bLoginCheck == true)
-		{
-			if (EraseBattleServerFunc_Set(EraseBattle->m_iServerNo) == false)
-				g_MasterDump->Crash();
-
-			// 로그인 상태를 false로 변경
-			EraseBattle->m_bLoginCheck = false;
-		}
-
-		// 4. stBattle* 반환
+		// 3. stBattle* 반환
 		m_TLSPool_BattleServer->Free(EraseBattle);
 	}
 
@@ -1400,8 +1576,18 @@ namespace Library_Jingyu
 		// 타입에 따라 분기 처리
 		try
 		{
+			// 자주 올 법한 패킷 순서대로 Switch ~ Case 구성.
+			//
+			// 유저의 액션은 예측할 수 없기 때문에, 예측할 수 없는 '유저 나감' 액션을 1순위로 측정
+			// 배틀서버에서 일정 수준의 대기방을 유지하기 때문에, 방 닫힘과 동시에 신규 대기방 생성이 날라올 수 있으니 둘을 2순위로 측정
+			// 일정 시간마다 토큰 재발행이 될 수 있기 때문에 3순위
+			// 배틀 서버로부터 받은 로그인 요청은, 마스터 서버가 켜진 후 몇 번 안받기 때문에 가장 후순위		
 			switch (Type)
 			{
+				// 유저 나감
+			case en_PACKET_BAT_MAS_REQ_LEFT_USER:
+				break;
+
 				// 신규 대기방 생성
 			case en_PACKET_BAT_MAS_REQ_CREATED_ROOM:
 				break;
@@ -1410,16 +1596,14 @@ namespace Library_Jingyu
 			case en_PACKET_BAT_MAS_REQ_CLOSED_ROOM:
 				break;
 
-				// 유저 나감
-			case en_PACKET_BAT_MAS_REQ_LEFT_USER:
-				break;
-
 				// 토큰 재발행
 			case en_PACKET_BAT_MAS_REQ_CONNECT_TOKEN:
+				Packet_TokenChange(SessionID, Payload);
 				break;
 
 				// 배틀서버 로그인 
 			case en_PACKET_BAT_MAS_REQ_SERVER_ON:
+				Packet_Login(SessionID, Payload);
 				break;
 
 				// Type Error
@@ -1469,11 +1653,13 @@ namespace Library_Jingyu
 	// 생성자
 	CBattleServer_Lan::CBattleServer_Lan()
 	{
+		// 변수 최초값
+		m_lBattleServerNo_Add = 0;
+
 		// 락 초기화
 		InitializeSRWLock(&m_srwl_BattleServer_Umap);
-		InitializeSRWLock(&m_srwl_Room_Umap);
-		InitializeSRWLock(&m_srwl_Room_pq);
-		InitializeSRWLock(&m_srwl_LoginBattleServer_Uset);
+		InitializeSRWLock(&m_srwl_Room_List);
+		InitializeSRWLock(&m_srwl_Room_Umap);	
 
 		// TLS 동적할당
 		m_TLSPool_BattleServer = new CMemoryPoolTLS<stBattle>(0, false);
@@ -1483,7 +1669,6 @@ namespace Library_Jingyu
 		// 자료구조 공간 미리 잡아두기
 		m_BattleServer_Umap.reserve(100);
 		m_Room_Umap.reserve(10000);
-		m_LoginBattleServer_Uset.reserve(100);
 	}
 
 	// 소멸자

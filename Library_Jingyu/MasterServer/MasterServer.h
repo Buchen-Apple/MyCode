@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <queue>
+#include <vector>
+#include <list>
 
 // -----------------------
 //
@@ -305,10 +307,10 @@ namespace Library_Jingyu
 			ULONGLONG m_ullSessionID;
 
 			// 배틀서버 고유번호
-			int m_iServerNo;
+			int m_iServerNo;		
 
-			// 로그인 여부
-			// true면 로그인 패킷을 받은 후 set에 추가까지 되었음.
+			// 배틀 서버 로그인 체크
+			// false면 로그인 처리가 안된 배틀서버.
 			bool m_bLoginCheck;
 
 			// 배틀서버 접속 IP
@@ -407,6 +409,10 @@ namespace Library_Jingyu
 		// !! Matching 서버 !!
 		CMatchServer_Lan* pMatchServer;
 
+		// 배틀서버에 부여할 번호.
+		// 배틀 서버에게 로그인 패킷이 처리 될 때 마다 1씩 증가.
+		LONG m_lBattleServerNo_Add;
+
 		
 
 	private:
@@ -444,19 +450,7 @@ namespace Library_Jingyu
 		SRWLOCK m_srwl_BattleServer_Umap;
 
 		// stBattle을 관리하는 TLSPool
-		CMemoryPoolTLS<stBattle> *m_TLSPool_BattleServer;
-
-		// ------------------------
-
-		// Battle 서버 중, 로그인 패킷까지 받은 서버 관리용 자료구조.
-		// 존재 여부 판단용도.
-		// uset 사용
-		//
-		// Key : ServerNo (배틀서버 No)
-		unordered_set<int> m_LoginBattleServer_Uset;
-
-		// m_LoginBattleServer_Uset관리용 SRWLOCK
-		SRWLOCK m_srwl_LoginBattleServer_Uset;
+		CMemoryPoolTLS<stBattle> *m_TLSPool_BattleServer;	
 
 
 
@@ -464,10 +458,24 @@ namespace Library_Jingyu
 
 	private:
 		// -----------------
-		// Room 관리용 자료구조
+		// Room 관리용 자료구조 (Main)
 		// -----------------
 
-		// RoomNo를 이용해, 룸을 관리하는 자료구조
+		// 룸을 관리하는 자료구조
+		// list 사용
+		//
+		// Key : stRoom*
+		list<stRoom*> m_Room_List;
+
+		// m_Room_List관리용 SRWLOCK
+		SRWLOCK m_srwl_Room_List;
+
+
+		// -----------------
+		// Room 관리용 자료구조 (Sub)
+		// -----------------
+
+		// RoomKey를 이용해, 룸을 관리하는 자료구조
 		// umap 사용
 		//
 		// Key : RoomKey(상위 4바이트는 BattleServerNo , 하위 4바이트는 RoomNo을 OR한 Mix값), Value : CPlayer*
@@ -476,19 +484,7 @@ namespace Library_Jingyu
 		// m_Room_Umap관리용 SRWLOCK
 		SRWLOCK m_srwl_Room_Umap;
 
-		// -----------------------			
-
-		// 룸을 관리하는 자료구조2
-		// Priority_Queue 사용
-		//
-		//  <자료형, 구현체, 비교연산자> 순서로 정의
-		// 자료형 : CRoom*, 구현체 : Vector<CRoom*>. 비교 연산자 : 직접 지정(오름차순)
-		priority_queue <stRoom*, vector<stRoom*>, RoomCMP> m_Room_pq;
-
-		// m_Room_pq관리용 SRWLOCK
-		SRWLOCK m_srwl_Room_pq;
-
-		// -----------------------
+		// -----------------------				
 
 		// stRoom을 관리하는 TLSPool
 		CMemoryPoolTLS<stRoom> *m_TLSPool_Room;
@@ -506,34 +502,20 @@ namespace Library_Jingyu
 		//		  : 실패 시 false(중복키)
 		bool InsertBattleServerFunc(ULONGLONG SessionID, stBattle* InsertBattle);
 
+		// 배틀 서버 관리 자료구조에서 배틀서버 Find
+		//
+		// Parameter : SessionID
+		// return : 정상적으로 찾을 시 stBattle*
+		//		  : 없을 시, nullptr
+		stBattle* FindBattleServerFunc(ULONGLONG SessionID);
+
+
 		// 배틀서버 관리 자료구조에서 배틀서버 erase
 		//
 		// Parameter : SessionID
 		// return : 성공 시 stBattle*
 		//		  : 실패 시 nullptr
 		stBattle* EraseBattleServerFunc(ULONGLONG SessionID);
-
-
-
-	private:
-		// -----------------------------------------
-		// 접속한 배틀서버 관리용 자료구조 함수 (Set)
-		// -----------------------------------------
-
-		// 배틀서버 Set 자료구조에 배틀서버 Insert
-		//
-		// Parameter : ServerNo
-		// return : 성공 시 true
-		//		  : 실패 시 false(중복키)
-		bool InsertBattleServerFunc_Set(int ServerNo);
-
-		// 배틀서버 Set 자료구조에서 배틀서버 erase
-		//
-		// Parameter : ServerNo
-		// return : 성공 시 true
-		//		  : 실패 시 false
-		bool EraseBattleServerFunc_Set(int ServerNo);
-
 
 
 	private:
@@ -552,9 +534,9 @@ namespace Library_Jingyu
 
 
 	private:
-		// -----------------
-		// 내부에서만 사용하는 함수
-		// -----------------
+		// -----------------------------
+		// 마스터의 매칭쪽에서 호출하는 함수
+		// -----------------------------
 
 		// 매칭으로 방 입장 성공 패킷이 올 시 호출되는 함수
 		// 1. RoomNo, BattleServerNo가 정말 일치하는지 확인
@@ -595,7 +577,21 @@ namespace Library_Jingyu
 		// return : 없음
 		void MatchLeave(int MatchServerNo);
 
-		// 배틀서버와 연결이 끊길 시, 해당 매칭서버의 룸을 모두 제거한다.
+		// 방 정보 요청 패킷 처리
+		// !! 매칭 랜 서버에서 호출 !!
+		//
+		// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, 매칭서버의 No
+		// return : 없음
+		void Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, int MatchServerNo);
+
+
+
+	private:
+		// -------------------------------
+		// 내부에서만 호출하는 함수
+		// -------------------------------
+
+		// 배틀서버와 연결이 끊길 시, 해당 배틀서버의 룸을 모두 제거한다.
 		// 룸 자료구조 모두(2개)에서 제거한다.
 		//
 		// Parameter : BattleServerNo
@@ -604,9 +600,30 @@ namespace Library_Jingyu
 
 
 
+
+	private:
+		// -------------------------------
+		// 패킷 처리 함수
+		// -------------------------------
+
+		// 배틀서버 로그인 패킷
+		//
+		// Parameter : SessionID, Payload
+		// return : 없음
+		void Packet_Login(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+
+		// 토큰 재발행
+		//
+		// Parameter : SessionID, Payload
+		// return : 없음
+		void Packet_TokenChange(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+
+
 	public:
 		// -----------------------
-		// 외부에서 사용 가능한 함수
+		// 외부에서 호출 가능한 함수
 		// -----------------------
 
 		// 서버 시작
@@ -619,26 +636,9 @@ namespace Library_Jingyu
 		//
 		// Parameter : 없음
 		// return : 없음
-		void ServerStop();
+		void ServerStop();	
 
 
-
-
-
-	private:
-		// -------------------------------
-		// 패킷 처리 함수
-		// -------------------------------
-
-		// 방 정보 요청 패킷 처리
-		// !! 매칭 랜 서버에서 호출 !!
-		//
-		// Parameter : SessionID(매칭 쪽의 SessionID), ClientKey, 매칭서버의 No
-		// return : 없음
-		void Relay_Battle_Room_Info(ULONGLONG SessionID, UINT64 ClientKey, int MatchServerNo);
-			
-
-		
 
 
 	private:
