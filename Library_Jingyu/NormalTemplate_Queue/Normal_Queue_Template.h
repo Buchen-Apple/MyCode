@@ -148,7 +148,7 @@ namespace Library_Jingyu
 		LocalTail->m_Next = NewNode;	
 
 		// 6. 큐 사이즈 1 증가
-		InterlockedAdd(&m_iSize, 1);
+		InterlockedIncrement(&m_iSize);
 	}
 
 
@@ -165,7 +165,7 @@ namespace Library_Jingyu
 			return -1;	
 
 		// 2. 큐 사이즈 1 감소
-		InterlockedAdd(&m_iSize, -1);
+		InterlockedDecrement(&m_iSize);
 
 		// 3. 그게 아니라면 데이터가 있는것.
 		// 헤더를 헤더->Next로 이동

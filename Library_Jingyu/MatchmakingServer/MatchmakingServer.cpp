@@ -606,8 +606,7 @@ namespace Library_Jingyu
 			SendData->PutData((char*)&Type, 2);
 			SendData->PutData((char*)&Status, 1);
 
-			// º¸³»°í ²÷±â
-			SendPacket(SessionID, SendData, TRUE);
+			SendPacket(SessionID, SendData);
 			return;
 		}		
 
@@ -633,8 +632,7 @@ namespace Library_Jingyu
 			SendData->PutData((char*)&Type, 2);
 			SendData->PutData((char*)&Status, 1);
 
-			// º¸³»°í ²÷±â
-			SendPacket(SessionID, SendData, TRUE);
+			SendPacket(SessionID, SendData);
 			return;
 		}
 
@@ -652,8 +650,7 @@ namespace Library_Jingyu
 			SendData->PutData((char*)&Type, 2);
 			SendData->PutData((char*)&Status, 1);
 
-			// º¸³»°í ²÷±â
-			SendPacket(SessionID, SendData, TRUE);
+			SendPacket(SessionID, SendData);
 			return;
 		}
 
