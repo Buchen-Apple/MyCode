@@ -518,6 +518,7 @@ namespace Library_Jingyu
 		stBattle* EraseBattleServerFunc(ULONGLONG SessionID);
 
 
+
 	private:
 		// -----------------
 		// 플레이어 관리용 자료구조 함수
@@ -598,6 +599,11 @@ namespace Library_Jingyu
 		// return : 없음
 		void BattleLeave(int BattleServerNo);
 
+		// RoomKey를 만들어내는 함수
+		//
+		// Parameter : BattleServerNo, RoomNo
+		// return : RoomKey(UINT64)
+		UINT64 Create_RoomKey(int BattleServerNo, int RoomNo);
 
 
 
@@ -611,15 +617,30 @@ namespace Library_Jingyu
 		// Parameter : SessionID, Payload
 		// return : 없음
 		void Packet_Login(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
-
-
+		
 		// 토큰 재발행
 		//
 		// Parameter : SessionID, Payload
 		// return : 없음
 		void Packet_TokenChange(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+		
+		// 신규 대기방 생성
+		//
+		// Parameter : SessionID, Payload
+		// return : 없음
+		void Packet_NewRoomCreate(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+		
+		// 방 닫힘
+		//
+		// Parameter : SessionID, payload
+		// return : 없음
+		void Packet_RoomClose(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
-
+		// 유저 나감
+		//
+		// Parameter : SessionID, Payload
+		// return : 없음
+		void Packet_UserExit(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
 	public:
 		// -----------------------
