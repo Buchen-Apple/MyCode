@@ -562,8 +562,6 @@ namespace Library_Jingyu
 		if (DeleteSession == nullptr)
 			return;
 
-		cNetDump->Crash();
-
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
 		shutdown(DeleteSession->m_Client_sock, SD_BOTH);

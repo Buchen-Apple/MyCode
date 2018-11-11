@@ -5,8 +5,10 @@
 #include "NetworkLib/NetworkLib_LanClinet.h"
 
 #include "Http_Exchange/HTTP_Exchange.h"
+#include "shDB_Communicate.h"
 
 #include <unordered_set>
+#include <unordered_map>
 
 using namespace std;
 
@@ -28,13 +30,12 @@ namespace Library_Jingyu
 		// CMMOServer의 cSession을 상속받는 세션 클래스
 		class CGameSession :public CMMOServer::cSession
 		{
-			friend class CBattleServer_Room;
+			friend class CBattleServer_Room;			
+
 
 			// -----------------------
-			// 생성자와 소멸자
+			// 멤버 변수
 			// -----------------------
-			CGameSession();
-			virtual ~CGameSession();
 
 			// 회원 번호
 			INT64 m_Int64AccountNo;
@@ -46,6 +47,19 @@ namespace Library_Jingyu
 
 			// CBattleServer_Room의 포인터
 			CBattleServer_Room* m_pParent;
+
+			// ClientKey의 초기 값
+			const INT64 m_i64Default_CK = -1;
+
+
+			
+		private:
+			// -----------------------
+			// 생성자와 소멸자
+			// -----------------------
+
+			CGameSession();
+			virtual ~CGameSession();
 
 
 		private:
@@ -79,6 +93,8 @@ namespace Library_Jingyu
 
 		};
 
+		friend class CGameSession;
+
 		// 파일에서 읽어오기 용 구조체
 		struct stConfigFile
 		{
@@ -110,23 +126,29 @@ namespace Library_Jingyu
 			int MonitorClientActiveWorker;
 			int MonitorClientNodelay;
 		};
-
-		// DB_Read 스레드에게 일시키기 용 구조체
-		struct DB_WORK
+				
+		// 방 구조체
+		struct stRoom
 		{
-			WORD m_wType;
-			CGameSession* m_pNowSession;
-			CProtocolBuff_Net* m_pWorkBuff;
+			// 룸 번호
+			int m_iRoomNo;
+
+			// 룸에 입장한 인원 수
+			int m_iJoinUserCount;
+
+			// 방 최대 인원 수. 
+			// 이 인원이 되면 꽉 찬것으로 판단
+			const int m_iMaxJoinCount = 5;
+
+			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
+			char m_cEnterToken[32];
 		};
-		
+
 		enum eu_DB_READ_TYPE
 		{
-			eu_LOGIN	= 0			// 로그인 패킷에 대한 처리
+			// 로그인 패킷에 대한 처리
+			eu_LOGIN	= 0			
 		};
-
-		// -----------------------
-		// 멤버 변수
-		// -----------------------
 
 
 
@@ -145,23 +167,19 @@ namespace Library_Jingyu
 		// 모니터링 클라
 		CGame_MinitorClient* m_Monitor_LanClient;
 
-		// U_set 자료구조.
-		// 접속 중인 유저의 AccountNo 관리용.
-		// 있는지 없는지 확인만 하기 때문에 Set 사용
-		unordered_set<INT64> m_setAccount;
-
-		// U_set 용 락
-		SRWLOCK m_setSrwl;
-
 		// 버전 코드
 		// 클라가 들고온 것을 비교. 파싱으로 읽어옴.
 		int m_uiVer_Code;
 
-		// DB_read 스레드 용 IOCP
-		HANDLE m_hDBRead_IOCPHandle;
+		// shDB와 통신하는 변수
+		shDB_Communicate m_shDB_Communicate;	
 
 
-		// ----------------
+		
+
+		// -----------------------
+		// 토큰관리 변수
+		// -----------------------
 
 		// 입장 토큰 관리
 		// 배틀서버는 이 2개 중 하나라도 일치한다면 맞다고 통과시킨다.
@@ -177,19 +195,75 @@ namespace Library_Jingyu
 		// 새로운 토큰을 "현재" 토큰에 넣는다.
 		char m_cConnectToken_Before[32];
 
-		// ----------------
 
 
 
-	private:
 		// -----------------------
-		// 스레드
+		// 방 관련 변수
 		// -----------------------
 
-		// DB_Read용 스레드
-		// IOCP의 스레드 풀을 이용해 관리된다.
-		static UINT WINAPI	DB_Read_Thread(LPVOID lParam);
+		// 방 번호를 할당할 변수
+		// 인터락으로 ++
+		LONG m_lGlobal_RoomNo;
 
+		// 최대 존재할 수 있는 방 수
+		// 고정 값
+		const int m_iMaxTotalRoomCount = 500;
+
+		// 최대 존재할 수 있는 대기방 수
+		// 고정 값
+		const int m_iMaxWaitRoomCount = 200;
+
+
+		// 현재 대기방 수 (5/5가 되지 않은 방)
+		int m_iNowWaitRoomCount;
+
+		// 현재 게임 내에 만들어진 방 수 (모든 방 합쳐서)
+		int m_iNowTotalRoomCount;
+
+		// 방 입장 토큰
+		// 미리 64개정도 만들어 두고, 방생성 시 랜덤으로 보낸다.
+		char m_cRoomEnterToken[64][32];
+
+		// stRoom 관리 Pool
+		CMemoryPoolTLS<stRoom> *m_Room_Pool;
+
+		
+
+		
+
+
+		// -----------------------
+		// 방 관리 자료구조 변수
+		// -----------------------
+
+		// 방 관리 umap
+		//
+		// Key : RoomNo, Value : stRoom*
+		unordered_map<int, stRoom*> m_Room_Umap;
+
+
+
+
+
+
+		// -----------------------
+		// 유저 관리 자료구조 변수
+		// -----------------------
+
+		// AccountNo를 이용해 CGameSession* 관리
+		//
+		// 접속 중인 유저의 AccountNo를 기준으로 CGameSession* 관리
+		// Key : AccountNo, Value : CGameSession*
+		unordered_map<INT64, CGameSession*> m_AccountNo_Umap;
+
+		// m_AccountNo_Umap용 SRW락
+		SRWLOCK m_AccountNo_Umap_srwl;	
+
+		
+		
+
+			   		 
 
 	private:
 		// -----------------------
@@ -203,6 +277,67 @@ namespace Library_Jingyu
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
 
+		// Start
+		// 내부적으로 CMMOServer의 Start, 세션 셋팅까지 한다.
+		//
+		// Parameter : 없음
+		// return : 실패 시 false
+		bool BattleServerStart();
+
+		// Stop
+		// 내부적으로 Stop 실행
+		//
+		// Parameter : 없음
+		// return : 없음
+		void BattleServerStop();
+
+		// 출력용 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ShowPrintf();
+
+
+
+	private:
+		// -----------------------
+		// 패킷 후처리 함수
+		// -----------------------
+
+		// Login 패킷 후처리
+		//
+		// Parameter : DB_WORK_LOGIN*
+		// return : 없음
+		void Auth_LoginPacket_Last(DB_WORK_LOGIN* DBData);
+
+
+
+
+	private:
+		// -----------------------
+		// AccountNo 자료구조 관리 함수
+		// -----------------------
+
+		// AccountNo 자료구조에 유저를 추가하는 함수
+		//
+		// Parameter : AccountNo, CGameSession*
+		// return : 성공 시 true
+		//		  : 실패 시 false
+		bool InsertAccountNoFunc(INT64 AccountNo, CGameSession* InsertPlayer);
+
+		// AccountNo 자료구조에서 유저를 검색하는 함수
+		//
+		// Parameter : AccountNo
+		// return : 성공 시 ClientKey
+		//		  : 실패 시 nullptr
+		CGameSession* FindAccountNoFunc(INT64 AccountNo);
+
+		// AccountNo 자료구조에서 유저를 제거하는 함수
+		//
+		// Parameter : AccountNo
+		// return : 성공 시 true
+		//		  : 실패 시 false
+		bool EraseAccountNoFunc(INT64 AccountNo);
 
 
 	protected:

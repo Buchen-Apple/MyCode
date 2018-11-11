@@ -1,11 +1,8 @@
-﻿  pch.cpp
-  CrashDump.cpp
-  HTTP_Exchange.cpp
-  Log.cpp
-  HTTP_POST_MAIN.cpp
+﻿  HTTP_POST_MAIN.cpp
+c:\git_public\10_실무용 게임서버 프로그래밍_2\3차과제_http_post 테스트\http_post_main\http_post_main\http_post_main.cpp(105): warning C4312: '형식 캐스트': 'int'에서 더 큰 'LPVOID'(으)로의 변환입니다.
   코드를 생성하고 있습니다.
-  6 of 269 functions ( 2.2%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    0 functions had inline decision re-evaluated but remain unchanged
+  33 of 295 functions (11.2%) were compiled, the rest were copied from previous compilation.
+    25 functions were new in current compilation
+    12 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
   HTTP_POST_MAIN.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\3차과제_HTTP_POST 테스트\HTTP_POST_MAIN\x64\Release\HTTP_POST_MAIN.exe
