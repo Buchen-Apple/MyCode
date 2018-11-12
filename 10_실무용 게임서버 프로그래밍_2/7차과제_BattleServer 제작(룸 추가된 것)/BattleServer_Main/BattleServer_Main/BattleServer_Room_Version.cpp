@@ -13,6 +13,7 @@
 #include "rapidjson\stringbuffer.h"
 
 #include <process.h>
+#include <strsafe.h>
 
 using namespace rapidjson;
 
@@ -80,7 +81,15 @@ namespace Library_Jingyu
 		:CMMOServer::cSession()
 	{
 		// ClientKey 초기값 셋팅
-		m_int64ClientKey = m_i64Default_CK;
+		m_int64ClientKey = -1;
+
+		// 자료구조에 들어감 플래그
+		m_bStructFlag = false;
+
+		// 로그인 패킷 완료 처리
+		m_bLoginFlag = false;
+
+		m_iRoomNo = -1;
 	}
 
 	// 소멸자
@@ -119,19 +128,60 @@ namespace Library_Jingyu
 		// 실제 게임 종료일 경우
 		else
 		{
-			// ClinetKey가 초기값이 아니라면, 로그인 패킷을 보낸 유저.
-			// 로그인 패킷을 보낸 유저는, AccountNo 자료구조에 무조건 들어있음.
-			if (m_int64ClientKey != m_i64Default_CK)
-			{
-				if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-					g_BattleServer_Room_Dump->Crash();
-			}
-
 			// ClientKey 초기값으로 셋팅.
 			// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
 			// !! Auth_Update에서 이미 샌드큐가 모두 정리된 유저에게 또 SendPacket 가능성 !!
 			// !! 이 경우, 전혀 엉뚱한 유저에게 Send가 될 수 있음 !!
-			m_int64ClientKey = m_i64Default_CK;
+			m_int64ClientKey = -1;
+
+			// 해당 유저가 있는 룸 안에서 유저 제거
+			// -1이 아니면 룸에 있는것.
+			if (m_iRoomNo != -1)
+			{
+				AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 락 
+
+				// 1. 룸 검색
+				auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+				// 룸이 없으면 Crash
+				if (FindRoom == m_pParent->m_Room_Umap.end())
+				{
+					ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+					g_BattleServer_Room_Dump->Crash();
+				}
+
+				stRoom* NowRoom = FindRoom->second;
+
+				// 룸 상태가 Play면 Crash. 말도 안됨
+				// Auth모드에서 종료되는 유저가 있는 방은, 무조건 대기/준비 방이어야 함				
+				if (NowRoom->m_iRoomState == eu_ROOM_STATE::PLAY_ROOM)
+				{
+					ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+					g_BattleServer_Room_Dump->Crash();
+				}
+
+				// 여기까지 오면 방 모드가 WAIT_ROOM 혹은 READY_ROOM 확정.
+				// 즉, Auth에서만 접근하는 방 확정. 락 푼다.
+				// 혹시, 락 풀었는데 삭제될 가능성은 없음.
+				// Auth에서 관리중인데 방이 삭제되는것은 말도 안됨. 
+				// 방은 Play모드에서 삭제된다
+				ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+
+
+				// 2. 현재 룸 안에 있는 유저 수 감소
+				--NowRoom->m_iJoinUserCount;
+
+				// 감소 후, 룸 안의 유저 수가 0보다 적으면 말도 안됨.
+				if (NowRoom->m_iJoinUserCount < 0)				
+					g_BattleServer_Room_Dump->Crash();
+
+
+				// 3. 룸 안의 자료구조에서 유저 제거
+				if (NowRoom->Erase(this) == false)
+					g_BattleServer_Room_Dump->Crash();
+
+				m_iRoomNo = -1;
+			}			
 		}
 
 	}
@@ -155,6 +205,10 @@ namespace Library_Jingyu
 				// 로그인 요청
 			case en_PACKET_CS_GAME_REQ_LOGIN:
 				Auth_LoginPacket(Packet);
+				break;
+
+				// 방 입장 요청
+			case en_PACKET_CS_GAME_REQ_ENTER_ROOM:
 				break;
 
 				// 하트비트
@@ -198,19 +252,59 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnGame_ClientLeave()
 	{
-		// ClinetKey가 초기값이 아니라면, 로그인 패킷을 보낸 유저.
-			// 로그인 패킷을 보낸 유저는, AccountNo 자료구조에 무조건 들어있음.
-		if (m_int64ClientKey != m_i64Default_CK)
-		{
-			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
-		}
-
 		// ClientKey 초기값으로 셋팅.
 		// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
 		// !! Game_Update에서 이미 샌드큐가 모두 정리된 유저에게 또 SendPacket 가능성 !!
 		// !! 이 경우, 전혀 엉뚱한 유저에게 Send가 될 수 있음 !!
-		m_int64ClientKey = m_i64Default_CK;
+		m_int64ClientKey = -1;
+
+		// 해당 유저가 있는 룸 안에서 유저 제거
+		// -1이 아니면 룸에 있는것.
+		if (m_iRoomNo != -1)
+		{
+			AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 락 
+
+			// 1. 룸 검색
+			auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+			// 룸이 없으면 Crash
+			if (FindRoom == m_pParent->m_Room_Umap.end())
+			{
+				ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+				g_BattleServer_Room_Dump->Crash();
+			}
+
+			stRoom* NowRoom = FindRoom->second;
+
+			// 룸 상태가 Play가 아니면 Crash. 말도 안됨
+			// Game모드에서 종료되는 유저가 있는 방은, 무조건 플레이 방이어야 함
+			if (NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			{
+				ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+				g_BattleServer_Room_Dump->Crash();
+			}
+
+			// 여기까지 오면 방 모드가 PLAY_ROOM 확정.
+			// 즉, Game에서만 접근하는 방 확정. 락 푼다.
+			// 락 풀었는데 방이 삭제될 가능성은 전혀 없음. 
+			// 방 삭제는 Game 스레드가 하고, 해당 함수도 Game 스레드에서 호출된다. 
+			ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+
+
+			// 2. 현재 룸 안에 있는 유저 수 감소
+			--NowRoom->m_iJoinUserCount;
+
+			// 감소 후, 룸 안의 유저 수가 0보다 적으면 말도 안됨.
+			if (NowRoom->m_iJoinUserCount < 0) 
+				g_BattleServer_Room_Dump->Crash();
+
+
+			// 3. 룸 안의 자료구조에서 유저 제거
+			if (NowRoom->Erase(this) == false) 
+				g_BattleServer_Room_Dump->Crash();
+
+			m_iRoomNo = -1;
+		}
 	}
 
 	// Game 모드의 유저에게 packet이 옴
@@ -263,7 +357,16 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnGame_ClientRelease()
 	{
+		// m_bStructFlag가 true라면, 자료구조에 들어간 유저
+		if (m_bStructFlag == true)
+		{
+			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
+
+			m_bStructFlag = false;
+		}
 		
+		m_bLoginFlag = false;		
 	}
 
 
@@ -280,7 +383,7 @@ namespace Library_Jingyu
 	void CBattleServer_Room::CGameSession::Auth_LoginPacket(CProtocolBuff_Net* Packet)
 	{
 		// 1. 현재 ClientKey가 초기값이 아니면 Crash
-		if (m_int64ClientKey != m_i64Default_CK)
+		if (m_int64ClientKey != -1)
 			g_BattleServer_Room_Dump->Crash();
 
 
@@ -321,18 +424,14 @@ namespace Library_Jingyu
 			// SendPacket
 			SendPacket(SendBuff);
 
-
-			// ------------- 기존 접속중이던 중복 유저도 종료
-
 			// 중복 로그인 처리된 유저 접속 종료 요청
-			CGameSession* ReleasePlayer = m_pParent->FindAccountNoFunc(AccountNo);
-			
-			// 그 사이에 종료해버린 유저라면, 접속 종료 안보냄.
-			if(ReleasePlayer != nullptr)
-				ReleasePlayer->Disconnect();
+			m_pParent->DisconnectAccountNoFunc(AccountNo);
 
 			return;
 		}
+
+		// 자료구조에 들어감 플래그 변경
+		m_bStructFlag = true;
 
 
 		// 5. HTTP 통신 시작
@@ -352,6 +451,196 @@ namespace Library_Jingyu
 		// Select_Account.php 요청
 		m_pParent->m_shDB_Communicate.DBReadFunc(Send, en_PHP_TYPE::SELECT_ACCOUNT);
 	}
+
+
+	// 방 입장 요청
+	// 
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CBattleServer_Room::CGameSession::Auth_RoomEnterPacket(CProtocolBuff_Net* Packet)
+	{
+		// 필요한 것 로컬로 받아두기
+		// 함수 static
+		static SRWLOCK RoomUmapLock = m_pParent->m_Room_Umap_srwl;
+		static auto RoomUmap = m_pParent->m_Room_Umap;
+
+		// ------------------------------------
+
+		// 로그인 여부 체크
+		if(m_bLoginFlag == false)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 1. 마샬링
+		INT64 AccountNo;
+		int RoomNo;
+		char EnterToken[32];
+
+		Packet->GetData((char*)&AccountNo, 8);
+		Packet->GetData((char*)&RoomNo, 4);
+		Packet->GetData(EnterToken, 32);		
+
+		// 2. 에러 체크
+		if (AccountNo != m_Int64AccountNo)
+			g_BattleServer_Room_Dump->Crash();
+		
+		AcquireSRWLockShared(&RoomUmapLock);	// ----- Room umap Shared 락
+
+		
+		// 2. 입장하고자 하는 방 검색
+		auto ret = RoomUmap.find(RoomNo);
+
+		// 3. 방 존재여부 체크
+		if (ret == RoomUmap.end())
+		{
+			ReleaseSRWLockShared(&RoomUmapLock);	// ----- Room umap Shared 언락
+
+			// 방이 없으면, 에러 리턴
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
+			BYTE Result = 4;
+			BYTE MaxUser = 0;	// 방 없음 패킷에는 의미가 없을듯.. 그냥 아무거나 보냄.
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&AccountNo, 8);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&MaxUser, 1);
+			SendBuff->PutData((char*)&Result, 1);
+
+			SendPacket(SendBuff);
+
+			return;
+		}
+
+		stRoom* NowRoom = ret->second;
+
+		// 4. 방이 대기방이 아니면 에러 3 리턴 (준비방 or 플레이 상태의 방일 경우)
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::WAIT_ROOM)
+		{
+			ReleaseSRWLockShared(&RoomUmapLock);	// ----- Room umap Shared 언락
+
+			// 대기방이 아니면, 에러 리턴
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
+			BYTE Result = 3;
+			BYTE MaxUser = 0;	// 대기방 아님 패킷에는 의미가 없을듯.. 그냥 아무거나 보냄.
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&AccountNo, 8);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&MaxUser, 1);
+			SendBuff->PutData((char*)&Result, 1);
+
+			SendPacket(SendBuff);
+
+			return;
+		}
+		
+		// 여기까지 오면, [존재하는 대기방]이라는게 확정. (Auth모드에서 관리중인 방 확정)
+		// 락 푼다. 어차피 Auth만 접근하는 방이다.
+		// 락 풀고 중간에 삭제될 가능성도 없다. 
+		// 삭제되기 위해서는 Play모드의 방이 되어야 하는데, 모드 변경은 Auth 스레드가 한다.
+		// 그리고, 해당 함수는 Auth 스레드에서 호출된다.
+		// 즉, 해당 함수가 끝나기 전에 방이 사라질 가능성은 없다.
+		ReleaseSRWLockShared(&RoomUmapLock);	// ----- Room umap Shared 언락
+
+
+		// 5. 방 인원수 체크
+		if (NowRoom->m_iJoinUserCount == NowRoom->m_iMaxJoinCount)
+		{
+			BYTE MaxUser = NowRoom->m_iJoinUserCount;		
+
+			// 최대 인원수라면, 에러 리턴			
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
+			BYTE Result = 5;
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&AccountNo, 8);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&MaxUser, 1);
+			SendBuff->PutData((char*)&Result, 1);
+
+			SendPacket(SendBuff);
+
+			return;
+		}
+
+		// 6. 방 토큰 체크
+		if (memcmp(EnterToken, NowRoom->m_cEnterToken, 32) != 0)
+		{
+			BYTE MaxUser = NowRoom->m_iJoinUserCount;		
+
+			// 토큰이 다르면, 에러 리턴
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
+			BYTE Result = 2;
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&AccountNo, 8);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&MaxUser, 1);
+			SendBuff->PutData((char*)&Result, 1);
+
+			SendPacket(SendBuff);
+
+			return;
+		}
+
+
+		// 7. 여기까지 오면 정상
+		// 룸에 인원 추가
+		NowRoom->m_iJoinUserCount++;
+		NowRoom->Insert(this);
+
+		int NowUser = NowRoom->m_iJoinUserCount;
+
+
+		// 8. 정상적인 방 입장 응답 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
+		BYTE Result = 1;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&AccountNo, 8);
+		SendBuff->PutData((char*)&RoomNo, 4);
+		SendBuff->PutData((char*)&NowUser, 1);
+		SendBuff->PutData((char*)&Result, 1);
+
+		SendPacket(SendBuff);
+
+
+		// 9. 룸 인원수가 풀 방이 되었을 경우
+		if (NowUser == NowRoom->m_iMaxJoinCount)
+		{
+			// 1) 마스터에게 방 닫힘 패킷 보내기
+			m_pParent->m_Master_LanClient->Packet_RoomClose(RoomNo);
+
+			// 2) 모든 유저에게 카운트다운 패킷 보내기
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_PLAY_READY;
+			BYTE ReadySec = 10;		// 초 단위
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&ReadySec, 1);
+
+			if (NowRoom->SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();				
+
+			// 3) 방 카운트다운 변수 갱신
+			NowRoom->m_dwCountDown = timeGetTime();
+
+			// 4) 방의 상태를 Ready로 변경
+			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;
+		}
+	}
+
 }
 
 
@@ -364,8 +653,7 @@ namespace Library_Jingyu
 {
 	// Net 직렬화 버퍼 1개의 크기 (Byte)
 	LONG g_lNET_BUFF_SIZE = 512;
-
-
+		   	  
 
 
 	// -----------------------
@@ -399,6 +687,8 @@ namespace Library_Jingyu
 				return false;
 			}
 		}
+
+
 
 		////////////////////////////////////////////////////////
 		// BATTLESERVER config 읽어오기
@@ -467,6 +757,32 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("VerCode"), &m_uiVer_Code) == false)
 			return false;
 
+		// BattleNetServer의 IP
+		if (Parser.GetValue_String(_T("BattleNetServerIP"), m_Master_LanClient->m_tcBattleNetServerIP) == false)
+			return false;
+
+		// MasterNetServer의 Port 셋팅.
+		m_Master_LanClient->m_iBattleNetServerPort = pConfig->Port;
+
+		// ChatNetServer의 IP
+		if (Parser.GetValue_String(_T("ChatNetServerIP"), m_Master_LanClient->m_tcChatNetServerIP) == false)
+			return false;
+
+		// ChatNetServer의 Port
+		if (Parser.GetValue_Int(_T("ChatNetServerPort"), &m_Master_LanClient->m_iChatNetServerPort) == false)
+			return false;
+
+		// 마스터 서버에 입장 시 들고갈 토큰
+		TCHAR m_tcMasterToken[33];
+		if (Parser.GetValue_String(_T("MasterEnterToken"), m_tcMasterToken) == false)
+			return false;
+
+		// 들고갈 때는 char형으로 들고가기 때문에 변환해서 가지고 있어야한다.
+		int len = WideCharToMultiByte(CP_UTF8, 0, m_tcMasterToken, lstrlenW(m_tcMasterToken), 0, 0, 0, 0);
+		WideCharToMultiByte(CP_UTF8, 0, m_tcMasterToken, lstrlenW(m_tcMasterToken), m_Master_LanClient->m_cMasterToken, len, 0, 0);
+
+
+		
 
 
 
@@ -558,15 +874,20 @@ namespace Library_Jingyu
 			++i;
 		}
 
-		// 2. Battle 서버 시작
-		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept,
-			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
-			return false;
-
-		// 3. 모니터링 서버와 연결되는, 랜 클라이언트 가동
+		// 2. 모니터링 서버와 연결되는, 랜 클라이언트 가동
 		if (m_Monitor_LanClient->ClientStart(m_stConfig.MonitorServerIP, m_stConfig.MonitorServerPort, m_stConfig.MonitorClientCreateWorker,
 			m_stConfig.MonitorClientActiveWorker, m_stConfig.MonitorClientNodelay) == false)
 			return false;
+
+		// 3. 마스터 서버와 연결되는, 랜 클라이언트 가동
+		if(m_Master_LanClient->ClientStart(m_stConfig.MasterServerIP, m_stConfig.MasterServerPort, m_stConfig.MasterClientCreateWorker,
+			m_stConfig.MasterClientActiveWorker, m_stConfig.MasterClientNodelay) == false)
+			return false;
+
+		// 4. Battle 서버 시작
+		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept,
+			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
+			return false;		
 
 		// 서버 오픈 로그 찍기		
 		g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -586,13 +907,16 @@ namespace Library_Jingyu
 		if (m_Monitor_LanClient->GetClinetState() == true)
 			m_Monitor_LanClient->ClientStop();
 
-		// 2. 서버 종료
+		// 2. 마스터 Lan 클라 종료
+		if (m_Master_LanClient->GetClinetState() == true)
+			m_Master_LanClient->ClientStop();
+
+		// 3. 서버 종료
 		if (GetServerState() == true)
 			Stop();
 
 		// 3. 세션 삭제
 		delete[] m_cGameSession;
-
 	}
 
 	// 출력용 함수
@@ -620,8 +944,8 @@ namespace Library_Jingyu
 		CGameSession* NowPlayer = (CGameSession*)DBData->pPointer;
 
 		// 다르면 이미 종료한 유저로 판단. 가능성 있는 상황
-		if(NowPlayer->m_int64ClientKey != DBData->m_i64UniqueKey)
-			return;			
+		if (NowPlayer->m_int64ClientKey != DBData->m_i64UniqueKey)
+			return;
 
 
 		// 2. Json데이터 파싱하기 (UTF-16)
@@ -665,7 +989,7 @@ namespace Library_Jingyu
 		DBData->m_pBuff->GetData(SessionKey, 64);
 		DBData->m_pBuff->GetData(ConnectToken, 32);
 		DBData->m_pBuff->GetData((char*)&VerCode, 4);
-		
+
 
 		// 5. 토큰키 비교
 		const TCHAR* tDBToekn = Doc[_T("sessionkey")].GetString();
@@ -695,7 +1019,7 @@ namespace Library_Jingyu
 
 		// 6. 배틀서버 입장 토큰 비교
 		// "현재" 토큰과 먼저 비교
-		if (memcmp(ConnectToken, cConnectToken_Now, 32) != 0)
+		if (memcmp(ConnectToken, m_cConnectToken_Now, 32) != 0)
 		{
 			// 다르다면 "이전" 토큰과 비교
 			if (memcpy(ConnectToken, m_cConnectToken_Before, 32) != 0)
@@ -739,8 +1063,12 @@ namespace Library_Jingyu
 			return;
 		}
 
+		// 8. 여기까지 오면 정상.
+		// 로그인 패킷 처리 Flag 변경
+		NowPlayer->m_bLoginFlag = true;
 
-		// 8. 정상이면 정상 응답 패킷 보냄
+
+		// 9. 정상이면 정상 응답 패킷 보냄
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
@@ -782,32 +1110,32 @@ namespace Library_Jingyu
 		return true;
 	}
 
-	// AccountNo 자료구조에서 유저를 검색하는 함수
+	// AccountNo 자료구조에서 유저 검색 후, 해당 유저에게 Disconenct 하는 함수
 	//
 	// Parameter : AccountNo
-	// return : 성공 시 CGameSession*
-	//		  : 실패 시 nullptr
-	CBattleServer_Room::CGameSession* CBattleServer_Room::FindAccountNoFunc(INT64 AccountNo)
+	// return : 없음
+	void CBattleServer_Room::DisconnectAccountNoFunc(INT64 AccountNo)
 	{
 		AcquireSRWLockShared(&m_AccountNo_Umap_srwl);		// AccountNo uamp Shared 락
 
 		// 1. 검색
 		auto ret = m_AccountNo_Umap.find(AccountNo);
 
-		// 2. 없는 유저일 시 nullptr 리턴
+		// 2. 없는 유저일 시 그냥 리턴.
+		// 여기 락 걸고 들어오기 전에, 이미 유저가 종료했을 수도 있기 때문에
+		// 정상적인 상황으로 판단.
 		if (ret == m_AccountNo_Umap.end())
 		{
 			ReleaseSRWLockShared(&m_AccountNo_Umap_srwl);		// AccountNo uamp Shared 언락
-			return nullptr;
+			return;
 		}
 
-		// 3. 있는 유저라면 ClientKey 리턴
-		CGameSession* RetPlayer = ret->second;
+		// 3. 있는 유저라면 Disconnect
+		ret->second->Disconnect();
 
 		ReleaseSRWLockShared(&m_AccountNo_Umap_srwl);		// AccountNo uamp Shared 언락
-
-		return RetPlayer;
 	}
+
 
 	// AccountNo 자료구조에서 유저를 제거하는 함수
 	//
@@ -835,7 +1163,41 @@ namespace Library_Jingyu
 
 		return true;
 	}
-	   	 
+
+
+
+
+
+
+	// ---------------------------------
+	// Auth모드의 방 관리 자료구조 변수
+	// ---------------------------------
+
+	// 방을 Room 자료구조에 Insert하는 함수
+	//
+	// Parameter : RoomNo, stRoom*
+	// return : 성공 시 true
+	//		  : 실패(중복 키) 시 false	
+	bool CBattleServer_Room::InsertRoomFunc(int RoomNo, stRoom* InsertRoom)
+	{
+		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- Room 자료구조 Exclusive 락 
+
+		// 1. insert
+		auto ret = m_Room_Umap.insert(make_pair(RoomNo, InsertRoom));
+
+		ReleaseSRWLockExclusive(&m_Room_Umap_srwl);		// ----- Room 자료구조 Exclusive 언락 
+
+		// 2. 중복키라면 false 리턴
+		if (ret.second == false)
+			return false;
+
+		return true;
+	}
+
+
+
+
+
 
 	// -----------------------
 	// 가상함수
@@ -848,51 +1210,13 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::OnAuth_Update()
 	{
-		// ------------------- 방생성
-		// !! 대기방 생성 조건 !!
-		// - [현재 게임 내에 만들어진 방 수(모든 방 포함) < 최대 존재할 수 있는 방 수] 만족
-		// - [현재 대기방 수 < 최대 존재할 수 있는 대기방 수] 만족
-
-		// 1. 조건 체크
-		// 현재 만들어진 총 방수
-		if (m_iNowTotalRoomCount < m_iMaxTotalRoomCount)
-		{
-			// 현재 대기방 수 
-			if (m_iNowWaitRoomCount < m_iMaxWaitRoomCount)
-			{
-				// 여기까지 오면 방생성 조건 만족
-
-				// 1) 방 Alloc
-				stRoom* NowRoom = m_Room_Pool->Alloc();
-
-				// 2) 셋팅
-				NowRoom->m_iRoomNo = InterlockedIncrement(&m_lGlobal_RoomNo);
-				NowRoom->m_iJoinUserCount = 0;
-				NowRoom->m_iJoinUserCount = NowRoom->m_iMaxJoinCount;
-
-				// 토큰 셋팅				
-				WORD Index = rand() % 64;	// 0 ~ 63 중 인덱스 골라내기				
-				memcpy_s(NowRoom->m_cEnterToken, 32, m_cRoomEnterToken[Index], 32);
-
-				// 3) 방 관리 자료구조에 추가
-				 
-
-
-			}
-		}
-
-
-		// ------------------- 토큰 재발급
-		// 1. 
-
-
 		// ------------------- HTTP 통신 후, 후처리
 		// 1. Q 사이즈 확인
 		int iQSize = m_shDB_Communicate.m_pDB_ReadComplete_Queue->GetInNode();
 
-		// 한 프레임에 최대 50명의 업데이트 처리
-		if (iQSize > 50)
-			iQSize = 50;
+		// 한 프레임에 최대 m_iHTTP_MAX개의 후처리.
+		if (iQSize > m_stConst.m_iHTTP_MAX)
+			iQSize = m_stConst.m_iHTTP_MAX;
 
 		// 2. 있으면 로직 진행
 		DB_WORK* DBData;
@@ -914,8 +1238,10 @@ namespace Library_Jingyu
 
 					// 없는 일감 타입이면 에러.
 				default:
-					g_BattleServer_Room_Dump->Crash();
-					break;
+					TCHAR str[200];
+					StringCchPrintf(str, 200, _T("OnAuth_Update(). Type Error. Type : %d"), DBData->m_wWorkType);
+
+					throw CException(str);
 				}
 
 			}
@@ -928,7 +1254,7 @@ namespace Library_Jingyu
 				// 덤프
 				g_BattleServer_Room_Dump->Crash();
 			}
-			
+
 
 			// DB_WORK 안의 직렬화 버퍼 반환
 			CProtocolBuff_Net::Free(DBData->m_pBuff);
@@ -938,6 +1264,87 @@ namespace Library_Jingyu
 
 			--iQSize;
 		}
+
+
+
+		// ------------------- 방생성
+		// !! 대기방 생성 조건 !!
+		// - [현재 게임 내에 만들어진 총 방 수 < 최대 존재할 수 있는 방 수] 만족
+		// - [현재 대기방 수 < 최대 존재할 수 있는 대기방 수] 만족
+			
+		// 한 프레임에 최대 m_iLoopCreateRoomCount개의 방 생성
+		int LoopCount = m_stConst.m_iLoopCreateRoomCount;
+
+		while (LoopCount > 0)
+		{
+			// 1. 현재 만들어진 총 방수 체크
+			if (m_lNowTotalRoomCount < m_stConst.m_lMaxTotalRoomCount)
+			{
+				// 2. 현재 대기방 수 체크
+				if (m_lNowWaitRoomCount < m_stConst.m_lMaxWaitRoomCount)
+				{
+					// 여기까지 오면 방생성 조건 만족
+
+					// 1) 현재 총 방 수 ++, 현재 대기방 수 ++
+					InterlockedIncrement(&m_lNowTotalRoomCount);
+					InterlockedIncrement(&m_lNowWaitRoomCount);
+
+
+					// 2) 방 Alloc
+					stRoom* NowRoom = m_Room_Pool->Alloc();
+
+					// 만약, 방 안에 유저 수가 0명이 아니면 Crash
+					if (NowRoom->m_iJoinUserCount != 0 || NowRoom->m_JoinUser_Vector.size() != 0)
+						g_BattleServer_Room_Dump->Crash();
+
+
+
+
+					// 3) 셋팅
+					LONG RoomNo = InterlockedIncrement(&m_lGlobal_RoomNo);
+					NowRoom->m_iRoomNo = RoomNo;
+					NowRoom->m_iRoomState = eu_ROOM_STATE::WAIT_ROOM;
+					NowRoom->m_iJoinUserCount = 0;
+					NowRoom->m_iGameModeUserCount = 0;
+					NowRoom->m_bGameStart = false;
+					NowRoom->m_dwCountDown = 0;
+
+					
+					
+
+					// 토큰 셋팅				
+					WORD Index = rand() % 64;	// 0 ~ 63 중 인덱스 골라내기				
+					memcpy_s(NowRoom->m_cEnterToken, 32, m_cRoomEnterToken[Index], 32);
+
+
+					// 4) 방 관리 자료구조에 추가
+					if (InsertRoomFunc(RoomNo, NowRoom) == false)
+						g_BattleServer_Room_Dump->Crash();
+
+
+					// 5) 마스터 서버에게 [신규 대기방 생성 알림] 패킷 보냄
+					// 랜 클라를 통해 보낸다.
+					m_Master_LanClient->Packet_NewRoomCreate_Req(m_iServerNo, NowRoom);
+				}
+
+				// 현재 대기방 수가 이미 max라면 방 안만들고 나간다.
+				else
+					break;
+			}
+
+			// 현재 만들어진 총 방수가 이미 max라면 방 안만들고 나간다.
+			else
+				break;
+
+
+			--LoopCount;
+		}
+
+		
+
+		// ------------------- 토큰 재발급
+		// 마스터 랜 클라이언트의 함수 호출
+		m_Master_LanClient->Packet_TokenChange_Req();	
 
 	}
 
@@ -1003,9 +1410,10 @@ namespace Library_Jingyu
 	{	
 		srand((UINT)time(NULL));
 
-		m_iNowWaitRoomCount = 0;
-		m_iNowTotalRoomCount = 0;
+		m_lNowWaitRoomCount = 0;
+		m_lNowTotalRoomCount = 0;
 		m_lGlobal_RoomNo = 0;
+		m_iServerNo = -1;
 
 		// 방 입장 토큰 만들어두기
 		for (int i = 0; i < 64; ++i)
@@ -1016,6 +1424,21 @@ namespace Library_Jingyu
 			}
 		}	
 
+		// 배틀서버 최초 입장 토큰 만들어 두기
+		for (int i = 0; i < 32; ++i)
+		{
+			m_cConnectToken_Now[i] = (rand() % 128) + 1;
+		}
+
+		// 모니터링 서버와 통신하기 위한 LanClient 동적할당
+		m_Monitor_LanClient = new CGame_MinitorClient;
+		m_Monitor_LanClient->ParentSet(this);
+
+		// 마스터 서버와 통신하기 위한 LanClient 동적할당
+		m_Master_LanClient = new CBattle_Master_LanClient;
+		m_Master_LanClient->ParentSet(this);
+
+
 		// ------------------- Config정보 셋팅		
 		if (SetFile(&m_stConfig) == false)
 			g_BattleServer_Room_Dump->Crash();
@@ -1024,19 +1447,18 @@ namespace Library_Jingyu
 		g_BattleServer_RoomLog->SetDirectory(L"CBattleServer_Room");
 		g_BattleServer_RoomLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);
 				
-		// TLS 동적할당
-		m_Room_Pool = new CMemoryPoolTLS<stRoom>(0, false);
 
-		// 모니터링 서버와 통신하기 위한 LanClient 동적할당
-		m_Monitor_LanClient = new CGame_MinitorClient;
-		m_Monitor_LanClient->ParentSet(this);
+
+		// TLS 동적할당
+		m_Room_Pool = new CMemoryPoolTLS<stRoom>(0, false);		
 
 		// reserve 셋팅.
 		m_AccountNo_Umap.reserve(m_stConfig.MaxJoinUser);
-		m_Room_Umap.reserve(m_iMaxTotalRoomCount);
+		m_Room_Umap.reserve(m_stConst.m_lMaxTotalRoomCount);
 
 		//SRW락 초기화
 		InitializeSRWLock(&m_AccountNo_Umap_srwl);
+		InitializeSRWLock(&m_Room_Umap_srwl);
 	}
 
 	CBattleServer_Room::~CBattleServer_Room()
@@ -1044,11 +1466,335 @@ namespace Library_Jingyu
 		// 모니터링 서버와 통신하는 LanClient 동적해제
 		delete m_Monitor_LanClient;
 
+		// 마스터 서버와 통신하는 LanClient 동적 해제
+		delete m_Master_LanClient;
+
 		// TLS 동적 해제
 		delete m_Room_Pool;
 	}
 
 }
+
+
+// ----------------------------------------
+// 
+// 마스터 서버와 연결되는 LanClient
+//
+// ----------------------------------------
+namespace Library_Jingyu
+{
+
+	// -----------------------
+	// 패킷 처리 함수
+	// -----------------------
+
+	// 마스터에게 보낸 로그인 요청 응답
+	//
+	// Parameter : SessionID, CProtocolBuff_Lan*
+	// return : 없음
+	void CBattle_Master_LanClient::Packet_Login_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{
+		// 1. Connect 상태인지 확인
+		if (SessionID != m_ullSessionID)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 2. 마샬링
+		int ServerNo;
+		Payload->GetData((char*)&ServerNo, 4);
+
+		// 3. 서버 번호 셋팅
+
+		// 만약, 배틀 Net 서버의 번호가 -1(초기 값)이 아니라면 2번 로그인 요청?을 보낸 것.
+		if(m_BattleServer_this->m_iServerNo != -1)
+			g_BattleServer_Room_Dump->Crash();
+
+		m_BattleServer_this->m_iServerNo = ServerNo;
+	}
+
+
+
+	// -----------------------
+	// Battle Net 서버가 호출하는 함수
+	// -----------------------
+
+	// 마스터에게, 신규 대기방 생성 패킷 보내기
+	//
+	// Parameter : 배틀서버 No, stRoom*
+	// return : 없음
+	void CBattle_Master_LanClient::Packet_NewRoomCreate_Req(int BattleServerNo, CBattleServer_Room::stRoom* NewRoom)
+	{
+		// 1. 패킷 만들기
+		WORD Type = en_PACKET_BAT_MAS_REQ_CREATED_ROOM;
+		UINT ReqSequence = InterlockedIncrement(&uiReqSequence);
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&BattleServerNo, 4);
+		SendBuff->PutData((char*)&NewRoom->m_iRoomNo, 4);
+		SendBuff->PutData((char*)&NewRoom->m_iMaxJoinCount, 4);
+		SendBuff->PutData(NewRoom->m_cEnterToken, 32);
+
+		SendBuff->PutData((char*)&ReqSequence, 4);
+
+		// 2. 토큰 발급 시간 갱신하기
+		m_dwTokenSendTime = timeGetTime();
+
+		// 3. 마스터에게 Send하기
+		SendPacket(m_ullSessionID, SendBuff);
+	}
+
+
+	// 토큰 재발급 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattle_Master_LanClient::Packet_TokenChange_Req()
+	{
+		// 마스터와 연결이 끊긴 상태라면 패킷 안보낸다.
+		if (m_ullSessionID == 0xffffffffffffffff)
+			return;
+
+
+		// 토큰 재발급 시점이 되었는지 확인하기.
+		DWORD NowTime = timeGetTime();
+
+		if ((m_dwTokenSendTime + m_BattleServer_this->m_stConst.m_iTokenChangeSlice) < NowTime)
+		{
+			// 1. 토큰 발급 시간 갱신
+			m_dwTokenSendTime = NowTime;
+
+			// 2. "현재" 토큰을 "이전" 토큰에 복사
+			memcpy_s(m_BattleServer_this->m_cConnectToken_Now, 32, m_BattleServer_this->m_cConnectToken_Before, 32);
+
+			// 3. "현재" 토큰 다시 만들기
+			int i = 0;
+			while (i < 32)
+			{
+				m_BattleServer_this->m_cConnectToken_Now[i] = (rand() % 128) + 1;
+
+				++i;
+			}
+
+			// 4. 토큰 재발급 패킷 만들기
+			WORD Type = en_PACKET_BAT_MAS_REQ_CONNECT_TOKEN;
+			UINT ReqSequence = InterlockedIncrement(&uiReqSequence);
+
+			CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData(m_BattleServer_this->m_cConnectToken_Now, 32);
+			SendBuff->PutData((char*)&ReqSequence, 4);
+
+
+			// 5. 마스터에게 패킷 보내기
+			SendPacket(m_ullSessionID, SendBuff);		
+		}
+	}
+
+	// 마스터에게, 방 닫힘 패킷 보내기
+	//
+	// Parameter : RoomNo
+	// return : 없음
+	void CBattle_Master_LanClient::Packet_RoomClose(int RoomNo)
+	{
+		// 마스터와 연결이 끊긴 상태라면 패킷 안보낸다.
+		if (m_ullSessionID == 0xffffffffffffffff)
+			return;
+
+		// 1. 패킷 만들기
+		WORD Type = en_PACKET_BAT_MAS_REQ_CLOSED_ROOM;
+		UINT ReqSequence = InterlockedIncrement(&uiReqSequence);
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&RoomNo, 4);
+		SendBuff->PutData((char*)&ReqSequence, 4);
+
+		SendPacket(m_ullSessionID, SendBuff);
+	}
+
+
+
+
+	// -----------------------
+	// 외부에서 사용 가능한 함수
+	// -----------------------
+
+	// 시작 함수
+	// 내부적으로, 상속받은 CLanClient의 Start호출.
+	//
+	// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+	// return : 성공 시 true , 실패 시 falsel 
+	bool CBattle_Master_LanClient::ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay)
+	{
+		// 마스터 서버에 연결
+		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
+			return false;
+
+		return true;
+	}
+
+	// 종료 함수
+	// 내부적으로, 상속받은 CLanClient의 Stop호출.
+	// 추가로, 리소스 해제 등
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattle_Master_LanClient::ClientStop()
+	{
+		// 마스터 서버와 연결 종료
+		Stop();
+	}
+
+	// 배틀서버의 this를 입력받는 함수
+	// 
+	// Parameter : 배틀 서버의 this
+	// return : 없음
+	void CBattle_Master_LanClient::ParentSet(CBattleServer_Room* ChatThis)
+	{
+		m_BattleServer_this = ChatThis;
+	}
+
+
+
+
+	// -----------------------
+	// 순수 가상함수
+	// -----------------------
+
+	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CBattle_Master_LanClient::OnConnect(ULONGLONG SessionID)
+	{
+		m_ullSessionID = SessionID;
+
+		// 마스터 서버(Lan)로 로그인 패킷 보냄
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_BAT_MAS_REQ_SERVER_ON;
+
+		SendBuff->PutData((char*)&Type, 2);
+
+		SendBuff->PutData((char*)m_tcBattleNetServerIP, 32);
+		SendBuff->PutData((char*)&m_iBattleNetServerPort, 2);
+		SendBuff->PutData(m_BattleServer_this->m_cConnectToken_Now, 32);
+		SendBuff->PutData(m_cMasterToken, 32);
+
+		SendBuff->PutData((char*)m_tcChatNetServerIP, 32);
+		SendBuff->PutData((char*)&m_iChatNetServerPort, 2);
+
+
+		SendPacket(SessionID, SendBuff);
+	}
+
+	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void CBattle_Master_LanClient::OnDisconnect(ULONGLONG SessionID)
+	{
+		// SessionID를 초기값으로 변경
+		m_ullSessionID = 0xffffffffffffffff;
+
+		// 배틀 Net 서버의 ServerNo를 초기값으로 변경
+		m_BattleServer_this->m_iServerNo = -1;
+	}
+
+	// 패킷 수신 완료 후 호출되는 함수.
+	//
+	// parameter : 유저 세션키, CProtocolBuff_Lan*
+	// return : 없음
+	void CBattle_Master_LanClient::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{
+		// Type 분리
+		WORD Type;
+		Payload->GetData((char*)&Type, 2);
+
+
+		// 타입에 따라 분기 처리
+		try
+		{
+			switch (Type)
+			{
+				// 로그인 요청에 대한 응답
+			case en_PACKET_BAT_MAS_RES_SERVER_ON:
+				Packet_Login_Res(SessionID, Payload);
+
+				break;
+			default:
+				break;
+			}
+
+		}
+		catch (CException& exc)
+		{
+
+		}
+	}
+
+	// 패킷 송신 완료 후 호출되는 함수
+	//
+	// parameter : 유저 세션키, Send 한 사이즈
+	// return : 없음
+	void CBattle_Master_LanClient::OnSend(ULONGLONG SessionID, DWORD SendSize)
+	{}
+
+	// 워커 스레드가 깨어날 시 호출되는 함수.
+	// GQCS 바로 하단에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CBattle_Master_LanClient::OnWorkerThreadBegin()
+	{}
+
+	// 워커 스레드가 잠들기 전 호출되는 함수
+	// GQCS 바로 위에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void CBattle_Master_LanClient::OnWorkerThreadEnd()
+	{}
+
+	// 에러 발생 시 호출되는 함수.
+	//
+	// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+	//			 : 에러 코드에 대한 스트링
+	// return : 없음
+	void CBattle_Master_LanClient::OnError(int error, const TCHAR* errorStr)
+	{}
+
+
+
+
+
+
+	// -----------------------
+	// 생성자와 소멸자
+	// -----------------------
+
+	// 생성자
+	CBattle_Master_LanClient::CBattle_Master_LanClient()
+	{
+		// SessionID 초기화
+		m_ullSessionID = 0xffffffffffffffff;
+
+		// Req시퀀스 초기화
+		uiReqSequence = 0;
+	}
+
+	// 소멸자
+	CBattle_Master_LanClient::~CBattle_Master_LanClient()
+	{
+		// 아직 연결이 되어있으면, 연결 해제
+		if (GetClinetState() == true)
+			ClientStop();
+	}
+}
+
 
 
 // ---------------
@@ -1069,7 +1815,6 @@ namespace Library_Jingyu
 		// 최초 생성 시 non-signalled 상태
 		// 이름 없는 Event	
 		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-
 	}
 
 	CGame_MinitorClient::~CGame_MinitorClient()
@@ -1278,6 +2023,9 @@ namespace Library_Jingyu
 	}
 
 
+
+
+
 	// -----------------------
 	// 순수 가상함수
 	// -----------------------
@@ -1346,7 +2094,4 @@ namespace Library_Jingyu
 	// return : 없음
 	void CGame_MinitorClient::OnError(int error, const TCHAR* errorStr)
 	{}
-
-
-
 }
