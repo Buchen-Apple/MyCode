@@ -6,6 +6,7 @@
 #include "LockFree_Queue/LockFree_Queue.h"
 #include "CrashDump/CrashDump.h"
 #include "Http_Exchange/HTTP_Exchange.h"
+#include "NormalTemplate_Queue\Normal_Queue_Template.h"
 
 // --------------------------------------------
 // shDB 내부에서 메모리풀로 관리되는 구조체들
@@ -16,13 +17,53 @@ namespace Library_Jingyu
 	struct DB_WORK_LOGIN
 	{
 		WORD m_wWorkType;
+		WORD m_wAPIType;
 		INT64 m_i64UniqueKey;
-		LPVOID pPointer;
-		CProtocolBuff_Net* m_pBuff;
-		TCHAR m_tcRequest[200];
 
-		// --- 아래부터가 컨텐츠 별 고유 정보.
+		// Player 포인터
+		LPVOID pPointer;	
+
+		// 직렬화 버퍼 포인터
+		CProtocolBuff_Net* m_pBuff;
+		TCHAR m_tcResponse[200];
+
 		INT64 AccountNo;
+	};
+
+	// Auth 스레드에서 로그인 요청을 받을 시, 유저 전적 정보를 저장하기 위한 프로토콜.
+	struct DB_WORK_LOGIN_CONTENTS
+	{
+		WORD m_wWorkType;
+		WORD m_wAPIType;
+		INT64 m_i64UniqueKey;
+
+		// Player 포인터
+		LPVOID pPointer;	
+		TCHAR m_tcResponse[200];
+
+		INT64 AccountNo;
+	};
+
+	// Game스레드에서 contents 정보 갱신할 때 사용하는 프로토콜
+	struct DB_WORK_CONTENT_UPDATE
+	{
+		WORD m_wWorkType;
+		WORD m_wAPIType;
+		INT64 m_i64UniqueKey;
+
+		// Player 포인터
+		LPVOID pPointer;		
+
+		int		m_iRecord_PlayCount;	// 플레이 횟수
+		int		m_iRecord_PlayTime;		// 플레이 시간 초단위
+		int		m_iRecord_Kill;			// 죽인 횟수
+		int		m_iRecord_Die;			// 죽은 횟수
+		int		m_iRecord_Win;			// 최종승리 횟수
+
+		// Update의 res는 굉장히 짧음.
+		TCHAR m_tcResponse[15];
+
+		INT64 AccountNo;		
 	};
 
 	// shDB의 어떤 API를 호출할 것인지.
@@ -31,11 +72,28 @@ namespace Library_Jingyu
 		// Seelct_account.php
 		SELECT_ACCOUNT = 1,
 
+		// Seelct_contents.php
+		SELECT_CONTENTS,
+
+		// Update_account.php
+		UPDATE_ACCOUN,
+
+		// Updated_contents.php
+		UPDATE_CONTENTS,
+
 		// DB_Read 스레드 종료 신호
 		EXIT = 9999
 	};
 
-	
+	// DB 요청에 대한 후처리를 위한, Type
+	enum eu_DB_READ_TYPE
+	{
+		// 로그인 패킷에 대한 인증 처리
+		eu_LOGIN_AUTH = 0,
+
+		// 로그인 패킷에 대한 정보 가져오기
+		eu_LOGIN_INFO = 1
+	};	
 }
 
 
@@ -52,7 +110,10 @@ namespace Library_Jingyu
 	{
 		// ---------------
 		// 멤버 변수
-		// ---------------			
+		// ---------------		
+
+		// 덤프
+		CCrashDump* m_Dump;
 
 		// DB_Read용 입출력 완료포트 핸들
 		HANDLE m_hDB_Read;
@@ -60,8 +121,19 @@ namespace Library_Jingyu
 		// DB_Read용 워커 스레드 핸들
 		HANDLE* m_hDB_Read_Thread;
 
-		// 덤프
-		CCrashDump* m_Dump;	
+		// ---------------		
+
+		// DB Write 스레드에게 일시키기 용 큐(Normal 큐)
+		CNormalQueue<DB_WORK*>* m_pDB_Wirte_Start_Queue;		
+
+		// DB Write용 스레드용 일시키기 용이벤트.
+		HANDLE m_hDBWrite_Event;
+
+		// DB Write용 스레드 종료용 이벤트
+		HANDLE m_hDBWrite_Exit_Event;
+
+		// DB_Write용 스레드 핸들
+		HANDLE m_hDB_Write_Thread;
 
 	public:
 		// ---------------
@@ -74,6 +146,9 @@ namespace Library_Jingyu
 		// Read가 완료된 DB_WORK* 를 저장해두는 락프리 큐
 		CLF_Queue<DB_WORK*> *m_pDB_ReadComplete_Queue;
 
+		// DB Write 스레드의, 완료된 일감 저장 큐(Normal 큐)
+		CNormalQueue<DB_WORK*>* m_pDB_Wirte_End_Queue;
+
 
 	private:
 		// --------------
@@ -83,16 +158,9 @@ namespace Library_Jingyu
 		// DB_Read 스레드
 		static UINT WINAPI DB_ReadThread(LPVOID lParam);
 
-
-	private:
-		// ---------------
-		// API 타입에 따른 쿼리문
-		// ---------------
-
-		// Select_Account.php에 날리는 쿼리문
-		TCHAR m_tcSELECT_ACCOUNT[30] = L"{\"accountno\" : %lld}";
-
-
+		// DB_Write 스레드
+		static UINT WINAPI DB_WriteThread(LPVOID lParam);
+	
 
 	public:
 		// ---------------
@@ -105,6 +173,13 @@ namespace Library_Jingyu
 		// Parameter : DB_WORK*, APIType
 		// return : 없음
 		void DBReadFunc(DB_WORK* Protocol, WORD APIType);
+
+		// DB에 Write 할 것이 있을 때 호출되는 함수.
+		// 인자로 받은 구조체의 정보를 확인해 로직 처리
+		//
+		// Parameter : DB_WORK*, APIType
+		// return : 없음
+		void DBWriteFunc(DB_WORK* Protocol, WORD APIType);
 
 
 	public:

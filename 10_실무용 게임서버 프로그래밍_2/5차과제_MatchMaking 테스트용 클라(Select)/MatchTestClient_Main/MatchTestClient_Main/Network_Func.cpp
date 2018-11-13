@@ -287,7 +287,7 @@ void cMatchTestDummy::MatchConnect()
 			{
 				closesocket(NowDummy->m_sock);
 				m_Dump->Crash();
-			}
+			}			
 
 			// 접속 성공 시 flag 변경
 			NowDummy->m_bMatchConnect = true;

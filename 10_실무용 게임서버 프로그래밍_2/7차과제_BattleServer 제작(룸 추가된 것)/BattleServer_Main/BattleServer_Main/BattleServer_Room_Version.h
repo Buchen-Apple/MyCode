@@ -42,6 +42,9 @@ namespace Library_Jingyu
 			// 회원 번호
 			INT64 m_Int64AccountNo;
 
+			// 닉네임
+			TCHAR m_tcNickName[20];
+
 			// 유저의 ClientKey
 			// 매칭서버가 발급.
 			// 유저 모두에게 고유
@@ -58,8 +61,42 @@ namespace Library_Jingyu
 			bool m_bStructFlag;
 
 			// 로그인 패킷 처리 플래그
-			// true면 세션키까지 정상적으로 처리됨
+			// true면 세션키, 컨텐츠 가져오기 까지 정상 처리됨.
 			bool m_bLoginFlag;
+
+			// 곧 종료될 유저 체크 플래그
+			// true면 곧 종료될 유저.
+			// 로그인 HTTP 처리 중, 이미 종료 패킷을 보낸 유저는 이 플래그를 true로 변경한다.
+			bool m_bLogoutFlag;
+
+			// 생존 플래그
+			// true면 살아있는 유저.
+			// Game모드에서만 유효하다.
+			bool m_bAliveFlag;
+
+			// 로그인 시 필요한 정보가 모두 셋팅되었나 체크하는 Flag
+			// 총 2개의 HTTP가 호출. 이 값이 2라면 모두 셋팅된 것.
+			LONG m_lLoginHTTPCount;
+
+
+			// -----------------------
+			// 전적 정보
+			// -----------------------
+			int		m_iRecord_PlayCount;	// 플레이 횟수
+			int		m_iRecord_PlayTime;		// 플레이 시간 초단위
+			int		m_iRecord_Kill;			// 죽인 횟수
+			int		m_iRecord_Die;			// 죽은 횟수
+			int		m_iRecord_Win;			// 최종승리 횟수
+
+
+			// -----------------------
+			// 컨텐츠 정보
+			// -----------------------
+			float m_fPosX;
+			float m_fPosY;
+
+			int		m_iHP;
+			int		m_iBullet;
 
 
 			
@@ -92,7 +129,7 @@ namespace Library_Jingyu
 
 
 			// -----------------
-			// 패킷 처리 함수
+			// Auth모드 패킷 처리 함수
 			// -----------------
 
 			// 로그인 요청 
@@ -106,6 +143,19 @@ namespace Library_Jingyu
 			// Parameter : CProtocolBuff_Net*
 			// return : 없음
 			void Auth_RoomEnterPacket(CProtocolBuff_Net* Packet);
+
+
+
+			// -----------------
+			// Game모드 패킷 처리 함수
+			// -----------------
+
+			// 내 캐릭터 생성 함수
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_CreateMyCharacter(CProtocolBuff_Net* Packet);
+
 
 		};
 
@@ -158,20 +208,35 @@ namespace Library_Jingyu
 			// 현재 룸 안에 있는 유저 수
 			int m_iJoinUserCount;			
 
-			// Game모드 상태의 유저 수
-			int m_iGameModeUserCount;
+			// 생존한 유저 수. HP가 0 이상인 유저.
+			int m_iAliveUserCount;
 
-			// 해당 방이 정말로 Play중인지.
-			// 정말 모든 유저가 Game모드가 되어 게임이 시작 된 경우
-			// 방 모드와는 다름
-			bool m_bGameStart;	
-
-			// 카운트 다운. 밀리세컨드 단위
+			// Play상태로 변경을 위한 카운트 다운. 밀리세컨드 단위
 			// timeGetTime()의 값이 들어간다.
 			DWORD m_dwCountDown;
 
+			// ------------
+
+			// 게임이 종료되었는지 체크하는 Flag.
+			// 승리자가 정해지면, Game 종료 패킷을 보낸 후 변경된다.
+			// true면 종료된 게임.
+			bool m_bGameEndFlag;	
+
+			// 게임 종료가 체크된 시점의 밀리세컨드
+			// m_bGameEndFlag를 true로 만들고 바로 
+			DWORD m_dwGameEndMSec;
+
+			// ------------
+
+			// 게임이 종료되어, 방 내의 모든 유저들에게 Shutdown을 날린 상태.
+			// 연속으로 Shutdown을 날리지 않도록 하기 위함.
+			// true면 이미, 방 안의 모든 유저에게 셧다운을 함.
+			bool m_bShutdownFlag;
+
+
 			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
 			char m_cEnterToken[32];
+
 
 
 			// ------------
@@ -180,109 +245,67 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 5;
+			const int m_iMaxJoinCount = 5;					   			 
+
+
+			// ------------
+			// 멤버 함수
+			// ------------
 
 			// 생성자
-			stRoom()
-			{
-				// 미리 메모리 공간 잡아두기
-				m_JoinUser_Vector.reserve(10);
-			}
+			stRoom();
+
+			// 자료구조 내의 모든 유저에게 인자로 받은 패킷 보내기
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 자료구조 내에 유저가 0명일 경우 false
+			//		  : 그 외에는 true
+			bool SendPacket_BroadCast(CProtocolBuff_Net* SendBuff);
+			
+			// 방 내의 모든 유저를 Auth_To_Game으로 변경
+			//
+			// Parameter : 없음
+			// return : 없음
+			void ModeChange();			
+
+			// 룸 안의 모든 유저를 생존상태로 변경
+			//
+			// Parameter : 없음
+			// return : 자료구조 내에 유저가 0명일 경우 false
+			//		  : 그 외에는 true
+			bool AliveFalg_True();
+
+			// 방 안의 유저들에게 게임 종료 패킷 보내기
+			//
+			// Parameter : 없음
+			// return : 없음
+			void GameOver();
+
+			// 방 안의 유저들에게 셧다운 날리기
+			//
+			// Parameter : 없음
+			// return : 없음
+			void Shutdown_All();
+
+
+
+			// ------------
+			// 자료구조 함수
+			// ------------
 
 			// 자료구조에 Insert
 			//
 			// Parameter : 추가하고자 하는 CGameSession*
 			// return : 없음
-			void Insert(CGameSession* InsertPlayer)
-			{
-				m_JoinUser_Vector.push_back(InsertPlayer);
-			}
+			void Insert(CGameSession* InsertPlayer);
 
 			// 자료구조에서 Erase
 			//
 			// Parameter : 제거하고자 하는 CGameSession*
 			// return : 성공 시 true
 			//		  : 실패 시  false
-			bool Erase(CGameSession* InsertPlayer)
-			{
-				size_t Size = m_JoinUser_Vector.size();
-				bool Flag = false;
+			bool Erase(CGameSession* InsertPlayer);
 
-				// 1. 자료구조 안에 유저가 0보다 작거나 같으면 return false
-				if (Size <= 0)
-					return false;	
-
-				// 2. 자료구조 안에 유저가 1명이거나, 찾고자 하는 유저가 마지막에 있다면 바로 제거
-				if (Size == 1 || m_JoinUser_Vector[Size - 1] == InsertPlayer)
-				{
-					Flag = true;
-					m_JoinUser_Vector.pop_back();
-				}
-
-				// 3. 아니라면 Swap 한다
-				else
-				{
-					size_t Index = 0;
-					while (Index < Size)
-					{
-						// 내가 찾고자 하는 유저를 찾았다면
-						if (m_JoinUser_Vector[Index] == InsertPlayer)
-						{
-							Flag = true;
-
-							CGameSession* Temp = m_JoinUser_Vector[Size - 1];
-							m_JoinUser_Vector[Size - 1] = m_JoinUser_Vector[Index];
-							m_JoinUser_Vector[Index] = Temp;
-
-							m_JoinUser_Vector.pop_back();							
-
-							break;
-						}
-
-						++Index;
-					}
-				}	
-
-				// 4. 만약, 제거 못했다면 return false
-				if (Flag == false)
-					return false;
-
-				return true;
-			}
-
-			// 자료구조 내의 모든 유저에게 인자로 받은 패킷 보내기
-			//
-			// Parameter : CProtocolBuff_Net*
-			// return : 성공 시 true
-			//		  : 유저가 0명일 시 false.
-			bool SendPacket_BroadCast(CProtocolBuff_Net* SendBuff)
-			{
-				// 1. 자료구조 내의 유저 수 받기
-				size_t Size = m_JoinUser_Vector.size();
-
-				// 2. 유저 수가 0명이거나 적을 경우, 문제있음 return false
-				if (Size <= 0)
-					return false;
-
-				// !! while문 돌기 전에 카운트를, 유저 수 만큼 증가 !!
-				// 엔진쪽에서, 완료 통지가 오면 Free를 하기 때문에 Add해야 한다.
-				SendBuff->Add((int)Size);
-
-				// 3. 유저 수 만큼 돌면서 패킷 전송.
-				size_t Index = 0;
-
-				while (Index < Size)
-				{
-					m_JoinUser_Vector[Index]->SendPacket(SendBuff);
-					++Index;
-				}
-
-				// 4. 패킷 Free
-				// !! 엔진쪽 완통에서 Free 하지만, 레퍼런스 카운트를 인원 수 만큼 Add 했기 때문에 1개가 더 증가한 상태. !!	
-				CProtocolBuff_Net::Free(SendBuff);
-
-				return true;
-			}
 		};
 
 		// 방 상태 state
@@ -297,20 +320,13 @@ namespace Library_Jingyu
 			// 플레이방
 			PLAY_ROOM
 		};
-
-		// DB 요청에 대한 후처리를 위한, Type
-		enum eu_DB_READ_TYPE
-		{
-			// 로그인 패킷에 대한 처리
-			eu_LOGIN	= 0			
-		};
-		
+				
 		// 절대 변경 불가능한 Config 변수 관리 구조체
 		struct stCONFIG
 		{
 			// Auth_Update에서 한 프레임에 처리할 HTTP통신 후처리
 			// 고정 값
-			const int m_iHTTP_MAX = 50;
+			const int m_iHTTP_MAX = 100;
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
@@ -324,10 +340,27 @@ namespace Library_Jingyu
 			// 고정 값
 			const int m_iLoopCreateRoomCount = 30;
 
+			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
+			// 즉, Ready 상태의 방을 Play로 변경하는 수
+			// 고정 값
+			const int m_iLoopRoomModeChange = 30;
+
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.
 			// ex) 1000일 경우, 1초 단위로 토큰 재발급.
-			const int m_iTokenChangeSlice = 12000;
+			const int m_iTokenChangeSlice = 120000;
+
+			// 방이 Ready상태가 되었을 때 카운트다운.
+			// 초 기준
+			const BYTE m_bCountDownSec = 10;
+
+			// 방이 Ready상태가 되었을 때 카운트다운.
+			// 밀리세컨드 기준
+			const int m_iCountDownMSec = 10000;
+
+			// Play상태의 방이, 게임 종료 후 몇 초동안 대기하는지.
+			// 밀리세컨드 단위
+			const int m_iRoomCloseDelay = 5000;
 		};
 
 
@@ -487,12 +520,17 @@ namespace Library_Jingyu
 		// 패킷 후처리 함수
 		// -----------------------
 
-		// Login 패킷 후처리
+		// Login 패킷에 대한 인증 처리 (토큰 체크 등..)
 		//
 		// Parameter : DB_WORK_LOGIN*
 		// return : 없음
-		void Auth_LoginPacket_Last(DB_WORK_LOGIN* DBData);
+		void Auth_LoginPacket_AUTH(DB_WORK_LOGIN* DBData);
 
+		// Login 패킷에 대한 Contents 정보 가져오기
+		//
+		// Parameter : DB_WORK_LOGIN*
+		// return : 없음
+		void Auth_LoginPacket_Info(DB_WORK_LOGIN_CONTENTS* DBData);
 
 
 
@@ -526,7 +564,7 @@ namespace Library_Jingyu
 
 	private:
 		// ---------------------------------
-		// Auth모드의 방 관리 자료구조 변수
+		// 방 관리 자료구조 변수
 		// ---------------------------------
 
 		// 방을 Room 자료구조에 Insert하는 함수
@@ -665,6 +703,30 @@ namespace Library_Jingyu
 		// return : 없음
 		void Packet_Login_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
+		// 신규 대기방 생성 응답
+		//
+		// Parameter : SessionID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_NewRoomCreate_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+		
+		// 토큰 재발행 응답
+		//
+		// Parameter : SessionID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_TokenChange_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+		// 방 닫힘 응답
+		//
+		// Parameter : SessionID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_RoomClose_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+		// 방 퇴장 응답
+		//
+		// Parameter : RoomNo, AccountNo
+		// return : 없음
+		void Packet_RoomLeave_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
 
 
 
@@ -689,7 +751,14 @@ namespace Library_Jingyu
 		//
 		// Parameter : RoomNo
 		// return : 없음
-		void Packet_RoomClose(int RoomNo);
+		void Packet_RoomClose_Req(int RoomNo);
+
+		// 마스터에게, 방 퇴장 패킷 보내기
+		//
+		// Parameter : RoomNo, AccountNo
+		// return : 없음
+		void Packet_RoomLeave_Req(int RoomNo, INT64 AccountNo);
+
 
 
 	public:
