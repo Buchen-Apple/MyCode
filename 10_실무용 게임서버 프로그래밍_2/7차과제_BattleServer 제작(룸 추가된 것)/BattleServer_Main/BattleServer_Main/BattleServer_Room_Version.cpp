@@ -278,7 +278,42 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnGame_ClientJoin()
 	{
-		// 할거 없음
+		// 현재 유저가 입장한 방에, 게임 모드로 변경된 카운트 증가
+
+		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
+
+		// 1. 유저가 있는 방 알아오기
+		auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+		// 없으면 말도 안됨.
+
+		if (FindRoom == m_pParent->m_Room_Umap.end())
+			g_BattleServer_Room_Dump->Crash();
+
+		stRoom* NowRoom = FindRoom->second;
+
+		// 방 모드가 Play가 아니면 말도 안됨.
+		if(NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 락 푼다
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
+
+
+
+		// 2. 게임 모드로 전환된 유저 카운트 증가.
+
+		// 증가 전, 이미 JoinUser와 같다면 말도 안됨. 한 명이 방에 더 들어온것. 크래시
+		if(NowRoom->m_iGameModeUser == NowRoom->m_iJoinUserCount)
+			g_BattleServer_Room_Dump->Crash();
+
+		++NowRoom->m_iGameModeUser;
+
+
+
+		// 3. 증가 후, JoinUser와 같아진다면 방 내의 모든 유저에게 [내 캐릭터 생성] 과 [다른 유저 캐릭터 생성]을 보낸다.
+
+		// 이 패킷이 가면 정말 유저는 게임이 시작된 것.
 	}
 
 	// 유저가 Game모드에서 나감
@@ -1912,6 +1947,7 @@ namespace Library_Jingyu
 					NowRoom->m_iRoomState = eu_ROOM_STATE::WAIT_ROOM;
 					NowRoom->m_iJoinUserCount = 0;
 					NowRoom->m_iAliveUserCount = 0;
+					NowRoom->m_iGameModeUser = 0;
 					NowRoom->m_dwCountDown = 0;		
 					NowRoom->m_bGameEndFlag = false;
 					NowRoom->m_dwGameEndMSec = 0;

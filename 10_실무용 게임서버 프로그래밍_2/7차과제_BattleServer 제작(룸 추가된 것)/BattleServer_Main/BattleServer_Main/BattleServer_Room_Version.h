@@ -208,8 +208,14 @@ namespace Library_Jingyu
 			// 현재 룸 안에 있는 유저 수
 			int m_iJoinUserCount;			
 
-			// 생존한 유저 수. HP가 0 이상인 유저.
+			// 생존한 유저 수. 
+			// HP가 0 이상인 유저.
 			int m_iAliveUserCount;
+
+			// 게임 모드로 전환된 유저 수.
+			// 이 수가 m_iJoinUserCount와 동일해지면, 방 내의 모두에게
+			// 캐릭터 생성 패킷을 보낸다 (나, 다른사람 포함)
+			int m_iGameModeUser;
 
 			// Play상태로 변경을 위한 카운트 다운. 밀리세컨드 단위
 			// timeGetTime()의 값이 들어간다.

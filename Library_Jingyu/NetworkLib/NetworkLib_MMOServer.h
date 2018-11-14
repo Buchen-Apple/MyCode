@@ -197,7 +197,7 @@ namespace Library_Jingyu
 			//
 			// Parameter : 없음
 			// return : 없음
-			void DB_Read_Start();
+			void DB_Start();
 
 			// 해당 유저가 DB의 Read 후 후처리까지 끝났다는 것을 알림.
 			// I/O카운트 1 감소
@@ -205,7 +205,7 @@ namespace Library_Jingyu
 			//
 			// Parameter : 없음
 			// return : 없음
-			void DB_Read_End();
+			void DB_End();
 
 
 
