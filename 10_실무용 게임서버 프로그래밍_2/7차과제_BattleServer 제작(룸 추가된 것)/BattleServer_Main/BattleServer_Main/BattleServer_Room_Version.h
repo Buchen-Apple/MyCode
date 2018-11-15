@@ -80,6 +80,15 @@ namespace Library_Jingyu
 
 
 			// -----------------------
+			// DBWrite 체크.
+			// -----------------------
+
+			// DBWrite 카운트 증가.
+			// 이게 0이 되면 빠진다.
+			int m_iDBWriteCount;
+
+
+			// -----------------------
 			// 전적 정보
 			// -----------------------
 			int		m_iRecord_PlayCount;	// 플레이 횟수
@@ -88,15 +97,47 @@ namespace Library_Jingyu
 			int		m_iRecord_Die;			// 죽은 횟수
 			int		m_iRecord_Win;			// 최종승리 횟수
 
+			// 실제 게임이 시작된 시간. 밀리세컨드 단위.
+			// DB에 저장하거나 유저에게 보내줄 때는 초단위로 변환 후 보낸다.
+			DWORD m_dwGameStartTime;		
+
+			// 전적이 마지막으로 저장되었는지 체크하는 플래그
+			// 강제 종료시에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 둔다.
+			bool m_bLastDBWriteFlag;
+			
+
 
 			// -----------------------
 			// 컨텐츠 정보
 			// -----------------------
-			float m_fPosX;
-			float m_fPosY;
+			float	m_fPosX;
+			float	m_fPosY;
 
 			int		m_iHP;
+
+			// 총알 수
 			int		m_iBullet;
+
+			// 탄창 수
+			int		m_iCartridge;
+					   
+
+
+			// -----------------------
+			// 공격 타임 체크
+			// -----------------------
+
+			// Fire_1(총 발사)를 시작한 시간.
+			// 이 시간부터 100m/s이내에 데미지 패킷이 와야 정상으로 처리해줌.
+			// 패킷을 받은 순간 값이 들어가며, 데미지 패킷이 오면 다시 0으로 초기화
+			// 즉, 해당 값이 0이면 Fire_1 공격이 안온 상태
+			DWORD m_dwFire1_StartTime;
+
+			// Fire_2(발차기)를 시작한 시간
+			// 이 시간부터 100m/s이내에 데미지 패킷이 와야 정상으로 처리해줌.
+			// 패킷을 받은 순간 값이 들어가며, 데미지 패킷이 오면 다시 0으로 초기화
+			// 즉, 해당 값이 0이면 Fire_2 공격이 안온 상태
+			DWORD m_dwFire2_StartTime;
 
 
 			
@@ -150,11 +191,29 @@ namespace Library_Jingyu
 			// Game모드 패킷 처리 함수
 			// -----------------
 
-			// 내 캐릭터 생성 함수
+			// 유저가 이동할 시 보내는 패킷.
 			//
 			// Parameter : CProtocolBuff_Net*
 			// return : 없음
-			void Game_CreateMyCharacter(CProtocolBuff_Net* Packet);
+			void Game_MovePacket(CProtocolBuff_Net* Packet);
+
+			// HitPoint 갱신
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_HitPointPacket(CProtocolBuff_Net* Packet);
+
+			// Fire 1 패킷 (총 발사)
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_Frie_1_Packet(CProtocolBuff_Net* Packet);
+
+			// HitDamage
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_HitDamage_Packet(CProtocolBuff_Net* Packet);
 
 
 		};
@@ -261,12 +320,23 @@ namespace Library_Jingyu
 			// 생성자
 			stRoom();
 
+			// 소멸자
+			virtual ~stRoom();
+
 			// 자료구조 내의 모든 유저에게 인자로 받은 패킷 보내기
 			//
 			// Parameter : CProtocolBuff_Net*
 			// return : 자료구조 내에 유저가 0명일 경우 false
 			//		  : 그 외에는 true
 			bool SendPacket_BroadCast(CProtocolBuff_Net* SendBuff);
+
+			// 자료구조 내의 모든 유저에게 인자로 받은 패킷 보내기
+			// 인자로 받은 AccountNo를 제외하고 보낸다
+			//
+			// Parameter : CProtocolBuff_Net*, AccountNo
+			// return : 자료구조 내에 유저가 0명일 경우 false
+			//		  : 그 외에는 true
+			bool SendPacket_BroadCast(CProtocolBuff_Net* SendBuff, INT64 AccountNo);
 			
 			// 방 내의 모든 유저를 Auth_To_Game으로 변경
 			//
@@ -293,6 +363,18 @@ namespace Library_Jingyu
 			// return : 없음
 			void Shutdown_All();
 
+			// 방 안의 모든 유저들에게 나 생성패킷과 다른 유저 생성 패킷 보내기
+			// 
+			// Parameter : 없음
+			// return : 없음
+			void CreateCharacter();
+
+			// 방 안의 모든 유저들에게 전적 변경내용 보내기.
+			//
+			// Parameter : 없음
+			// return : 없음
+			void RecodeSend();
+			
 
 
 			// ------------
@@ -304,6 +386,13 @@ namespace Library_Jingyu
 			// Parameter : 추가하고자 하는 CGameSession*
 			// return : 없음
 			void Insert(CGameSession* InsertPlayer);
+
+			// 자료구조에 유저가 있나 체크
+			//
+			// Parameter : AccountNo
+			// return : 있을 시 true
+			//		  : 없을 시 false
+			bool Find(INT64 AccountNo);
 
 			// 자료구조에서 Erase
 			//
@@ -482,7 +571,22 @@ namespace Library_Jingyu
 		unordered_map<INT64, CGameSession*> m_AccountNo_Umap;
 
 		// m_AccountNo_Umap용 SRW락
-		SRWLOCK m_AccountNo_Umap_srwl;			  
+		SRWLOCK m_AccountNo_Umap_srwl;	
+
+
+
+		// -----------------------
+		// 아직 DB에 Write 중인 유저 관리 자료구조 변수
+		// -----------------------
+
+		// AccountNo를 이용해 DBWrite 중인 카운트 관리.
+		//
+		// Key : AccountNo, Value : WriteCount(int)
+		unordered_map<INT64, int> m_DBWrite_Umap;
+
+		// m_DBWrite_Umap용 SRW락
+		SRWLOCK m_DBWrite_Umap_srwl;
+
 
 
 
@@ -537,6 +641,12 @@ namespace Library_Jingyu
 		// Parameter : DB_WORK_LOGIN*
 		// return : 없음
 		void Auth_LoginPacket_Info(DB_WORK_LOGIN_CONTENTS* DBData);
+		
+		// DB_Write에 대한 작업 후 처리
+		//
+		// Parameter : DB_WORK_CONTENT_UPDATE*
+		// return : 없음
+		void Game_DBWrite(DB_WORK_CONTENT_UPDATE* DBData);
 
 
 
@@ -565,6 +675,35 @@ namespace Library_Jingyu
 		//		  : 실패 시 false
 		bool EraseAccountNoFunc(INT64 AccountNo);
 
+
+
+	private:
+		// -----------------------
+		// DBWrite 카운트 자료구조 관리 함수
+		// -----------------------
+
+		// DBWrite 카운트 관리 자료구조에 유저를 추가하는 함수
+		//
+		// Parameter : AccountNo, Count(int)
+		// return : 성공 시 true
+		//		  : 실패(키 중복) 시 false
+		bool InsertDBWriteCountFunc(INT64 AccountNo, int WriteCount);
+
+		// DBWrite 카운트 관리 자료구조에서 유저를 검색 후, 
+		// 카운트(Value)를 1 증가하는 함수
+		//
+		// Parameter : AccountNo
+		// return : 없음
+		void AddDBWriteCountFunc(INT64 AccountNo);
+
+		// DBWrite 카운트 관리 자료구조에서 유저를 검색 후, 
+		// 카운트(Value)를 1 감소시키는 함수
+		// 감소 후 0이되면 Erase한다.
+		//
+		// Parameter : AccountNo
+		// return : 성공 시 true
+		//		  : 검색 실패 시 false
+		bool MinDBWriteCountFunc(INT64 AccountNo);
 		
 
 

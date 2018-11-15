@@ -49,10 +49,6 @@ namespace Library_Jingyu
 	{
 		WORD m_wWorkType;
 		WORD m_wAPIType;
-		INT64 m_i64UniqueKey;
-
-		// Player 포인터
-		LPVOID pPointer;		
 
 		int		m_iRecord_PlayCount;	// 플레이 횟수
 		int		m_iRecord_PlayTime;		// 플레이 시간 초단위
@@ -86,13 +82,16 @@ namespace Library_Jingyu
 	};
 
 	// DB 요청에 대한 후처리를 위한, Type
-	enum eu_DB_READ_TYPE
+	enum eu_DB_AFTER_TYPE
 	{
 		// 로그인 패킷에 대한 인증 처리
 		eu_LOGIN_AUTH = 0,
 
 		// 로그인 패킷에 대한 정보 가져오기
-		eu_LOGIN_INFO = 1
+		eu_LOGIN_INFO = 1,
+
+		// DB Write 작업
+		eu_WRITE = 4
 	};	
 }
 

@@ -107,29 +107,6 @@ namespace Library_Jingyu
 		m_lAuthToGameFlag = TRUE;
 	}
 
-	// 해당 유저가 DB의 Write상태가 시작되었다는것을 알림.
-	// 결과 받은 후 후처리가 있을 수 있기 때문에, I/O카운트 1 증가
-	// 삭제 방어용
-	//
-	// Parameter : 없음
-	// return : 없음
-	void CMMOServer::cSession::DB_Start()
-	{
-		InterlockedIncrement(&m_lIOCount);
-	}
-
-	// 해당 유저가 DB의 Write 후 후처리까지 끝났다는 것을 알림.
-	// I/O카운트 1 감소
-	// 0이되면 Logout_Flag 변경
-	//
-	// Parameter : 없음
-	// return : 없음
-	void CMMOServer::cSession::DB_End()
-	{
-		if(InterlockedDecrement(&m_lIOCount) == 0)
-			m_lLogoutFlag = TRUE;
-	}
-
 
 	// Auth 스레드에서 처리
 	void CMMOServer::cSession::OnAuth_ClientJoin() {}
@@ -143,9 +120,6 @@ namespace Library_Jingyu
 
 	// Release용
 	void CMMOServer::cSession::OnGame_ClientRelease() {}
-
-
-
 }
 
 
