@@ -101,7 +101,7 @@ namespace Library_Jingyu
 			// DB에 저장하거나 유저에게 보내줄 때는 초단위로 변환 후 보낸다.
 			DWORD m_dwGameStartTime;		
 
-			// 전적이 마지막으로 저장되었는지 체크하는 플래그
+			// 마지막 전적이 저장되었는지 체크하는 플래그
 			// 강제 종료시에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 둔다.
 			bool m_bLastDBWriteFlag;
 			
@@ -121,6 +121,8 @@ namespace Library_Jingyu
 			// 탄창 수
 			int		m_iCartridge;
 					   
+			// 헬멧 수
+			int m_iHelmetCount;
 
 
 			// -----------------------
@@ -214,8 +216,18 @@ namespace Library_Jingyu
 			// Parameter : CProtocolBuff_Net*
 			// return : 없음
 			void Game_HitDamage_Packet(CProtocolBuff_Net* Packet);
+			
+			// Frie 2 패킷 (발 차기)
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_Fire_2_Packet(CProtocolBuff_Net* Packet);
 
-
+			// KickDamage
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_KickDamage_Packet(CProtocolBuff_Net* Packet);
 		};
 
 		friend class CGameSession;
@@ -298,7 +310,6 @@ namespace Library_Jingyu
 			// true면 이미, 방 안의 모든 유저에게 셧다운을 함.
 			bool m_bShutdownFlag;
 
-
 			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
 			char m_cEnterToken[32];
 
@@ -310,7 +321,9 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 5;					   			 
+			const int m_iMaxJoinCount = 5;		
+
+			CBattleServer_Room* m_pBattleServer;
 
 
 			// ------------
@@ -349,7 +362,7 @@ namespace Library_Jingyu
 			// Parameter : 없음
 			// return : 자료구조 내에 유저가 0명일 경우 false
 			//		  : 그 외에는 true
-			bool AliveFalg_True();
+			bool AliveFlag_True();
 
 			// 방 안의 유저들에게 게임 종료 패킷 보내기
 			//
@@ -390,9 +403,9 @@ namespace Library_Jingyu
 			// 자료구조에 유저가 있나 체크
 			//
 			// Parameter : AccountNo
-			// return : 있을 시 true
-			//		  : 없을 시 false
-			bool Find(INT64 AccountNo);
+			// return : 찾은 유저의 CGameSession*
+			//		  : 유저가 없을 시 nullptr
+			CGameSession* Find(INT64 AccountNo);
 
 			// 자료구조에서 Erase
 			//

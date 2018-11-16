@@ -114,6 +114,9 @@ namespace Library_Jingyu
 
 		// DBWrite 카운트 초기화
 		m_iDBWriteCount = 0;
+
+		// 헬멧 수
+		m_iHelmetCount = 0;
 	}
 
 	// 소멸자
@@ -121,6 +124,8 @@ namespace Library_Jingyu
 	{
 		// 할거 없음
 	}
+
+
 
 	// -----------------
 	// 가상함수
@@ -324,9 +329,30 @@ namespace Library_Jingyu
 
 		// 3. 증가 후, JoinUser와 같아진다면 방 내의 모든 유저에게 [내 캐릭터 생성] 과 [다른 유저 캐릭터 생성]을 보낸다.
 		// OnGame_ClientJoin 마다 호출하는게 아니라, 모두 접속했는지 확인 후 보낸다. 동시에 캐릭터 생성을 하기 위해서.
-
 		if (NowRoom->m_iGameModeUser == NowRoom->m_iJoinUserCount)
 			NowRoom->CreateCharacter();
+
+
+		// 전적 중, 플레이 횟수 증가. 그리고 DB에 저장
+		++m_iRecord_PlayCount;
+
+		DB_WORK_CONTENT_UPDATE* CountWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
+
+		CountWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
+		CountWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
+		CountWrite->m_iRecord_Kill = m_iRecord_Kill;
+		CountWrite->m_iRecord_Die = m_iRecord_Die;
+		CountWrite->m_iRecord_Win = m_iRecord_Win;
+
+		CountWrite->AccountNo = m_Int64AccountNo;
+
+		// Write 하기 전에, WriteCount 증가.
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+
+		// DBWrite
+		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite, en_PHP_TYPE::UPDATE_CONTENTS);
 	}
 
 	// 유저가 Game모드에서 나감
@@ -480,6 +506,17 @@ namespace Library_Jingyu
 
 				// HitDamage
 			case en_PACKET_CS_GAME_REQ_HIT_DAMAGE:
+				Game_HitDamage_Packet(Packet);
+				break;
+
+				// Fire 2 공격 (발차기)
+			case en_PACKET_CS_GAME_REQ_FIRE2:
+				Game_Fire_2_Packet(Packet);
+				break;
+
+				// KickDamage
+			case en_PACKET_CS_GAME_RES_KICK_DAMAGE:
+				Game_KickDamage_Packet(Packet);
 				break;
 
 				// 캐릭터 HitPoint 갱신
@@ -536,9 +573,9 @@ namespace Library_Jingyu
 		
 		m_bLoginFlag = false;	
 		m_bLogoutFlag = false;
-		m_bAliveFlag = false;
 		m_lLoginHTTPCount = 0;		
 		m_bLastDBWriteFlag = false;		
+		m_iHelmetCount = 0;
 	}
 
 
@@ -896,6 +933,11 @@ namespace Library_Jingyu
 		if (m_bLoginFlag == false)
 			g_BattleServer_Room_Dump->Crash();
 
+		// 생존 여부 체크
+		// 죽은 유저의 이동 요청이면 그냥 무시.
+		if (m_bAliveFlag == false)
+			return;
+
 		// 1. 내가있는 방 알아오기
 		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
 
@@ -969,6 +1011,11 @@ namespace Library_Jingyu
 		if (m_bLoginFlag == false)
 			g_BattleServer_Room_Dump->Crash();
 
+		// 생존 여부 체크
+		// 죽은 유저의 히트 포인트 갱신은 무시
+		if (m_bAliveFlag == false)
+			return;
+
 
 		// 1. 내가있는 방 알아오기
 		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
@@ -1027,6 +1074,11 @@ namespace Library_Jingyu
 		// 로그인 여부 체크
 		if (m_bLoginFlag == false)
 			g_BattleServer_Room_Dump->Crash();
+
+		// 생존 여부 체크
+		// 죽은 유저의 공격 요청은 무시
+		if (m_bAliveFlag == false)
+			return;
 
 
 		// 1. 내가있는 방 알아오기
@@ -1101,6 +1153,11 @@ namespace Library_Jingyu
 		if (m_bLoginFlag == false)
 			g_BattleServer_Room_Dump->Crash();
 
+		// 생존 여부 체크
+		// 죽은 유저가 보낸 데미지 패킷은 무시
+		if (m_bAliveFlag == false)
+			return;
+
 
 		// 1. 내가있는 방 알아오기
 		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
@@ -1120,11 +1177,11 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
 
 
+
 		// 2. Fire_1 패킷을 받은 시간 체크
 		DWORD FireTime = m_dwFire1_StartTime;
 
 		// 기존 시간은 0으로 초기화.
-		// 100 m/s안에 안왔어도 초기화해야함.
 		m_dwFire1_StartTime = 0;
 
 		// 100m/s 이내로 왔는지 체크
@@ -1135,6 +1192,7 @@ namespace Library_Jingyu
 		}
 
 
+
 		// 3. 100 m/s 이내로 왔다면 마샬링
 		INT64 TargetAccountNo; // 피해자 AccountNo
 
@@ -1142,19 +1200,404 @@ namespace Library_Jingyu
 
 
 		// 4. 해당 방에 피해자 AccountNo가 있나 체크
-		NowRoom;
+		CGameSession* Target = NowRoom->Find(TargetAccountNo);
+
+		if (Target == nullptr)
+		{
+			// 없다면 패킷 무시
+			// 없을 가능성 있음. 100 m/s 이내에 이미 나갔을 가능성
+
+			//로그 남긴다.
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
+				L"Game_HitDamage_Packet() --> Target Not Find (Attack : %lld, Target : %lld)", m_Int64AccountNo, TargetAccountNo);
+
+			return;
+		}
 
 		
-		// 4. hp 차감 처리
+		// 5. hp 차감 처리		
+		int TargetHP, HelmetCount;
+		BYTE HelmetHit;
+
+		// 타겟에게 헬멧이 있는 경우, 헬멧만 1 차감
+		if (Target->m_iHelmetCount > 0)
+		{
+			--Target->m_iHelmetCount;
+
+			// Send할 변수 셋팅
+			HelmetCount = Target->m_iHelmetCount;
+
+			TargetHP = Target->m_iHP;
+			HelmetHit = 1;
+		}
+
+		// 헬멧이 없는 경우, 데미지 적용
+		else
+		{
+			// 피타고라스 정리 (a2 + b2 = c2)
+			// 두 점간의 거리 구함 (c)
+			float a = (m_fPosX - Target->m_fPosX);
+			float b = (m_fPosY - Target->m_fPosY);
+
+			float c = sqrtf((a*a) + (b*b));
+
+			// 거리 기준으로 HP 감소
+			// 지금은 그냥 무조건 -10 감소. 
+			// 차후 강사님에게 프로토콜 받으면 그때 정상 처리			
+			TargetHP = Target->m_iHP - 10;
+			if (TargetHP < 0)
+				TargetHP = 0;
+
+			Target->m_iHP = TargetHP;			
+
+			// Send할 변수 셋팅
+			HelmetCount = 0;
+
+			HelmetHit = 0;
+		}
+		
 
 
-		// 5. 방 내의 모든 유저에게 응답패킷 보내기
+		// 6. 방 내의 모든 유저에게 응답패킷 보내기
+		// 방 안의 모든 유저에게 보낸다.(자기 자신 포함)
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_HIT_DAMAGE;
+
+		SendBuff->PutData((char*)&Type, 2);
+
+		SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+		SendBuff->PutData((char*)&TargetAccountNo, 8);
+		SendBuff->PutData((char*)&TargetHP, 4);
+
+		SendBuff->PutData((char*)&HelmetHit, 1);
+		SendBuff->PutData((char*)&HelmetCount, 4);
+
+		NowRoom->SendPacket_BroadCast(SendBuff);
+
+
+		// 7. 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
+		if (TargetHP == 0)
+		{
+			// 피해자의 생존 플래그를 false로 변경
+			Target->m_bAliveFlag = false;
+
+			// 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
+			// 모든 유저가 죽었는데 또 죽었다고 한 것.
+			if (NowRoom->m_iAliveUserCount == 0)
+				g_BattleServer_Room_Dump->Crash();
+			
+			// 룸의 생존 유저 수 카운트 1 감소
+			--NowRoom->m_iAliveUserCount;
+
+			// 패킷 보내기
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_DIE;
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&TargetAccountNo, 8);			
+
+			NowRoom->SendPacket_BroadCast(SendBuff);
 
 
 
+			// DB 저장 파트 -----------------------------------
+
+			// 공격자의 Kill 카운트 증가
+			++m_iRecord_Kill;
+
+			// DBWrite 구조체 셋팅
+			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+		
+			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
+
+			KillWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
+			KillWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
+			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
+			KillWrite->m_iRecord_Die = m_iRecord_Die;
+			KillWrite->m_iRecord_Win = m_iRecord_Win;
+
+			KillWrite->AccountNo = m_Int64AccountNo;
+
+			// 요청하기
+			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite, en_PHP_TYPE::UPDATE_CONTENTS);	
+
+
+			
+
+			// 사망자의 Die 카운트 증가
+			++Target->m_iRecord_Die;
+
+			// DBWrite 구조체 셋팅
+			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
+
+			DieWrite->m_iRecord_PlayCount = Target->m_iRecord_PlayCount;
+			DieWrite->m_iRecord_PlayTime = Target->m_iRecord_PlayTime;
+			DieWrite->m_iRecord_Kill = Target->m_iRecord_Kill;
+			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
+			DieWrite->m_iRecord_Win = Target->m_iRecord_Win;
+
+			DieWrite->AccountNo = TargetAccountNo;
+
+			// 요청하기
+			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+		}
 	}
 
+	// Frie 2 패킷 (발 차기)
+	//
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CBattleServer_Room::CGameSession::Game_Fire_2_Packet(CProtocolBuff_Net* Packet)
+	{
+		// 로그인 여부 체크
+		if (m_bLoginFlag == false)
+			g_BattleServer_Room_Dump->Crash();
 
+		// 생존 여부 체크
+		// 죽은 유저의 공격 요청은 무시
+		if (m_bAliveFlag == false)
+			return;
+
+
+		// 1. 내가있는 방 알아오기
+		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
+
+		auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+		// 없으면 크래시
+		if (FindRoom == m_pParent->m_Room_Umap.end())
+			g_BattleServer_Room_Dump->Crash();
+
+		stRoom* NowRoom = FindRoom->second;
+
+		// 플레이모드가 아니면 크래시
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			g_BattleServer_Room_Dump->Crash();
+
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
+
+
+
+		// 2. 마샬링
+		float HitPointX;
+		float HitPointY;
+		float HitPointZ;
+
+		Packet->GetData((char*)&HitPointX, 4);
+		Packet->GetData((char*)&HitPointY, 4);
+		Packet->GetData((char*)&HitPointZ, 4);
+
+
+
+		// 3. 방 안의 유저들에게(자기자신 포함) Fire 2에 대한 응답패킷 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_FIRE2;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+
+		SendBuff->PutData((char*)&HitPointX, 4);
+		SendBuff->PutData((char*)&HitPointY, 4);
+		SendBuff->PutData((char*)&HitPointZ, 4);
+
+		NowRoom->SendPacket_BroadCast(SendBuff);
+
+
+
+		// 5. 패킷을 받은 시간 갱신
+		// 패킷을 브로드캐스트 하는 시간은 100m/s에 안잡히게 하기 위해 여기서 시간 갱신
+		m_dwFire2_StartTime = timeGetTime();
+	}
+
+	// KickDamage
+	//
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CBattleServer_Room::CGameSession::Game_KickDamage_Packet(CProtocolBuff_Net* Packet)
+	{
+		// 로그인 여부 체크
+		if (m_bLoginFlag == false)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 생존 여부 체크
+		// 죽은 유저의 공격 요청은 무시
+		if (m_bAliveFlag == false)
+			return;
+
+
+		// 1. 내가있는 방 알아오기
+		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
+
+		auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+		// 없으면 크래시
+		if (FindRoom == m_pParent->m_Room_Umap.end())
+			g_BattleServer_Room_Dump->Crash();
+
+		stRoom* NowRoom = FindRoom->second;
+
+		// 플레이모드가 아니면 크래시
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			g_BattleServer_Room_Dump->Crash();
+
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
+
+
+
+		// 2. Fire_2 패킷을 받은 시간 체크
+		DWORD FireTime = m_dwFire2_StartTime;
+
+		// 기존 시간은 0으로 초기화.
+		m_dwFire2_StartTime = 0;
+
+		// 100m/s 이내로 왔는지 체크
+		if ((timeGetTime() - FireTime) > 100)
+		{
+			// 100m/s가 지난 후에 왔다면 패킷 무시
+			return;
+		}
+
+
+
+		// 3. 100 m/s 이내로 왔다면 마샬링
+		INT64 TargetAccountNo; // 피해자 AccountNo
+
+		Packet->GetData((char*)&TargetAccountNo, 8);
+
+
+
+		// 4. 해당 방에 피해자 AccountNo가 있나 체크
+		CGameSession* Target = NowRoom->Find(TargetAccountNo);
+
+		if (Target == nullptr)
+		{
+			// 없다면 패킷 무시
+			// 없을 가능성 있음. 100 m/s 이내에 이미 나갔을 가능성
+
+			//로그 남긴다.
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
+				L"Game_KickDamage_Packet() --> Target Not Find (Attack : %lld, Target : %lld)", m_Int64AccountNo, TargetAccountNo);
+
+			return;
+		}
+
+
+		// 5. 공격자와 피격자의 거리 구하기.
+
+		// 피타고라스 정리 (a2 + b2 = c2)
+		// 두 점간의 거리 구함 (c)
+		float a = (m_fPosX - Target->m_fPosX);
+		float b = (m_fPosY - Target->m_fPosY);
+
+		float c = sqrtf((a*a) + (b*b));
+
+		// 두 점의 거리가 2보다 멀다면, 공격 무시
+		if (c > 2)
+			return;
+
+
+		// 6. 타겟의 hp 감소 및 갱신
+		int TargetHP = Target->m_iHP - 10;
+
+		if (TargetHP < 0)
+			TargetHP = 0;
+
+		Target->m_iHP = TargetHP;
+
+
+		// HP 감소 패킷 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_KICK_DAMAGE;
+
+		SendBuff->PutData((char*)&Type, 2);
+
+		SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+		SendBuff->PutData((char*)&TargetAccountNo, 8);
+		SendBuff->PutData((char*)&TargetHP, 4);
+
+		NowRoom->SendPacket_BroadCast(SendBuff);
+
+
+		// 7. 피격자가 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
+		if (TargetHP == 0)
+		{
+			// 피해자의 생존 플래그를 false로 변경
+			Target->m_bAliveFlag = false;
+
+			// 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
+			// 모든 유저가 죽었는데 또 죽었다고 한 것.
+			if (NowRoom->m_iAliveUserCount == 0)
+				g_BattleServer_Room_Dump->Crash();
+
+			// 룸의 생존 유저 수 카운트 1 감소
+			--NowRoom->m_iAliveUserCount;
+
+			// 패킷 보내기
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_DIE;
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&TargetAccountNo, 8);
+
+			NowRoom->SendPacket_BroadCast(SendBuff);
+
+
+
+			// DB 저장 파트 -----------------------------------
+
+			// 공격자의 Kill 카운트 증가
+			++m_iRecord_Kill;
+
+			// DBWrite 구조체 셋팅
+			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
+
+			KillWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
+			KillWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
+			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
+			KillWrite->m_iRecord_Die = m_iRecord_Die;
+			KillWrite->m_iRecord_Win = m_iRecord_Win;
+
+			KillWrite->AccountNo = m_Int64AccountNo;
+
+			// 요청하기
+			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+
+
+
+
+			// 사망자의 Die 카운트 증가
+			++Target->m_iRecord_Die;
+
+			// DBWrite 구조체 셋팅
+			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
+
+			DieWrite->m_iRecord_PlayCount = Target->m_iRecord_PlayCount;
+			DieWrite->m_iRecord_PlayTime = Target->m_iRecord_PlayTime;
+			DieWrite->m_iRecord_Kill = Target->m_iRecord_Kill;
+			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
+			DieWrite->m_iRecord_Win = Target->m_iRecord_Win;
+
+			DieWrite->AccountNo = TargetAccountNo;
+
+			// 요청하기
+			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+		}
+	}
 }
 
 
@@ -1295,7 +1738,7 @@ namespace Library_Jingyu
 	// Parameter : 없음
 	// return : 자료구조 내에 유저가 0명일 경우 false
 	//		  : 그 외에는 true
-	bool CBattleServer_Room::stRoom::AliveFalg_True()
+	bool CBattleServer_Room::stRoom::AliveFlag_True()
 	{
 		// 1. 자료구조 내의 유저 수 받기
 		size_t Size = m_JoinUser_Vector.size();
@@ -1356,6 +1799,9 @@ namespace Library_Jingyu
 			// 유저가 승리자일 경우 (생존자)
 			if (m_JoinUser_Vector[Index]->m_bAliveFlag == true)
 			{
+				// 미리 초기화.
+				m_JoinUser_Vector[Index]->m_bAliveFlag = false;
+
 				// 한 게임에 승리자는 1명.
 				// WinUserCount가 1인데 여기 들어왔다면, 승리자가 1명 이상이 되었다는 의미.
 				// 말도 안됨.
@@ -1457,14 +1903,11 @@ namespace Library_Jingyu
 			m_JoinUser_Vector[Index]->m_iBullet = 10;	
 
 			// 탄창 수
-			m_JoinUser_Vector[Index]->m_iCartridge = 3;
-
-			// 전적 중, 플레이 횟수 증가
-			++m_JoinUser_Vector[Index]->m_iRecord_PlayCount;
+			m_JoinUser_Vector[Index]->m_iCartridge = 3;			
 
 			// 게임 시작 시간.
 			// 밀리 세컨드로 보관.
-			m_JoinUser_Vector[Index]->m_dwGameStartTime = NowTime;
+			m_JoinUser_Vector[Index]->m_dwGameStartTime = NowTime;	
 
 			++Index;
 		}
@@ -1618,11 +2061,34 @@ namespace Library_Jingyu
 	// 자료구조에 유저가 있나 체크
 	//
 	// Parameter : AccountNo
-	// return : 있을 시 true
-	//		  : 없을 시 false
-	bool CBattleServer_Room::stRoom::Find(INT64 AccountNo)
+	// return : 찾은 유저의 CGameSession*
+	//		  : 유저가 없을 시 nullptr
+	CBattleServer_Room::CGameSession* CBattleServer_Room::stRoom::Find(INT64 AccountNo)
 	{
+		size_t Size = m_JoinUser_Vector.size();
 
+		// 1. 자료구조 안에 유저가 0이라면 Crash
+		if (Size == 0)
+			g_BattleServer_Room_Dump->Crash();
+
+
+		// 2. 룸 안에 있는 유저 수와 다르다면 Crash
+		if (m_iJoinUserCount != Size)
+			g_BattleServer_Room_Dump->Crash();
+
+
+		// 3. 순회하면서 있나 없나 검색
+		size_t Index;
+		while (Index < Size)
+		{
+			if (m_JoinUser_Vector[Index]->m_Int64AccountNo == AccountNo)
+				return m_JoinUser_Vector[Index];
+
+			++Index;
+		}
+
+		// 4. 여기까지 오면 없는것. 
+		return nullptr;
 	}
 
 	// 자료구조에서 Erase
@@ -1635,8 +2101,8 @@ namespace Library_Jingyu
 		size_t Size = m_JoinUser_Vector.size();
 		bool Flag = false;
 
-		// 1. 자료구조 안에 유저가 0보다 작거나 같으면 return false
-		if (Size <= 0)
+		// 1. 자료구조 안에 유저가 0이라면 return false
+		if (Size == 0)
 			return false;
 
 		// 2. 자료구조 안에 유저가 1명이거나, 찾고자 하는 유저가 마지막에 있다면 바로 제거
@@ -2265,7 +2731,7 @@ namespace Library_Jingyu
 
 	}
 
-	// DB_Write에 대한 작업 후 처리
+	// DB_Write에 대한 작업 후처리
 	//
 	// Parameter : DB_WORK_CONTENT_UPDATE*
 	// return : 없음
@@ -2613,7 +3079,7 @@ namespace Library_Jingyu
 					// 2. 룸 내 모든 유저의 생존 플래그 변경
 					// false가 리턴될 수 있음. 자료구조 내에 유저가 0명일 수 있기 때문에.
 					// 때문에 리턴값 안받는다.
-					NowRoom->AliveFalg_True();
+					NowRoom->AliveFlag_True();
 
 
 					// 3. 방 안의 모든 유저에게, 배틀서버 대기방 플레이 시작 패킷 보내기
@@ -2807,8 +3273,8 @@ namespace Library_Jingyu
 		auto itor_End = m_Room_Umap.end();
 
 		// Step 1. 삭제될 방 체크
-		// Step 2. 아직 유저가 있다면, 게임 종료된 방 처리 	
-		// Setp 3. 게임 종료된 방이 아니고 삭제될 방도 아니라면, 게임 종료 체크
+		// Step 2. 게임 종료된 방 처리 	
+		// Setp 3. 게임 종료 체크
 		// Step 4. 생존자가 0명인 경우에도 게임 종료.
 
 		// 모든 방을 순회하며, PLAY 모드인 방에 한해 작업 진행
@@ -2832,7 +3298,7 @@ namespace Library_Jingyu
 					}
 				}
 
-				// Step 2. 아직 유저가 있다면, 게임 종료된 방 처리 
+				// Step 2. 게임 종료된 방 처리 
 				else if (NowRoom->m_bGameEndFlag == true)
 				{
 					// 셧다운을 하지 않았을 경우에만 로직 진행.
@@ -2852,7 +3318,7 @@ namespace Library_Jingyu
 					}
 				}				
 
-				// Setp 3. 게임 종료된 방이 아니고 삭제될 방도 아니라면, 게임 종료 체크
+				// Setp 3. 게임 종료 체크
 				// 생존자가 1명이면 게임 종료.
 				else if (NowRoom->m_iAliveUserCount == 1)
 				{

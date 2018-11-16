@@ -326,7 +326,7 @@ namespace Library_Jingyu
 				break;
 
 			// 직렬화 버퍼를 쓰는 Type이면, 직렬화 버퍼 Free
-			if(Delete->m_wWorkType == eu_DB_READ_TYPE::eu_LOGIN_AUTH)
+			if(Delete->m_wWorkType == eu_DB_AFTER_TYPE::eu_LOGIN_AUTH)
 				CProtocolBuff_Net::Free(Delete->m_pBuff);
 
 			// 반환

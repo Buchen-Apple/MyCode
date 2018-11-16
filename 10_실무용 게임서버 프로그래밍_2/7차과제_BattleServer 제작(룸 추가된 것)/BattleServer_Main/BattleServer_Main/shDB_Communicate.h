@@ -91,7 +91,7 @@ namespace Library_Jingyu
 		eu_LOGIN_INFO = 1,
 
 		// DB Write ÀÛ¾÷
-		eu_WRITE = 4
+		eu_WRITE = 2
 	};	
 }
 

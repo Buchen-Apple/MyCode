@@ -1125,9 +1125,9 @@ namespace Library_Jingyu
 
 
 
-			// ------------------
-			// Part 2. AUTH모드 세션들 패킷 처리 + Logout Flag 처리
-			// Part 3. AUTH에서 GAME으로 모드 전환
+			// ------------------			
+			// Part 2. AUTH에서 GAME으로 모드 전환
+			// Part 3. AUTH모드 세션들 패킷 처리 + Logout Flag 처리
 			// ------------------
 			int iIndex = MAX_USER - 1;
 
@@ -1140,70 +1140,74 @@ namespace Library_Jingyu
 				// 해당 유저가 MODE_AUTH인지 확인 ---------------------------
 				if (NowSession->m_euMode == euSessionModeState::MODE_AUTH)
 				{
-					// LogOutFlag 체크
-					// FALSE라면 정상 로직 처리
-					if (NowSession->m_lLogoutFlag == FALSE)
+					// Auth TO Game 플래그 확인
+					// AUTH에서 GAME으로 모드 전환
+					if (NowSession->m_lAuthToGameFlag == TRUE)
 					{
-						// 1. CompleteRecvPacket 큐의 사이즈 확인.
-						int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
+						// Auth 모드 유저 수 감소
+						--g_lAuthModeUserCount;
 
-						// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
-						if (iQSize > 0)
+						// 나갔다고 알려준다.
+						// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
+						NowSession->OnAuth_ClientLeave(true);
+
+						// MODE_AUTH_TO_GAME으로 모드 변경
+						NowSession->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
+					}
+
+					// AUTH모드인게 확정이라면
+					else
+					{
+						// LogOutFlag 체크
+						// FALSE라면 정상 로직 처리. Auth에서 종료될 유저
+						if (NowSession->m_lLogoutFlag == FALSE)
 						{
-							// !! 패킷 처리 횟수 제한을 두기 위해, PACKET_WORK_COUNT보다 노드의 수가 더 많으면, PACKET_WORK_COUNT로 변경 !!
-							if (iQSize > PACKET_WORK_COUNT)
-								iQSize = PACKET_WORK_COUNT;
+							// 1. CompleteRecvPacket 큐의 사이즈 확인.
+							int iQSize = NowSession->m_CRPacketQueue->GetNodeSize();
 
-							CProtocolBuff_Net* NowPacket;
-
-							while (iQSize > 0)
+							// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
+							if (iQSize > 0)
 							{
-								// 노드 빼기
-								if (NowSession->m_CRPacketQueue->Dequeue(NowPacket) == -1)
-									cMMOServer_Dump->Crash();
+								// !! 패킷 처리 횟수 제한을 두기 위해, PACKET_WORK_COUNT보다 노드의 수가 더 많으면, PACKET_WORK_COUNT로 변경 !!
+								if (iQSize > PACKET_WORK_COUNT)
+									iQSize = PACKET_WORK_COUNT;
 
-								// 패킷 처리
-								NowSession->OnAuth_Packet(NowPacket);
+								CProtocolBuff_Net* NowPacket;
 
-								// 패킷 래퍼런스 카운트 1 감소
-								CProtocolBuff_Net::Free(NowPacket);
+								while (iQSize > 0)
+								{
+									// 노드 빼기
+									if (NowSession->m_CRPacketQueue->Dequeue(NowPacket) == -1)
+										cMMOServer_Dump->Crash();
 
-								// 패킷 1개 처리했으니 남은 수 감소.
-								--iQSize;
+									// 패킷 처리
+									NowSession->OnAuth_Packet(NowPacket);
+
+									// 패킷 래퍼런스 카운트 1 감소
+									CProtocolBuff_Net::Free(NowPacket);
+
+									// 패킷 1개 처리했으니 남은 수 감소.
+									--iQSize;
+								}
 							}
 						}
 
-						// Auth TO Game 플래그 확인
-						// AUTH에서 GAME으로 모드 전환
-						if (NowSession->m_lAuthToGameFlag == TRUE)
+						// TRUE라면 끊길 유저
+						else
 						{
-							// Auth 모드 유저 수 감소
-							--g_lAuthModeUserCount;
+							// SendFlag 체크
+							if (NowSession->m_lSendFlag == FALSE)
+							{
+								// Auth 모드 유저 수 감소
+								--g_lAuthModeUserCount;
 
-							// 나갔다고 알려준다.
-							// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
-							NowSession->OnAuth_ClientLeave(true);
+								// 나갔다고 알려준다.
+								// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
+								NowSession->OnAuth_ClientLeave();
 
-							// MODE_AUTH_TO_GAME으로 모드 변경
-							NowSession->m_euMode = euSessionModeState::MODE_AUTH_TO_GAME;
-						}
-					}
-
-					// TRUE라면 끊길 유저
-					else
-					{
-						// SendFlag 체크
-						if (NowSession->m_lSendFlag == FALSE)
-						{
-							// Auth 모드 유저 수 감소
-							--g_lAuthModeUserCount;
-
-							// 나갔다고 알려준다.
-							// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
-							NowSession->OnAuth_ClientLeave();
-
-							// MODE_WAIT_LOGOUT으로 모드 변경
-							NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
+								// MODE_WAIT_LOGOUT으로 모드 변경
+								NowSession->m_euMode = euSessionModeState::MODE_WAIT_LOGOUT;
+							}
 						}
 					}
 							
@@ -1218,8 +1222,7 @@ namespace Library_Jingyu
 			// ------------------
 			g_This->OnAuth_Update();			
 
-			InterlockedIncrement(&g_lAuthFPS);
-					   	
+			InterlockedIncrement(&g_lAuthFPS);					   	
 		}
 
 		return 0;		
