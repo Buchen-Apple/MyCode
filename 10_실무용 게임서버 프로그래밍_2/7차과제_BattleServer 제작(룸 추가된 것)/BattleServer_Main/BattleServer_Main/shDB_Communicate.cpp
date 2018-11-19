@@ -280,6 +280,9 @@ namespace Library_Jingyu
 		
 		// Read 완료 락프리 큐 동적할당
 		m_pDB_ReadComplete_Queue = new CLF_Queue<DB_WORK*>(0);
+		
+		// Write 완료 노멀 큐 동적할당.
+		m_pDB_Wirte_End_Queue = new CNormalQueue<DB_WORK*>();
 
 		// DB_Read용 입출력 완료포트 생성
 		// 4개의 스레드 생성, 2개의 스레드 활성화

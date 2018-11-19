@@ -972,6 +972,10 @@ namespace Library_Jingyu
 		{
 			InterlockedIncrement(&g_lTokenNotFound);
 			ReleaseSRWLockExclusive(&m_Logn_LanClient->srwl);		// 언락 -----
+
+			// 해당 유저 접속 끊기
+			Disconnect(SessionID);
+
 			return;
 		}
 

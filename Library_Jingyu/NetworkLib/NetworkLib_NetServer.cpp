@@ -16,13 +16,6 @@
 #include "Log\Log.h"
 #include "LockFree_Queue\LockFree_Queue.h"
 
-ULONGLONG g_ullAcceptTotal;
-LONG	  g_lAcceptTPS;
-LONG	g_lSendPostTPS;
-
-LONG g_lSemCount;
-
-LONG g_lDisconnecetCount;
 
 
 namespace Library_Jingyu
@@ -144,6 +137,11 @@ namespace Library_Jingyu
 	bool CNetServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
 							BYTE Code, BYTE XORCode1, BYTE XORCode2)
 	{		
+
+		// 카운트 변수 0으로 초기화
+		m_ullAcceptTotal = 0;
+		m_lAcceptTPS = 0;
+		m_lSendPostTPS = 0;
 
 		// rand설정
 		srand((UINT)time(NULL));
@@ -604,6 +602,31 @@ namespace Library_Jingyu
 		return m_stEmptyIndexStack->GetInNode();
 	}
 
+	// Accept Total 얻기.
+	ULONGLONG CNetServer::GetAcceptTotal()
+	{
+		return m_ullAcceptTotal;
+	}
+
+	// AcceptTPS 얻기.
+	// 반환과 동시에 기존 값은 0으로 초기화
+	LONG CNetServer::GetAccpetTPS()
+	{
+		LONG Ret = m_lSendPostTPS;
+		m_lSendPostTPS = 0;
+
+		return Ret;
+	}
+
+	// SendTPS 얻기
+	// 반환과 동시에 기존 값은 0으로 초기화
+	LONG CNetServer::GetSendTPS()
+	{
+		LONG Ret = m_lSendPostTPS;
+		m_lSendPostTPS = 0;
+
+		return Ret;
+	}
 
 
 
@@ -616,7 +639,7 @@ namespace Library_Jingyu
 	CNetServer::CNetServer()
 	{
 		// 서버 가동상태 false로 시작 
-		m_bServerLife = false;
+		m_bServerLife = false;		
 	}
 
 	// 소멸자
@@ -837,7 +860,7 @@ namespace Library_Jingyu
 			{
 				// !! 테스트 출력용 !!
 				// sendpostTPS 추가
-				InterlockedAdd(&g_lSendPostTPS, stNowSession->m_iWSASendCount);
+				InterlockedAdd(&g_This->m_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);	
@@ -955,7 +978,7 @@ namespace Library_Jingyu
 				break;
 			}
 					
-			InterlockedIncrement(&g_lAcceptTPS); // 테스트용!!
+			InterlockedIncrement(&g_This->m_lAcceptTPS); // 테스트용!!
 
 			// ------------------
 			// 최대 접속자 수 이상 접속 불가
@@ -979,7 +1002,7 @@ namespace Library_Jingyu
 				continue;				
 			}
 
-			g_ullAcceptTotal++;	// 테스트용!!
+			g_This->m_ullAcceptTotal++;	// 테스트용!!
 
 			// ------------------
 			// IP와 포트 알아오기.

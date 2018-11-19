@@ -113,6 +113,9 @@ namespace Library_Jingyu
 		// 만약, 레퍼런스 카운트가 0이라면 삭제함. TLSPool에 Free 함
 		static void Free(CProtocolBuff_Lan* PBuff);
 
+		// 현재 Alloc된 노드 카운트 얻기
+		static LONG GetNodeCount();
+
 		// 일반 함수 -----------
 		// 레퍼런스 카운트 1 Add하는 함수
 		void Add();

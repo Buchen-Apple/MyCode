@@ -2,10 +2,12 @@
 #define __CHAT_SERVER_ROOM_H__
 
 #include "NetworkLib/NetworkLib_NetServer.h"
+#include "NetworkLib/NetworkLib_LanClinet.h"
 #include "ObjectPool/Object_Pool_LockFreeVersion.h"
 
 #include <unordered_map>
 #include <vector>
+#include <process.h>
 
 using namespace std;
 
@@ -19,6 +21,9 @@ namespace Library_Jingyu
 {
 	class CChatServer_Room	:public CNetServer
 	{
+		friend class CChat_LanClient;
+		friend class CChat_MonitorClient;
+
 		// --------------
 		// 이너 클래스
 		// --------------
@@ -45,16 +50,36 @@ namespace Library_Jingyu
 			// 로그인 여부 체크
 			// true면 로그인 중.
 			bool m_bLoginCheck;
+
+			stPlayer()
+			{
+				// 시작 시, 룸 번호는 -1
+				m_iRoomNo = -1;
+			}
 		};
 
 		// 룸 구조체
 		struct stRoom
 		{
+			// 배틀서버 번호
+			int m_iBattleServerNo;
+
 			// 룸 번호
-			int m_iRoomNo;
+			int m_iRoomNo;		
+
+			// 입장 가능 유저 수
+			int m_iMaxUser;
+
+			// 방에 접속 중인 유저 수
+			int m_iJoinUser;
 
 			// 방 입장 토큰
 			char m_cEnterToken[32];
+
+			// 삭제될 방 플래그
+			// true면 삭제될 방이다.
+			// true면서 방에 유저 수가 0명이면 방이 삭제된다.
+			bool m_bDeleteFlag;
 
 			// 룸에 접속한 유저들 관리 자료구조
 			//
@@ -157,6 +182,36 @@ namespace Library_Jingyu
 								
 		};
 
+		// 파싱 구조체
+		struct stParser
+		{
+			// 넷 서버
+			TCHAR BindIP[20];
+			int Port;
+			int CreateWorker;
+			int ActiveWorker;
+			int CreateAccept;
+			int HeadCode;
+			int XORCode1;
+			int XORCode2;
+			int Nodelay;
+			int MaxJoinUser;
+			int LogLevel;
+
+			// 배틀과 연결되는 랜 클라
+			TCHAR BattleServerIP[20];
+			int BattleServerPort;
+			int BattleClientCreateWorker;
+			int BattleClientActiveWorker;
+			int BattleClientNodelay;
+
+			// 모니터링과 연결되는 랜 클라
+			TCHAR MonitorServerIP[20];
+			int MonitorServerPort;
+			int MonitorClientCreateWorker;
+			int MonitorClientActiveWorker;
+			int MonitorClientNodelay;
+		};
 
 
 
@@ -164,9 +219,53 @@ namespace Library_Jingyu
 		// 멤버 변수
 		// --------------
 
-		// 채팅 Net서버 입장 토큰
-		// 클라가 들고 온다.
-		char m_cConnectToken[32];
+		// 파서 변수
+		stParser m_Paser;
+
+		// 모니터링 랜 클라 
+		CChat_MonitorClient* m_pMonitor_Client;
+
+		// 배틀 랜 클라
+		CChat_LanClient* m_pBattle_Client;
+
+
+		// ---- 카운트 용 ----
+
+		// 실제 로그인 패킷까지 처리된 유저 카운트.
+		LONG m_lChatLoginCount;
+
+		// Player 구조체 할당량
+		// Alloc시 1 증가, Free 시 1 감소
+		LONG m_lUpdateStruct_PlayerCount;
+
+		// 채팅서버 입장 토큰이 다를 시 1 증가
+		LONG m_lEnterTokenMiss;
+
+		// 룸 입장 토큰이 다를 시 1 증가
+		LONG m_lRoom_EnterTokenMiss;
+
+
+
+
+
+
+		// -----------------------
+		// 토큰관리 변수
+		// -----------------------
+
+		// 입장 토큰 관리
+		// 배틀서버는 이 2개 중 하나라도 일치한다면 맞다고 통과시킨다.
+
+		// 배틀서버 입장 토큰 1번
+		// "현재" 토큰을 보관한다.
+		// 마스터와 연결된 랜 클라가 생성 및 갱신한다.
+		char m_cConnectToken_Now[32];
+
+		// 배틀서버 입장 토큰 2번 
+		// "이전" 토큰을 보관한다.
+		// 토큰이 재할당 될 경우, 이전 토큰을 여기다 저장한 후
+		// 새로운 토큰을 "현재" 토큰에 넣는다.
+		char m_cConnectToken_Before[32];
 
 
 
@@ -186,6 +285,7 @@ namespace Library_Jingyu
 
 		// stPlayer 관리 메모리풀
 		CMemoryPoolTLS<stPlayer> *m_pPlayer_Pool;
+
 
 
 
@@ -250,9 +350,7 @@ namespace Library_Jingyu
 		// return :  Erase 후 Second(stPlayer*)
 		//		  : 없는 유저일 시 nullptr
 		stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
-
-
-
+			   
 
 
 
@@ -277,24 +375,48 @@ namespace Library_Jingyu
 
 
 
+	private:
+		// ----------------------------
+		// 룸 관리 자료구조 함수
+		// ----------------------------
+
+		// 룸 자료구조에 Insert
+		//
+		// Parameter : RoonNo, stROom*
+		// return : 정상 추가 시 true
+		//		  : 키 중복 시 flase
+		bool InsertRoomFunc(int RoomNo, stRoom* InsertRoom);
+
+		// 룸 자료구조에서 Erase
+		//
+		// Parameter : RoonNo
+		// return : 정상적으로 제거 시 stRoom*
+		//		  : 검색 실패 시 nullptr
+		stRoom* EraseRoomFunc(int RoomNo);
+
+
 
 	public:
 		// --------------
 		// 외부에서 호출 가능한 함수
 		// --------------
 
+		// 출력용 함수
+		void ShowPrintf();
+
+
 		// 서버 시작
 		//
 		// Parameter : 없음
 		// return : 성공 시 true
 		//		  : 실패 시 false
-
-
+		bool ServerStart();
 
 		// 서버 종료
 		//
 		// Parameter : 없음
 		// return : 없음
+		void ServerStop();
 
 
 
@@ -307,28 +429,13 @@ namespace Library_Jingyu
 		//
 		// Parameter : stRoom* CProtocolBuff_Net*
 		// return : 자료구조에 0명이면 false. 그 외에는 true
-		bool Room_BroadCast(stRoom* NowRoom, CProtocolBuff_Net* SendBuff)
-		{
-			// 자료구조 사이즈가 0이면 false
-			size_t Size = NowRoom->m_JoinUser_vector.size();
-			if (Size == 0)
-				return false;
+		bool Room_BroadCast(stRoom* NowRoom, CProtocolBuff_Net* SendBuff);
 
-			// 직렬화 버퍼 레퍼런스 카운트 증가
-			SendBuff->Add((int)Size);
-
-			// 처음부터 순회하며 보낸다.
-			size_t Index = 0;
-
-			while (Index < Size)
-			{
-				SendPacket(NowRoom->m_JoinUser_vector[0], SendBuff);
-
-				++Index;				
-			}			
-
-			return true;
-		}
+		// Config 셋팅
+		//
+		// Parameter : stParser*
+		// return : 실패 시 false
+		bool SetFile(stParser* pConfig);
 
 
 
@@ -354,6 +461,7 @@ namespace Library_Jingyu
 		// Parameter : SessionID, CProtocolBuff_Net*
 		// return : 없음
 		void Packet_Message(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
+
 
 
 	private:
@@ -428,6 +536,318 @@ namespace Library_Jingyu
 		virtual ~CChatServer_Room();
 	};
 }
+
+
+// -----------------------
+//
+// 배틀서버와 연결되는 Lan 클라
+//
+// -----------------------
+namespace Library_Jingyu
+{
+	class CChat_LanClient	:public CLanClient
+	{
+		friend class CChatServer_Room;
+
+
+		// ----------------------
+		// 멤버 변수
+		// ----------------------
+
+		// !! 채팅 넷서버 !!
+		CChatServer_Room* m_pNetServer;
+
+		// 배틀 랜서버와 접속한 세션아이디
+		ULONGLONG m_ullSessionID;
+
+		// 배틀 랜서버에 로그인 여부
+		// true면 로그인 된 상태
+		// 서버 켜짐을 보낸 후 응답을 받으면 true로 변경
+		bool m_bLoginCheck;
+
+
+
+
+
+	private:
+		// ----------------------
+		// 내부에서만 사용하는 함수
+		// ----------------------
+
+		// 채팅 넷서버 셋팅
+		//
+		// Parameter : CChatServer_Room*
+		// return : 없음
+		void SetNetServer(CChatServer_Room* NetServer);
+
+		
+
+
+
+	private:
+		// ----------------------
+		// 패킷 처리 함수
+		// ----------------------
+
+		// 신규 대기방 생성
+		//
+		// Parameter : ClientID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_RoomCreate(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload);
+
+		// 연결 토큰 재발행
+		//
+		// Parameter : ClientID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_TokenChange(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload);
+
+		// 로그인 패킷에 대한 응답
+		//
+		// Parameter : CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_Login(CProtocolBuff_Lan* Payload);
+
+		// 방 삭제 
+		//
+		// Parameter : ClientID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_RoomErase(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload);
+
+
+	public:
+		// ----------------------
+		// 외부에서 사용 가능한 함수
+		// ----------------------
+
+		// 시작 함수
+		// 내부적으로, 상속받은 CLanClient의 Start호출.
+		//
+		// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+		// return : 성공 시 true , 실패 시 falsel 
+		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
+
+		// 클라이언트 종료
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ClientStop();
+
+
+
+
+	private:
+		// -----------------------
+		// 가상함수
+		// -----------------------
+
+		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnConnect(ULONGLONG ClinetID);
+
+		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnDisconnect(ULONGLONG ClinetID);
+
+		// 패킷 수신 완료 후 호출되는 함수.
+		//
+		// parameter : 세션키, 받은 패킷
+		// return : 없음
+		virtual void OnRecv(ULONGLONG ClinetID, CProtocolBuff_Lan* Payload);
+
+		// 패킷 송신 완료 후 호출되는 함수
+		//
+		// parameter : 세션키, Send 한 사이즈
+		// return : 없음
+		virtual void OnSend(ULONGLONG ClinetID, DWORD SendSize);
+
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadBegin();
+
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadEnd();
+
+		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
+		virtual void OnError(int error, const TCHAR* errorStr);
+
+
+
+	public:
+		// -------------------
+		// 생성자와 소멸자
+		// -------------------
+
+		// 생성자
+		CChat_LanClient();
+
+		// 소멸자
+		virtual ~CChat_LanClient();
+
+	};
+}
+
+
+// ---------------------------------------------
+// 
+// 모니터링 LanClient
+// 
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+	class CChat_MonitorClient :public CLanClient
+	{
+		friend class CChatServer_Room;
+
+		// 디파인 정보들 모아두기
+		enum en_MonitorClient
+		{
+			dfSERVER_NO = 3	// 채팅서버는 3번이다
+		};
+
+		// -----------------------
+		// 멤버 변수
+		// -----------------------
+
+		// 모니터링 서버로 정보 전달할 스레드의 핸들.
+		HANDLE m_hMonitorThread;
+
+		// 모니터링 서버를 종료시킬 이벤트
+		HANDLE m_hMonitorThreadExitEvent;
+
+		// 현재 모니터링 서버와 연결된 세션 ID
+		ULONGLONG m_ullSessionID;
+
+		// ----------------------
+		// !! 채팅 서버의 this !!
+		// ----------------------
+		CChatServer_Room* m_ChatServer_this;
+
+
+	private:
+		// -----------------------
+		// 내부에서만 사용하는 기능 함수
+		// -----------------------
+
+		// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+		static UINT	WINAPI MonitorThread(LPVOID lParam);
+
+		// 모니터링 서버로 데이터 전송
+		//
+		// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+		// return : 없음
+		void InfoSend(BYTE DataType, int DataValue, int TimeStamp);
+
+
+
+
+	public:
+		// -----------------------
+		// 생성자와 소멸자
+		// -----------------------
+		CChat_MonitorClient();
+		virtual ~CChat_MonitorClient();
+
+
+	public:
+
+		// -----------------------
+		// 외부에서 사용 가능한 함수
+		// -----------------------
+
+		// 시작 함수
+		// 내부적으로, 상속받은 CLanClient의 Start호출.
+		//
+		// Parameter : 연결할 서버의 IP, 포트, 워커스레드 수, 활성화시킬 워커스레드 수, TCP_NODELAY 사용 여부(true면 사용)
+		// return : 성공 시 true , 실패 시 falsel 
+		bool ClientStart(TCHAR* ConnectIP, int Port, int CreateWorker, int ActiveWorker, int Nodelay);
+
+		// 종료 함수
+		// 내부적으로, 상속받은 CLanClient의 Stop호출.
+		// 추가로, 리소스 해제 등
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ClientStop();
+
+		// 채팅서버의 this를 입력받는 함수
+		// 
+		// Parameter : 쳇 서버의 this
+		// return : 없음
+		void SetNetServer(CChatServer_Room* ChatThis);
+
+
+	private:
+		// -----------------------
+		// 가상함수
+		// -----------------------
+
+		// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnConnect(ULONGLONG SessionID);
+
+		// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		//
+		// parameter : 세션키
+		// return : 없음
+		virtual void OnDisconnect(ULONGLONG SessionID);
+
+		// 패킷 수신 완료 후 호출되는 함수.
+		//
+		// parameter : 유저 세션키, CProtocolBuff_Lan*
+		// return : 없음
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+		// 패킷 송신 완료 후 호출되는 함수
+		//
+		// parameter : 유저 세션키, Send 한 사이즈
+		// return : 없음
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize);
+
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadBegin();
+
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadEnd();
+
+		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
+		virtual void OnError(int error, const TCHAR* errorStr);
+
+	};
+}
+
+
+
+
+
 
 
 #endif // !__CHAT_SERVER_ROOM_H__

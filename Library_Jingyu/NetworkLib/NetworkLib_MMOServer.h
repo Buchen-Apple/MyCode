@@ -318,6 +318,22 @@ namespace Library_Jingyu
 		HANDLE m_hReleaseExitEvent;
 
 
+		// ----- 카운트 용 -------
+
+		ULONGLONG m_ullAcceptTotal;
+		LONG	  m_lAcceptTPS;
+		LONG	m_lSendPostTPS;
+		LONG	m_lRecvTPS;
+
+		LONG m_lAuthModeUserCount;
+		LONG m_lGameModeUserCount;
+
+		LONG m_lAuthFPS;
+		LONG m_lGameFPS;
+
+
+
+
 	public:
 		// -----------------------
 		// 생성자와 소멸자
@@ -360,6 +376,33 @@ namespace Library_Jingyu
 		// Parameter : 없음
 		// return : 밖에서 사용중인 청크 수 (LONG)
 		LONG GetOutChunkCount();
+
+		// AcceptTotal 얻기
+		ULONGLONG GetAccpetTotal();
+
+		// AcceptTPS 얻기
+		LONG GetAccpetTPS();
+
+		// SendTPS 얻기
+		LONG GetSendTPS();
+
+		// RecvTPS 얻기
+		LONG GetRecvTPS();
+
+		// Auth모드 유저 수 얻기
+		LONG GetAuthModeUserCount();
+		
+		// Game모드 유저 수 얻기
+		LONG GetGameModeUserCount();
+
+		// AuthFPS 얻기
+		LONG GetAuthFPS();
+
+		// GameFPS 얻기
+		LONG GetGameFPS();
+
+
+
 
 
 	private:

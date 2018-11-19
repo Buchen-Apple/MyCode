@@ -213,8 +213,6 @@ namespace Library_Jingyu
 			int MonitorClientCreateWorker;
 			int MonitorClientActiveWorker;
 			int MonitorClientNodelay;
-
-
 		};
 
 		// 플레이어 구조체
@@ -243,6 +241,7 @@ namespace Library_Jingyu
 			// true면 로그인 패킷까지 처리된 유저
 			bool m_bLoginCheck;
 		};
+
 
 
 	private:

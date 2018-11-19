@@ -51,6 +51,7 @@ namespace Library_Jingyu
 			NETWORK_LIB_ERROR__RECV_CHECKSUM_ERROR,			// RecvPost에서 Decode 중 체크섬이 다름
 			NETWORK_LIB_ERROR__RECV_LENBIG_ERROR,			// RecvPost에서 헤더 안에 Len이 비정상적으로 큼.
 		};
+
 			
 	private:
 		// ----------------------
@@ -61,6 +62,9 @@ namespace Library_Jingyu
 
 		// 헤더 구조체
 		struct stProtocolHead;
+
+
+
 
 		// ----------------------
 		// private 변수들
@@ -110,6 +114,14 @@ namespace Library_Jingyu
 
 		// PQCS overlapped 구조체
 		OVERLAPPED m_overPQCSOverlapped;
+
+
+		// ------ 카운트용 ------
+
+		ULONGLONG m_ullAcceptTotal;
+		LONG	  m_lAcceptTPS;
+		LONG	m_lSendPostTPS;
+
 
 
 	private:
@@ -234,6 +246,19 @@ namespace Library_Jingyu
 
 		// 미사용 세션 관리 스택의 노드 얻기
 		LONG GetStackNodeCount();
+
+		// Accept Total 얻기.
+		ULONGLONG GetAcceptTotal();
+
+		// AcceptTPS 얻기.
+		// 반환과 동시에 기존 값은 0으로 초기화
+		LONG GetAccpetTPS();
+
+		// SendTPS 얻기
+		// 반환과 동시에 기존 값은 0으로 초기화
+		LONG GetSendTPS();
+
+
 
 	protected:
 		// -----------------------

@@ -12,21 +12,6 @@
 #include "Parser\Parser_Class.h"
 
 
-ULONGLONG g_ullAcceptTotal_MMO;
-LONG	  g_lAcceptTPS_MMO;
-LONG	g_lSendPostTPS_MMO;
-LONG	g_lRecvTPS_MMO;
-
-LONG g_lAuthModeUserCount;
-LONG g_lGameModeUserCount;
-
-LONG g_lAuthFPS;
-LONG g_lGameFPS;
-
-// GQCS에서 세마포어 리턴 시 1 증가
-LONG g_SemCount;
-
-
 // ------------------------
 // cSession의 함수
 // (MMOServer의 이너클래스)
@@ -264,6 +249,71 @@ namespace Library_Jingyu
 	{
 		return m_pAcceptPool->GetOutChunkCount();
 	}
+
+
+	// AcceptTotal 얻기
+	ULONGLONG CMMOServer::GetAccpetTotal()
+	{
+		return m_ullAcceptTotal;
+	}
+
+	// AcceptTPS 얻기
+	LONG CMMOServer::GetAccpetTPS()
+	{
+		LONG ret = m_lAcceptTPS;
+		m_lAcceptTPS = 0;
+
+		return ret;
+	}
+
+	// SendTPS 얻기
+	LONG CMMOServer::GetSendTPS()
+	{
+		LONG ret = m_lSendPostTPS;
+		m_lSendPostTPS = 0;
+
+		return ret;
+	}
+
+	// RecvTPS 얻기
+	LONG CMMOServer::GetRecvTPS()
+	{
+		LONG ret = m_lRecvTPS;
+		m_lRecvTPS = 0;
+
+		return ret;
+	}
+
+	// Auth모드 유저 수 얻기
+	LONG CMMOServer::GetAuthModeUserCount()
+	{
+		return m_lAuthModeUserCount;
+	}
+
+	// Game모드 유저 수 얻기
+	LONG CMMOServer::GetGameModeUserCount()
+	{
+		return m_lGameModeUserCount;
+	}
+
+	// AuthFPS 얻기
+	LONG CMMOServer::GetAuthFPS()
+	{
+		LONG ret = m_lAuthFPS;
+		m_lAuthFPS = 0;
+
+		return ret;
+	}
+
+	// GameFPS 얻기
+	LONG CMMOServer::GetGameFPS()
+	{
+		LONG ret = m_lGameFPS;
+		m_lGameFPS = 0;
+
+		return ret;
+	}
+
 
 
 
@@ -563,7 +613,7 @@ namespace Library_Jingyu
 
 
 			// 11. 완성된 패킷을 CompletionRecvPacekt (Queue)에 넣는다.
-			InterlockedIncrement(&g_lRecvTPS_MMO);
+			InterlockedIncrement(&m_lRecvTPS);
 			NowSession->m_CRPacketQueue->Enqueue(PayloadBuff);
 		}
 
@@ -692,16 +742,8 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
-			{
-				if (overlapped != nullptr)
-				{
-					if (GetLastError() == ERROR_SEM_TIMEOUT)
-					{
-						InterlockedIncrement(&g_SemCount);
-					}
-				}
-			}
+			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+
 
 			// --------------
 			// 완료 체크
@@ -768,7 +810,7 @@ namespace Library_Jingyu
 			{
 				// !! 테스트 출력용 !!
 				// sendpostTPS 추가
-				InterlockedAdd(&g_lSendPostTPS_MMO, stNowSession->m_iWSASendCount);
+				InterlockedAdd(&g_This->m_lSendPostTPS, stNowSession->m_iWSASendCount);
 
 				// 1. 보내고 끊을 유저일 경우 로직
 				if (stNowSession->m_LastPacket != nullptr)
@@ -886,8 +928,8 @@ namespace Library_Jingyu
 				break;
 			}
 
-			g_ullAcceptTotal_MMO++;	// 테스트용!!
-			InterlockedIncrement(&g_lAcceptTPS_MMO); // 테스트용!!
+			++g_This->m_ullAcceptTotal;	// 테스트용!!
+			InterlockedIncrement(&g_This->m_lAcceptTPS); // 테스트용!!
 
 			
 			// ------------------
@@ -1068,7 +1110,7 @@ namespace Library_Jingyu
 				// 4) 셋팅이 모두 끝났으면 Auth 상태로 변경
 
 				// Auth 모드 유저 수 증가
-				++g_lAuthModeUserCount;
+				++g_This->m_lAuthModeUserCount;
 
 				SessionArray[wIndex]->m_euMode = euSessionModeState::MODE_AUTH;
 
@@ -1145,7 +1187,7 @@ namespace Library_Jingyu
 					if (NowSession->m_lAuthToGameFlag == TRUE)
 					{
 						// Auth 모드 유저 수 감소
-						--g_lAuthModeUserCount;
+						--g_This->m_lAuthModeUserCount;
 
 						// 나갔다고 알려준다.
 						// 모드 변경 후 알려주면, OnAuth_ClientLeave가 호출되기도 전에, GAME쪽에서 먼저 OnGame_ClinetJoin 뜰 가능성
@@ -1199,7 +1241,7 @@ namespace Library_Jingyu
 							if (NowSession->m_lSendFlag == FALSE)
 							{
 								// Auth 모드 유저 수 감소
-								--g_lAuthModeUserCount;
+								--g_This->m_lAuthModeUserCount;
 
 								// 나갔다고 알려준다.
 								// 모드 변경 후 알려주면, 아직 알려주기 전에, GAME쪽에서 Release되어 Release가 먼저 뜰 가능성.
@@ -1222,7 +1264,7 @@ namespace Library_Jingyu
 			// ------------------
 			g_This->OnAuth_Update();			
 
-			InterlockedIncrement(&g_lAuthFPS);					   	
+			InterlockedIncrement(&g_This->m_lAuthFPS);
 		}
 
 		return 0;		
@@ -1290,7 +1332,7 @@ namespace Library_Jingyu
 					iModeChangeCount > 0)
 				{
 					// Game 모드 유저 수 증가
-					++g_lGameModeUserCount;
+					++g_This->m_lGameModeUserCount;
 
 					// 맞다면, OnGame_ClientJoint 호출
 					NowSession->OnGame_ClientJoin();
@@ -1349,7 +1391,7 @@ namespace Library_Jingyu
 						if (NowSession->m_lSendFlag == FALSE)
 						{
 							// Game 모드 유저 수 감소
-							--g_lGameModeUserCount;
+							--g_This->m_lGameModeUserCount;
 
 							// Game모드에서 나갔음을 알려준다.
 							NowSession->OnGame_ClientLeave();
@@ -1368,7 +1410,7 @@ namespace Library_Jingyu
 			// ------------------
 			g_This->OnGame_Update();								   			
 
-			InterlockedIncrement(&g_lGameFPS);
+			InterlockedIncrement(&g_This->m_lGameFPS);
 		}
 
 		return 0;
@@ -1796,6 +1838,19 @@ namespace Library_Jingyu
 	bool CMMOServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
 		BYTE Code, BYTE XORCode1, BYTE XORCode2)
 	{
+		// 카운트 변수 초기화
+		m_ullAcceptTotal = 0;
+		m_lAcceptTPS = 0;
+		m_lSendPostTPS = 0;
+		m_lRecvTPS = 0;
+
+		m_lAuthModeUserCount = 0;
+		m_lGameModeUserCount = 0;
+
+		m_lAuthFPS = 0;
+		m_lGameFPS = 0;
+
+
 		// rand설정
 		srand((UINT)time(NULL));
 

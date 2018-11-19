@@ -3,6 +3,7 @@
 
 #include "NetworkLib/NetworkLib_MMOServer.h"
 #include "NetworkLib/NetworkLib_LanClinet.h"
+#include "NetworkLib/NetworkLib_LanServer.h"
 
 #include "Http_Exchange/HTTP_Exchange.h"
 #include "shDB_Communicate.h"
@@ -23,6 +24,7 @@ namespace Library_Jingyu
 	{
 		friend class CGame_MinitorClient;
 		friend class CBattle_Master_LanClient;
+		friend class CBattle_Chat_LanServer;
 
 
 
@@ -267,6 +269,9 @@ namespace Library_Jingyu
 		// 방 구조체
 		struct stRoom
 		{
+			// 배틀서버 번호
+			int m_iBattleServerNo;
+
 			// 룸 번호
 			int m_iRoomNo;
 
@@ -493,6 +498,9 @@ namespace Library_Jingyu
 		// 마스터와 연결된 클라
 		CBattle_Master_LanClient* m_Master_LanClient;
 
+		// 채팅서버에게 연결 받는 랜서버
+		CBattle_Chat_LanServer* m_Chat_LanServer;
+
 		// 버전 코드
 		// 클라가 들고온 것을 비교. 파싱으로 읽어옴.
 		int m_uiVer_Code;
@@ -504,7 +512,34 @@ namespace Library_Jingyu
 		// 마스터 서버가 할당해 준다.
 		int m_iServerNo;
 
+
+		// -----------------------
+		// 출력용 변수
+		// -----------------------
 		
+		// 배틀서버 입장 토큰 에러
+		LONG m_lBattleEnterTokenError;
+
+		// 방 입장 토큰 에러
+		LONG m_lRoomEnterTokenError;
+
+		// auth의 로그인 패킷에서, DB 쿼리 시 결과로 -10(사용자 없음)이 올 경우
+		LONG m_lQuery_Result_Not_Find;
+
+		// auth의 로그인 패킷에서, DB 쿼리 시 결과로 -10도 아닌데 1이 아닌 에러일 경우 
+		LONG m_lTempError;
+
+		// auth의 로그인 패킷에서, 유저의 SessionKey(토큰)이 다를 경우
+		LONG m_lTokenError;
+
+		// auth의 로그인 패킷에서, 유저가 들고 온 버전이 다를 경우
+		LONG m_lVerError;
+
+		// auth의 로그인 패킷에서, 중복 로그인 시
+		LONG m_DuplicateCount;
+
+		// auth의 로그인 패킷에서, DBWrite 중인데 들어올 경우
+		LONG m_DBWrie_LoginCount;
 
 
 		
@@ -601,6 +636,30 @@ namespace Library_Jingyu
 		SRWLOCK m_DBWrite_Umap_srwl;
 
 
+	public:
+		// -----------------------
+		// 외부에서 사용 가능한 함수
+		// -----------------------
+
+		// Start
+		// 내부적으로 CMMOServer의 Start, 세션 셋팅까지 한다.
+		//
+		// Parameter : 없음
+		// return : 실패 시 false
+		bool ServerStart();
+
+		// Stop
+		// 내부적으로 Stop 실행
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ServerStop();
+
+		// 출력용 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ShowPrintf();
 
 
 	private:
@@ -615,25 +674,7 @@ namespace Library_Jingyu
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
 
-		// Start
-		// 내부적으로 CMMOServer의 Start, 세션 셋팅까지 한다.
-		//
-		// Parameter : 없음
-		// return : 실패 시 false
-		bool BattleServerStart();
-
-		// Stop
-		// 내부적으로 Stop 실행
-		//
-		// Parameter : 없음
-		// return : 없음
-		void BattleServerStop();
-
-		// 출력용 함수
-		//
-		// Parameter : 없음
-		// return : 없음
-		void ShowPrintf();
+		
 
 
 		
@@ -810,6 +851,7 @@ namespace Library_Jingyu
 	class CBattle_Master_LanClient :public CLanClient
 	{
 		friend class CBattleServer_Room;
+		friend class CBattle_Chat_LanServer;
 
 
 		// ------------- 
@@ -886,18 +928,19 @@ namespace Library_Jingyu
 		void Packet_RoomLeave_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
 
 
-
-
 	private:
 		// -----------------------
-		// Battle Net 서버가 호출하는 함수
+		// 채팅 Lan 서버가 호출하는 함수
 		// -----------------------
 
 		// 마스터에게, 신규 대기방 생성 패킷 보내기
 		//
-		// Parameter : 배틀서버 No, stRoom*
+		// Parameter : RoomNo
 		// return : 없음
-		void Packet_NewRoomCreate_Req(int BattleServerNo, CBattleServer_Room::stRoom* NewRoom);
+		void Packet_NewRoomCreate_Req(int RoomNo);
+
+
+	private:
 
 		// 토큰 재발급 함수
 		//
@@ -1157,5 +1200,148 @@ namespace Library_Jingyu
 }
 
 
+
+// ---------------------------
+//
+// 채팅서버의 랜클라와 연결되는 Lan 서버
+//
+// ---------------------------
+namespace Library_Jingyu
+{
+	class CBattle_Chat_LanServer	:public CLanServer
+	{
+		friend class CBattle_Master_LanClient;
+		friend class CBattleServer_Room;
+
+
+
+		// ------------
+		// 멤버 변수
+		// ------------
+
+		// 마스터 랜서버와 연결되는 랜클라
+		CBattle_Master_LanClient* m_pMasterClient;
+
+		// 접속한 세션.
+		// 초기값은 0xffffffffffffffff
+		ULONGLONG m_ullSessionID;
+
+		// 마스터 서버에게 패킷을 하나 보낼 때 1씩 증가되는 값.
+		UINT m_uiReqSequence;
+
+
+
+	private:
+		// -----------------------
+		// Battle Net 서버가 호출하는 함수
+		// -----------------------
+
+		// 채팅 랜클라에게, 신규 대기방 생성 패킷 보내기
+		//
+		// Parameter : stRoom*
+		// return : 없음
+		void Packet_NewRoomCreate_Req(CBattleServer_Room::stRoom* NewRoom);
+
+
+
+	private:
+		// -----------------------
+		// 패킷 처리 함수
+		// -----------------------
+
+		// 신규 대기방 생성 패킷 응답.
+		// 이 안에서 마스터에게도 보내준다.
+		//
+		// Parameter : CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_NewRoomCreate_Res(CProtocolBuff_Lan* Packet);
+
+
+
+	private:
+		// --------------------------
+		// 내부에서만 사용하는 함수
+		// --------------------------
+
+		// 마스터 랜 클라 셋팅.
+		// 마스터 랜 클라는 MMOServer에서 동적할당
+		//
+		// Parameter : CBattle_Master_LanClient*
+		// return : 없음
+		void SetMasterClient(CBattle_Master_LanClient* SetPoint);
+
+
+
+	private:
+		// -----------------------
+		// 가상함수
+		// -----------------------
+
+		// Accept 직후, 호출된다.
+		//
+		// parameter : 접속한 유저의 IP, Port
+		// return false : 클라이언트 접속 거부
+		// return true : 접속 허용
+		virtual bool OnConnectionRequest(TCHAR* IP, USHORT port);
+
+		// 연결 후 호출되는 함수 (AcceptThread에서 Accept 후 호출)
+		//
+		// parameter : 접속한 유저에게 할당된 세션키
+		// return : 없음
+		virtual void OnClientJoin(ULONGLONG SessionID);
+
+		// 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+		//
+		// parameter : 유저 세션키
+		// return : 없음
+		virtual void OnClientLeave(ULONGLONG SessionID);
+
+		// 패킷 수신 완료 후 호출되는 함수.
+		//
+		// parameter : 유저 세션키, 받은 패킷
+		// return : 없음
+		virtual void OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+		// 패킷 송신 완료 후 호출되는 함수
+		//
+		// parameter : 유저 세션키, Send 한 사이즈
+		// return : 없음
+		virtual void OnSend(ULONGLONG SessionID, DWORD SendSize);
+
+		// 워커 스레드가 깨어날 시 호출되는 함수.
+		// GQCS 바로 하단에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadBegin();
+
+		// 워커 스레드가 잠들기 전 호출되는 함수
+		// GQCS 바로 위에서 호출
+		// 
+		// parameter : 없음
+		// return : 없음
+		virtual void OnWorkerThreadEnd();
+
+		// 에러 발생 시 호출되는 함수.
+		//
+		// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+		//			 : 에러 코드에 대한 스트링
+		// return : 없음
+		virtual void OnError(int error, const TCHAR* errorStr);
+
+
+	public:
+		// ---------------
+		// 생성자와 소멸자
+		// ----------------
+
+		// 생성자
+		CBattle_Chat_LanServer();
+
+		// 소멸자
+		virtual ~CBattle_Chat_LanServer();
+
+	};
+}
 
 #endif // !__BATTLESERVER_ROOM_VERSION_H__

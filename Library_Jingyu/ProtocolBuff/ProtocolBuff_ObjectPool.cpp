@@ -285,7 +285,12 @@ namespace Library_Jingyu
 			pBuff->m_RefCount = 1;	// ref값 1로 초기화
 			m_MPool->Free(pBuff);
 		}
+	}
 
+	// 현재 Alloc된 노드 카운트 얻기
+	LONG CProtocolBuff_Lan::GetNodeCount()
+	{
+		return g_lAllocNodeCount_Lan;
 	}
 
 	// 레퍼런스 카운트 1 Add하는 함수

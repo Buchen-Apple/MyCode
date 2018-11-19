@@ -349,8 +349,12 @@ namespace Library_Jingyu
 		return m_Size - m_Rear;
 	}
 
-	// static 함수 -----------
-		// Alloc. 현재는 이 안에서 Alloc 후, 레퍼런스 카운트 1 증가
+
+	// ----------------------
+	// static 함수 
+	// ----------------------
+
+	// Alloc. 
 	CProtocolBuff_Net* CProtocolBuff_Net::Alloc()
 	{
 		InterlockedIncrement(&g_lAllocNodeCount);
@@ -375,6 +379,13 @@ namespace Library_Jingyu
 			m_MPool->Free(pBuff);
 		}
 	}
+
+	// 노드 카운트 얻기
+	LONG CProtocolBuff_Net::GetNodeCount()
+	{
+		return g_lAllocNodeCount;
+	}
+
 
 	// 일반 함수 -----------
 	// 레퍼런스 카운트 1 Add하는 함수

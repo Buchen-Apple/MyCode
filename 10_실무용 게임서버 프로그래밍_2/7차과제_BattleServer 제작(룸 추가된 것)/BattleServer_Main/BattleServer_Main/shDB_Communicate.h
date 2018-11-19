@@ -134,6 +134,7 @@ namespace Library_Jingyu
 		// DB_Write용 스레드 핸들
 		HANDLE m_hDB_Write_Thread;
 
+
 	public:
 		// ---------------
 		// 외부에서 접근 가능한 멤버 변수
