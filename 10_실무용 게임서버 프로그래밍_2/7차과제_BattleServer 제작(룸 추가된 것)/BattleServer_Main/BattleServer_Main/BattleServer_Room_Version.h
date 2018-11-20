@@ -24,7 +24,7 @@ namespace Library_Jingyu
 	{
 		friend class CGame_MinitorClient;
 		friend class CBattle_Master_LanClient;
-		friend class CBattle_Chat_LanServer;
+		friend class CBattle_Chat_LanServer;		
 
 
 
@@ -264,6 +264,17 @@ namespace Library_Jingyu
 			int MonitorClientCreateWorker;
 			int MonitorClientActiveWorker;
 			int MonitorClientNodelay;
+
+			
+			// 채팅 랜서버
+			TCHAR ChatLanServerIP[20];
+			int ChatPort;
+			int ChatCreateWorker;
+			int ChatActiveWorker;
+			int ChatCreateAccept;
+			int ChatNodelay;
+			int ChatMaxJoinUser;
+			int ChatLogLevel;
 		};
 				
 		// 방 구조체
@@ -317,6 +328,13 @@ namespace Library_Jingyu
 
 			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
 			char m_cEnterToken[32];
+
+			// ------------
+
+			// Wait상태의 방인데, 파괴되어야 하는 방일 경우를 체크하는 Flag	
+			// 마스터가 죽어 배틀과 연결이 끊겼을 때를 위한것.
+			// true 시 Wait상태라도 방 입장 불가.
+			bool m_bWaitDelete;
 
 
 
@@ -513,6 +531,7 @@ namespace Library_Jingyu
 		int m_iServerNo;
 
 
+
 		// -----------------------
 		// 출력용 변수
 		// -----------------------
@@ -540,6 +559,12 @@ namespace Library_Jingyu
 
 		// auth의 로그인 패킷에서, DBWrite 중인데 들어올 경우
 		LONG m_DBWrie_LoginCount;
+
+		// Ready 방 수
+		LONG m_lReadyRoomCount;
+
+		// Play 방 수
+		LONG m_lPlayRoomCount;
 
 
 		
@@ -573,7 +598,7 @@ namespace Library_Jingyu
 		// 인터락으로 ++
 		LONG m_lGlobal_RoomNo;
 		
-		// 현재 대기방 수 (5/5가 되지 않은 방)
+		// Wait Room 카운트
 		LONG m_lNowWaitRoomCount;
 
 		// 현재 게임 내에 만들어진 방 수 (모든 방 합쳐서)
@@ -595,12 +620,12 @@ namespace Library_Jingyu
 		// 방 관리 자료구조 변수
 		// -----------------------
 
-		// Auth 모드에 있는 방 관리 umap
+		// 방 관리 umap
 		//
 		// Key : RoomNo, Value : stRoom*
 		unordered_map<int, stRoom*> m_Room_Umap;
 
-		// m_AuthRoom_Umap SRW락
+		// m_Room_Umap SRW락
 		SRWLOCK m_Room_Umap_srwl;
 
 
@@ -675,7 +700,17 @@ namespace Library_Jingyu
 		bool SetFile(stConfigFile* pConfig);
 
 		
+	private:
+		// -----------------------
+		// 마스터 랜 클라에서 호출하는 함수
+		// -----------------------
 
+		// 배틀서버 내에 존재하는 모든 방 중, Wait 상태의 방을 찾아낸다.
+		// 찾은 Wait모드 방에 유저가 있는 경우, 모두 접속 종료 시킨다.
+		//
+		// Parameter : 없음
+		// return : 없음
+		void RoomClear();		
 
 		
 
@@ -866,6 +901,7 @@ namespace Library_Jingyu
 		int m_iBattleNetServerPort;
 
 		// 채팅 넷 서버의 IP와 Port
+		// 채팅 Lan 클라에게 받는다.
 		TCHAR m_tcChatNetServerIP[30];
 		int m_iChatNetServerPort;
 
@@ -875,10 +911,10 @@ namespace Library_Jingyu
 		// 마스터 서버에게 패킷을 하나 보낼 때 1씩 증가되는 값.
 		UINT uiReqSequence;
 
-		// 토큰 발급 시간 갱신하기
-		// timeGetTime() 함수의 리턴값.
-		// 밀리 세컨드 단위
-		DWORD m_dwTokenSendTime;
+		// 로그인 체크
+		// true면 로그인 패킷을 보낸 상태
+		bool m_bLoginCheck;
+
 
 
 
@@ -939,14 +975,17 @@ namespace Library_Jingyu
 		// return : 없음
 		void Packet_NewRoomCreate_Req(int RoomNo);
 
-
-	private:
-
 		// 토큰 재발급 함수
 		//
 		// Parameter : 없음
 		// return : 없음
 		void Packet_TokenChange_Req();
+
+
+	private:	
+		// -----------------------
+		// Battle Net 서버가 호출하는 함수
+		// -----------------------		
 
 		// 마스터에게, 방 닫힘 패킷 보내기
 		//
@@ -1222,12 +1261,24 @@ namespace Library_Jingyu
 		// 마스터 랜서버와 연결되는 랜클라
 		CBattle_Master_LanClient* m_pMasterClient;
 
+		// 배틀 Net서버
+		CBattleServer_Room* m_BattleServer;
+
 		// 접속한 세션.
 		// 초기값은 0xffffffffffffffff
 		ULONGLONG m_ullSessionID;
+		
+		// 로그인 여부.
+		// 로그인 패킷을 받으면 true로 변경
+		bool m_bLoginCheck;
 
-		// 마스터 서버에게 패킷을 하나 보낼 때 1씩 증가되는 값.
+		// 채팅 랜 클라에게 패킷을 하나 보낼 때 1씩 증가되는 값.
 		UINT m_uiReqSequence;
+
+		// 토큰 발급 시간 갱신하기
+		// timeGetTime() 함수의 리턴값.
+		// 밀리 세컨드 단위
+		DWORD m_dwTokenSendTime;
 
 
 
@@ -1242,6 +1293,29 @@ namespace Library_Jingyu
 		// return : 없음
 		void Packet_NewRoomCreate_Req(CBattleServer_Room::stRoom* NewRoom);
 
+		// 채팅 랜클라에게, 토큰 발급
+		//
+		// Parameter : 없음
+		// return : 없음
+		void Packet_TokenChange_Req();
+
+
+	public:
+		// ------------------------
+		// 외부에서 호출 가능한 함수
+		// ------------------------
+
+		// 서버 시작
+		//
+		// Parameter : IP, Port, 생성 워커, 활성화 워커, 생성 엑셉트 스레드, 노딜레이, 최대 접속자 수
+		// return : 실패 시 false
+		bool ServerStart(TCHAR* IP, int Port, int CreateWorker, int ActiveWorker, int CreateAccept, int Nodelay, int MaxUser);
+
+		// 서버 종료
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ServerStop();
 
 
 	private:
@@ -1249,12 +1323,33 @@ namespace Library_Jingyu
 		// 패킷 처리 함수
 		// -----------------------
 
+	
 		// 신규 대기방 생성 패킷 응답.
 		// 이 안에서 마스터에게도 보내준다.
 		//
-		// Parameter : CProtocolBuff_Lan*
+		// Parameter : SessinID, CProtocolBuff_Lan*
 		// return : 없음
-		void Packet_NewRoomCreate_Res(CProtocolBuff_Lan* Packet);
+		void Packet_NewRoomCreate_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Packet);
+
+		// 방 삭제에 대한 응답
+		//
+		// Parameter : SessinID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_RoomClose_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Packet);
+
+
+		// 토큰 재발행에 대한 응답
+		// 이 안에서 마스터에게도 보내준다.
+		//
+		// Parameter : SessionID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_TokenChange_Res(ULONGLONG SessionID, CProtocolBuff_Lan* Packet);
+
+		// 로그인 요청
+		//
+		// Parameter : SessinID, CProtocolBuff_Lan*
+		// return : 없음
+		void Packet_Login(ULONGLONG SessionID, CProtocolBuff_Lan* Packet);
 
 
 
@@ -1263,12 +1358,11 @@ namespace Library_Jingyu
 		// 내부에서만 사용하는 함수
 		// --------------------------
 
-		// 마스터 랜 클라 셋팅.
-		// 마스터 랜 클라는 MMOServer에서 동적할당
+		// 마스터 랜 클라, 배틀 Net 서버 셋팅
 		//
 		// Parameter : CBattle_Master_LanClient*
 		// return : 없음
-		void SetMasterClient(CBattle_Master_LanClient* SetPoint);
+		void SetMasterClient(CBattle_Master_LanClient* SetPoint, CBattleServer_Room* SetPoint2);
 
 
 

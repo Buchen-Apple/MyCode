@@ -198,6 +198,9 @@ namespace Library_Jingyu
 			int MaxJoinUser;
 			int LogLevel;
 
+			// 외부에서 접속할 IP
+			TCHAR ChatIP[20];
+
 			// 배틀과 연결되는 랜 클라
 			TCHAR BattleServerIP[20];
 			int BattleServerPort;
@@ -244,6 +247,8 @@ namespace Library_Jingyu
 		// 룸 입장 토큰이 다를 시 1 증가
 		LONG m_lRoom_EnterTokenMiss;
 
+		// 채팅서버 내 방 수 (모드 상관 없이)
+		LONG m_lRoomCount;
 
 
 

@@ -165,7 +165,7 @@ namespace Library_Jingyu
 
 		// 토큰
 		TCHAR tcBattleEnterToken[33];
-		if (Parser.GetValue_String(_T("EnterToken"), tcBattleEnterToken) == false)
+		if (Parser.GetValue_String(_T("BattleEnterToken"), tcBattleEnterToken) == false)
 			return false;
 
 		// 클라가 들고올 때는 char형으로 들고오기 때문에 변환해서 가지고 있어야한다.
@@ -738,7 +738,7 @@ namespace Library_Jingyu
 
 		// 배틀 서버 동적할당
 		pBattleServer = new CBattleServer_Lan;
-
+		pBattleServer->SetParent(this);
 	}
 
 	// 소멸자
@@ -1421,7 +1421,14 @@ namespace Library_Jingyu
 		return ((ReturnKey << 32) | RoomNo);
 	}
 
-
+	// 매칭서버 셋팅
+	//
+	// Parameter : CMatchServer_Lan*
+	// return : 없음
+	void CBattleServer_Lan::SetParent(CMatchServer_Lan* Match)
+	{
+		pMatchServer = Match;
+	}
 
 
 	// -------------------------------

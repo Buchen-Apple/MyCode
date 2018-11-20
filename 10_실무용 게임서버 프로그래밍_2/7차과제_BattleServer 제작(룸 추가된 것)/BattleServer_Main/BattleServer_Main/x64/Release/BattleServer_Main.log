@@ -1,21 +1,7 @@
-﻿  pch.cpp
-  CPUUsage.cpp
-  CrashDump.cpp
-  HTTP_Exchange.cpp
-  Log.cpp
-  NetworkLib_LanClient.cpp
-  NetworkLib_LanServer.cpp
-  NetworkLib_MMOServer.cpp
-  Parser_Class.cpp
-  PDHCheck.cpp
-  ProtocolBuff(Net)_ObjectPool.cpp
-  ProtocolBuff_ObjectPool.cpp
-  RingBuff.cpp
-  BattleServer_Main.cpp
-  BattleServer_Room_Version.cpp
-c:\git_public\10_실무용 게임서버 프로그래밍_2\7차과제_battleserver 제작(룸 추가된 것)\battleserver_main\battleserver_main\battleserver_room_version.cpp(3989): warning C4101: 'exc' :참조되지 않은 지역 변수입니다.
-  shDB_Communicate.cpp
+﻿  BattleServer_Main.cpp
   코드를 생성하고 있습니다.
+  1 of 1476 functions (<0.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
   코드를 생성했습니다.
-  All 1457 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   BattleServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\7차과제_BattleServer 제작(룸 추가된 것)\BattleServer_Main\x64\Release\BattleServer_Main.exe

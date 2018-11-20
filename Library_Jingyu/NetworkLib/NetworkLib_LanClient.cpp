@@ -116,7 +116,7 @@ namespace Library_Jingyu
 		}	
 
 		// 연결
-		ConnectFunc();
+		//ConnectFunc();
 
 		// Connect 스레드 생성
 		hConnectHandle = (HANDLE)_beginthreadex(0, 0, ConnectThread, this, 0, 0);

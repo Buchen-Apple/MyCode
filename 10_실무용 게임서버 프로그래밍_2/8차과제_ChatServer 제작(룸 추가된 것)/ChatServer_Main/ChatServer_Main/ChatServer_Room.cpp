@@ -264,6 +264,10 @@ namespace Library_Jingyu
 		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 		Chat_PlayerChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
+		TotalRoom_Pool :	- 방 Umap에 Size
+		TotalRoom :			- 방 수
+		Room_ChunkAlloc_Count : - 룸 총 Alloc한 청크 수(외부에서 사용 청크 수)
+
 		Server_EnterToken_Miss : 		- 채팅서버 입장 토큰 미스
 		Room_EnterTokenNot_Miss : 	- 방 입장토큰 미스
 
@@ -299,6 +303,11 @@ namespace Library_Jingyu
 			"Room_EnterTokenNot_Miss : %d\n\n"
 
 			"------------------------------------------------\n"
+			"TotalRoom_Pool : %lld\n"
+			"TotalRoom : %d\n"
+			"Room_ChunkAlloc_Count : %d (Out : %d)\n\n"
+
+			"------------------------------------------------\n"
 			"PacketPool_Lan : %d\n\n"
 
 			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"
@@ -308,21 +317,25 @@ namespace Library_Jingyu
 
 			// ----------- 채팅 서버용
 			m_pMonitor_Client->GetClinetState(), m_pBattle_Client->GetClinetState(),
-			GetClientCount(), 
+			GetClientCount(),
 			CProtocolBuff_Net::GetNodeCount(),
 
-			m_lUpdateStruct_PlayerCount, 
+			m_lUpdateStruct_PlayerCount,
 			m_Player_Umap.size(),
 
-			GetAcceptTotal(), 
-			GetAccpetTPS(), 
+			GetAcceptTotal(),
+			GetAccpetTPS(),
 			GetSendTPS(),
 
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_pPlayer_Pool->GetAllocChunkCount(), m_pPlayer_Pool->GetOutChunkCount(),
 
-			m_lEnterTokenMiss, 
+			m_lEnterTokenMiss,
 			m_lRoom_EnterTokenMiss,
+
+			m_Room_Umap.size(),
+			m_lRoomCount,
+			m_pRoom_Pool->GetAllocChunkCount(), m_pRoom_Pool->GetOutChunkCount(),
 
 			// ----------- 배틀 랜 클라이언트용
 			CProtocolBuff_Lan::GetNodeCount(),
@@ -332,12 +345,7 @@ namespace Library_Jingyu
 			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel());
 
 	}
-
-
-
-
-
-
+	   	  
 	// 서버 시작
 	//
 	// Parameter : 없음
@@ -345,9 +353,16 @@ namespace Library_Jingyu
 	//		  : 실패 시 false
 	bool CChatServer_Room::ServerStart()
 	{
+		// 변수 초기화
+		m_lChatLoginCount = 0;
+		m_lUpdateStruct_PlayerCount = 0;
+		m_lEnterTokenMiss = 0;
+		m_lRoom_EnterTokenMiss = 0;
+		m_lRoomCount = 0;
+
 
 		// 모니터링 서버와 연결되는 랜 클라 시작
-		if (m_pBattle_Client->ClientStart(m_Paser.MonitorServerIP, m_Paser.MonitorServerPort, m_Paser.MonitorClientCreateWorker,
+		if (m_pMonitor_Client->ClientStart(m_Paser.MonitorServerIP, m_Paser.MonitorServerPort, m_Paser.MonitorClientCreateWorker,
 			m_Paser.MonitorClientActiveWorker, m_Paser.MonitorClientNodelay) == false)
 		{
 			return false;
@@ -510,7 +525,22 @@ namespace Library_Jingyu
 		// 로그 레벨
 		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
 			return false;
+
+
+
+		////////////////////////////////////////////////////////
+		// config 읽어오기
+		////////////////////////////////////////////////////////
 			   		 
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("CONFIG")) == false)
+			return false;
+
+		// 외부 IP
+		if (Parser.GetValue_String(_T("ChatIP"), pConfig->ChatIP) == false)
+			return false;
+
+
 
 
 		////////////////////////////////////////////////////////
@@ -568,7 +598,6 @@ namespace Library_Jingyu
 		// 활성화 워커 수
 		if (Parser.GetValue_Int(_T("MonitorClientActiveWorker"), &pConfig->MonitorClientActiveWorker) == false)
 			return false;
-
 
 		// Nodelay
 		if (Parser.GetValue_Int(_T("MonitorClientNodelay"), &pConfig->MonitorClientNodelay) == false)
@@ -1072,8 +1101,10 @@ namespace Library_Jingyu
 				if (DeleteRoom == nullptr)
 					g_ChatDump->Crash();
 
+				InterlockedDecrement(&m_lRoomCount);
+
 				// 룸 Free
-				m_pRoom_Pool->Free(DeleteRoom);
+				m_pRoom_Pool->Free(DeleteRoom);				
 			}
 		}
 
@@ -1310,6 +1341,7 @@ namespace Library_Jingyu
 		if(NewRoom->m_JoinUser_vector.size() != 0)
 			g_ChatDump->Crash();
 
+		InterlockedIncrement(&m_pNetServer->m_lRoomCount);
 
 		// 3. 방 자료구조에 추가
 		if (m_pNetServer->InsertRoomFunc(RoomNo, NewRoom) == false)
@@ -1448,13 +1480,16 @@ namespace Library_Jingyu
 		// 4. 셧다운 날리기
 		// 현재 접속자 수가 1명 이상이면, 방에 있는 모든 유저에게 Shutdown 호출
 		// 그리고 삭제될 방 플래그 체크
+		if(NowRoom->m_iJoinUser < 0)
+			g_ChatDump->Crash();
+
 		if (NowRoom->m_iJoinUser > 0)
 		{
 			NowRoom->m_bDeleteFlag = true;
 
 			size_t Size = NowRoom->m_JoinUser_vector.size();
 
-			if(Size != NowRoom->m_iJoinUser)
+			if (Size != NowRoom->m_iJoinUser)
 				g_ChatDump->Crash();
 
 			size_t Index = 0;
@@ -1465,14 +1500,26 @@ namespace Library_Jingyu
 
 				++Index;
 			}
+
+			NowRoom->ROOM_UNLOCK();	// ----- 룸 언락
+
+			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
 		}
 
-		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락
+		// 5. 접속자 수가 0명이면 방 즉시 제거
+		else
+		{
+			NowRoom->ROOM_UNLOCK();	// ----- 룸 언락
 
-		ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
+			InterlockedDecrement(&m_pNetServer->m_lRoomCount);
+
+			m_pNetServer->m_Room_Umap.erase(FindRoom);
+
+			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
+		}		
 
 
-		// 5. 응답 패킷
+		// 6. 응답 패킷
 		// 이 때, 방이 아직 삭제되지 않았을 수도 있지만, 곧 삭제될 예정이기 때문에 상관없다.
 		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
 
@@ -1557,7 +1604,7 @@ namespace Library_Jingyu
 		WORD Type = en_PACKET_CHAT_BAT_REQ_SERVER_ON;
 
 		SendBuff->PutData((char*)&Type, 2);
-		SendBuff->PutData((char*)m_pNetServer->m_Paser.BindIP, 32);
+		SendBuff->PutData((char*)m_pNetServer->m_Paser.ChatIP, 32);
 		SendBuff->PutData((char*)&m_pNetServer->m_Paser.Port, 2);
 
 		SendPacket(ClinetID, SendBuff);
@@ -1722,6 +1769,7 @@ namespace Library_Jingyu
 		// 이름 없는 Event	
 		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
+		m_ullSessionID = 0xffffffffffffffff;
 	}
 
 	CChat_MonitorClient::~CChat_MonitorClient()
@@ -1837,8 +1885,10 @@ namespace Library_Jingyu
 			else if (Check == WAIT_OBJECT_0)
 				break;
 
-
 			// 그게 아니라면, 일을 한다.
+			// 모니터링 서버와 연결중일 때만!
+			if (g_This->GetClinetState() == false)
+				continue;
 
 			// 프로세서 CPU 사용율, PDH 정보 갱신
 			CProcessCPU.UpdateCpuTime();
@@ -1868,7 +1918,6 @@ namespace Library_Jingyu
 
 				// 6. 채팅서버 로그인을 성공한 전체 인원				
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_PLAYER, g_This->m_ChatServer_this->m_lChatLoginCount, TimeStamp);
-
 			}
 
 		}
@@ -1925,7 +1974,9 @@ namespace Library_Jingyu
 	// parameter : 세션키
 	// return : 없음
 	void CChat_MonitorClient::OnDisconnect(ULONGLONG SessionID)
-	{}
+	{
+		m_ullSessionID = 0xffffffffffffffff;
+	}
 
 	// 패킷 수신 완료 후 호출되는 함수.
 	//

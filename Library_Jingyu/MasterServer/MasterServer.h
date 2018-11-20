@@ -605,6 +605,12 @@ namespace Library_Jingyu
 		// return : RoomKey(UINT64)
 		UINT64 Create_RoomKey(int BattleServerNo, int RoomNo);
 
+		// 매칭서버 셋팅
+		//
+		// Parameter : CMatchServer_Lan*
+		// return : 없음
+		void SetParent(CMatchServer_Lan* Match);
+
 
 
 	private:
@@ -641,6 +647,8 @@ namespace Library_Jingyu
 		// Parameter : SessionID, Payload
 		// return : 없음
 		void Packet_UserExit(ULONGLONG SessionID, CProtocolBuff_Lan* Payload);
+
+
 
 	public:
 		// -----------------------
