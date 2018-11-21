@@ -103,7 +103,19 @@ namespace Library_Jingyu
 		int m_iMaxJoinUser;
 
 		// 현재 접속중인 유저 수
-		ULONGLONG m_ullJoinUserCount;		
+		ULONGLONG m_ullJoinUserCount;	
+
+		// 엑셉트 토탈.
+		ULONGLONG m_ullAcceptTotal;
+
+		// 엑셉트 TPS
+		LONG m_lAcceptTPS;
+
+		// 샌드 TPS
+		LONG m_lSendPostTPS;
+
+		// 리시브 TPS
+		LONG m_lRecvTPS;
 
 		// 서버 가동 여부. true면 작동중 / false면 작동중 아님
 		bool m_bServerLife;
@@ -221,6 +233,18 @@ namespace Library_Jingyu
 
 		// 미사용 세션 관리 스택의 노드 얻기
 		LONG GetStackNodeCount();
+
+		// 엑셉트 토탈 얻기
+		ULONGLONG GetAcceptTotal();
+
+		// 엑셉트 TPS 얻기
+		LONG GetAcceptTPS();
+
+		// 샌드 TPS 얻기
+		LONG GetSendTPS();
+
+		// 리시브 TPS 얻기
+		LONG GetRecvTPS();
 
 	protected:
 		// -----------------------

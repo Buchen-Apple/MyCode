@@ -135,7 +135,11 @@ namespace Library_Jingyu
 				// 룸 상태가 Play면 Crash. 말도 안됨
 				// Auth모드에서 종료되는 유저가 있는 방은, 무조건 대기/준비 방이어야 함				
 				if (NowRoom->m_iRoomState == eu_ROOM_STATE::PLAY_ROOM)
-					g_BattleServer_Room_Dump->Crash();			
+					g_BattleServer_Room_Dump->Crash();	
+
+				// 여기까지 오면 Wait 혹은 Ready상태의 방.
+				// Auth 스레드만 접근 가능. 락 풀어도 안전
+				ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
 				
 
 
@@ -171,20 +175,7 @@ namespace Library_Jingyu
 
 
 				// 5. 마스터 서버에게 해당 유저 나갔다고 패킷 보내줘야 함.
-				m_pParent->m_Master_LanClient->Packet_RoomLeave_Req(m_iRoomNo, m_Int64AccountNo);
-
-
-				// 6. 방 안의 유저 수가 0명이라면, m_bWaitDelete 플래그 체크 후, 방 모드를 Play로 변경
-				if (NowRoom->m_iJoinUserCount == 0 && NowRoom->m_bWaitDelete == true)
-				{
-					InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
-					InterlockedIncrement(&m_pParent->m_lPlayRoomCount);
-
-					NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;
-				}
-
-				// Auth 스레드와, Master_LanClient 스레드가, Wait모드인 방에 동시 접근하기 때문에, 크기 락을 묶어야 함.
-				ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
+				m_pParent->m_Master_LanClient->Packet_RoomLeave_Req(m_iRoomNo, m_Int64AccountNo);						
 			}			
 		}
 
@@ -711,12 +702,14 @@ namespace Library_Jingyu
 
 		stRoom* NowRoom = ret->second;
 
-		// 5. 방이 대기방이 아니거나, Wait이지만 삭제될 방일 경우 (m_bWaitDelete가 true) 에러 3 리턴
-		if (NowRoom->m_iRoomState != eu_ROOM_STATE::WAIT_ROOM || 
-			NowRoom->m_bWaitDelete == true)
-		{
-			ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
+		// Wait상태의 방은, Auth스레드에서만 접근.
+		// 때문에, 여기까지 왔으면 Auth만 접근 확정.
+		// 락 풀어도 안전하다.
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
 
+		// 5. 방이 대기방이 아닐 경우에러 3 리턴
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::WAIT_ROOM)
+		{
 			// 대기방이 아니면, 에러 리턴
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -738,9 +731,7 @@ namespace Library_Jingyu
 		// 6. 방 인원수 체크
 		if (NowRoom->m_iJoinUserCount == NowRoom->m_iMaxJoinCount)
 		{
-			BYTE MaxUser = NowRoom->m_iJoinUserCount;
-
-			ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락				
+			BYTE MaxUser = NowRoom->m_iJoinUserCount;		
 
 			// 이미 최대 인원수라면, 에러 리턴			
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -763,8 +754,6 @@ namespace Library_Jingyu
 		if (memcmp(EnterToken, NowRoom->m_cEnterToken, 32) != 0)
 		{
 			BYTE MaxUser = NowRoom->m_iJoinUserCount;
-
-			ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
 
 			InterlockedIncrement(&m_pParent->m_lRoomEnterTokenError);		
 
@@ -854,17 +843,15 @@ namespace Library_Jingyu
 			// 유저도 AUTH_TO_GAME으로 변경시킨다.
 			NowRoom->m_dwCountDown = timeGetTime();
 
-			// 4) 방의 상태를 Ready로 변경
-			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;
-
 			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
 			InterlockedIncrement(&m_pParent->m_lReadyRoomCount);
 
+			// 4) 방의 상태를 Ready로 변경
+			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;
+
 			// 5) 대기방 수 감소
 			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
-		}
-
-		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
+		}		
 	}
 
 
@@ -2222,17 +2209,19 @@ namespace Library_Jingyu
 		Send TPS:			- 초당 Send완료 횟수. (완료통지에서 증가)
 		Recv TPS:			- 초당 Recv완료 횟수. (패킷 1개가 완성되었을 때 증가. RecvProc에서 패킷에 넣기 전에 1씩 증가)
 
+		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		ASQPool_ChunkAlloc_Count : - Accept Socket Queue에 들어가는 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+
+		------------------ Room -------------------
 		WaitRoom :			- 대기방 수
 		ReadyRoom :			- 준비방 수
 		PlayRoom :			- 플레이방 수
 		TotalRoom :			- 총 방 수
+		TotalRoom_Pool :	- 룸 umap에 있는 카운트.	
 
-		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-		ASQPool_ChunkAlloc_Count : - Accept Socket Queue에 들어가는 일감 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-
+		Room_ChunkAlloc_Count : - 할당받은 룸 청크 수(밖에서 사용중인 수)
 
 		------------------ Error -------------------
-
 		Battle_EnterTokenError:		- 배틀서버 입장 토큰 에러
 		Room_EnterTokenError:		- 방 입장 토큰 에러
 		Login_Query_Not_Find :		- auth의 로그인 패킷에서, DB 쿼리시 -10이 결과로 옴.
@@ -2243,14 +2232,12 @@ namespace Library_Jingyu
 		Login_DBWrite :				- DBWrite중인데 또 들어올 경우
 
 		---------- Battle LanServer(Chat) ---------
-
 		SessionNum :				- 배틀 랜서버 (채팅서버)에 접속한 세션 수
 		PacketPool_Lan :			- 사용중인 직렬화버퍼 랜 버전. 토탈.
 
 		Lan_BuffChunkAlloc_Count :	- 사용중인 직렬화 버퍼의 청크 수(밖에서 사용중인 수)
 
 		-------------- LanClient -------------------
-
 		Monitor Connect :			- 모니터 서버와 연결되는 랜 클라. 접속 여부
 		Master Connect :			- 마스터 서버와 연결되는 랜 클라. 접속여부
 
@@ -2259,7 +2246,7 @@ namespace Library_Jingyu
 		LONG AuthUser = GetAuthModeUserCount();
 		LONG GameUser = GetGameModeUserCount();
 
-		printf("========================================================\n"
+		printf("================== Battle Server ==================\n"
 			"Total SessionNum : %lld\n"
 			"AuthMode SessionNum : %d\n"
 			"GameMode SessionNum : %d (Auth + Game : %d)\n\n"
@@ -2278,8 +2265,7 @@ namespace Library_Jingyu
 			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 			"ASQPool_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
-			"------------------ Room -------------------\n\n"
-
+			"------------------ Room -------------------\n"
 			"WaitRoom : %d\n"
 			"ReadyRoom : %d\n"
 			"PlayRoom : %d\n"
@@ -2288,8 +2274,7 @@ namespace Library_Jingyu
 
 			"Room_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
-			"------------------ Error -------------------\n\n"
-
+			"------------------ Error -------------------\n"
 			"Battle_EnterTokenError : %d\n"
 			"Room_EnterTokenError : %d\n"
 			"Login_Query_Not_Find : %d\n"
@@ -2299,15 +2284,13 @@ namespace Library_Jingyu
 			"Login_Duplicate :%d\n"
 			"Login_DBWrite :%d\n\n"
 
-			"---------- Battle LanServer(Chat) ---------\n\n"
-
+			"---------- Battle LanServer(Chat) ---------\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Lan : %d\n\n"
 
 			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"
 
-			"-------------- LanClient -----------\n\n"
-
+			"-------------- LanClient -----------\n"
 			"Monitor Connect : %d\n"
 			"Master Connect : %d\n\n"
 
@@ -2593,70 +2576,7 @@ namespace Library_Jingyu
 		return true;
 	}
 
-	
-
-
-	// -----------------------
-	// 마스터 랜 클라에서 호출하는 함수
-	// -----------------------
-
-	// 배틀서버 내에 존재하는 모든 방 중, Wait 상태의 방을 찾아낸다.
-	// 찾은 Wait모드 방에 유저가 있는 경우, 모두 접속 종료 시킨다.
-	//
-	// Parameter : 없음
-	// return : 없음
-	void CBattleServer_Room::RoomClear()
-	{
-		// Auth 스레드와 동일하게, Wait모드의 룸 동시접근.
-		// 때문에 Exclusive락을 걸어야 한다.
-		// Game 스레드와는 동일한 방 접근 없음.
-		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 락
-
-		// 방이 하나 이상 있다면
-		if (m_Room_Umap.size() > 0)
-		{
-			auto itor_Now = m_Room_Umap.begin();
-			auto itor_End = m_Room_Umap.end();
-
-			// 방 순회
-			while (itor_Now != itor_End)
-			{
-				// wait모드의 방인 경우
-				if (itor_Now->second->m_iRoomState == eu_ROOM_STATE::WAIT_ROOM)
-				{
-					stRoom* NowRoom = itor_Now->second;
-
-					// 유저가 있는 방의 경우
-					if (NowRoom->m_iJoinUserCount > 0)
-					{
-						// m_bWaitDelete 플래그를 true로 변경
-						NowRoom->m_bWaitDelete = true;
-
-						// 방 안의 모든 유저 Shutdown
-						NowRoom->Shutdown_All();
-					}
-
-					// 유저가 없는 방의 경우
-					else if (NowRoom->m_iJoinUserCount == 0)
-					{
-						// 방 모드를 Play로 변경. 바로 삭제되도록
-						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;
-
-						InterlockedDecrement(&m_lNowWaitRoomCount);
-						InterlockedIncrement(&m_lPlayRoomCount);
-					}				
-				}
-
-				++itor_Now;
-			}
-
-		}
-
-		ReleaseSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 언락
-	}
-
-
-	   	  
+		   	  
 
 
 
@@ -3304,46 +3224,65 @@ namespace Library_Jingyu
 			// 해당 방이 준비방일 경우
 			if (NowRoom->m_iRoomState == eu_ROOM_STATE::READY_ROOM)
 			{
-				// 카운트 다운이 완료되었는지 체크
-				if ( (NowRoom->m_dwCountDown + m_stConst.m_iCountDownMSec) <= CmpTime )
+				// 게임이 종료된 방인지 체크
+				// Auth모드에서 이 로직을 타는 경우는, 중간에 채팅 or 마스터 서버가 죽어서 방을 파괴해야 할 경우.
+				if (NowRoom->m_bGameEndFlag == true)
 				{
-					// 1. 생존한 유저 수 갱신
-					if (NowRoom->m_iJoinUserCount != NowRoom->m_JoinUser_Vector.size())
-						g_BattleServer_Room_Dump->Crash();
+					// 방 안의 유저 수가 0명이라면, Play로 변경
+					if (NowRoom->m_iJoinUserCount == 0)
+					{
+						InterlockedDecrement(&m_lReadyRoomCount);
+						InterlockedIncrement(&m_lPlayRoomCount);
 
-					NowRoom->m_iAliveUserCount = NowRoom->m_iJoinUserCount;
+						// 방 상태를 Play로 변경
+						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;						
+					}
+				}
+
+				// 게임 종료된 방이 아닐 경우 로직.
+				else
+				{
+					// 카운트 다운이 완료되었는지 체크
+					if ((NowRoom->m_dwCountDown + m_stConst.m_iCountDownMSec) <= CmpTime)
+					{
+						// 1. 생존한 유저 수 갱신
+						if (NowRoom->m_iJoinUserCount != NowRoom->m_JoinUser_Vector.size())
+							g_BattleServer_Room_Dump->Crash();
+
+						NowRoom->m_iAliveUserCount = NowRoom->m_iJoinUserCount;
 
 
-					// 2. 룸 내 모든 유저의 생존 플래그 변경
-					// false가 리턴될 수 있음. 자료구조 내에 유저가 0명일 수 있기 때문에.
-					// 때문에 리턴값 안받는다.
-					NowRoom->AliveFlag_True();
+						// 2. 룸 내 모든 유저의 생존 플래그 변경
+						// false가 리턴될 수 있음. 자료구조 내에 유저가 0명일 수 있기 때문에.
+						// 때문에 리턴값 안받는다.
+						NowRoom->AliveFlag_True();
 
 
-					// 3. 방 안의 모든 유저에게, 배틀서버 대기방 플레이 시작 패킷 보내기
-					CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+						// 3. 방 안의 모든 유저에게, 배틀서버 대기방 플레이 시작 패킷 보내기
+						CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
-					WORD Type = en_PACKET_CS_GAME_RES_PLAY_START;
+						WORD Type = en_PACKET_CS_GAME_RES_PLAY_START;
 
-					SendBuff->PutData((char*)&Type, 2);
-					SendBuff->PutData((char*)&NowRoom->m_iRoomNo, 4);
+						SendBuff->PutData((char*)&Type, 2);
+						SendBuff->PutData((char*)&NowRoom->m_iRoomNo, 4);
 
-					// 여기서는 false가 리턴될 수 있음(자료구조 내에 유저가 0명일 수 있음)
-					// 카운트다운이 끝나기 전에 모든 유저가 나갈 가능성.
-					// 그래서 리턴값 안받는다.
-					NowRoom->SendPacket_BroadCast(SendBuff);
+						// 여기서는 false가 리턴될 수 있음(자료구조 내에 유저가 0명일 수 있음)
+						// 카운트다운이 끝나기 전에 모든 유저가 나갈 가능성.
+						// 그래서 리턴값 안받는다.
+						NowRoom->SendPacket_BroadCast(SendBuff);
 
-					InterlockedDecrement(&m_lReadyRoomCount);
-					InterlockedIncrement(&m_lPlayRoomCount);
+						InterlockedDecrement(&m_lReadyRoomCount);
+						InterlockedIncrement(&m_lPlayRoomCount);
 
-					// 4. 방 상태를 Play로 변경
-					NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;
+						// 4. 방 상태를 Play로 변경
+						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;
 
-					// 5. 모든 유저를 AUTH_TO_GAME으로 변경
-					NowRoom->ModeChange();
+						// 5. 모든 유저를 AUTH_TO_GAME으로 변경
+						NowRoom->ModeChange();
 
-					// 6. 이번 프레임에서 방 모드 변경 남은 카운트 감소
-					--ModeChangeCount;					
+						// 6. 이번 프레임에서 방 모드 변경 남은 카운트 감소
+						--ModeChangeCount;
+					}
 				}
 			}
 
@@ -3352,8 +3291,7 @@ namespace Library_Jingyu
 
 		ReleaseSRWLockShared(&m_Room_Umap_srwl);	// ----- Room umap Shared 언락
 
-
-
+		
 
 
 		// ------------------- 방생성
@@ -3406,7 +3344,6 @@ namespace Library_Jingyu
 						NowRoom->m_bGameEndFlag = false;
 						NowRoom->m_dwGameEndMSec = 0;
 						NowRoom->m_bShutdownFlag = false;
-						NowRoom->m_bWaitDelete = false;
 
 						// 방 입장 토큰 셋팅				
 						WORD Index = rand() % 64;	// 0 ~ 63 중 인덱스 골라내기				
@@ -3437,6 +3374,62 @@ namespace Library_Jingyu
 			}
 		}
 
+
+
+		// -------------------- 마스터 서버 혹은 채팅 서버가 죽었을 경우
+
+		// Wait상태의 방을 파괴한다.
+		//
+		// !! 마스터 서버에게 방 파괴 패킷을 보내는 시점 : 아래 로직 !!
+		// !! 채팅 서버에게 방 파괴 패킷을 보내는 시점 : Play에서 방이 파괴될 때. !!
+		//
+		// Play는 게임스레드에서 접근하며, 해당 방의 인원이 0명이 되면 방을 삭제한다.
+		else if (m_Master_LanClient->m_bLoginCheck == false ||
+			m_Chat_LanServer->m_bLoginCheck == false)
+		{
+			// Wait모드의 방만 접근하기 때문에, Shared 락 가능
+			AcquireSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 락
+
+			// 방이 하나 이상 있다면
+			if (m_Room_Umap.size() > 0)
+			{
+				auto itor_Now = m_Room_Umap.begin();
+				auto itor_End = m_Room_Umap.end();
+
+				// 방 순회
+				while (itor_Now != itor_End)
+				{
+					// wait모드의 방인 경우
+					if (itor_Now->second->m_iRoomState == eu_ROOM_STATE::WAIT_ROOM)
+					{
+						stRoom* NowRoom = itor_Now->second;
+
+						// 대기방 수 감소, 레디 방 수 증가
+						InterlockedDecrement(&m_lNowWaitRoomCount);
+						InterlockedIncrement(&m_lReadyRoomCount);
+
+						// 마스터에게 방 닫힘 패킷 보내기
+						m_Master_LanClient->Packet_RoomClose_Req(NowRoom->m_iRoomNo);
+
+						// 게임 종료 플래그 변경
+						NowRoom->m_bGameEndFlag = true;
+
+						// 방 모드를 Ready로 변경
+						NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;						
+
+						// 유저가 있는 방의 경우 방 안의 모든 유저 Shutdown
+						if (NowRoom->m_iJoinUserCount > 0)
+							NowRoom->Shutdown_All();						
+					}
+
+					++itor_Now;
+				}
+
+			}
+
+			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
+		}
+		
 		
 
 
@@ -4199,9 +4192,6 @@ namespace Library_Jingyu
 
 		// 비 로그인 상태로 변경
 		m_bLoginCheck = false;
-
-		// 배틀서버에서, Wait모드인 방에 있는 유저들을 모두 쫓아냄.
-		m_BattleServer_this->RoomClear();
 	}
 
 	// 패킷 수신 완료 후 호출되는 함수.

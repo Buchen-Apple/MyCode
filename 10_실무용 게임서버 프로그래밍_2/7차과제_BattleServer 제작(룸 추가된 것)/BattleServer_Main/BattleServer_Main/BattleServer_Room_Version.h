@@ -327,14 +327,7 @@ namespace Library_Jingyu
 			bool m_bShutdownFlag;
 
 			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
-			char m_cEnterToken[32];
-
-			// ------------
-
-			// Wait상태의 방인데, 파괴되어야 하는 방일 경우를 체크하는 Flag	
-			// 마스터가 죽어 배틀과 연결이 끊겼을 때를 위한것.
-			// true 시 Wait상태라도 방 입장 불가.
-			bool m_bWaitDelete;
+			char m_cEnterToken[32];		
 
 
 
@@ -698,19 +691,6 @@ namespace Library_Jingyu
 		// return : 정상적으로 셋팅 시 true
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
-
-		
-	private:
-		// -----------------------
-		// 마스터 랜 클라에서 호출하는 함수
-		// -----------------------
-
-		// 배틀서버 내에 존재하는 모든 방 중, Wait 상태의 방을 찾아낸다.
-		// 찾은 Wait모드 방에 유저가 있는 경우, 모두 접속 종료 시킨다.
-		//
-		// Parameter : 없음
-		// return : 없음
-		void RoomClear();		
 
 		
 

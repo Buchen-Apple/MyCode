@@ -114,6 +114,12 @@ namespace Library_Jingyu
 	// return true : 성공
 	bool CLanServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect)
 	{
+		m_ullAcceptTotal = 0;
+		m_ullJoinUserCount = 0;
+		m_lAcceptTPS = 0;
+		m_lSendPostTPS = 0;
+		m_lRecvTPS = 0;
+
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
 		m_iMyErrorCode = (euError)0;
@@ -540,7 +546,36 @@ namespace Library_Jingyu
 	}
 
 
+	// 엑셉트 토탈 얻기
+	ULONGLONG  CLanServer::GetAcceptTotal()
+	{
+		return m_ullAcceptTotal;
+	}
 
+	// 엑셉트 TPS 얻기
+	LONG CLanServer::GetAcceptTPS()
+	{
+		LONG ret = InterlockedExchange(&m_lAcceptTPS, 0);
+
+		return ret;
+	}
+
+	// 샌드 TPS 얻기
+	LONG CLanServer::GetSendTPS()
+	{
+		LONG ret = InterlockedExchange(&m_lSendPostTPS, 0);
+
+		return ret;
+	}
+
+
+	// 리시브 TPS 얻기
+	LONG CLanServer::GetRecvTPS()
+	{
+		LONG ret = InterlockedExchange(&m_lRecvTPS, 0);
+
+		return ret;
+	}
 
 
 
@@ -761,6 +796,10 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+				// !! 테스트 출력용 !!
+				// sendpostTPS 추가
+				InterlockedAdd(&g_This->m_lSendPostTPS, stNowSession->m_iWSASendCount);
+
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
@@ -839,6 +878,12 @@ namespace Library_Jingyu
 
 				break;
 			}
+
+			// 엑셉트 토탈 증가
+			++g_This->m_ullAcceptTotal;
+
+			// 엑셉트 TPS 증가
+			InterlockedIncrement(&g_This->m_lAcceptTPS); // 테스트용!!
 
 			// ------------------
 			// 최대 접속자 수 이상 접속 불가
@@ -934,7 +979,7 @@ namespace Library_Jingyu
 				g_This->OnError((int)euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT, L"accpet(). Abonormal_exit");
 
 				break;
-			}
+			}			
 
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
@@ -1110,6 +1155,7 @@ namespace Library_Jingyu
 			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 8. Recv받은 데이터의 헤더 타입에 따라 분기처리.
+			InterlockedIncrement(&m_lRecvTPS);
 			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
 			CProtocolBuff_Lan::Free(PayloadBuff);

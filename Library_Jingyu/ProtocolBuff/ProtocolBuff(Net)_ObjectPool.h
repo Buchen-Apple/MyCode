@@ -18,6 +18,7 @@ namespace Library_Jingyu
 	class CProtocolBuff_Net
 	{
 		friend class CNetServer;
+		friend class CMMOServer;
 
 	private:
 		// ----------- 멤버변수 위치를 잡을 때 '캐시 친화 코드(Cache Friendly Code)' 최대한 적용 고려
@@ -48,7 +49,7 @@ namespace Library_Jingyu
 		// 문제 생길 시 Crash 발생시킬 덤프.
 		static CCrashDump* m_Dump;
 
-	public:
+	private:
 		// 인코딩
 		// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
 		//

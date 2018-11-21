@@ -182,7 +182,28 @@ namespace Library_Jingyu
 		CMemoryPoolTLS<stPlayer> *m_PlayerPool;
 
 		// -----------------------------------
-			   
+			  
+
+		// ------------
+		// 출력용
+		// ------------
+
+		// 로그인 패킷 받았을 시, 에러.
+		LONG m_lTokenError;
+		LONG m_lAccountError;
+		LONG m_lTempError;
+		LONG m_lVerError;
+
+		// 로그인에 성공한 유저 수
+		LONG m_lLoginUser;
+
+		// 플레이어 구조체 할당 수
+		LONG m_lstPlayer_AllocCount;
+
+		// 배틀 방 입장 성공 패킷을 안보내고 끊은 클라이언트의 수
+		LONG m_lNot_BattleRoom_Enter;
+
+
 
 
 	private:

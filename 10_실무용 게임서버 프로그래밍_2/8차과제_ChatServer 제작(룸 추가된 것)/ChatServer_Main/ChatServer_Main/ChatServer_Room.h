@@ -399,6 +399,12 @@ namespace Library_Jingyu
 		//		  : 검색 실패 시 nullptr
 		stRoom* EraseRoomFunc(int RoomNo);
 
+		// 룸 자료구조의 모든 방 삭제
+		//
+		// Parameter : 없음
+		// return : 없음
+		void RoomClearFunc();
+
 
 
 	public:
@@ -440,7 +446,7 @@ namespace Library_Jingyu
 		//
 		// Parameter : stParser*
 		// return : 실패 시 false
-		bool SetFile(stParser* pConfig);
+		bool SetFile(stParser* pConfig);		
 
 
 

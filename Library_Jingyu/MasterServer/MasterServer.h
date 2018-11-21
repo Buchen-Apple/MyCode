@@ -82,6 +82,21 @@ namespace Library_Jingyu
 
 		// Config용 변수
 		stConfigFile m_stConfig;
+
+
+
+		// -----------------
+		// 출력용 변수
+		// -----------------
+
+		// 로그인 시, 토큰 에러가 난 횟수
+		LONG m_lMatch_TokenError;
+
+		// 로그인 시, 이미 로그인 된 매칭서버가 또 로그인 요청함.
+		LONG m_lMatch_DuplicateLogin;
+
+		// 로그인 되지 않은 매칭서버가 패킷을 보냄.
+		LONG m_lMatch_NotLoginPacket;
 			   		 	  
 
 
@@ -229,6 +244,12 @@ namespace Library_Jingyu
 		// Parameter : 없음
 		// return : 없음
 		void ServerStop();
+
+		// 출력용 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void ShowPrintf();
 
 
 
@@ -412,6 +433,18 @@ namespace Library_Jingyu
 		// 배틀서버에 부여할 번호.
 		// 배틀 서버에게 로그인 패킷이 처리 될 때 마다 1씩 증가.
 		LONG m_lBattleServerNo_Add;
+
+		// --------------
+		// 출력용
+		// --------------
+
+		// 방 수
+		LONG m_lTotalRoom;
+
+		// 로그인 시, 토큰 에러가 난 횟수
+		LONG m_lBattle_TokenError;
+
+
 
 		
 

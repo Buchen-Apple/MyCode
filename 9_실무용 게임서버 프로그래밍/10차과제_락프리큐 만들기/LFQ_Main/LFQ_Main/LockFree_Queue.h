@@ -216,7 +216,6 @@ namespace Library_Jingyu
 				// 헤더와 테일이 다르면 디큐작업 진행
 				else
 				{
-
 					// 헤더 이동 시도
 					if (InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead.m_pPoint->m_stpNextBlock, (LONG64*)&LocalHead))
 					{

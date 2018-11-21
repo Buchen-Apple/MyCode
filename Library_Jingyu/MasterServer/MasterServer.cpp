@@ -5,24 +5,6 @@
 
 #include <strsafe.h>
 
-// ----------------- 매치메이킹용 출력 변수
-
-// 로그인 시, 토큰 에러가 난 횟수
-LONG g_lMatch_TokenError;
-
-// 로그인 시, 이미 로그인 된 매칭서버가 또 로그인 요청함.
-LONG g_lMatch_DuplicateLogin;
-
-// 로그인 되지 않은 유저가 패킷을 보냄.
-LONG g_lMatch_NotLoginPacket;
-
-
-// ----------------- 배틀용 출력 변수
-
-// 로그인 시, 토큰 에러가 난 횟수
-LONG g_lBattle_TokenError;
-
-
 // -----------------------
 //
 // 마스터 Match 서버
@@ -189,6 +171,11 @@ namespace Library_Jingyu
 	// return : 실패 시 false.
 	bool CMatchServer_Lan::ServerStart()
 	{
+		m_lMatch_TokenError = 0;
+		m_lMatch_DuplicateLogin = 0;
+		m_lMatch_NotLoginPacket = 0;
+
+
 		// 매칭 랜서버 시작
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, 
 			m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser) == false)
@@ -223,6 +210,120 @@ namespace Library_Jingyu
 		// 배틀 랜서버 종료
 		if (pBattleServer->GetServerState() == true)
 			pBattleServer->ServerStop();
+	}
+
+	// 출력용 함수
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CMatchServer_Lan::ShowPrintf()
+	{
+		// 화면 출력할 것 셋팅
+		/*
+		------------------ Match -------------------
+		SessionNum : 		- 마스터의 매치메이킹 랜서버로 접속한 매칭서버의 수	
+
+		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+		Accept TPS :		- 초당 Accept 처리 횟수
+		Send TPS:			- 초당 Send완료 횟수. (완료통지에서 증가)
+		Recv TPS:			- 초당 Recv완료 횟수. (패킷 1개가 완성되었을 때 증가. RecvProc에서 패킷에 넣기 전에 1씩 증가)
+				
+		Login_TokenError :	- 로그인 시 토큰 에러
+		Login_Duplivate :	- 이미 로그인 된 매칭서버가 또 로그인 요청
+		Login_NotLogin :	- 로그인 패킷을 보내지 않은 매칭서버가 패킷을 보냄.
+
+		------------------ Battle -------------------
+		SessionNum : 		- 마스터의 배틀 랜서버로 접속한 배틀서버의 수
+
+		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
+		Accept TPS :		- 초당 Accept 처리 횟수
+		Send TPS:			- 초당 Send완료 횟수. (완료통지에서 증가)
+		Recv TPS:			- 초당 Recv완료 횟수. (패킷 1개가 완성되었을 때 증가. RecvProc에서 패킷에 넣기 전에 1씩 증가)
+
+		Login_TokenError :  - 로그인 시 토큰 에러
+
+		------------------ Room -------------------
+		TotalRoom :			- 총 방 수
+		TotalRoom_Pool :	- 룸 umap에 있는 카운트.
+
+		Room_ChunkAlloc_Count : - 할당받은 룸 청크 수(밖에서 사용중인 수)		
+
+		-------------- ProtocolBuff -------------------
+		PacketPool_Lan : 			- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
+
+		Lan_BuffChunkAlloc_Count :	- 사용중인 직렬화 버퍼의 청크 수(밖에서 사용중인 수)
+
+		*/
+
+		printf("==================== Master Server =====================\n"
+			"------------------ Match -------------------\n"
+			"SessionNum : %lld\n\n"		
+
+			"Accept Total : %lld\n"
+			"Accept TPS : %d\n"
+			"Send TPS : %d\n"
+			"Recv TPS : %d\n\n"		
+
+			"Login_TokenError : %d\n"
+			"Login_Duplivate : %d\n"
+			"Login_NotLogin : %d\n\n"
+
+			"------------------ Battle -------------------\n"
+			"SessionNum : %lld\n\n"
+
+			"Accept Total : %lld\n"
+			"Accept TPS : %d\n"
+			"Send TPS : %d\n"
+			"Recv TPS : %d\n\n"
+
+			"Login_TokenError : %d\n\n"
+
+			"------------------ Room -------------------\n"
+			"TotalRoom : %d\n"
+			"TotalRoom_Pool : %lld\n\n"
+
+			"Room_ChunkAlloc_Count : %d (Out : %d)\n\n"			
+
+			"---------------- ProtocolBuff -------------\n"
+			"PacketPool_Lan : %d\n\n"
+
+			"Lan_BuffChunkAlloc_Count : %d (Out : %d)\n\n"			
+
+			"========================================================\n\n",
+
+			// ----------- 매칭 랜서버			
+			GetClientCount(),
+
+			GetAcceptTotal(),
+			GetAcceptTPS(),
+			GetSendTPS(),
+			GetRecvTPS(),
+
+			m_lMatch_TokenError,
+			m_lMatch_DuplicateLogin,
+			m_lMatch_NotLoginPacket,
+
+			// ----------- 배틀 랜서버
+			pBattleServer->GetClientCount(),
+
+			pBattleServer->GetAcceptTotal(),
+			pBattleServer->GetAcceptTPS(),
+			pBattleServer->GetSendTPS(),
+			pBattleServer->GetRecvTPS(),
+
+			pBattleServer->m_lBattle_TokenError,
+
+			// ----------- 룸
+			pBattleServer->m_lTotalRoom,
+			pBattleServer->m_Room_List.size() + pBattleServer->m_Room_Umap.size(),
+
+			pBattleServer->m_TLSPool_Room->GetAllocChunkCount(), pBattleServer->m_TLSPool_Room->GetOutChunkCount(),
+
+			// ----------- 직렬화버퍼_랜
+			CProtocolBuff_Lan::GetNodeCount(),
+
+			CProtocolBuff_Lan::GetChunkCount(), CProtocolBuff_Lan::GetOutChunkCount()
+		);
 	}
 
 
@@ -394,7 +495,7 @@ namespace Library_Jingyu
 		// 2. 입장 토큰키 비교.		
 		if (memcmp(MasterToken, m_stConfig.BattleEnterToken, 32) != 0)
 		{
-			InterlockedIncrement(&g_lMatch_TokenError);
+			InterlockedIncrement(&m_lMatch_TokenError);
 
 			g_MasterDump->Crash();
 
@@ -412,7 +513,7 @@ namespace Library_Jingyu
 		// 3. 중복로그인 체크를 위해 자료구조에 Insert
 		if (InsertLoginMatchServerFunc(ServerNo) == false)
 		{
-			InterlockedIncrement(&g_lMatch_DuplicateLogin);
+			InterlockedIncrement(&m_lMatch_DuplicateLogin);
 
 			g_MasterDump->Crash();
 
@@ -470,7 +571,7 @@ namespace Library_Jingyu
 		// 2. 매칭 서버의 로그인 상태 확인
 		if (NowUser->m_bLoginCheck == false)
 		{
-			InterlockedIncrement(&g_lMatch_NotLoginPacket);
+			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
 			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -504,7 +605,7 @@ namespace Library_Jingyu
 		// 2. 매칭 서버의 로그인 상태 확인
 		if (NowUser->m_bLoginCheck == false)
 		{
-			InterlockedIncrement(&g_lMatch_NotLoginPacket);
+			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
 			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -546,7 +647,7 @@ namespace Library_Jingyu
 		// 2. 매칭 서버의 로그인 상태 확인
 		if (NowUser->m_bLoginCheck == false)
 		{
-			InterlockedIncrement(&g_lMatch_NotLoginPacket);
+			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
 			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -1360,6 +1461,8 @@ namespace Library_Jingyu
 					// 같다면, Erase 후 Free
 					itor_Now = m_Room_List.erase(itor_Now);
 					m_TLSPool_Room->Free(NowRoom);
+
+					InterlockedDecrement(&m_lTotalRoom);
 				}
 
 				// 2. 다르다면 itor_Now ++
@@ -1396,6 +1499,8 @@ namespace Library_Jingyu
 					// 같다면, Erase와 Free
 					itor_Now = m_Room_Umap.erase(itor_Now);
 					m_TLSPool_Room->Free(NowRoom);
+
+					InterlockedDecrement(&m_lTotalRoom);
 				}
 
 				// 2. 다르다면 itor_Now ++
@@ -1460,7 +1565,7 @@ namespace Library_Jingyu
 		if (memcmp(pMatchServer->m_stConfig.BattleEnterToken, MasterEnterToken, 32) != 0)
 		{
 			// 다를 경우
-			InterlockedIncrement(&g_lBattle_TokenError);
+			InterlockedIncrement(&m_lBattle_TokenError);
 
 			g_MasterDump->Crash();
 
@@ -1579,6 +1684,7 @@ namespace Library_Jingyu
 
 		ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- 룸 list Exclusive 언락
 
+		InterlockedIncrement(&m_lTotalRoom);
 
 		// 6. 응답 패킷 보내기
 		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
@@ -1617,28 +1723,81 @@ namespace Library_Jingyu
 		// 3. 룸 Key 받아오기
 		UINT64 RoomKey = Create_RoomKey(NowBattle->m_iServerNo, RoomNo);
 
+		int EraseFlag = false;
+
 		// 4. umap에서 제거
 		AcquireSRWLockExclusive(&m_srwl_Room_Umap);		// ----- umap 룸 Exclusive 락
 
 		// 검색
 		auto FindRoom = m_Room_Umap.find(RoomKey);
 
-		// 없으면 Crash
-		// 한 번이라도 풀 방이 되었던 방은 umap에 들어오기 때문에 
-		// 여기 없는건 말도 안된다.
-		if(FindRoom == m_Room_Umap.end())
+		// 있을 경우 로직
+		if (FindRoom != m_Room_Umap.end())
+		{
+			stRoom* EraseRoom = FindRoom->second;
+
+			// Erase
+			m_Room_Umap.erase(FindRoom);
+
+			ReleaseSRWLockExclusive(&m_srwl_Room_Umap);		// ----- umap 룸 Exclusive 언락			
+
+			InterlockedDecrement(&m_lTotalRoom);
+
+			// 5. stRoom* Free
+			m_TLSPool_Room->Free(EraseRoom);
+
+			EraseFlag = true;
+		}
+
+		// 없으면 리스트 자료구조 확인.
+		// 한 번이라도 풀 방이 되었던 방은 umap에 들어오기 때문에 없는건 말도 안되지만
+		// 채팅 서버가 갑자기 종료되었을 경우, Wait상태의 방이 삭제될 가능성이 있음.
+		// Wait상태의 방은 list 자료구조에서 관리되기 때문에 list를 확인해야 한다.
+		else
+		{
+			ReleaseSRWLockExclusive(&m_srwl_Room_Umap);		// ----- umap 룸 Exclusive 언락
+
+			AcquireSRWLockExclusive(&m_srwl_Room_List);		// ----- list 룸 Exclusive 락
+
+			// 리스트 순회
+			size_t Size = m_Room_List.size();
+
+			// 사이즈가 있을 경우에만 순회
+			if (Size > 0)
+			{
+				auto itor_Now = m_Room_List.begin();
+				auto itor_End = m_Room_List.end();
+
+				while (itor_Now != itor_End)
+				{
+					// 방을 찾았다면 Erase
+					if ((*itor_Now)->m_iRoomNo == RoomNo)
+					{
+						stRoom* EraseRoom = (*itor_Now);
+
+						m_Room_List.erase(itor_Now);
+						
+						InterlockedDecrement(&m_lTotalRoom);
+
+						//stRoom* Free
+						m_TLSPool_Room->Free(EraseRoom);
+
+						EraseFlag = true;
+
+						break;
+					}
+
+					++itor_Now;
+				}				
+			}		
+
+			ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- list 룸 Exclusive 언락
+		}		
+
+		// 방 삭제를 못했다면 Crash
+		if(EraseFlag == false)
 			g_MasterDump->Crash();
 
-		stRoom* EraseRoom = FindRoom->second;
-
-		// Erase
-		m_Room_Umap.erase(FindRoom);
-
-		ReleaseSRWLockExclusive(&m_srwl_Room_Umap);		// ----- umap 룸 Exclusive 언락
-
-
-		// 5. stRoom* Free
-		m_TLSPool_Room->Free(EraseRoom);
 
 
 		// 6. 응답 패킷 보내기
@@ -1781,6 +1940,9 @@ namespace Library_Jingyu
 	// return : 실패 시 false.
 	bool CBattleServer_Lan::ServerStart()
 	{
+		m_lTotalRoom = 0;
+		m_lBattle_TokenError = 0;
+
 		// 배틀 랜서버 시작
 		if (Start(pMatchServer->m_stConfig.BattleBindIP, pMatchServer->m_stConfig.BattlePort, pMatchServer->m_stConfig.BattleCreateWorker,
 			pMatchServer->m_stConfig.BattleActiveWorker, pMatchServer->m_stConfig.BattleCreateAccept, pMatchServer->m_stConfig.BattleNodelay, 

@@ -260,8 +260,7 @@ namespace Library_Jingyu
 	// AcceptTPS 얻기
 	LONG CMMOServer::GetAccpetTPS()
 	{
-		LONG ret = m_lAcceptTPS;
-		m_lAcceptTPS = 0;
+		LONG ret = InterlockedExchange(&m_lAcceptTPS, 0);
 
 		return ret;
 	}
@@ -269,8 +268,7 @@ namespace Library_Jingyu
 	// SendTPS 얻기
 	LONG CMMOServer::GetSendTPS()
 	{
-		LONG ret = m_lSendPostTPS;
-		m_lSendPostTPS = 0;
+		LONG ret = InterlockedExchange(&m_lSendPostTPS, 0);
 
 		return ret;
 	}
@@ -278,8 +276,7 @@ namespace Library_Jingyu
 	// RecvTPS 얻기
 	LONG CMMOServer::GetRecvTPS()
 	{
-		LONG ret = m_lRecvTPS;
-		m_lRecvTPS = 0;
+		LONG ret = InterlockedExchange(&m_lRecvTPS, 0);
 
 		return ret;
 	}
@@ -299,8 +296,7 @@ namespace Library_Jingyu
 	// AuthFPS 얻기
 	LONG CMMOServer::GetAuthFPS()
 	{
-		LONG ret = m_lAuthFPS;
-		m_lAuthFPS = 0;
+		LONG ret = InterlockedExchange(&m_lAuthFPS, 0);
 
 		return ret;
 	}
@@ -308,8 +304,7 @@ namespace Library_Jingyu
 	// GameFPS 얻기
 	LONG CMMOServer::GetGameFPS()
 	{
-		LONG ret = m_lGameFPS;
-		m_lGameFPS = 0;
+		LONG ret = InterlockedExchange(&m_lGameFPS, 0);
 
 		return ret;
 	}

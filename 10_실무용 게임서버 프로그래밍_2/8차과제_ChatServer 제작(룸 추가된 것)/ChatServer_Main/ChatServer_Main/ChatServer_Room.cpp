@@ -203,8 +203,7 @@ namespace Library_Jingyu
 
 		return true;
 	}
-
-
+	
 	// 룸 자료구조에서 Erase
 	//
 	// Parameter : RoonNo
@@ -233,6 +232,32 @@ namespace Library_Jingyu
 		return RetRoom;
 	}
 
+	// 룸 자료구조의 모든 방 삭제
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CChatServer_Room::RoomClearFunc()
+	{
+		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 락
+
+		// 룸이 있을 경우 룸 클리어 진행
+		if (m_Room_Umap.size() > 0)
+		{
+			auto itor_Now = m_Room_Umap.begin();
+			auto itor_End = m_Room_Umap.end();
+
+			while (itor_Now != itor_End)
+			{
+				m_pRoom_Pool->Free(itor_Now->second);
+
+				InterlockedDecrement(&m_lRoomCount);
+
+				itor_Now = m_Room_Umap.erase(itor_Now);				
+			}
+		}
+
+		ReleaseSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 언락
+	}
 
 
 
@@ -284,7 +309,7 @@ namespace Library_Jingyu
 		// 출력 전에, 프로세스 사용량 갱신
 		ProcessUsage.UpdateCpuTime();
 
-		printf("========================================================\n"
+		printf("==================== Chat Server =====================\n"
 			"MonitorConnect : %d, BattleConnect : %d\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n\n"
@@ -797,24 +822,7 @@ namespace Library_Jingyu
 			*/
 		}
 
-
-		// 5. 접속중인 룸 검증
-		if (RoomNo != NowPlayer->m_iRoomNo)
-		{
-			g_ChatDump->Crash();
-
-			/*
-			TCHAR str[100];
-			StringCchPrintf(str, 100, _T("Packet_Room_Enter(). RoomNo Error. SessionID : %lld, AccountNo : %lld, RoomNo : %d"),
-				SessionID, AccountNo, RoomNo);
-
-			throw CException(str);
-			*/
-		}	
-
-
-
-		// 6. 룸 검색
+		// 5. 룸 검색
 		AcquireSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 락
 
 		auto FindRoom = m_Room_Umap.find(RoomNo);
@@ -841,7 +849,7 @@ namespace Library_Jingyu
 		stRoom* NowRoom = FindRoom->second;
 
 
-		// 7. 룸 토큰 검사 및 자료구조에 추가
+		// 6. 룸 토큰 검사 및 자료구조에 추가
 		NowRoom->ROOM_LOCK();	// ----- 룸 락	
 
 		// 룸 토큰 검사
@@ -878,7 +886,7 @@ namespace Library_Jingyu
 
 
 
-		// 8. 성공 패킷 응답
+		// 7. 성공 패킷 응답
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_CHAT_RES_ENTER_ROOM;
@@ -1458,8 +1466,16 @@ namespace Library_Jingyu
 
 		auto FindRoom = m_pNetServer->m_Room_Umap.find(RoomNo);
 		
+		// 방 검색 시, 방이 없을 수도 있음.
+		// 채팅이 꺼질 경우, 배틀서버는 보유하고 있는 Wait 방을 모두 파괴시킨다. Play방은 남아있다.
+		// 다시 채팅이 붙으면, 배틀은 Play방이 있고 채팅은 방이 하나도 없다.
+		// 이 상태에서 Play방이 종료되면, 채팅에게 방 삭제 패킷을 보내는데 
+		// 채팅은 다시 켜졌기 때문에 이전의 플레이 방이 없다.
 		if (FindRoom == m_pNetServer->m_Room_Umap.end())
-			g_ChatDump->Crash();
+		{
+			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
+			return;
+		}
 
 		CChatServer_Room::stRoom* NowRoom = FindRoom->second;
 
@@ -1618,6 +1634,9 @@ namespace Library_Jingyu
 	{
 		m_ullSessionID = 0xffffffffffffffff;
 		m_bLoginCheck = false;
+
+		// 배틀서버와 연결이 끊기면 모든 방 삭제
+		m_pNetServer->RoomClearFunc();
 	}
 
 	// 패킷 수신 완료 후 호출되는 함수.

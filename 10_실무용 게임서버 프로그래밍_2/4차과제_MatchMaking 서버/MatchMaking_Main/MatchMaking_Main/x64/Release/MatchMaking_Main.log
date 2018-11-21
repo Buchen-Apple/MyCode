@@ -1,8 +1,17 @@
-﻿  MatchmakingServer.cpp
+﻿  pch.cpp
+  CrashDump.cpp
+  DB_Connector.cpp
+  HTTP_Exchange.cpp
+  Log.cpp
+  MatchmakingServer.cpp
+  NetworkLib_LanClient.cpp
   NetworkLib_NetServer.cpp
+  Parser_Class.cpp
+  ProtocolBuff(Net)_ObjectPool.cpp
+  ProtocolBuff_ObjectPool.cpp
+  RingBuff.cpp
+  MatchMaking_Main.cpp
   코드를 생성하고 있습니다.
-  4 of 813 functions ( 0.5%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
+  All 817 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   MatchMaking_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\4차과제_MatchMaking 서버\MatchMaking_Main\x64\Release\MatchMaking_Main.exe

@@ -16,33 +16,6 @@
 
 using namespace rapidjson;
 
-// 출력용 변수들 ------------------------
-
-// 로그인 패킷 받았을 시, 에러.
-LONG g_lTokenError;	
-LONG g_lAccountError;
-LONG g_lTempError;
-LONG g_lVerError;
-
-// 로그인에 성공한 유저 수
-LONG g_lLoginUser;
-
-// 플레이어 구조체 할당 수
-LONG g_lstPlayer_AllocCount;
-
-// 배틀 방 입장 성공 패킷을 안보내고 끊은 클라이언트의 수
-LONG g_lNot_BattleRoom_Enter;
-
-// Net 엔진에서 카운트 중인 값.
-extern ULONGLONG g_ullAcceptTotal;
-extern LONG	  g_lAcceptTPS;
-extern LONG	g_lSendPostTPS;
-
-// 패킷 직렬화 버퍼 사용 수 (Net)
-extern LONG g_lAllocNodeCount;
-
-
-
 
 // ---------------------------------------------
 // 
@@ -591,14 +564,14 @@ namespace Library_Jingyu
 			if (iResult == -10)
 			{
 				Status = 3;
-				InterlockedIncrement(&g_lAccountError);
+				InterlockedIncrement(&m_lAccountError);
 			}
 
 			// 그 외 기타 에러일 경우
 			else
 			{
 				Status = 4;
-				InterlockedIncrement(&g_lTempError);
+				InterlockedIncrement(&m_lTempError);
 			}
 
 			CProtocolBuff_Net* SendData = CProtocolBuff_Net::Alloc();
@@ -622,7 +595,7 @@ namespace Library_Jingyu
 		if (memcmp(DBToken, Token, 64) != 0)
 		{
 			// 토큰이 다를경우 status 2(토큰 오류)를 보낸다.
-			InterlockedIncrement(&g_lTokenError);
+			InterlockedIncrement(&m_lTokenError);
 
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
 			BYTE Status = 2;			
@@ -640,7 +613,7 @@ namespace Library_Jingyu
 		if (m_uiVer_Code != Ver_Code)
 		{
 			// 버전이 다를경우 status 5(버전 오류)를 보낸다.
-			InterlockedIncrement(&g_lVerError);
+			InterlockedIncrement(&m_lVerError);
 
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
 			BYTE Status = 5;
@@ -665,7 +638,7 @@ namespace Library_Jingyu
 		NowPlayer->m_bLoginCheck = true;
 
 		// 로그인 유저 수 증가
-		InterlockedIncrement(&g_lLoginUser);
+		InterlockedIncrement(&m_lLoginUser);
 
 
 		// 8. 정상 패킷 응답
@@ -757,6 +730,15 @@ namespace Library_Jingyu
 	// return : 실패 시 false 리턴
 	bool Matchmaking_Net_Server::ServerStart()
 	{
+		m_lTokenError = 0;
+		m_lAccountError = 0;
+		m_lTempError = 0;
+		m_lVerError = 0;
+		m_lLoginUser = 0;
+		m_lstPlayer_AllocCount = 0;
+		m_lNot_BattleRoom_Enter = 0;
+
+
 		// ------------------- 매치메이킹 DB에 초기 데이터 생성
 		ServerInfo_DBInsert();
 
@@ -846,9 +828,6 @@ namespace Library_Jingyu
 
 		*/
 
-		LONG AccpetTPS = InterlockedExchange(&g_lAcceptTPS, 0);
-		LONG SendTPS = InterlockedExchange(&g_lSendPostTPS, 0);
-
 		printf("========================================================\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n\n"
@@ -872,12 +851,24 @@ namespace Library_Jingyu
 			"========================================================\n\n",
 
 			// ------------ 매치메이킹 Net 서버용
-			GetClientCount(), g_lAllocNodeCount,
-			g_lstPlayer_AllocCount, m_umapPlayer.size(),
-			g_ullAcceptTotal, AccpetTPS, SendTPS,
+			GetClientCount(), 
+			CProtocolBuff_Net::GetNodeCount(),
+
+			m_lstPlayer_AllocCount, 
+			m_umapPlayer.size(),
+
+			GetAcceptTotal(),
+			GetAccpetTPS(), 
+			GetSendTPS(),
+
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
-			g_lTokenError, g_lAccountError, g_lTempError, g_lVerError, g_lNot_BattleRoom_Enter);
+
+			m_lTokenError, 
+			m_lAccountError, 
+			m_lTempError, 
+			m_lVerError, 
+			m_lNot_BattleRoom_Enter);
 
 	}
 
@@ -899,7 +890,7 @@ namespace Library_Jingyu
 	{
 		// 1. stPlayer TLS에서 구조체 할당받음
 		stPlayer* NowPlayer = m_PlayerPool->Alloc();
-		InterlockedIncrement(&g_lstPlayer_AllocCount);
+		InterlockedIncrement(&m_lstPlayer_AllocCount);
 
 		// 2. stPlayer에 SessionID, ClientKey 셋팅
 		NowPlayer->m_ullSessionID = SessionID;	
@@ -959,7 +950,7 @@ namespace Library_Jingyu
 
 		// 3. 만약, 로그인 상태의 유저가 나갔다면 (로그인 패킷까지 보낸 유저) g_LoginUser--
 		if (ErasePlayer->m_bLoginCheck == true)
-			InterlockedDecrement(&g_lLoginUser);
+			InterlockedDecrement(&m_lLoginUser);
 
 		// 4. 유저 로그인 상태를 false로 만듬.
 		ErasePlayer->m_bLoginCheck = false;
@@ -967,7 +958,7 @@ namespace Library_Jingyu
 		// 5. 배틀 방 입장 패킷을 안보낸 유저라면, 실패 패킷을 마스터에게 보냄
 		if (ErasePlayer->m_bBattleRoomEnterCheck == false)
 		{
-			InterlockedIncrement(&g_lNot_BattleRoom_Enter);
+			InterlockedIncrement(&m_lNot_BattleRoom_Enter);
 			Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
 		}
 
@@ -977,7 +968,7 @@ namespace Library_Jingyu
 
 		// 7. 플레이어 구조체 반환
 		m_PlayerPool->Free(ErasePlayer);
-		InterlockedDecrement(&g_lstPlayer_AllocCount);		
+		InterlockedDecrement(&m_lstPlayer_AllocCount);		
 	}
 
 	// 새로운 패킷 받음
