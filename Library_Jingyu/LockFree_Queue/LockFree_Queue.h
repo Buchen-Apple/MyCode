@@ -203,27 +203,26 @@ namespace Library_Jingyu
 				{
 					// LocalHead->Next가 null인지 체크
 					if (LocalHead_Next == nullptr)
-					{
 						continue;
-					}
 
+					// 그게 아니면 tail 이동 시도	
 					else
-					{
-						// tail 이동 시도	
 						InterlockedCompareExchange128((LONG64*)&m_stpTail, LocalTail.m_l64Count + 1, (LONG64)LocalTail.m_pPoint->m_stpNextBlock, (LONG64*)&LocalTail);
-					}
 				}
 
 				// 헤더와 테일이 다르면 디큐작업 진행
 				else
 				{
+					// LocalHead->Next가 null인지 체크
+					if (LocalHead_Next == nullptr)
+						continue;
+
+					// 리턴할 데이터 받아두기 ------
+					OutData = LocalHead_Next->m_Data;
 
 					// 헤더 이동 시도
 					if (InterlockedCompareExchange128((LONG64*)&m_stpHead, LocalHead.m_l64Count + 1, (LONG64)LocalHead_Next, (LONG64*)&LocalHead))
 					{
-						// 성공시 ------
-						OutData = LocalHead_Next->m_Data;
-
 						// 이동 전의 헤더를 메모리풀에 반환
 						m_MPool->Free(LocalHead.m_pPoint);
 						break;

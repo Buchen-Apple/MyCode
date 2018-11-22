@@ -155,7 +155,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="LockFree_Queue.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
