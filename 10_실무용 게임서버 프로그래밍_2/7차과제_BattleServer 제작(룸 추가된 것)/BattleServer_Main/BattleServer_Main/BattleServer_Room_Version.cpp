@@ -1059,7 +1059,7 @@ namespace Library_Jingyu
 
 
 
-		// 4. 방 안의 유저들에게(자기자신 포함) Fire 1에 대한 응답패킷 보내기
+		// 4. 방 안의 유저들에게(자기자신은 제외) Fire 1에 대한 응답패킷 보내기
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_GAME_RES_FIRE1;
@@ -1071,7 +1071,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&HitPointY, 4);
 		SendBuff->PutData((char*)&HitPointZ, 4);
 
-		NowRoom->SendPacket_BroadCast(SendBuff);
+		NowRoom->SendPacket_BroadCast(SendBuff, m_Int64AccountNo);
 
 
 
@@ -1332,7 +1332,7 @@ namespace Library_Jingyu
 
 
 
-		// 3. 방 안의 유저들에게(자기자신 포함) Fire 2에 대한 응답패킷 보내기
+		// 3. 방 안의 유저들에게(자기자신은 제외) Fire 2에 대한 응답패킷 보내기
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_GAME_RES_FIRE2;
@@ -1344,7 +1344,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&HitPointY, 4);
 		SendBuff->PutData((char*)&HitPointZ, 4);
 
-		NowRoom->SendPacket_BroadCast(SendBuff);
+		NowRoom->SendPacket_BroadCast(SendBuff, m_Int64AccountNo);
 
 
 
