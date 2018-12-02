@@ -553,12 +553,8 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
     $Value = mysqli_real_escape_string($shDB_Data, current($Content_Body));
     $SetText = "`$Key` = '$Value'";
 
-    while(true)
-    {
-        // next가 없으면, 다 뺀것.
-        if(next($Content_Body) === false)
-            break;
-        
+    while(next($Content_Body) !== false)
+    {        
         $Key = mysqli_real_escape_string($shDB_Data, key($Content_Body));
         $Value = mysqli_real_escape_string($shDB_Data, current($Content_Body));
         $SetText .= " ,`$Key` = '$Value'";
@@ -566,7 +562,7 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
    
 
     // 2. Update 쿼리문 만들어서 날리기
-    $Result = DB_Query("UPDATE `$dbname`.`$TBLName` SET $SetText WHERE accountno =  $accountNo" , $shDB_Data, $accountNo);
+    $Result = DB_Query("UPDATE `$dbname`.`$TBLName` SET $SetText WHERE accountno = $accountNo" , $shDB_Data, $accountNo);
 
     // 3. 쿼리 날리는데 실패했으면, 실패 이유에 따라 응답패킷 보낸다.
     if($Result === false)
@@ -593,7 +589,7 @@ function shDB_Data_Update($accountNo, &$shDB_Data, $dbname, $TBLName, $Content_B
         // 그 외는 일반 DB 쿼리 에러
         global $cnf_DB_QUERY_ERROR;
         OnError($cnf_DB_QUERY_ERROR, $accountNo);  
-    }
+    }   
 }
 
 // -------------------------------------------------------------------
@@ -674,8 +670,7 @@ function shDB_Data_Select($accountNo, &$shDB_Data, $dbname, $TBLName)
         {
             global $cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_CONTENTSTBL;
             OnError($cnf_CONTENT_ERROR_NOT_FIND_ACCOUNTNO_CONTENTSTBL);     
-        }
-       
+        }       
     }
 
     // 5. 있는 유저라면 정보 리턴

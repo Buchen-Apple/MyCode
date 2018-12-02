@@ -71,6 +71,6 @@ $Response['die'] = intval($SelectData['die']);
 $Response['win'] = intval($SelectData['win']);
 
 // 8. 결과 돌려주기
-ResponseJSON($Response, $Data['accountno']);
 require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
+ResponseJSON($Response, $Data['accountno']);
 ?>
