@@ -1,0 +1,9 @@
+﻿  ArrayQueue.cpp
+  ConsoleApplication1.cpp
+c:\git_public\_자료구조,알고리즘 공부\15차_원형큐 기반 시뮬레이션\consoleapplication1\consoleapplication1\consoleapplication1.cpp(30): warning C4244: '인수': 'time_t'에서 'unsigned int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  6 of 17 functions (35.3%) were compiled, the rest were copied from previous compilation.
+  코드를 생성했습니다.
+    0 functions were new in current compilation
+    6 functions had inline decision re-evaluated but remain unchanged
+  ConsoleApplication1.vcxproj -> C:\Git_Public\_자료구조,알고리즘 공부\15차_원형큐 기반 시뮬레이션\ConsoleApplication1\Release\ConsoleApplication1.exe
