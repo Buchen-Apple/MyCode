@@ -1,1 +1,8 @@
-﻿  Red_Black_Tree.vcxproj -> C:\Users\procademy\source\repos\알고리즘,자료구조\5차과제_Red Black Tree(삭제추가)_완\Red_Black_Tree\x64\Release\Red_Black_Tree.exe
+﻿  소스.cpp
+c:\git_public\5_알고리즘,자료구조\5차과제_red black tree(삭제추가)_완\red_black_tree\red_black_tree\소스.cpp(83): warning C4244: '인수': 'time_t'에서 'unsigned int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+  코드를 생성하고 있습니다.
+  코드를 생성했습니다.
+  1 of 18 functions ( 5.6%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
+  Red_Black_Tree.vcxproj -> C:\Git_Public\5_알고리즘,자료구조\5차과제_Red Black Tree(삭제추가)_완\Red_Black_Tree\x64\Release\Red_Black_Tree.exe
