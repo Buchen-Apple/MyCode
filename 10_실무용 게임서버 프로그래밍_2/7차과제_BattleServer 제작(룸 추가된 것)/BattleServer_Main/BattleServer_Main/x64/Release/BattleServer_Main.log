@@ -10,6 +10,7 @@
   PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
   ProtocolBuff_ObjectPool.cpp
+  ContentsData.cpp
   RingBuff.cpp
   BattleServer_Main.cpp
   BattleServer_Room_Version.cpp

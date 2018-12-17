@@ -21,10 +21,7 @@ namespace Library_Jingyu
 		INT64 m_i64UniqueKey;
 
 		// Player 포인터
-		LPVOID pPointer;	
-
-		// 직렬화 버퍼 포인터
-		CProtocolBuff_Net* m_pBuff;
+		LPVOID pPointer;
 		TCHAR m_tcResponse[200];
 
 		INT64 AccountNo;

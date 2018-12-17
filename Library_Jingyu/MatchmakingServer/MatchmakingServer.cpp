@@ -1158,7 +1158,6 @@ namespace Library_Jingyu
 
 		SendBuff->PutData((char*)&Type, 2);
 		SendBuff->PutData((char*)&NowPlayer->m_ui64ClientKey, 8);
-		SendBuff->PutData((char*)&NowPlayer->m_i64AccountNo, 8);
 
 		// 3. 데이터 Send
 		SendPacket(m_ullClientID, SendBuff);
@@ -1259,6 +1258,7 @@ namespace Library_Jingyu
 
 		SendBuff->PutData((char*)&ChatServerIP, 32);
 		SendBuff->PutData((char*)&ChatServerPort, 2);
+		SendBuff->PutData((char*)&ClinetKey, 8);
 
 
 		// 6. 클라에게 보내기 (Net으로 보내기)

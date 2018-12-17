@@ -1,7 +1,56 @@
-#ifndef __GODDAMNBUG_ONLINE_PROTOCOL__
-#define __GODDAMNBUG_ONLINE_PROTOCOL__
+//#ifndef __GODDAMNBUG_ONLINE_PROTOCOL__
+//#define __GODDAMNBUG_ONLINE_PROTOCOL__
 
 /*
+- 2018.12.11
+
+
+	# 변경 en_PACKET_MAT_MAS_REQ_GAME_ROOM,
+	
+		삭제		UINT64	AccountNo			
+
+		매칭서버가 마스터 서버에게 방배정 요청시 AccountNo 정보를 삭제함.
+		AccountNo 로 구분하지 않고, ClientKey 만 가지고 구분하도록 함.
+
+
+	# 변경 en_PACKET_CS_MATCH_RES_GAME_ROOM,
+
+		추가		INT64	ClientKey
+
+		매칭서버가 클라이언트에게 방배정 정보를 줄때 매칭서버에서 생성시킨
+		ClientKey 를 같이 보내줌.
+
+		클라이언트는 이를 가지고 배틀서버로 들어감.
+
+
+	# 변경 en_PACKET_CS_GAME_REQ_LOGIN,
+
+		추가		INT64	ClientKey
+
+		클라이언트가 배틀서버에 로그인시 자신의 ClientKey 를 들고 들어감
+		ClientKey 는 매칭서버에서 받았음.
+
+
+	# 변경 en_PACKET_BAT_MAS_REQ_LEFT_USER,
+	
+		삭제		INT64	AccountNo
+		추가		INT64	ClientKey
+
+		배틀서버 대기방에서 유저 퇴장시에
+		마스터 서버에게 주던 AccountNo 를 ClientKey 로 변경
+
+
+
+
+
+- 2018.10.30
+
+	# 추가 en_PACKET_CS_GAME_RES_REDZONE_ALERT_FINAL,
+	# 추가 en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_FINAL,
+
+		마지막 레드존 컨텐츠 패킷 추가
+
+
 
 - 2018.10.14
 
@@ -287,6 +336,8 @@ enum en_PACKET_TYPE
 	//
 	//		char	ConnectToken[32]
 	//		UINT	Ver_Code
+	//
+	//		INT64	ClientKey
 	//	}
 	//
 	//	배틀서버로 로그인 시 사용자의 SessionKey 확인과 ConnectToken 을 확인 한다.
@@ -299,6 +350,7 @@ enum en_PACKET_TYPE
 	//	유저가 방 입장 후 게임플레이 전환 전 까지는 계속 AUTH 스레드에 머물도록 한다.
 	//
 	//  배틀서버 버전코드 들어감.  단순 숫자가 아니며 고유한 코드값.
+	//	클라이언트는 매칭서버에서 받은 ClientKey 를 들고가므로 배틀역시 ClientKey 를 관리 한다.
 	//------------------------------------------------------------
 	en_PACKET_CS_GAME_REQ_LOGIN,
 
@@ -888,6 +940,22 @@ enum en_PACKET_TYPE
 	en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_RIGHT,
 	en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_BOTTOM,
 
+
+	//------------------------------------------------------------
+	// 마지막 RedZone 경고
+	//
+	//	{
+	//		WORD	Type
+	//
+	//		BYTE	AlertTimeSec
+	//		BYTE	RedZoneType			// 마지막 레드존 타입. (1,2,3,4)
+	//	}
+	//
+	//  4개 레드존 구역이 활성화 된 40초 뒤에  20초 후 마지막 레드존 활성화 경고가 발생
+	//  마지막 레드존은 Type1,2,3,4 중 1개만 활성화.
+	//------------------------------------------------------------
+	en_PACKET_CS_GAME_RES_REDZONE_ALERT_FINAL,
+
 	//------------------------------------------------------------
 	// 마지막 RedZone 활성화
 	//
@@ -898,7 +966,7 @@ enum en_PACKET_TYPE
 	//	}
 	//
 	//  가장 마지막에 추가되는 Final 
-	//	이후 부터는 해당구역의 플레이어에게 1초마다 1데미지를 먹임. (en_PACKET_CS_GAME_RES_REDZONE_DAMAGE)
+	//	이후 부터는 기존 레드존 처리를 무시하고 해당구역 외의 플레이어에게 1초마다 1데미지를 먹임. (en_PACKET_CS_GAME_RES_REDZONE_DAMAGE)
 	//------------------------------------------------------------
 	en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_FINAL,
 
@@ -1250,11 +1318,15 @@ enum en_PACKET_TYPE
 	//
 	//		WCHAR	ChatServerIP[16]
 	//		WORD	ChatServerPort
+	//
+	//		INT64	ClientKey
 	//	}
 	//
 	//	배틀서버 관련 정보는 배틀서버가 마스터 서버에게 전달한 정보이며
 	//	매치메이킹 서버는 마스터 서버에게서 이를 받아 클라이언트 에게 전달 한다.
 	//
+	//	클라이언트도 자신의 고유한 ClientKey 를 받도록 한다.
+	//	이 ClientKey 는 클라이언트가 배틀서버 입장시 배틀서버에게 전달 한다.
 	//------------------------------------------------------------
 	en_PACKET_CS_MATCH_RES_GAME_ROOM,
 
@@ -1287,8 +1359,7 @@ enum en_PACKET_TYPE
 	//		WORD	Type
 	//	}
 	//
-	//	매치메이킹 서버는 위의 방 입장 성공 패킷을 받으면 마스터 서버에게 이를 전달 한 뒤에
-	//	마스터 서버로부터 회신이 오면 클라이언트에게 결과를 보내준다.
+	//	매치메이킹 서버는 위의 방 입장 성공 패킷을 받으면 마스터 서버에게 이를 전달
 	//
 	//	이 패킷을 받으면 클라이언트는 매치메이킹 서버와의 연결을 끊게 된다.
 	//	굳이 RES 확인 패킷이 있는 이유는, 클라이언트가 일방적으로 보내고 끊어 버리면 
@@ -1377,12 +1448,11 @@ enum en_PACKET_TYPE
 	//		WORD	Type
 	//
 	//		UINT64	ClientKey			클라이언트 고유 키 (매치메이킹 서버가 생성한 클라이언트 유니크 키)
-	//		UINT64	AccountNo			
 	//	}
 	//
 	//	매치메이킹 서버는 클라이언트에게 게임방 정보 요청을 받으면, 이 패킷을 마스터 서버에게 보냄
-	//
-	//	AccountNo 도 추가 함.  마스터 서버는 ClientKey 와 AccountNo 를 쌍으로 관리 사용한다.
+	//  매치메이킹 서버는 해당 클라이언트를 유니크하게 구분할 수 있는 ClientKey 를 생성하며
+	//	마스터 서버 - 배틀서버 간에 이 ClientKey 를 사용하여 관리함.
 	//------------------------------------------------------------
 	en_PACKET_MAT_MAS_REQ_GAME_ROOM,
 
@@ -1411,9 +1481,12 @@ enum en_PACKET_TYPE
 	//
 	//
 	//	마스터 서버는 입장 가능한 게임방이 있는경우 즉각 결과를 알려주지만
-	//	지금 대기 방이 없다면, 적절한 배틀서버 에게 방생성을 요청하게 됨
-	//	이때는 '방 정보 얻기 실패' 패킷을 돌려준다. 매치메이킹 서버는 이 정보를 그대로 클라이언트 에게 전달하며
+	//	지금 대기 방이 없다면, '방 정보 얻기 실패' 패킷을 돌려준다. 
+	//
+	//	매치메이킹 서버는 이 정보를 그대로 클라이언트 에게 전달하며
 	//	방 얻기 실패시 클라이언트는 일정시간 후 재 시도를 하게 될 것이다.
+	//
+	//	
 	//------------------------------------------------------------
 	en_PACKET_MAT_MAS_RES_GAME_ROOM,
 	
@@ -1646,7 +1719,7 @@ enum en_PACKET_TYPE
 	//		WORD	Type
 	//
 	//		int		RoomNo
-	//		INT64	AccountNo
+	//		INT64	ClientKey				// 나간 사용자 구분용
 	//		UINT	ReqSequence				// 메시지 시퀀스 번호 (REQ / RES 짝맞춤 용도)
 	//	}
 	//
@@ -1656,20 +1729,8 @@ enum en_PACKET_TYPE
 	//	그러므로 유저가 나갈 경우에만 배틀서버 -> 마스터서버 로 전달 한다.
 	//
 	//	현재 인원의 수치를 전달 하는것이 아닌 -1 값을 보내는 의미이므로 마스터서버는 
-	//	해당 방 배정가능 인원을 +1 시켜주면 됨.
+	//	해당 방에 배정된 ClientKey 를 확인하여 해당 인원을 차감(가용유저 증가) 시켜주면 됨.
 	//
-	//
-	//	AccoutNo 추가 > 나간 실제 사용자 AccountNo 를 넣어서 마스터에서는 해당 유저 유무를 확인하여
-	//	인원 -1 차감을 하도록 한다.
-	//
-	// 사용자가 방 배정 받은 후,  매칭/배틀에 연결된 상태에서 배틀에 방 입장을 요청한 뒤에 바로 연결을 끊어버리면
-	// 1. 매칭 -> 마스터  에게 사용자 입장실패 전달 en_PACKET_MAT_MAS_REQ_ROOM_ENTER_FAIL
-	// 2. 배틀 -> 마스터  에게 사용자 나감 전달 en_PACKET_BAT_MAS_REQ_LEFT_USER
-	//
-	// 이 상황으로 방 하나에 -2 가 차감되는 상황 발생 가능.  그리하여 AccountNO 추가 됨.
-	//
-	// 마스터서버는 각 유저의 고유 값으로 ClientKey 를 사용하지만, Battle 서버는 ClientKey 를 모르기 때문에
-	// Battle 서버는 AccountNo 로 구분하여 사용한다.
 	//------------------------------------------------------------
 	en_PACKET_BAT_MAS_REQ_LEFT_USER,
 
@@ -1702,6 +1763,7 @@ enum en_PACKET_TYPE
 	// 채팅 -> 배틀 Request
 	// 배틀 -> 채팅 Response 
 	// 
+	// 기본은 그러하나 꼭 REQ / RES 방향이 맞지 않음. 주석참고
 
 	//------------------------------------------------------------
 	//	채팅서버가 배틀서버에게 서버 켜짐 알림
@@ -1734,7 +1796,7 @@ enum en_PACKET_TYPE
 
 
 	//------------------------------------------------------------
-	//	배틀서버의 연결토큰 재발행 채팅서버에게 알림.
+	//	배틀서버의 연결토큰 재발행 채팅서버에게 알림.  (배틀 -> 채팅)
 	//
 	//	{
 	//		WORD	Type
@@ -1748,7 +1810,7 @@ enum en_PACKET_TYPE
 	en_PACKET_CHAT_BAT_REQ_CONNECT_TOKEN,
 
 	//------------------------------------------------------------
-	//	배틀서버의 연결토큰 재발행 수신 확인
+	//	배틀서버의 연결토큰 재발행 수신 확인	(채팅 -> 배틀)
 	//
 	//	{
 	//		WORD	Type
@@ -1763,7 +1825,7 @@ enum en_PACKET_TYPE
 
 
 	//------------------------------------------------------------
-	//	배틀 서버의 신규 대기 방 생성 채팅서버에게 알림
+	//	배틀 서버의 신규 대기 방 생성 채팅서버에게 알림  (배틀 -> 채팅)
 	//
 	//	{
 	//		WORD	Type
@@ -1782,7 +1844,7 @@ enum en_PACKET_TYPE
 	en_PACKET_CHAT_BAT_REQ_CREATED_ROOM,
 	 
 	//------------------------------------------------------------
-	//	배틀 서버의 신규 대기 방 생성 수신 응답
+	//	배틀 서버의 신규 대기 방 생성 수신 응답	(채팅 -> 배틀)
 	//
 	//	{
 	//		WORD	Type
@@ -2090,4 +2152,4 @@ enum en_PACKET_SS_MONITOR_DATA_UPDATE
 
 
 
-#endif	// !__GODDAMNBUG_ONLINE_PROTOCOL__
+//#endif

@@ -74,5 +74,8 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanServer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Protocol_Set\ContentsData.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

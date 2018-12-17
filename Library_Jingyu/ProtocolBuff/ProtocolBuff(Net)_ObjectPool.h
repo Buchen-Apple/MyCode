@@ -49,13 +49,27 @@ namespace Library_Jingyu
 		// 문제 생길 시 Crash 발생시킬 덤프.
 		static CCrashDump* m_Dump;
 
+	public:
+		// 인코딩2
+		// 보내기 전에, 헤더를 넣는다. 이 때 암호화후 넣는다.
+		//
+		// Parameter : 헤더코드, XORCode(고정 XOR코드)
+		void Encode2(BYTE bCode, BYTE bXORCode);
+
+		// 디코딩2
+		// 네트워크로 받은 패킷 중, 헤더를 해석한다.
+		//
+		// Parameter : 페이로드 길이, 랜덤xor코드, 체크썸, XORCode
+		// return : CheckSum이 다를 시 false
+		bool Decode2(WORD PayloadLen, BYTE RandXORCode, BYTE CheckSum, BYTE bXORCode);
+
 	private:
 		// 인코딩
 		// 보내기 전에, 헤더를 넣는다. 이 때 암호화 후 넣는다.
 		//
 		// Parameter : 헤더 코드, XORCode1, XORCode2
 		// return : 없음
-		void Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2);
+		void Encode(BYTE bCode, BYTE bXORCode_1, BYTE bXORCode_2);		
 
 		// 디코딩
 		// 네트워크로 받은 패킷 중, 헤더를 해석한다.

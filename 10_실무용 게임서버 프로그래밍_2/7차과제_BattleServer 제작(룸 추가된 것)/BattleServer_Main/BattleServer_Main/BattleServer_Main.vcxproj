@@ -175,6 +175,7 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\PDHClass\PDHCheck.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\Protocol_Set\ContentsData.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />
     <ClCompile Include="BattleServer_Main.cpp" />
     <ClCompile Include="BattleServer_Room_Version.cpp" />

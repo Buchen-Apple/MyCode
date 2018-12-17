@@ -47,6 +47,9 @@ namespace Library_Jingyu
 			// 닉네임
 			TCHAR m_tcNickName[20];
 
+			// 세션키
+			char m_cSessionKey[64];
+
 			// 유저의 ClientKey
 			// 매칭서버가 발급.
 			// 유저 모두에게 고유
@@ -280,6 +283,23 @@ namespace Library_Jingyu
 		// 방 구조체
 		struct stRoom
 		{
+			// 아이템 타입
+			enum eu_ITEM_TYPE
+			{
+				CARTRIDGE = 0,	// 탄창
+				HELMET = 1,		// 헬멧
+				MEDKIT = 2		// 메드킷
+			};
+
+			// 아이템 구조체
+			struct stRoomItem
+			{
+				UINT m_uiID;
+				eu_ITEM_TYPE m_euType;
+				float m_fPosX;
+				float m_fPosY;
+			};			
+
 			// 배틀서버 번호
 			int m_iBattleServerNo;
 
@@ -306,7 +326,7 @@ namespace Library_Jingyu
 
 			// Play상태로 변경을 위한 카운트 다운. 밀리세컨드 단위
 			// timeGetTime()의 값이 들어간다.
-			DWORD m_dwCountDown;
+			DWORD m_dwCountDown;			
 
 			// ------------
 
@@ -327,9 +347,7 @@ namespace Library_Jingyu
 			bool m_bShutdownFlag;
 
 			// 방 입장 토큰 (배틀서버 입장 토큰과는 다름)
-			char m_cEnterToken[32];		
-
-
+			char m_cEnterToken[32];	
 
 			// ------------
 
@@ -337,7 +355,22 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 5;		
+			const int m_iMaxJoinCount = 5;	
+
+			// ------------
+
+			// 방 별로, 고유하게 아이템ID를 부여하기 위한 변수.
+			// 아이템 생성 시 ++한다.
+			UINT m_uiItemID;
+			
+			// 아이템 구조체 관리 메모리풀 TLS
+			CMemoryPoolTLS<stRoomItem> *m_Item_Pool;
+
+			// 해당 방에 생성된 아이템 자료구조
+			// Key : ItemID, Value : stRoomTiem*
+			unordered_map<UINT, stRoomItem*> m_RoomItem_umap;
+
+			// ------------
 
 			CBattleServer_Room* m_pBattleServer;
 
@@ -403,6 +436,10 @@ namespace Library_Jingyu
 			// Parameter : 없음
 			// return : 없음
 			void RecodeSend();
+
+			// 해당 방에, 아이템 생성 (최초 게임 시작 시 생성)
+			// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
+			void CreateItem();
 			
 
 
@@ -429,6 +466,17 @@ namespace Library_Jingyu
 			// return : 성공 시 true
 			//		  : 실패 시  false
 			bool Erase(CGameSession* InsertPlayer);
+
+
+			// ------------
+			// 아이템 자료구조 함수
+			// ------------
+
+			// 아이템 자료구조에 Insert
+			//
+			// Parameter : ItemID, stRoomItem*
+			// return : 없음
+			void Item_Insert(UINT ID, stRoomItem* InsertItem);
 
 		};
 
@@ -975,9 +1023,9 @@ namespace Library_Jingyu
 
 		// 마스터에게, 방 퇴장 패킷 보내기
 		//
-		// Parameter : RoomNo, AccountNo
+		// Parameter : RoomNo, ClientKey
 		// return : 없음
-		void Packet_RoomLeave_Req(int RoomNo, INT64 AccountNo);
+		void Packet_RoomLeave_Req(int RoomNo, INT64 ClientKey);
 
 
 
