@@ -35,8 +35,7 @@ namespace Library_Jingyu
 			int ActiveWorker;
 			int CreateAccept;
 			int HeadCode;
-			int XORCode1;
-			int XORCode2;
+			int XORCode;
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;
@@ -76,10 +75,14 @@ namespace Library_Jingyu
 			// 방 접속 성공 패킷을 받았는지 체크. true면 받음
 			bool m_bBattleRoomEnterCheck;
 
+			// 마스터 서버로부터 방 정보를, 정상적으로 받은 유저. true면 받음
+			bool m_bRoomInfoOK;
+
 			stPlayer()
 			{
 				m_bLoginCheck = false;	// 최초 생성시에는 flase로 시작
 				m_bBattleRoomEnterCheck = false;	// 최초 생성시에는 flase로 시작
+				m_bRoomInfoOK = false;
 			}
 		};
 		

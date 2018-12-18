@@ -130,12 +130,12 @@ namespace Library_Jingyu
 	// -----------------------------
 
 	// 서버 시작
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 코드] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
 	bool CNetServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
-							BYTE Code, BYTE XORCode1, BYTE XORCode2)
+							BYTE Code, BYTE XORCode)
 	{		
 
 		// 카운트 변수 0으로 초기화
@@ -148,8 +148,7 @@ namespace Library_Jingyu
 
 		// Config 데이터 셋팅
 		m_bCode = Code;
-		m_bXORCode_1 = XORCode1;
-		m_bXORCode_2 = XORCode2;
+		m_bXORCode = XORCode;
 
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
@@ -521,7 +520,7 @@ namespace Library_Jingyu
 			NowSession->m_LastPacket = payloadBuff;				
 
 		// 3. 헤더를 넣어 패킷 완성
-		payloadBuff->Encode(m_bCode, m_bXORCode_1, m_bXORCode_2);
+		payloadBuff->Encode2(m_bCode, m_bXORCode);
 
 		// 4. 인큐. 패킷의 "주소"를 인큐한다(8바이트)
 		// 직렬화 버퍼 레퍼런스 카운트 1 증가
@@ -1299,7 +1298,8 @@ namespace Library_Jingyu
 			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 10. 헤더 Decode
-			if (PayloadBuff->Decode(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
+			//if (PayloadBuff->Decode(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode2(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode) == false)
 			{
 				// 할당받은 패킷 Free
 				CProtocolBuff_Net::Free(PayloadBuff);

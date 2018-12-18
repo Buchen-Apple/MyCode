@@ -730,9 +730,8 @@ namespace Library_Jingyu
 
 					}
 
-					// 5회 시도했는데도 안됐으면, 다음에 시도.
-					ConnectTryCount++;
-					if (ConnectTryCount == 1)
+					// 5회 시도했는데도 안됐으면, 다음에 시도.					
+					if (ConnectTryCount == 5)
 					{
 						closesocket(m_stSession.m_Client_sock);						
 
@@ -745,11 +744,13 @@ namespace Library_Jingyu
 					// 5회가 안됐으면 다시 접속 시도.
 					Sleep(0);
 					continue;
-				}
+				}				
 
 				// 이미 연결이 되었다면 break;
 				else if (Check == WSAEISCONN)
-					break;
+					break;		
+
+				ConnectTryCount++;
 			}
 
 			// ------------------			

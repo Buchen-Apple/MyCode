@@ -32,6 +32,14 @@ namespace Library_Jingyu
 		// 이너 클래스
 		// -----------------------
 
+		// 아이템 타입
+		enum eu_ITEM_TYPE
+		{
+			CARTRIDGE = 0,	// 탄창
+			HELMET = 1,		// 헬멧
+			MEDKIT = 2		// 메드킷
+		};
+
 		// CMMOServer의 cSession을 상속받는 세션 클래스
 		class CGameSession :public CMMOServer::cSession
 		{
@@ -233,6 +241,18 @@ namespace Library_Jingyu
 			// Parameter : CProtocolBuff_Net*
 			// return : 없음
 			void Game_KickDamage_Packet(CProtocolBuff_Net* Packet);
+
+			// Reload Request
+			//
+			// Parameter : CProtocolBuff_Net*
+			// return : 없음
+			void Game_Reload_Packet(CProtocolBuff_Net* Packet);
+
+			// 아이템 획득 요청
+			//
+			// Parameter : CProtocolBuff_Net*, 아이템의 Type
+			// return : 없음
+			void Game_GetItem_Packet(CProtocolBuff_Net* Packet, int Type);	
 		};
 
 		friend class CGameSession;
@@ -283,14 +303,6 @@ namespace Library_Jingyu
 		// 방 구조체
 		struct stRoom
 		{
-			// 아이템 타입
-			enum eu_ITEM_TYPE
-			{
-				CARTRIDGE = 0,	// 탄창
-				HELMET = 1,		// 헬멧
-				MEDKIT = 2		// 메드킷
-			};
-
 			// 아이템 구조체
 			struct stRoomItem
 			{
@@ -439,7 +451,17 @@ namespace Library_Jingyu
 
 			// 해당 방에, 아이템 생성 (최초 게임 시작 시 생성)
 			// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
-			void CreateItem();
+			//
+			// Parameter : 없음
+			// return : 없음
+			void StartCreateItem();
+
+			// 해당 방에, 아이템 1개 생성 (유저 사망 시 생성)
+			// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
+			//
+			// Parameter : CGameSession* (사망한 유저)
+			// return : 없음
+			void CreateItem(CGameSession* DiePlayer);
 			
 
 
@@ -477,6 +499,20 @@ namespace Library_Jingyu
 			// Parameter : ItemID, stRoomItem*
 			// return : 없음
 			void Item_Insert(UINT ID, stRoomItem* InsertItem);
+
+			// 아이템 자료구조에 아이템이 있나 체크
+			//
+			// Parameter : itemID
+			// return : 찾은 아이템의 stRoomItem*
+			//		  : 아이템이 없을 시 nullptr
+			stRoomItem* Item_Find(UINT ID);
+
+			// 아이템 자료구조에서 Erase
+			//
+			// Parameter : 제거하고자 하는 stRoomItem*
+			// return : 성공 시 true
+			//		  : 실패 시  false
+			bool Item_Erase(stRoomItem* InsertPlayer);
 
 		};
 
@@ -606,6 +642,9 @@ namespace Library_Jingyu
 
 		// Play 방 수
 		LONG m_lPlayRoomCount;
+
+		// 총알 공격 시 유저에게 입혀야하는 데미지(거리 1당 데미지)
+		float m_fFire1_Damage;
 
 
 		
@@ -740,6 +779,12 @@ namespace Library_Jingyu
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
 
+		// 총알 데미지 계산 시 사용되는 함수 (발차기 계산시에는 사용되지 않음.)
+		// 실제 감소시켜야 하는 HP를 계산한다.
+		//
+		// Parameter : 공격자와 피해자의 거리
+		// return : 감소시켜야하는 HP
+		int GetDamage(float Range);
 		
 
 	private:

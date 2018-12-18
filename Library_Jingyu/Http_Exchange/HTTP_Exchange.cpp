@@ -123,7 +123,12 @@ namespace Library_Jingyu
 		// 웹 서버로 연결하기
 		// -------------
 		SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		HTTP_Connect(sock);		   		 
+
+		// 내부에서는 Connect를 1회만 시도해 본다.
+		// 실패하면 밖으로 false던진다.
+		// 밖에서 일정 횟수만큼 HTTP_ReqANDRes() 함수를 호출해보는 형태로 로직 진행해야 함.
+		if (HTTP_Connect(sock) == false)
+			return false;
 
 
 
@@ -158,8 +163,6 @@ namespace Library_Jingyu
 		// -----------------
 		if (send(sock, utf8_HTTP_Data, (int)strlen(utf8_HTTP_Data), 0) == SOCKET_ERROR)
 		{
-			_tprintf(L"send Fail...(%d)\n", WSAGetLastError());
-
 			closesocket(sock);
 			g_HTTP_Dump->Crash();
 			return false;
@@ -175,7 +178,6 @@ namespace Library_Jingyu
 		if (HTTP_Recv(sock, Json_Buff, 2000) == false)
 		{
 			closesocket(sock);
-			g_HTTP_Dump->Crash();
 			return false;
 		}
 
@@ -252,9 +254,6 @@ namespace Library_Jingyu
 			LONG Check = recv(sock, recvBuff, 1024, 0);
 			if (Check == SOCKET_ERROR)
 			{
-				LONG Error = WSAGetLastError();
-				_tprintf(L"recv Fail...(%d)\n", Error);
-				g_HTTP_Dump->Crash();
 				return false;
 			}
 
@@ -317,7 +316,7 @@ namespace Library_Jingyu
 			int Content_Length = atoi(LengthString);
 
 			if (Content_Length == 0)
-				g_HTTP_Dump->Crash();
+				return false;
 
 			// HeaderEndPtr에는 헤더의 끝(\r\n\r\n)부터 들어있다.
 			// 즉, Content_Length + 4 만큼 length가 있어야 한다.
@@ -338,9 +337,7 @@ namespace Library_Jingyu
 			break;
 		}
 
-
 		return true;
-
 	}
 
 
@@ -368,6 +365,46 @@ namespace Library_Jingyu
 		clientaddr.sin_port = htons(m_usServer_Port);
 		InetPton(AF_INET, m_tIP, &clientaddr.sin_addr.S_un.S_addr);
 
+		// connect 시도
+		connect(sock, (SOCKADDR*)&clientaddr, sizeof(clientaddr));
+
+		DWORD Check = WSAGetLastError();
+
+		// 이미 연결된 경우
+		if (Check == WSAEISCONN)
+		{
+			return true;
+		}
+
+		// 우드블럭이 뜬 경우
+		else if (Check == WSAEWOULDBLOCK)
+		{
+			// 쓰기셋, 예외셋, 셋팅
+			FD_SET wset;
+			FD_SET exset;
+			wset.fd_count = 0;
+			exset.fd_count = 0;
+
+			wset.fd_array[wset.fd_count] = sock;
+			wset.fd_count++;
+
+			exset.fd_array[exset.fd_count] = sock;
+			exset.fd_count++;
+
+			// timeval 셋팅. 500m/s  대기
+			TIMEVAL tval;
+			tval.tv_sec = 0;
+			tval.tv_usec = 500000;
+
+			// Select()
+			DWORD retval = select(0, 0, &wset, &exset, &tval);
+
+			// 쓰기셋에 반응온 것이 아니면 무조건 false 리턴
+			if (wset.fd_count <= 0)
+				return false;
+		}
+		
+		/*
 		// connect 시도
 		int iReConnectCount = 0;
 		while (1)
@@ -463,6 +500,7 @@ namespace Library_Jingyu
 
 			}			
 		}
+		*/
 
 		// -------------
 		// 다시 소켓을 블락으로 변경
@@ -470,14 +508,10 @@ namespace Library_Jingyu
 		on = 0;
 		if (ioctlsocket(sock, FIONBIO, &on) == SOCKET_ERROR)
 		{
-			printf("NoneBlock Change Fail...\n");
-
 			closesocket(sock);
 			g_HTTP_Dump->Crash();
 			return false;
 		}
-
-
 
 		// -------------
 		// Time_Wait을 남기지 않기 위해 Linger옵션 설정.
@@ -487,8 +521,6 @@ namespace Library_Jingyu
 		optval.l_linger = 0;
 		if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (char*)&optval, sizeof(optval)) == SOCKET_ERROR)
 		{
-			printf("Linger Fail...\n");
-
 			closesocket(sock);
 			g_HTTP_Dump->Crash();
 			return false;

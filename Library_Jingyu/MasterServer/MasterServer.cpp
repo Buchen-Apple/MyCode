@@ -350,8 +350,9 @@ namespace Library_Jingyu
 			ReleaseSRWLockExclusive(&m_srwl_MatchServer_Umap);		// ------- Exclusive 언락
 			return false;
 		}
-		return true;
 
+		ReleaseSRWLockExclusive(&m_srwl_MatchServer_Umap);		// ------- Exclusive 언락
+		return true;
 	}
 
 
@@ -493,7 +494,7 @@ namespace Library_Jingyu
 		Payload->GetData(MasterToken, 32);
 
 		// 2. 입장 토큰키 비교.		
-		if (memcmp(MasterToken, m_stConfig.BattleEnterToken, 32) != 0)
+		if (memcmp(MasterToken, m_stConfig.EnterToken, 32) != 0)
 		{
 			InterlockedIncrement(&m_lMatch_TokenError);
 
@@ -662,7 +663,7 @@ namespace Library_Jingyu
 		UINT64 ClinetKey;
 		Payload->GetData((char*)&ClinetKey, 8);
 
-		// ------------ 배틀 랜 서버의 자료구조에서 삭제
+		// ------------ 배틀 랜 서버의 자료구조에서 삭제		
 		// 1. 배틀의 함수 호출.
 		// Room을 체크해 카운트 증감처리
 		// 내부에서 stPlayer*를 Free까지 한다.

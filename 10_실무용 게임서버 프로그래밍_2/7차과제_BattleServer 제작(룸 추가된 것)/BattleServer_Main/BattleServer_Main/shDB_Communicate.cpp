@@ -73,8 +73,14 @@ namespace Library_Jingyu
 				swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", NowWork->AccountNo);
 
 				// 2. http 통신 및 결과 얻기
-				if (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, NowWork->m_tcResponse) == false)
-					gThis->m_Dump->Crash();
+				int TryCount = 5;
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, NowWork->m_tcResponse) == false)
+				{
+					TryCount--;
+
+					if(TryCount == 0)
+						gThis->m_Dump->Crash();
+				}					
 
 				// 3. Read 완료 큐에 넣기
 				m_pComQueue->Enqueue(pWork);
@@ -97,8 +103,14 @@ namespace Library_Jingyu
 				swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", NowWork->AccountNo);
 
 				// 2. http 통신 및 결과 얻기
-				if (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_contents.php"), Body, NowWork->m_tcResponse) == false)
-					gThis->m_Dump->Crash();
+				int TryCount = 5;
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_contents.php"), Body, NowWork->m_tcResponse) == false)
+				{
+					TryCount--;
+
+					if (TryCount == 0)
+						gThis->m_Dump->Crash();
+				}
 
 				// 3. Read 완료 큐에 넣기
 				m_pComQueue->Enqueue(pWork);
@@ -176,6 +188,161 @@ namespace Library_Jingyu
 				if (pWorkerQueue->Dequeue(pWork) == -1)
 					gThis->m_Dump->Crash();
 
+				// 2. 일감 타입에 따라 로직 처리
+				switch (pWork->m_wWorkType)
+				{
+					// 플레이 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_PLAYCOUNT* NowWork = (DB_WORK_CONTENT_UPDATE_PLAYCOUNT*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"playcount\" : \"%d\"}",	NowWork->AccountNo, NowWork->m_iRecord_PlayCount);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					// 3. Write 완료 큐에 넣기
+					pEndQueue->Enqueue(pWork);
+				}
+					break;
+
+					// 플레이 시간 저장
+				case eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_PLAYTIME* NowWork = (DB_WORK_CONTENT_UPDATE_PLAYTIME*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"playtime\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iRecord_PlayTime);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					// 3. Write 완료 큐에 넣기
+					pEndQueue->Enqueue(pWork);
+				}
+					break;
+
+					// 킬 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_KILL_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_KILL* NowWork = (DB_WORK_CONTENT_UPDATE_KILL*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"kill\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iRecord_Kill);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					// 3. Write 완료 큐에 넣기
+					pEndQueue->Enqueue(pWork);
+
+				}
+					break;
+
+					// 사망 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_DIE_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_DIE* NowWork = (DB_WORK_CONTENT_UPDATE_DIE*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"die\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iRecord_Die);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					// 3. Write 완료 큐에 넣기
+					pEndQueue->Enqueue(pWork);
+
+				}
+					break;
+
+					// 승리 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_WIN_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_WIN* NowWork = (DB_WORK_CONTENT_UPDATE_WIN*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"wind\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iRecord_Win);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					// 3. Write 완료 큐에 넣기
+					pEndQueue->Enqueue(pWork);
+				}
+					break;
+
+				default:
+					gThis->m_Dump->Crash();
+				}
+
+				/*
 				// 2. API 타입에 따라 로직 처리
 				switch (pWork->m_wAPIType)
 				{
@@ -195,25 +362,23 @@ namespace Library_Jingyu
 						NowWork->AccountNo, NowWork->m_iRecord_PlayTime, NowWork->m_iRecord_PlayCount, NowWork->m_iRecord_Kill, NowWork->m_iRecord_Die, NowWork->m_iRecord_Win);
 
 					// 2. HTTP 통신
-					if (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
 					{
-						printf("fail...\n");
-						gThis->m_Dump->Crash();
-					}
+						TryCount--;
+
+						if(TryCount == 0)
+							gThis->m_Dump->Crash();
+					}	
 
 					// 3. Write 완료 큐에 넣기
 					pEndQueue->Enqueue(pWork);
 				}
 					break;
-
-					// 없는 타입이면 크래시
-				default:
-					gThis->m_Dump->Crash();
-					break;
 				}
-
-			}
-
+					*/
+				
+				}
 
 		}
 
@@ -241,13 +406,12 @@ namespace Library_Jingyu
 	// DB에 Write 할 것이 있을 때 호출되는 함수.
 	// 인자로 받은 구조체의 정보를 확인해 로직 처리
 	//
-	// Parameter : DB_WORK*, APIType
+	// Parameter : DB_WORK*
 	// return : 없음
-	void shDB_Communicate::DBWriteFunc(DB_WORK* Protocol, WORD APIType)
+	void shDB_Communicate::DBWriteFunc(DB_WORK* Protocol)
 	{
 		// Wirte용 스레드에게 일감 던짐 (Normal Q 사용)
 		DB_WORK_CONTENT_UPDATE* Temp = (DB_WORK_CONTENT_UPDATE*)Protocol;
-		Temp->m_wAPIType = APIType;
 
 		m_pDB_Wirte_Start_Queue->Enqueue(Protocol);
 

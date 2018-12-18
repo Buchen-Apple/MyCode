@@ -99,12 +99,8 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->HeadCode) == false)
 			return false;
 
-		// xorcode1
-		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode1) == false)
-			return false;
-
-		// xorcode2
-		if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->XORCode2) == false)
+		// xorcode
+		if (Parser.GetValue_Int(_T("XorCode"), &pConfig->XORCode) == false)
 			return false;
 
 		// Nodelay
@@ -541,9 +537,18 @@ namespace Library_Jingyu
 		ZeroMemory(RequestBody, sizeof(RequestBody));
 		ZeroMemory(Body, sizeof(Body));
 
+		int TryCount = 5;
 		swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", AccountNo);
-		if (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, RequestBody) == false)
-			gMatchServerDump->Crash();
+
+		while (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, RequestBody) == false)
+		{
+			TryCount--;
+			if (TryCount == 0)
+				gMatchServerDump->Crash();
+
+			Sleep(1);
+		}
+		
 
 		// Json데이터 파싱하기 (UTF-16)
 		GenericDocument<UTF16<>> Doc;
@@ -697,8 +702,7 @@ namespace Library_Jingyu
 		// 5. 마스터에게 Send
 		m_pLanClient->SendPacket(m_pLanClient->m_ullClientID, SendBuff);
 	}
-
-
+	
 	// 방 입장 실패
 	// 마스터에게 방 입장 실패 패킷 보냄
 	//
@@ -761,7 +765,7 @@ namespace Library_Jingyu
 
 		// ------------------- 넷서버 가동
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser,
-			m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
+			m_stConfig.HeadCode, m_stConfig.XORCode) == false)
 		{
 			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen Fail...");
 			return false;
@@ -950,23 +954,32 @@ namespace Library_Jingyu
 
 		// 3. 만약, 로그인 상태의 유저가 나갔다면 (로그인 패킷까지 보낸 유저) g_LoginUser--
 		if (ErasePlayer->m_bLoginCheck == true)
+		{
 			InterlockedDecrement(&m_lLoginUser);
 
-		// 4. 유저 로그인 상태를 false로 만듬.
-		ErasePlayer->m_bLoginCheck = false;
+			// 유저 로그인 상태를 false로 만듬.
+			ErasePlayer->m_bLoginCheck = false;
+		}		
 
-		// 5. 배틀 방 입장 패킷을 안보낸 유저라면, 실패 패킷을 마스터에게 보냄
-		if (ErasePlayer->m_bBattleRoomEnterCheck == false)
+		// 4. 방 정보를 받은 유저 중, 배틀 방 접속 성공 패킷을 안보낸 유저라면, 
+		// 방 입장 실패 패킷을 마스터에게 보냄
+		if (ErasePlayer->m_bRoomInfoOK == true)
 		{
-			InterlockedIncrement(&m_lNot_BattleRoom_Enter);
-			Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
-		}
+			// 마스터에게 방 정보 받음 플래그 변경
+			ErasePlayer->m_bRoomInfoOK = false;
 
-		// 6. 배틀방 입장 플래그 변경
+			if (ErasePlayer->m_bBattleRoomEnterCheck == false)
+			{
+				InterlockedIncrement(&m_lNot_BattleRoom_Enter);
+				Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
+			}			
+		}	
+
+		// 5. 배틀방 입장 플래그 변경
 		ErasePlayer->m_bBattleRoomEnterCheck = false;
 
 
-		// 7. 플레이어 구조체 반환
+		// 6. 플레이어 구조체 반환
 		m_PlayerPool->Free(ErasePlayer);
 		InterlockedDecrement(&m_lstPlayer_AllocCount);		
 	}
@@ -1150,7 +1163,25 @@ namespace Library_Jingyu
 		if (NowPlayer == nullptr)
 			gMatchServerDump->Crash();
 
-		// 2. 마스터에게 보낼 패킷 제작
+		// 2. 마스터와 연결되어 있지 않다면, 바로 방없음 패킷 보냄.
+		if (m_bLoginCheck == false)
+		{
+			// Net 직렬화 버퍼 사용.
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_MATCH_RES_GAME_ROOM;
+			BYTE SendStatus = 0;
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&SendStatus, 1);
+
+			// 차후 보내고 끊어야 할지 고민..
+			m_pParent->SendPacket(NowPlayer->m_ullSessionID, SendBuff);
+
+			return;
+		}
+
+		// 3. 마스터와 연결되어 있으면, 보낼 패킷 제작
 		// Lan 직렬화 버퍼 사용
 		WORD Type = en_PACKET_MAT_MAS_REQ_GAME_ROOM;
 
@@ -1260,8 +1291,11 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&ChatServerPort, 2);
 		SendBuff->PutData((char*)&ClinetKey, 8);
 
+		// 6. 마스터에게, 방 정보 받았음 플래그 변경
+		NowPlayer->m_bRoomInfoOK = true;
 
-		// 6. 클라에게 보내기 (Net으로 보내기)
+
+		// 7. 클라에게 보내기 (Net으로 보내기)
 		m_pParent->SendPacket(NowPlayer->m_ullSessionID, SendBuff);
 	}
 
@@ -1307,8 +1341,8 @@ namespace Library_Jingyu
 
 		// LanClient의 Start() 호출
 		// 마스터의 LanServer와 연결
-		//if (Start(m_pParent->m_stConfig.MasterServerIP, m_pParent->m_stConfig.MasterServerPort, m_pParent->m_stConfig.ClientCreateWorker, m_pParent->m_stConfig.ClientActiveWorker, m_pParent->m_stConfig.ClientNodelay) == false)
-			//return false;
+		if (Start(m_pParent->m_stConfig.MasterServerIP, m_pParent->m_stConfig.MasterServerPort, m_pParent->m_stConfig.ClientCreateWorker, m_pParent->m_stConfig.ClientActiveWorker, m_pParent->m_stConfig.ClientNodelay) == false)
+			return false;
 
 		return true;
 	}

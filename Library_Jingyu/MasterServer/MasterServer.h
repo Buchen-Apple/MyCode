@@ -311,16 +311,6 @@ namespace Library_Jingyu
 		// CRoom 전방선언
 		struct stRoom;
 
-		// Room_Priority_Queue에서 사용할 비교연산자
-		struct RoomCMP
-		{
-			// m_iEmptyCount가 낮은 순으로 pop
-			bool operator()(stRoom* t, stRoom* u)
-			{
-				return t->m_iEmptyCount > u->m_iEmptyCount;
-			}
-		};
-
 		// 배틀서버 구조체
 		struct stBattle
 		{
@@ -381,6 +371,9 @@ namespace Library_Jingyu
 			// 해당 방에 입장한 유저 관리 자료구조
 			//
 			// Key : ClientKey
+			// !! m_Player_Umap은 유저가 방입장 성공/실패 패킷이 오면 유저 제거함 !!
+			// 때문에, 방 입장 후, 방퇴장 패킷이 왔을 경우 체크하기가 애매함.
+			// 그 용도로 Set을 둠
 			unordered_set<UINT64> m_uset_JoinUser;
 
 			stRoom()

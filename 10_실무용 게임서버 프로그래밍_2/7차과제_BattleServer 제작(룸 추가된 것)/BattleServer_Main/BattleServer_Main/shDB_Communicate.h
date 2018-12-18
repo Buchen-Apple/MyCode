@@ -45,7 +45,6 @@ namespace Library_Jingyu
 	struct DB_WORK_CONTENT_UPDATE
 	{
 		WORD m_wWorkType;
-		WORD m_wAPIType;
 
 		int		m_iRecord_PlayCount;	// 플레이 횟수
 		int		m_iRecord_PlayTime;		// 플레이 시간 초단위
@@ -53,13 +52,78 @@ namespace Library_Jingyu
 		int		m_iRecord_Die;			// 죽은 횟수
 		int		m_iRecord_Win;			// 최종승리 횟수
 
-		// Update의 res는 굉장히 짧음.
-		TCHAR m_tcResponse[15];
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
 
 		INT64 AccountNo;		
 	};
 
-	// shDB의 어떤 API를 호출할 것인지.
+	// 유저의 PlayCount 횟수를 업데이트 할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_PLAYCOUNT
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iRecord_PlayCount;	// 플레이 횟수		
+
+		INT64 AccountNo;
+	};
+
+	// 유저의 PlayTime을 업데이트 할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_PLAYTIME
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iRecord_PlayTime;	// 플레이 횟수		
+
+		INT64 AccountNo;
+	};
+
+	// 유저의 Kill 횟수를 업데이트 할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_KILL
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iRecord_Kill;			// 죽인 횟수	
+
+		INT64 AccountNo;
+	};
+
+	// 유저의 Die 횟수를 업데이트 할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_DIE
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iRecord_Die;			// 죽은 횟수		
+
+		INT64 AccountNo;
+	};
+
+	// 유저의 Win 횟수를 업데이트 할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_WIN
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iRecord_Win;			// 최종승리 횟수		
+
+		INT64 AccountNo;
+	};
+
+	// shDB의 어떤 API를 호출할 것인지. API Type
 	enum en_PHP_TYPE
 	{
 		// Seelct_account.php
@@ -85,10 +149,25 @@ namespace Library_Jingyu
 		eu_LOGIN_AUTH = 0,
 
 		// 로그인 패킷에 대한 정보 가져오기
-		eu_LOGIN_INFO = 1,
+		eu_LOGIN_INFO,
 
-		// DB Write 작업
-		eu_WRITE = 2
+		// DB Write 작업(전체 저장)
+		eu_WRITE,
+
+		// PlayCount 저장
+		eu_PLAYCOUNT_UPDATE,
+
+		// PlayTime 저장
+		eu_PLAYTIME_UPDATE,
+
+		// Kill 저장
+		eu_KILL_UPDATE,
+
+		// Die 저장
+		eu_DIE_UPDATE,
+
+		// Win 저장
+		eu_WIN_UPDATE
 	};	
 }
 
@@ -174,9 +253,9 @@ namespace Library_Jingyu
 		// DB에 Write 할 것이 있을 때 호출되는 함수.
 		// 인자로 받은 구조체의 정보를 확인해 로직 처리
 		//
-		// Parameter : DB_WORK*, APIType
+		// Parameter : DB_WORK*
 		// return : 없음
-		void DBWriteFunc(DB_WORK* Protocol, WORD APIType);
+		void DBWriteFunc(DB_WORK* Protocol);
 
 
 	public:

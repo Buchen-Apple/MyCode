@@ -279,15 +279,10 @@ namespace Library_Jingyu
 		// 전적 중, 플레이 횟수 증가. 그리고 DB에 저장
 		++m_iRecord_PlayCount;
 
-		DB_WORK_CONTENT_UPDATE* CountWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+		DB_WORK_CONTENT_UPDATE_PLAYCOUNT* CountWrite = (DB_WORK_CONTENT_UPDATE_PLAYCOUNT*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
+		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
 		CountWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
-		CountWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
-		CountWrite->m_iRecord_Kill = m_iRecord_Kill;
-		CountWrite->m_iRecord_Die = m_iRecord_Die;
-		CountWrite->m_iRecord_Win = m_iRecord_Win;
 
 		CountWrite->AccountNo = m_Int64AccountNo;
 
@@ -295,7 +290,7 @@ namespace Library_Jingyu
 		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
-		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
 	}
 
 	// 유저가 Game모드에서 나감
@@ -387,7 +382,7 @@ namespace Library_Jingyu
 
 
 
-		// 6. 마지막 전적 저장 패킷을 안보냈다면, 여기서 보낸다.
+		// 6. 플레이 타임 저장을 아직 안했다면, 여기서 한다.
 		if (m_bLastDBWriteFlag == false)
 		{
 			// 플레이 타임 갱신
@@ -395,15 +390,10 @@ namespace Library_Jingyu
 			m_iRecord_PlayTime = m_iRecord_PlayTime + AddTime;
 
 			// DB에 Write 준비
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_PLAYTIME* WriteWork = (DB_WORK_CONTENT_UPDATE_PLAYTIME*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			WriteWork->m_iRecord_PlayCount = m_iRecord_PlayCount;
+			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
 			WriteWork->m_iRecord_PlayTime = m_iRecord_PlayTime;
-			WriteWork->m_iRecord_Kill = m_iRecord_Kill;
-			WriteWork->m_iRecord_Die = m_iRecord_Die;
-			WriteWork->m_iRecord_Win = m_iRecord_Win;
 
 			WriteWork->AccountNo = m_Int64AccountNo;
 
@@ -411,7 +401,7 @@ namespace Library_Jingyu
 			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 			// DBWrite
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork, en_PHP_TYPE::UPDATE_CONTENTS);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
 		}
 	}
 
@@ -452,9 +442,29 @@ namespace Library_Jingyu
 				break;
 
 				// KickDamage
-			case en_PACKET_CS_GAME_RES_KICK_DAMAGE:
+			case en_PACKET_CS_GAME_REQ_KICK_DAMAGE:
 				Game_KickDamage_Packet(Packet);
 				break;
+
+				// 재장전
+			case en_PACKET_CS_GAME_REQ_RELOAD:
+				Game_Reload_Packet(Packet);
+				break;
+
+				// 메드킷 아이템 획득
+			case en_PACKET_CS_GAME_REQ_MEDKIT_GET:
+				Game_GetItem_Packet(Packet, MEDKIT);
+				break;
+
+				// 탄창 아이템 획득
+			case en_PACKET_CS_GAME_REQ_CARTRIDGE_GET:
+				Game_GetItem_Packet(Packet, CARTRIDGE);
+				break;
+
+				// 헬멧 아이템 획득
+			case en_PACKET_CS_GAME_REQ_HELMET_GET:
+				Game_GetItem_Packet(Packet, HELMET);
+				break;				
 
 				// 캐릭터 HitPoint 갱신
 			case en_PACKET_CS_GAME_REQ_HIT_POINT:
@@ -1198,18 +1208,37 @@ namespace Library_Jingyu
 		}
 
 		
-		// 5. hp 차감 처리		
-		int TargetHP, HelmetCount;
-		BYTE HelmetHit;
+		// 5. 타겟과 거리 계산
+		// 피타고라스 정리 (a2 + b2 = c2)
+		// 두 점간의 거리 구함 (c)
+		float a = (m_fPosX - Target->m_fPosX);
+		float b = (m_fPosY - Target->m_fPosY);
+
+		float c = sqrtf((a*a) + (b*b));
+
+		// 계산 결과, 타겟이 범위 내에 없다면, 패킷 안보냄
+		if (c >= (float)17)
+			return;
+
+
+		// 6. hp 차감 처리
+		// 여기까지 오면 데미지 대상이 있는것.
+
+		// 타겟에게 입힐 데미지 계산
+		// 데미지가 0보다 적을 순 없음. 위에서 거리 내에 있다고 확인했기 때문에.
+		int MinusDamage = m_pParent->GetDamage(c);
+		if (MinusDamage <= 0)
+			g_BattleServer_Room_Dump->Crash();		
 
 		// 타겟에게 헬멧이 있는 경우, 헬멧만 1 차감
+		int TargetHP, HelmetCount;
+		BYTE HelmetHit;
 		if (Target->m_iHelmetCount > 0)
 		{
 			--Target->m_iHelmetCount;
 
 			// Send할 변수 셋팅
 			HelmetCount = Target->m_iHelmetCount;
-
 			TargetHP = Target->m_iHP;
 			HelmetHit = 1;
 		}
@@ -1217,17 +1246,8 @@ namespace Library_Jingyu
 		// 헬멧이 없는 경우, 데미지 적용
 		else
 		{
-			// 피타고라스 정리 (a2 + b2 = c2)
-			// 두 점간의 거리 구함 (c)
-			float a = (m_fPosX - Target->m_fPosX);
-			float b = (m_fPosY - Target->m_fPosY);
-
-			float c = sqrtf((a*a) + (b*b));
-
-			// 거리 기준으로 HP 감소
-			// 지금은 그냥 무조건 -10 감소. 
-			// 차후 강사님에게 프로토콜 받으면 그때 정상 처리			
-			TargetHP = Target->m_iHP - 10;
+			// HP 감소	
+			TargetHP = Target->m_iHP - MinusDamage;
 			if (TargetHP < 0)
 				TargetHP = 0;
 
@@ -1235,14 +1255,12 @@ namespace Library_Jingyu
 
 			// Send할 변수 셋팅
 			HelmetCount = 0;
-
 			HelmetHit = 0;
 		}
 		
 
 
-		// 6. 방 내의 모든 유저에게 응답패킷 보내기
-		// 방 안의 모든 유저에게 보낸다.(자기 자신 포함)
+		// 6. 방 내의 모든 유저에게 응답패킷 보내기 (자기 자신 포함)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_GAME_RES_HIT_DAMAGE;
@@ -1284,6 +1302,9 @@ namespace Library_Jingyu
 			NowRoom->SendPacket_BroadCast(SendBuff);
 
 
+			// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
+			NowRoom->CreateItem(Target);
+
 
 			// DB 저장 파트 -----------------------------------
 
@@ -1291,21 +1312,16 @@ namespace Library_Jingyu
 			++m_iRecord_Kill;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_KILL* KillWrite = (DB_WORK_CONTENT_UPDATE_KILL*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 		
-			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			KillWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
-			KillWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
+			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
 			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
-			KillWrite->m_iRecord_Die = m_iRecord_Die;
-			KillWrite->m_iRecord_Win = m_iRecord_Win;
 
 			KillWrite->AccountNo = m_Int64AccountNo;
 
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite, en_PHP_TYPE::UPDATE_CONTENTS);	
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);	
 
 
 			
@@ -1314,21 +1330,16 @@ namespace Library_Jingyu
 			++Target->m_iRecord_Die;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_DIE* DieWrite = (DB_WORK_CONTENT_UPDATE_DIE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			DieWrite->m_iRecord_PlayCount = Target->m_iRecord_PlayCount;
-			DieWrite->m_iRecord_PlayTime = Target->m_iRecord_PlayTime;
-			DieWrite->m_iRecord_Kill = Target->m_iRecord_Kill;
+			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
 			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
-			DieWrite->m_iRecord_Win = Target->m_iRecord_Win;
 
 			DieWrite->AccountNo = TargetAccountNo;
 
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 		}
 	}
 
@@ -1482,13 +1493,12 @@ namespace Library_Jingyu
 		float c = sqrtf((a*a) + (b*b));
 
 		// 두 점의 거리가 2보다 멀다면, 공격 무시
-		if (c > 2)
+		if (c > (float)2)
 			return;
 
 
 		// 6. 타겟의 hp 감소 및 갱신
-		int TargetHP = Target->m_iHP - 10;
-
+		int TargetHP = Target->m_iHP - g_Data_KickDamage;
 		if (TargetHP < 0)
 			TargetHP = 0;
 
@@ -1534,6 +1544,10 @@ namespace Library_Jingyu
 			NowRoom->SendPacket_BroadCast(SendBuff);
 
 
+			// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
+			NowRoom->CreateItem(Target);
+
+
 
 			// DB 저장 파트 -----------------------------------
 
@@ -1541,22 +1555,16 @@ namespace Library_Jingyu
 			++m_iRecord_Kill;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_KILL* KillWrite = (DB_WORK_CONTENT_UPDATE_KILL*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			KillWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
-			KillWrite->m_iRecord_PlayTime = m_iRecord_PlayTime;
+			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
 			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
-			KillWrite->m_iRecord_Die = m_iRecord_Die;
-			KillWrite->m_iRecord_Win = m_iRecord_Win;
 
 			KillWrite->AccountNo = m_Int64AccountNo;
 
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite, en_PHP_TYPE::UPDATE_CONTENTS);
-
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
 
 
 
@@ -1564,23 +1572,208 @@ namespace Library_Jingyu
 			++Target->m_iRecord_Die;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_DIE* DieWrite = (DB_WORK_CONTENT_UPDATE_DIE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			DieWrite->m_iRecord_PlayCount = Target->m_iRecord_PlayCount;
-			DieWrite->m_iRecord_PlayTime = Target->m_iRecord_PlayTime;
-			DieWrite->m_iRecord_Kill = Target->m_iRecord_Kill;
+			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
 			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
-			DieWrite->m_iRecord_Win = Target->m_iRecord_Win;
 
 			DieWrite->AccountNo = TargetAccountNo;
 
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite, en_PHP_TYPE::UPDATE_CONTENTS);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 		}
 	}
+
+	// Reload Request
+	//
+	// Parameter : CProtocolBuff_Net*
+	// return : 없음
+	void CBattleServer_Room::CGameSession::Game_Reload_Packet(CProtocolBuff_Net* Packet)
+	{
+		// 로그인 여부 체크
+		if (m_bLoginFlag == false)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 생존 여부 체크
+		// 죽은 유저의 재장전 요청은 무시
+		if (m_bAliveFlag == false)
+			return;
+
+		// 1. 내가있는 방 알아오기
+		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
+
+		auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+		// 없으면 크래시
+		if (FindRoom == m_pParent->m_Room_Umap.end())
+			g_BattleServer_Room_Dump->Crash();
+
+		stRoom* NowRoom = FindRoom->second;
+
+		// 플레이모드가 아니면 크래시
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			g_BattleServer_Room_Dump->Crash();
+
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
+
+
+		// 2. 내 탄창 수 확인
+		//	-------- 탄창이 없다면 총알을 0 으로
+		if (m_iCartridge == 0)
+			m_iBullet = 0;
+
+		//	-------- 탄창이 있다면 탄창 -1 후  총알을 g_Data_Cartridge_Bullet 로 셋팅
+		else
+		{
+			m_iCartridge = m_iCartridge - 1;
+			m_iBullet = g_Data_Cartridge_Bullet;
+		}
+
+		// 3. 방 안의 모든 유저(자기자신 포함)에게 패킷 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_RELOAD;
+
+		SendBuff->PutData((char*)&Type, 2);
+
+		SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+		SendBuff->PutData((char*)&m_iBullet, 4);
+		SendBuff->PutData((char*)&m_iCartridge, 4);
+
+		NowRoom->SendPacket_BroadCast(SendBuff);
+	}
+
+	// 아이템 획득 요청
+	//
+	// Parameter : CProtocolBuff_Net*, 아이템의 Type
+	// return : 없음
+	void CBattleServer_Room::CGameSession::Game_GetItem_Packet(CProtocolBuff_Net* Packet, int Type)
+	{
+		// 로그인 여부 체크
+		if (m_bLoginFlag == false)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 생존 여부 체크
+		// 죽은 유저의 재장전 요청은 무시
+		if (m_bAliveFlag == false)
+			return;
+
+		// 1. 내가있는 방 알아오기
+		AcquireSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 락
+
+		auto FindRoom = m_pParent->m_Room_Umap.find(m_iRoomNo);
+
+		// 없으면 크래시
+		if (FindRoom == m_pParent->m_Room_Umap.end())
+			g_BattleServer_Room_Dump->Crash();
+
+		stRoom* NowRoom = FindRoom->second;
+
+		// 플레이모드가 아니면 크래시
+		if (NowRoom->m_iRoomState != eu_ROOM_STATE::PLAY_ROOM)
+			g_BattleServer_Room_Dump->Crash();
+
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
+
+
+		// 2. 마샬링
+		UINT ItemID;
+		Packet->GetData((char*)&ItemID, 4);
+
+		// 3. 아이템 검색
+		stRoom::stRoomItem* NowItem = NowRoom->Item_Find(ItemID);
+
+		// 없는 아이템이면 무시한다.
+		if (NowItem == nullptr)
+			return;
+
+		// 4. 아이템과 유저의 거리 체크.
+		// +2 ~ -2 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)
+		if (m_fPosX + 2 < NowItem->m_fPosX || m_fPosX - 2 > NowItem->m_fPosX ||
+			m_fPosY + 2 < NowItem->m_fPosY || m_fPosY - 2 < NowItem->m_fPosY)
+		{
+			return;
+		}
+
+		// 5. 거리도 맞으면 정상적으로 획득한 아이템.
+		// 아이템 자료구조에서 아이템 삭제
+		if (NowRoom->Item_Erase(NowItem) == false)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 6. 아이템에 따라 효과 적용 및 패킷 보내기
+		switch (Type)
+		{
+			// 탄창 
+		case CARTRIDGE:
+		{
+			// 탄창 +1
+			m_iCartridge++;
+
+			// 결과 패킷 보내기 (자기자신 포함. 브로드캐스팅)
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_CARTRIDGE_GET;
+
+			SendBuff->PutData((char*)&Type, 2);
+
+			SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+			SendBuff->PutData((char*)&ItemID, 4);
+			SendBuff->PutData((char*)&m_iCartridge, 4);
+
+			if (NowRoom->SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
+			break;
+
+			// 헬멧
+		case HELMET:
+		{
+			// 보유 헬멧 수를 g_Data_HelmetDefensive만큼 증가
+			m_iHelmetCount = m_iHelmetCount + g_Data_HelmetDefensive;
+
+			// 결과 패킷 보내기 (자기자신 포함. 브로드캐스팅)
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_HELMET_GET;
+
+			SendBuff->PutData((char*)&Type, 2);
+
+			SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+			SendBuff->PutData((char*)&ItemID, 4);
+			SendBuff->PutData((char*)&m_iHelmetCount, 4);
+
+			if (NowRoom->SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
+			break;
+
+			// 메드킷
+		case MEDKIT:			
+		{
+			//  유저의 hp 2 회복
+			m_iHP = m_iHP + 2;	
+
+			// 결과 패킷 보내기 (자기자신 포함. 브로드캐스팅)
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_GAME_RES_MEDKIT_GET;
+
+			SendBuff->PutData((char*)&Type, 2);
+
+			SendBuff->PutData((char*)&m_Int64AccountNo, 8);
+			SendBuff->PutData((char*)&ItemID, 4);
+			SendBuff->PutData((char*)&m_iHP, 4);
+
+			if (NowRoom->SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
+			break;
+
+		default:
+			g_BattleServer_Room_Dump->Crash();
+		}		
+	}	
 }
 
 // ------------------
@@ -1612,7 +1805,9 @@ namespace Library_Jingyu
 		delete m_Item_Pool;
 	}
 
-
+	// ------------
+	// 브로드 캐스트
+	// ------------
 
 	// 자료구조 내의 모든 유저에게 인자로 받은 패킷 보내기
 	//
@@ -1694,6 +1889,10 @@ namespace Library_Jingyu
 	}
 
 
+
+	// ------------
+	// 일반 기능함수
+	// ------------
 
 	// 방 내의 모든 유저를 Auth_To_Game으로 변경
 	//
@@ -1802,7 +2001,22 @@ namespace Library_Jingyu
 				m_JoinUser_Vector[Index]->SendPacket(winPacket);
 
 				// 승리패킷 보낸 수 증가
-				++WinUserCount;				
+				++WinUserCount;
+
+
+				// 승리 카운트 DB에 저장.
+				DB_WORK_CONTENT_UPDATE_WIN* WriteWork = (DB_WORK_CONTENT_UPDATE_WIN*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+				WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
+				WriteWork->m_iRecord_Win = m_JoinUser_Vector[Index]->m_iRecord_PlayTime;
+
+				WriteWork->AccountNo = m_JoinUser_Vector[Index]->m_Int64AccountNo;
+
+				// Write 하기 전에, DBWrite카운트 올려야함.
+				m_JoinUser_Vector[Index]->m_pParent->AddDBWriteCountFunc(m_JoinUser_Vector[Index]->m_Int64AccountNo);
+
+				// DBWrite 시도
+				m_JoinUser_Vector[Index]->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);							
 			}
 
 			// 유저가 패배자일 경우 (사망자)
@@ -2006,19 +2220,14 @@ namespace Library_Jingyu
 			NowPlayer->SendPacket(SendBuff);
 
 
-			// 3. 마지막 전적을 DB에 저장하기
+			// 3. 플레이 타임 저장
 			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
 			NowPlayer->m_bLastDBWriteFlag = true;
 
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)NowPlayer->m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE_PLAYTIME* WriteWork = (DB_WORK_CONTENT_UPDATE_PLAYTIME*)NowPlayer->m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WRITE;
-
-			WriteWork->m_iRecord_PlayCount = NowPlayer->m_iRecord_PlayCount;
+			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
 			WriteWork->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime;
-			WriteWork->m_iRecord_Kill = NowPlayer->m_iRecord_Kill;
-			WriteWork->m_iRecord_Die = NowPlayer->m_iRecord_Die;
-			WriteWork->m_iRecord_Win = NowPlayer->m_iRecord_Win;
 
 			WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
@@ -2026,13 +2235,16 @@ namespace Library_Jingyu
 			NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
 
 			// DBWrite 시도
-			NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork, en_PHP_TYPE::UPDATE_CONTENTS);
+			NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
 		}
 	}
 
 	// 해당 방에, 아이템 생성 (최초 게임 시작 시 생성)
 	// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
-	void CBattleServer_Room::stRoom::CreateItem()
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattleServer_Room::stRoom::StartCreateItem()
 	{
 		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
 		if (m_iJoinUserCount <= 0)
@@ -2056,30 +2268,28 @@ namespace Library_Jingyu
 			int ItemType = rand() % 2;			
 
 			// 아이템ID ++
-			++m_uiItemID;
-			UINT TempID = m_uiItemID;			
+			++m_uiItemID;	
 
-			// 룸 정보 셋팅
+			// 아이템 정보 셋팅
 			stRoomItem* Item = m_Item_Pool->Alloc();
 			Item->m_uiID = m_uiItemID;
 			Item->m_fPosX = g_Data_ItemPoint_Redzone[i][0];
 			Item->m_fPosY = g_Data_ItemPoint_Redzone[i][1];
 			Item->m_euType = (eu_ITEM_TYPE)ItemType;
 
+			// 룸 안의, 아이템 자료구조에 추가	
+			Item_Insert(m_uiItemID, Item);
+
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 			
 			// 탄창일 경우
 			if (ItemType == CARTRIDGE)
-			{	
-				// 룸 안의, 아이템 자료구조에 추가	
-				Item_Insert(m_uiItemID, Item);
-
+			{
 				// 타입
 				WORD Type = en_PACKET_CS_GAME_RES_CARTRIDGE_CREATE;
 				SendBuff->PutData((char*)&Type, 2);
 
 				// 아이템 ID
-				m_uiItemID++;
 				SendBuff->PutData((char*)&m_uiItemID, 4);
 
 				// 아이템 좌표
@@ -2091,15 +2301,11 @@ namespace Library_Jingyu
 			// 헬멧일 경우
 			else
 			{
-				// 룸 안의, 아이템 자료구조에 추가
-				Item_Insert(m_uiItemID, Item);				
-
 				// 타입
 				WORD Type = en_PACKET_CS_GAME_RES_HELMET_CREATE;
 				SendBuff->PutData((char*)&Type, 2);
 
 				// 아이템 ID
-				m_uiItemID++;
 				SendBuff->PutData((char*)&m_uiItemID, 4);
 
 				// 아이템 좌표
@@ -2133,19 +2339,18 @@ namespace Library_Jingyu
 			Item->m_fPosY = g_Data_ItemPoint_Playzone[i][1];
 			Item->m_euType = (eu_ITEM_TYPE)ItemType;
 
+			Item_Insert(m_uiItemID, Item);
+
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			// 탄창일 경우
 			if (ItemType == CARTRIDGE)
 			{	
-				Item_Insert(m_uiItemID, Item);
-
 				// 타입
 				WORD Type = en_PACKET_CS_GAME_RES_CARTRIDGE_CREATE;
 				SendBuff->PutData((char*)&Type, 2);
 
 				// 아이템 ID
-				m_uiItemID++;
 				SendBuff->PutData((char*)&m_uiItemID, 4);
 
 				// 아이템 좌표
@@ -2164,7 +2369,6 @@ namespace Library_Jingyu
 				SendBuff->PutData((char*)&Type, 2);
 
 				// 아이템 ID
-				m_uiItemID++;
 				SendBuff->PutData((char*)&m_uiItemID, 4);
 
 				// 아이템 좌표
@@ -2199,6 +2403,125 @@ namespace Library_Jingyu
 
 	}
 
+	// 해당 방에, 아이템 1개 생성 (유저 사망 시 생성)
+	// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
+	//
+	// Parameter : CGameSession* (사망한 유저)
+	// return : 없음
+	void CBattleServer_Room::stRoom::CreateItem(CGameSession* DiePlayer)
+	{
+		// 1. 탄창이 있으면 탄창 생성
+		if (DiePlayer->m_iCartridge > 0)
+		{
+			// 아이템 생성 ----------------------
+			// 아이템ID ++
+			++m_uiItemID;
+			UINT TempID = m_uiItemID;
+
+			// 이번에 아이템이 생성될 좌표
+			// 좌표 기준 (-1, 0, +1) 위치 중 1곳에 생성
+			// rand() % 3을 하면 (0, 1, 2) 중 1개가 나옴.
+			// 여기서 -1를 하면 (-1, 0, 1) 중 1개가 나오게 된다.
+			int Add = (rand() % 3) - 1;
+			float itemX = DiePlayer->m_fPosX + Add;
+			float itemY = DiePlayer->m_fPosY + Add;
+
+			// 아이템 정보 셋팅
+			stRoomItem* Item = m_Item_Pool->Alloc();
+			Item->m_uiID = m_uiItemID;
+			Item->m_fPosX = itemX;
+			Item->m_fPosY = itemY;
+			Item->m_euType = eu_ITEM_TYPE::CARTRIDGE;
+
+			// 룸 안의, 아이템 자료구조에 추가	
+			Item_Insert(m_uiItemID, Item);
+
+
+
+			// 패킷 보내기 ----------------------
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_CARTRIDGE_CREATE;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// 아이템 ID
+			m_uiItemID++;
+			SendBuff->PutData((char*)&m_uiItemID, 4);
+
+			// 아이템 좌표
+			SendBuff->PutData((char*)&itemX, 4);
+			SendBuff->PutData((char*)&itemY, 4);
+
+			// SendPacket_브로드캐스팅
+			// 최소한 자기 자신 1명은 있기 때문에 0명이면 말도 안됨.
+			if (SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
+
+		// 2. 탄창과 관계 없이 추가로, 메디킷 또는 헬멧 중 1개 생성 
+		
+		// 1이면 헬멧, 2면 메디킷
+		int Type = (rand() % 2) + 1;
+
+		// 이번에 아이템이 생성될 좌표
+		int Add = (rand() % 3) - 1;
+		float itemX = DiePlayer->m_fPosX + Add;
+		float itemY = DiePlayer->m_fPosY + Add;
+
+		// 아이템ID ++
+		++m_uiItemID;
+
+		// 룸 안의, 아이템 자료구조에 추가
+		stRoomItem* Item = m_Item_Pool->Alloc();
+		Item->m_uiID = m_uiItemID;
+		Item->m_fPosX = itemX;
+		Item->m_fPosY = itemY;
+		Item->m_euType = (eu_ITEM_TYPE)Type;
+
+		Item_Insert(m_uiItemID, Item);
+
+		// 패킷 보내기 ----------------------
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+		
+		// 헬멧일 경우
+		if (Type == HELMET)
+		{
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_HELMET_CREATE;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// 아이템 ID
+			m_uiItemID++;
+			SendBuff->PutData((char*)&m_uiItemID, 4);
+
+			// 아이템 좌표
+			SendBuff->PutData((char*)&itemX, 4);
+			SendBuff->PutData((char*)&itemY, 4);
+		}
+
+		// 메디킷일 경우
+		else
+		{
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_MEDKIT_CREATE;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// 아이템 ID
+			m_uiItemID++;
+			SendBuff->PutData((char*)&m_uiItemID, 4);
+
+			// 아이템 좌표
+			SendBuff->PutData((char*)&itemX, 4);
+			SendBuff->PutData((char*)&itemY, 4);
+		}
+
+		// SendPacket_브로드캐스팅
+		// 최소한 자기 자신 1명은 있기 때문에 0명이면 말도 안됨.
+		if (SendPacket_BroadCast(SendBuff) == false)
+			g_BattleServer_Room_Dump->Crash();
+
+	}
 
 
 	// ------------
@@ -2311,6 +2634,45 @@ namespace Library_Jingyu
 		// 중복일 경우 Crash
 		if(ret.second == false)
 			g_BattleServer_Room_Dump->Crash();		
+	}
+
+	// 아이템 자료구조에 아이템이 있나 체크
+	//
+	// Parameter : itemID
+	// return : 찾은 아이템의 stRoomItem*
+	//		  : 아이템이 없을 시 nullptr
+	CBattleServer_Room::stRoom::stRoomItem* CBattleServer_Room::stRoom::Item_Find(UINT ID)
+	{
+		// 아이템 검색
+		auto itor = m_RoomItem_umap.find(ID);
+
+		if (itor == m_RoomItem_umap.end())
+			return nullptr;
+
+		return itor->second;
+	}
+
+	// 아이템 자료구조에서 Erase
+	//
+	// Parameter : 제거하고자 하는 stRoomItem*
+	// return : 성공 시 true
+	//		  : 실패 시  false
+	bool CBattleServer_Room::stRoom::Item_Erase(stRoomItem* InsertPlayer)
+	{
+		// 검색
+		auto itor = m_RoomItem_umap.find(InsertPlayer->m_uiID);
+
+		// 없으면 return false
+		if (itor == m_RoomItem_umap.end())
+			return false;
+
+		// 찾았으면 Erase
+		m_RoomItem_umap.erase(itor);
+
+		// stRoomItem* 반환
+		m_Item_Pool->Free(InsertPlayer);
+
+		return true;
 	}
 }
 
@@ -2807,6 +3169,25 @@ namespace Library_Jingyu
 		return true;
 	}
 
+	// 총알 데미지 계산 시 사용되는 함수 (발차기 계산시에는 사용되지 않음.)
+	// 실제 감소시켜야 하는 HP를 계산한다.
+	//
+	// Parameter : 공격자와 피해자의 거리
+	// return : 감소시켜야하는 HP
+	int CBattleServer_Room::GetDamage(float Range)
+	{
+		// 공격 비율에 의해 입힐 데미지 계산
+
+		// 거리가 2보다 짧다면 100%데미지
+		if (Range <= 2)
+			return g_Data_HitDamage;
+
+		// 그게 아니라면 비율에 따라 계산
+		// 0~2까지는 동일한 거리로 취급한다.
+		// 즉, 0~17까지 거리를 체크하긴 하지만, 사실 2~17이며
+		// 이는 즉, 실제 계산때는 0~15까지 있는것으로 취급해야 한다.
+		return (int)(g_Data_HitDamage - (m_fFire1_Damage * (Range - 2)));
+	}
 		   	  
 
 
@@ -3404,7 +3785,7 @@ namespace Library_Jingyu
 
 							// 아이템 생성 후 stRoom의 아이템 자료구조에 추가.
 							// 그리고 모든 유저에게 아이템 생성 패킷 보냄
-							NowRoom->CreateItem();
+							NowRoom->StartCreateItem();
 
 							// 방 안의 모든 유저에게, 배틀서버 대기방 플레이 시작 패킷 보내기
 							CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -3950,6 +4331,9 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_AccountNo_Umap_srwl);
 		InitializeSRWLock(&m_Room_Umap_srwl);
 		InitializeSRWLock(&m_DBWrite_Umap_srwl);
+
+		// 게임 내에서 사용되는, 거리당 데미지.
+		m_fFire1_Damage = g_Data_HitDamage / (float)15;	// 총알 데미지
 	}
 
 	CBattleServer_Room::~CBattleServer_Room()
