@@ -149,9 +149,7 @@ namespace Library_Jingyu
 
 				// 3. 룸 안의 자료구조에서 유저 제거
 				if (NowRoom->Erase(this) == false)
-					g_BattleServer_Room_Dump->Crash();
-
-				m_iRoomNo = -1;
+					g_BattleServer_Room_Dump->Crash();			
 
 
 				// 4. 방 안의 모든 유저에게, 방에서 유저가 나갔다고 알려줌
@@ -171,7 +169,12 @@ namespace Library_Jingyu
 
 
 				// 5. 마스터 서버에게 해당 유저 나갔다고 패킷 보내줘야 함.
-				m_pParent->m_Master_LanClient->Packet_RoomLeave_Req(m_iRoomNo, TempClientKey);
+				// Ready상태인 유저는, 이미 마스터에서 사라졌기 때문에 보내면 안됨.
+				if(NowRoom->m_iRoomState == eu_ROOM_STATE::WAIT_ROOM)
+					m_pParent->m_Master_LanClient->Packet_RoomLeave_Req(m_iRoomNo, TempClientKey);
+
+				// 6. 룸 키 -1로 초기화
+				m_iRoomNo = -1;
 			}			
 		}
 
@@ -200,6 +203,7 @@ namespace Library_Jingyu
 
 				// 방 입장 요청
 			case en_PACKET_CS_GAME_REQ_ENTER_ROOM:
+				Auth_RoomEnterPacket(Packet);
 				break;
 
 				// 하트비트
@@ -221,9 +225,6 @@ namespace Library_Jingyu
 			// 덤프
 			g_BattleServer_Room_Dump->Crash();
 		}
-
-		// 직렬화 버퍼 반환
-		CProtocolBuff_Net::Free(Packet);
 	}
 
 
@@ -491,7 +492,6 @@ namespace Library_Jingyu
 			// 덤프
 			g_BattleServer_Room_Dump->Crash();
 		}
-
 	}
 
 
@@ -833,50 +833,34 @@ namespace Library_Jingyu
 
 		// 8. 여기까지 오면 정상
 		// 룸에 인원 추가
-		NowRoom->m_iJoinUserCount++;
+		++NowRoom->m_iJoinUserCount;
 		NowRoom->Insert(this);
 
-		int NowUser = NowRoom->m_iJoinUserCount;
+		// 플레이어에게 방 할당
+		m_iRoomNo = NowRoom->m_iRoomNo;
 
 
 		// 9. 정상적인 방 입장 응답 보내기
-		CProtocolBuff_Net* SendBuff_A = CProtocolBuff_Net::Alloc();
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_GAME_RES_ENTER_ROOM;
 		BYTE Result = 1;
 
-		SendBuff_A->PutData((char*)&Type, 2);
-		SendBuff_A->PutData((char*)&AccountNo, 8);
-		SendBuff_A->PutData((char*)&RoomNo, 4);
-		SendBuff_A->PutData((char*)&NowUser, 1);
-		SendBuff_A->PutData((char*)&Result, 1);
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&AccountNo, 8);
+		SendBuff->PutData((char*)&RoomNo, 4);
+		SendBuff->PutData((char*)&NowRoom->m_iMaxJoinCount, 1);
+		SendBuff->PutData((char*)&Result, 1);
 
-		SendPacket(SendBuff_A);
+		SendPacket(SendBuff);
 
 
 		// 10. 방에 있는 모든 유저에게 "유저 추가됨" 패킷 보내기
-		// 이번에 입장한 자기 자신 포함.
-		Type = en_PACKET_CS_GAME_RES_ADD_USER;
-
-		CProtocolBuff_Net* SendBuff_B = CProtocolBuff_Net::Alloc();
-
-		SendBuff_B->PutData((char*)&Type, 2);
-		SendBuff_B->PutData((char*)&RoomNo, 4);
-		SendBuff_B->PutData((char*)&AccountNo, 8);
-		SendBuff_B->PutData((char*)m_tcNickName, 40);
-
-		SendBuff_B->PutData((char*)&m_iRecord_PlayCount, 4);
-		SendBuff_B->PutData((char*)&m_iRecord_PlayTime, 4);
-		SendBuff_B->PutData((char*)&m_iRecord_Kill, 4);
-		SendBuff_B->PutData((char*)&m_iRecord_Die, 4);
-		SendBuff_B->PutData((char*)&m_iRecord_Win, 4);
-
-		if (NowRoom->SendPacket_BroadCast(SendBuff_B) == false)
-			g_BattleServer_Room_Dump->Crash();
+		NowRoom->Send_AddUser(this);	
 
 
 		// 11. 룸 인원수가 풀 방이 되었을 경우
-		if (NowUser == NowRoom->m_iMaxJoinCount)
+		if (NowRoom->m_iJoinUserCount == NowRoom->m_iMaxJoinCount)
 		{
 			// 1) 마스터에게 방 닫힘 패킷 보내기
 			m_pParent->m_Master_LanClient->Packet_RoomClose_Req(RoomNo);
@@ -885,11 +869,10 @@ namespace Library_Jingyu
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD Type = en_PACKET_CS_GAME_RES_PLAY_READY;
-			BYTE ReadySec = m_pParent->m_stConst.m_bCountDownSec;		// 초 단위
 
 			SendBuff->PutData((char*)&Type, 2);
 			SendBuff->PutData((char*)&RoomNo, 4);
-			SendBuff->PutData((char*)&ReadySec, 1);
+			SendBuff->PutData((char*)&m_pParent->m_stConst.m_bCountDownSec, 1);
 
 			if (NowRoom->SendPacket_BroadCast(SendBuff) == false)
 				g_BattleServer_Room_Dump->Crash();
@@ -901,12 +884,10 @@ namespace Library_Jingyu
 
 			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
 			InterlockedIncrement(&m_pParent->m_lReadyRoomCount);
+			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
 
 			// 4) 방의 상태를 Ready로 변경
-			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;
-
-			// 5) 대기방 수 감소
-			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
+			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;			
 		}		
 	}
 
@@ -1754,6 +1735,10 @@ namespace Library_Jingyu
 			//  유저의 hp 2 회복
 			m_iHP = m_iHP + 2;	
 
+			// 최대 hp 이상 회복 불가능.
+			if (m_iHP > g_Data_HP)
+				m_iHP = g_Data_HP;
+
 			// 결과 패킷 보내기 (자기자신 포함. 브로드캐스팅)
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -1883,6 +1868,8 @@ namespace Library_Jingyu
 
 		// 4. 패킷 Free
 		// !! 엔진쪽 완통에서 Free 하지만, 레퍼런스 카운트를 인원 수 만큼 Add 했기 때문에 1개가 더 증가한 상태. !!	
+		// 만약, 유저 수가 1명이었을 경우. 레퍼런스 카운트를 증가시키지 않아 그대로 1이지만 
+		// 어차피 Send도 안했기 때문에 여기서 감소시켜야 함.
 		CProtocolBuff_Net::Free(SendBuff);
 
 		return true;
@@ -2046,13 +2033,9 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount <= 0)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 2. 백터 안에 0명이면 크래시
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
 		size_t Size = m_JoinUser_Vector.size();
-		if(Size <= 0)
-			g_BattleServer_Room_Dump->Crash();
-
-		// 3. 백터 안의 유저와 변수가 다르면 크래시
-		if(m_iJoinUserCount != Size)
+		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
 		// 4. 순회하며 Shutdown
@@ -2076,12 +2059,8 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount <= 0)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 2. 백터 안에 0명이면 크래시
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
 		size_t Size = m_JoinUser_Vector.size();
-		if (Size <= 0)
-			g_BattleServer_Room_Dump->Crash();
-
-		// 3. 백터 안의 유저와 변수가 다르면 크래시
 		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
@@ -2182,12 +2161,8 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount <= 0)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 2. 백터 안에 0명이면 크래시
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
 		size_t Size = m_JoinUser_Vector.size();
-		if (Size <= 0)
-			g_BattleServer_Room_Dump->Crash();
-
-		// 3. 백터 안의 유저와 변수가 다르면 크래시
 		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
@@ -2236,6 +2211,8 @@ namespace Library_Jingyu
 
 			// DBWrite 시도
 			NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+
+			Index++;
 		}
 	}
 
@@ -2250,12 +2227,8 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount <= 0)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 2. 백터 안에 0명이면 크래시
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
 		size_t Size = m_JoinUser_Vector.size();
-		if (Size <= 0)
-			g_BattleServer_Room_Dump->Crash();
-
-		// 3. 백터 안의 유저와 변수가 다르면 크래시
 		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
@@ -2330,7 +2303,6 @@ namespace Library_Jingyu
 
 			// 아이템ID ++
 			++m_uiItemID;
-			UINT TempID = m_uiItemID;
 
 			// 룸 안의, 아이템 자료구조에 추가
 			stRoomItem* Item = m_Item_Pool->Alloc();
@@ -2362,8 +2334,6 @@ namespace Library_Jingyu
 			// 헬멧일 경우
 			else if(ItemType == HELMET)
 			{
-				Item_Insert(m_uiItemID, Item);
-
 				// 타입
 				WORD Type = en_PACKET_CS_GAME_RES_HELMET_CREATE;
 				SendBuff->PutData((char*)&Type, 2);
@@ -2379,8 +2349,6 @@ namespace Library_Jingyu
 			// 메디킷일 경우
 			else
 			{
-				Item_Insert(m_uiItemID, Item);
-
 				// 타입
 				WORD Type = en_PACKET_CS_GAME_RES_MEDKIT_CREATE;
 				SendBuff->PutData((char*)&Type, 2);
@@ -2416,7 +2384,6 @@ namespace Library_Jingyu
 			// 아이템 생성 ----------------------
 			// 아이템ID ++
 			++m_uiItemID;
-			UINT TempID = m_uiItemID;
 
 			// 이번에 아이템이 생성될 좌표
 			// 좌표 기준 (-1, 0, +1) 위치 중 1곳에 생성
@@ -2446,7 +2413,6 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&Type, 2);
 
 			// 아이템 ID
-			m_uiItemID++;
 			SendBuff->PutData((char*)&m_uiItemID, 4);
 
 			// 아이템 좌표
@@ -2492,7 +2458,6 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&Type, 2);
 
 			// 아이템 ID
-			m_uiItemID++;
 			SendBuff->PutData((char*)&m_uiItemID, 4);
 
 			// 아이템 좌표
@@ -2508,7 +2473,6 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&Type, 2);
 
 			// 아이템 ID
-			m_uiItemID++;
 			SendBuff->PutData((char*)&m_uiItemID, 4);
 
 			// 아이템 좌표
@@ -2521,6 +2485,88 @@ namespace Library_Jingyu
 		if (SendPacket_BroadCast(SendBuff) == false)
 			g_BattleServer_Room_Dump->Crash();
 
+	}
+	
+	// 방 안의 모든 유저에게 "유저 추가됨" 패킷 보내기
+	//
+	// Parameter : 이번에 입장한 유저 CGameSession*
+	// return : 없음
+	void CBattleServer_Room::stRoom::Send_AddUser(CGameSession* NowPlayer)
+	{
+		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
+		if (m_iJoinUserCount <= 0)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
+		size_t Size = m_JoinUser_Vector.size();
+		if (m_iJoinUserCount != Size)
+			g_BattleServer_Room_Dump->Crash();
+
+		WORD Type = en_PACKET_CS_GAME_RES_ADD_USER;
+
+		// 4. 나에게(인자로 받은 유저. 이번에 접속한 유저), 유저 추가됨 패킷 보내기 (방 안의 모든 유저)
+		// 자기 자신 포함. 모두 보냄.
+		size_t Index = 0;
+		while (Index < Size)
+		{
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			CGameSession* NowSession = m_JoinUser_Vector[Index];
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&m_iRoomNo, 4);
+			SendBuff->PutData((char*)&NowSession->m_Int64AccountNo, 8);
+			SendBuff->PutData((char*)NowSession->m_tcNickName, 40);
+
+			SendBuff->PutData((char*)&NowSession->m_iRecord_PlayCount, 4);
+			SendBuff->PutData((char*)&NowSession->m_iRecord_PlayTime, 4);
+			SendBuff->PutData((char*)&NowSession->m_iRecord_Kill, 4);
+			SendBuff->PutData((char*)&NowSession->m_iRecord_Die, 4);
+			SendBuff->PutData((char*)&NowSession->m_iRecord_Win, 4);
+
+			NowPlayer->SendPacket(SendBuff);
+
+			++Index;
+		}
+
+		// 5. 방에 있는 나 제외 유저에게, 나의 "유저 추가됨" 패킷 보내기
+		// 다만, 방에 유저가 1명일 경우(즉, 이번에 접속한 나 혼자)는 그냥 나감.
+		if (Size == 1)
+			return;
+		
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		// 보낼 패킷 만들어두기.
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&m_iRoomNo, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_Int64AccountNo, 8);
+		SendBuff->PutData((char*)NowPlayer->m_tcNickName, 40);
+
+		SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayCount, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayTime, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_iRecord_Kill, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_iRecord_Die, 4);
+		SendBuff->PutData((char*)&NowPlayer->m_iRecord_Win, 4);
+
+		// 레퍼런스 카운트 증가
+		// 나 자신은 무조건 제외이니 1 감소.
+		// Alloc하면서 1 올라갔으니 1 감소.
+		// 즉, 3명일 경우는 Alloc으로 1 올라가고, Add로 (3-2 = 1) 올라간다. --> RefCount 2가된다. 딱 맞음.
+		SendBuff->Add((int)Size - 2);
+		
+		Index = 0;
+		INT64 TempAccountNo = NowPlayer->m_Int64AccountNo;
+		while (Index < Size)
+		{
+			// 4번에서 자기 자신에게 보냈으니, 여기서는 제외시켜야 함.
+			if (TempAccountNo != m_JoinUser_Vector[Index]->m_Int64AccountNo)
+			{
+				// 내가 아닌게 확정이니, 패킷 보내기
+				m_JoinUser_Vector[Index]->SendPacket(SendBuff);
+			}
+
+			++Index;
+		}
 	}
 
 
@@ -2746,7 +2792,7 @@ namespace Library_Jingyu
 
 		// 4. Battle 서버 시작
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept,
-			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
+			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode) == false)
 			return false;
 
 		// 서버 오픈 로그 찍기		
@@ -3006,12 +3052,8 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->HeadCode) == false)
 			return false;
 
-		// xorcode1
-		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode1) == false)
-			return false;
-
-		// xorcode2
-		if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->XORCode2) == false)
+		// xorcode
+		if (Parser.GetValue_Int(_T("XorCode"), &pConfig->XORCode) == false)
 			return false;
 
 		// Nodelay
@@ -3279,7 +3321,7 @@ namespace Library_Jingyu
 			// 토큰이 다를경우 Result 3(세션키 오류)를 보낸다.
 			InterlockedIncrement(&m_lTokenError);
 
-			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
+			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
 			BYTE Result = 3;
 
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -3310,7 +3352,7 @@ namespace Library_Jingyu
 			// 정상 응답 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
-			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
+			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
 			BYTE Result = 1;
 
 			SendBuff->PutData((char*)&Type, 2);
@@ -3400,7 +3442,7 @@ namespace Library_Jingyu
 			// 정상 응답 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
-			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
+			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
 			BYTE Result = 1;
 
 			SendBuff->PutData((char*)&Type, 2);
@@ -3759,7 +3801,9 @@ namespace Library_Jingyu
 						InterlockedIncrement(&m_lPlayRoomCount);
 
 						// 방 상태를 Play로 변경
-						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;						
+						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;		
+
+						--ModeChangeCount;
 					}
 				}
 
@@ -3875,6 +3919,7 @@ namespace Library_Jingyu
 						NowRoom->m_dwGameEndMSec = 0;
 						NowRoom->m_bShutdownFlag = false;
 						NowRoom->m_uiItemID = 0;
+						NowRoom->m_pBattleServer = this;
 
 						// 방 안의 아이템 클리어시키기
 						auto itor_begin = NowRoom->m_RoomItem_umap.begin();
@@ -4151,7 +4196,7 @@ namespace Library_Jingyu
 				}
 			}
 
-			++itor_End;
+			++itor_Now;
 		}
 
 		ReleaseSRWLockShared(&m_Room_Umap_srwl);	// ----- Room Umap Shared 언락

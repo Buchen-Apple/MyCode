@@ -362,6 +362,9 @@ namespace Library_Jingyu
 			// 룸이 존재하는 배틀 서버의 No
 			int m_iBattleServerNo;
 
+			// 룸이 존재하는 배틀서버의 SessionID
+			ULONGLONG m_ullBattleSessionID;
+
 			// 배틀서버 방 입장 토큰(배틀서버 발행)
 			char	m_cEnterToken[32];
 

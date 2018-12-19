@@ -20,7 +20,7 @@ namespace Library_Jingyu
 
 	// 직렬화 버퍼 1개의 크기
 	// 각 서버에 전역 변수로 존재해야 함.
-	LONG g_lNET_BUFF_SIZE;
+	LONG g_lNET_BUFF_SIZE = 512;
 
 	// 덤프용 
 	CCrashDump* g_ChatDump = CCrashDump::GetInstance();
@@ -402,7 +402,7 @@ namespace Library_Jingyu
 
 		// 채팅 Net 서버 시작
 		if (Start(m_Paser.BindIP, m_Paser.Port, m_Paser.CreateWorker, m_Paser.ActiveWorker, m_Paser.ActiveWorker,
-			m_Paser.Nodelay, m_Paser.MaxJoinUser, m_Paser.HeadCode, m_Paser.XORCode1, m_Paser.XORCode2) == false)
+			m_Paser.Nodelay, m_Paser.MaxJoinUser, m_Paser.HeadCode, m_Paser.XORCode) == false)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
 			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Net ServerOpenError");
@@ -462,7 +462,7 @@ namespace Library_Jingyu
 
 		while (Index < Size)
 		{
-			SendPacket(NowRoom->m_JoinUser_vector[0], SendBuff);
+			SendPacket(NowRoom->m_JoinUser_vector[Index], SendBuff);
 
 			++Index;
 		}
@@ -531,12 +531,8 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->HeadCode) == false)
 			return false;
 
-		// xorcode1
-		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode1) == false)
-			return false;
-
-		// xorcode2
-		if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->XORCode2) == false)
+		// xorcode
+		if (Parser.GetValue_Int(_T("XorCode"), &pConfig->XORCode) == false)
 			return false;
 
 		// Nodelay
@@ -884,7 +880,8 @@ namespace Library_Jingyu
 
 		ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
 
-
+		// 유저에게 룸 번호 할당
+		NowPlayer->m_iRoomNo = RoomNo;
 
 		// 7. 성공 패킷 응답
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -998,6 +995,11 @@ namespace Library_Jingyu
 		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
 
 		ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
+
+		// BroadCast했던 패킷 Free
+		// Room_BroadCast() 함수에서, 유저 수 만큼 래퍼런스 카운트를 증가시켰기 때문에
+		// 여기서 1 감소시켜줘야 한다 
+		CProtocolBuff_Net::Free(SendBuff);
 	}
 
 

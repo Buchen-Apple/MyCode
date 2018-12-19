@@ -16,6 +16,6 @@
   BattleServer_Room_Version.cpp
   shDB_Communicate.cpp
   코드를 생성하고 있습니다.
-  All 1723 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 1786 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   BattleServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\7차과제_BattleServer 제작(룸 추가된 것)\BattleServer_Main\x64\Release\BattleServer_Main.exe

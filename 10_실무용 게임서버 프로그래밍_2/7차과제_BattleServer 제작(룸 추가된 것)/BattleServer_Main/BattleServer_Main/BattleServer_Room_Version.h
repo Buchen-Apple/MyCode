@@ -267,8 +267,7 @@ namespace Library_Jingyu
 			int ActiveWorker;
 			int CreateAccept;
 			int HeadCode;
-			int XORCode1;
-			int XORCode2;
+			int XORCode;
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;
@@ -367,7 +366,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 5;	
+			const BYTE m_iMaxJoinCount = 2;	
 
 			// ------------
 
@@ -462,6 +461,12 @@ namespace Library_Jingyu
 			// Parameter : CGameSession* (사망한 유저)
 			// return : 없음
 			void CreateItem(CGameSession* DiePlayer);
+
+			// 방 안의 모든 유저에게 "유저 추가됨" 패킷 보내기
+			//
+			// Parameter : 이번에 입장한 유저 CGameSession*
+			// return : 없음
+			void Send_AddUser(CGameSession* NowPlayer);
 			
 
 

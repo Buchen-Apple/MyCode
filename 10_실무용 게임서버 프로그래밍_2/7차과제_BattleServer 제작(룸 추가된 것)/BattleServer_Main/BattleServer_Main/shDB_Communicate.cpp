@@ -33,7 +33,7 @@ namespace Library_Jingyu
 		// --------------------
 		// 변수 선언
 		// --------------------
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 80);	
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 80);	
 
 		DWORD APIType;
 		DB_WORK* pWork;
@@ -155,7 +155,7 @@ namespace Library_Jingyu
 
 		DB_WORK* pWork;
 
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 80);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 80);
 		
 		while (1)
 		{
@@ -448,6 +448,9 @@ namespace Library_Jingyu
 		// Write 완료 노멀 큐 동적할당.
 		m_pDB_Wirte_End_Queue = new CNormalQueue<DB_WORK*>();
 
+		// Write 스레드에게 일시키기용 큐 동적할당.
+		m_pDB_Wirte_Start_Queue = new CNormalQueue<DB_WORK*>();
+
 		// DB_Read용 입출력 완료포트 생성
 		// 4개의 스레드 생성, 2개의 스레드 활성화
 		int Create = 4;
@@ -534,5 +537,11 @@ namespace Library_Jingyu
 
 		// Read 완료 락프리 큐 동적해제
 		delete m_pDB_ReadComplete_Queue;
+
+		// Write 완료 노멀 큐 동적해제
+		delete m_pDB_Wirte_End_Queue;
+
+		// Write 스레드에게 일시키기용 큐 동적해제
+		delete m_pDB_Wirte_Start_Queue;
 	}
 }

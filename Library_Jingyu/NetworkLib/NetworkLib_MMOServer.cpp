@@ -11,6 +11,12 @@
 #include "CrashDump\CrashDump.h"
 #include "Parser\Parser_Class.h"
 
+#include <list>
+
+using namespace std;
+
+list<WORD> TypeTest;
+
 
 // ------------------------
 // cSession의 함수
@@ -583,7 +589,8 @@ namespace Library_Jingyu
 
 
 			// 10. 헤더 Decode
-			if (PayloadBuff->Decode(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
+			//if (PayloadBuff->Decode(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode_1, m_bXORCode_2) == false)
+			if (PayloadBuff->Decode2(PayloadLen, Header.m_RandXORCode, Header.m_Checksum, m_bXORCode) == false)
 			{
 				// 할당받은 패킷 Free
 				CProtocolBuff_Net::Free(PayloadBuff);
@@ -1435,8 +1442,7 @@ namespace Library_Jingyu
 
 		// Encode할 변수들 받아두기
 		BYTE Head = g_This->m_bCode;
-		BYTE XORCode1 = g_This->m_bXORCode_1;
-		BYTE XORCode2 = g_This->m_bXORCode_2;
+		BYTE XORCode = g_This->m_bXORCode;
 
 		while (1)
 		{
@@ -1557,8 +1563,14 @@ namespace Library_Jingyu
 					if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[iPacketIndex]) == -1)
 						cMMOServer_Dump->Crash();
 
+					WORD Temp = *((WORD*)(NowSession->m_PacketArray[iPacketIndex]->m_pProtocolBuff + 5));
+
+					TypeTest.push_back(Temp);
+
 					// 헤더를 넣어서, 패킷 완성하기		
-					NowSession->m_PacketArray[iPacketIndex]->Encode(Head, XORCode1, XORCode2);
+					//NowSession->m_PacketArray[iPacketIndex]->Encode(Head, XORCode1, XORCode2);
+					NowSession->m_PacketArray[iPacketIndex]->Encode2(Head, XORCode);
+
 
 					// WSABUF에 포인터 복사
 					wsabuf[iPacketIndex].buf = NowSession->m_PacketArray[iPacketIndex]->GetBufferPtr();
@@ -1826,12 +1838,12 @@ namespace Library_Jingyu
 	// -----------------------
 	
 	// 서버 시작
-	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
+	// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 코드] 입력받음.
 	//
 	// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 	// return true : 성공
 	bool CMMOServer::Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
-		BYTE Code, BYTE XORCode1, BYTE XORCode2)
+		BYTE Code, BYTE XORCode)
 	{
 		// 카운트 변수 초기화
 		m_ullAcceptTotal = 0;
@@ -1851,8 +1863,7 @@ namespace Library_Jingyu
 
 		// Config 데이터 셋팅
 		m_bCode = Code;
-		m_bXORCode_1 = XORCode1;
-		m_bXORCode_2 = XORCode2;
+		m_bXORCode = XORCode;
 
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;

@@ -1213,6 +1213,7 @@ namespace Library_Jingyu
 	{
 		int iSendRoomNo;
 		int iBattleServerNo;
+		ULONGLONG ullBattleSessionID;
 		char cSendEnterToken[32];
 		bool bSearchFlag = false;	// umap 자료구조에서 방에 대한 정보 찾았음 플래그. false면 못찾음.
 
@@ -1257,6 +1258,7 @@ namespace Library_Jingyu
 					// 3. Room에서 필요한 정보들 받아두기
 					iSendRoomNo = NowRoom->m_iRoomNo;
 					iBattleServerNo = NowRoom->m_iBattleServerNo;
+					ullBattleSessionID = NowRoom->m_ullBattleSessionID;
 					memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
 
 					ReleaseSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 언락
@@ -1314,6 +1316,7 @@ namespace Library_Jingyu
 			// 4. Room에서 필요한 정보들 받아두기
 			iSendRoomNo = NowRoom->m_iRoomNo;
 			iBattleServerNo = NowRoom->m_iBattleServerNo;
+			ullBattleSessionID = NowRoom->m_ullBattleSessionID;
 			memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
 
 
@@ -1365,7 +1368,7 @@ namespace Library_Jingyu
 		// 2. 해당 룸이 있는 배틀서버의 정보 알아오기
 		AcquireSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 락
 
-		auto FindBattle = m_BattleServer_Umap.find(iBattleServerNo);
+		auto FindBattle = m_BattleServer_Umap.find(ullBattleSessionID);
 
 		// 여기서 배틀서버가 없는 것은 배틀서버가 죽었다는 것 밖에 안됨.
 		if (FindBattle == m_BattleServer_Umap.end())
@@ -1401,7 +1404,7 @@ namespace Library_Jingyu
 		SendBuff->PutData(cSendEnterToken, 32);
 
 		SendBuff->PutData((char*)NowBattle->m_tcChatIP, 32);
-		SendBuff->PutData((char*)NowBattle->m_wChatPort, 2);
+		SendBuff->PutData((char*)&NowBattle->m_wChatPort, 2);
 
 		ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
 
@@ -1421,7 +1424,7 @@ namespace Library_Jingyu
 
 
 		// 5. 매칭 Lan서버를 통해, 방 정보 Send하기
-		SendPacket(SessionID, SendBuff);
+		pMatchServer->SendPacket(SessionID, SendBuff);
 	}
 
 	
@@ -1674,7 +1677,8 @@ namespace Library_Jingyu
 		NewRoom->m_ui64RoomKey = Create_RoomKey(BattleServerNo, RoomNo);
 		NewRoom->m_iRoomNo = RoomNo;
 		NewRoom->m_iEmptyCount = MaxUser;
-		NewRoom->m_iBattleServerNo = BattleServerNo;		
+		NewRoom->m_iBattleServerNo = BattleServerNo;
+		NewRoom->m_ullBattleSessionID = SessionID;
 		NewRoom->m_uset_JoinUser.clear();	
 
 

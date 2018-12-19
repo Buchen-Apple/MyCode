@@ -192,8 +192,7 @@ namespace Library_Jingyu
 			int ActiveWorker;
 			int CreateAccept;
 			int HeadCode;
-			int XORCode1;
-			int XORCode2;
+			int XORCode;
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;

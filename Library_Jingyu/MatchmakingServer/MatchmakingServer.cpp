@@ -1275,7 +1275,7 @@ namespace Library_Jingyu
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_MATCH_RES_GAME_ROOM;
-		BYTE SendStatus = 0;
+		BYTE SendStatus = 1;
 
 		SendBuff->PutData((char*)&Type, 2);
 		SendBuff->PutData((char*)&SendStatus, 1);
@@ -1318,6 +1318,7 @@ namespace Library_Jingyu
 			gMatchServerDump->Crash();
 
 		// 서버가 정상적으로 맞다면 할 것 없음.
+		m_bLoginCheck = true;
 	}
 
 

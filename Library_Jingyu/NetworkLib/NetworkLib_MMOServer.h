@@ -263,8 +263,7 @@ namespace Library_Jingyu
 
 		// MMO서버의 Config들.
 		BYTE m_bCode;
-		BYTE m_bXORCode_1;
-		BYTE m_bXORCode_2;
+		BYTE m_bXORCode;
 
 		// 리슨소켓
 		SOCKET m_soListen_sock;
@@ -474,12 +473,12 @@ namespace Library_Jingyu
 		// -----------------------
 
 		// 서버 시작
-		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 1번코드, XOR 2번코드] 입력받음.
+		// [오픈 IP(바인딩 할 IP), 포트, 워커스레드 수, 활성화시킬 워커스레드 수, 엑셉트 스레드 수, TCP_NODELAY 사용 여부(true면 사용), 최대 접속자 수, 패킷 Code, XOR 코드] 입력받음.
 		//
 		// return false : 에러 발생 시. 에러코드 셋팅 후 false 리턴
 		// return true : 성공
 		bool Start(const TCHAR* bindIP, USHORT port, int WorkerThreadCount, int ActiveWThreadCount, int AcceptThreadCount, bool Nodelay, int MaxConnect,
-			BYTE Code, BYTE XORCode1, BYTE XORCode2);
+			BYTE Code, BYTE XORCode1);
 
 		// 서버 스탑.
 		void Stop();

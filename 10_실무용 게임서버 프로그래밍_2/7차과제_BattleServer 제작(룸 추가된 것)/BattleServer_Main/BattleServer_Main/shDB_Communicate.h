@@ -22,7 +22,7 @@ namespace Library_Jingyu
 
 		// Player ฦ๗ภฮลอ
 		LPVOID pPointer;
-		TCHAR m_tcResponse[200];
+		TCHAR m_tcResponse[420];
 
 		INT64 AccountNo;
 	};

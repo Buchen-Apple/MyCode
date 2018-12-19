@@ -662,6 +662,8 @@ namespace Library_Jingyu
 
 				DWORD Check = WSAGetLastError();
 
+				ConnectTryCount++;
+
 				// 우드블럭이 뜬 경우
 				if (Check == WSAEWOULDBLOCK)
 				{
@@ -748,9 +750,7 @@ namespace Library_Jingyu
 
 				// 이미 연결이 되었다면 break;
 				else if (Check == WSAEISCONN)
-					break;		
-
-				ConnectTryCount++;
+					break;					
 			}
 
 			// ------------------			
