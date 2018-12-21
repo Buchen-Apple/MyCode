@@ -15,6 +15,8 @@
 
 #include <process.h>
 #include <strsafe.h>
+#include <cmath>
+#include <algorithm>
 
 using namespace rapidjson;
 
@@ -63,9 +65,6 @@ namespace Library_Jingyu
 
 		// 마지막 전적 저장 상태 확인
 		m_bLastDBWriteFlag = false;
-
-		// DBWrite 카운트 초기화
-		m_iDBWriteCount = 0;
 	}
 
 	// 소멸자
@@ -280,10 +279,10 @@ namespace Library_Jingyu
 		// 전적 중, 플레이 횟수 증가. 그리고 DB에 저장
 		++m_iRecord_PlayCount;
 
-		DB_WORK_CONTENT_UPDATE_PLAYCOUNT* CountWrite = (DB_WORK_CONTENT_UPDATE_PLAYCOUNT*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+		DB_WORK_CONTENT_UPDATE* CountWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
-		CountWrite->m_iRecord_PlayCount = m_iRecord_PlayCount;
+		CountWrite->m_iCount = m_iRecord_PlayCount;
 
 		CountWrite->AccountNo = m_Int64AccountNo;
 
@@ -346,10 +345,11 @@ namespace Library_Jingyu
 
 
 
-		// 3. 생존한 유저 수 감소.
+		// 3. 나가는 유저가 생존한 유저였을 경우, 생존한 유저 수 감소.
 		// 생존한 유저 수로 승리여부를 판단해야 하기 때문에 
 		// 유저가 게임에서 나가거나 HP가 0이되어 사망할 경우 감소시켜야 함
-		--NowRoom->m_iAliveUserCount;
+		if(m_bAliveFlag == true)
+			--NowRoom->m_iAliveUserCount;
 
 		// 감소 후, 0보다 적으면 말도 안됨.
 		if (NowRoom->m_iAliveUserCount < 0)
@@ -391,10 +391,10 @@ namespace Library_Jingyu
 			m_iRecord_PlayTime = m_iRecord_PlayTime + AddTime;
 
 			// DB에 Write 준비
-			DB_WORK_CONTENT_UPDATE_PLAYTIME* WriteWork = (DB_WORK_CONTENT_UPDATE_PLAYTIME*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iRecord_PlayTime = m_iRecord_PlayTime;
+			WriteWork->m_iCount = m_iRecord_PlayTime;
 
 			WriteWork->AccountNo = m_Int64AccountNo;
 
@@ -547,7 +547,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)&AccountNo, 8);
 
 		// 3. 혹시 아직 DBWrite 중인지 체크
-		if (m_pParent->InsertDBWriteCountFunc(AccountNo, 1) == false)
+		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
 			InterlockedIncrement(&m_pParent->m_DBWrie_LoginCount);
 
@@ -884,7 +884,6 @@ namespace Library_Jingyu
 
 			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
 			InterlockedIncrement(&m_pParent->m_lReadyRoomCount);
-			InterlockedDecrement(&m_pParent->m_lNowWaitRoomCount);
 
 			// 4) 방의 상태를 Ready로 변경
 			NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;			
@@ -1188,8 +1187,12 @@ namespace Library_Jingyu
 			return;
 		}
 
+		// 5. 타겟이 사망 상태라면 그냥 리턴
+		if (Target->m_bAliveFlag == false)
+			return;
+
 		
-		// 5. 타겟과 거리 계산
+		// 6. 타겟과 거리 계산
 		// 피타고라스 정리 (a2 + b2 = c2)
 		// 두 점간의 거리 구함 (c)
 		float a = (m_fPosX - Target->m_fPosX);
@@ -1202,7 +1205,7 @@ namespace Library_Jingyu
 			return;
 
 
-		// 6. hp 차감 처리
+		// 7. hp 차감 처리
 		// 여기까지 오면 데미지 대상이 있는것.
 
 		// 타겟에게 입힐 데미지 계산
@@ -1241,7 +1244,7 @@ namespace Library_Jingyu
 		
 
 
-		// 6. 방 내의 모든 유저에게 응답패킷 보내기 (자기 자신 포함)
+		// 8. 방 내의 모든 유저에게 응답패킷 보내기 (자기 자신 포함)
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_GAME_RES_HIT_DAMAGE;
@@ -1258,7 +1261,7 @@ namespace Library_Jingyu
 		NowRoom->SendPacket_BroadCast(SendBuff);
 
 
-		// 7. 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
+		// 9. 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
 		if (TargetHP == 0)
 		{
 			// 피해자의 생존 플래그를 false로 변경
@@ -1293,10 +1296,10 @@ namespace Library_Jingyu
 			++m_iRecord_Kill;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE_KILL* KillWrite = (DB_WORK_CONTENT_UPDATE_KILL*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 		
 			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
-			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
+			KillWrite->m_iCount = m_iRecord_Kill;
 
 			KillWrite->AccountNo = m_Int64AccountNo;
 
@@ -1311,10 +1314,10 @@ namespace Library_Jingyu
 			++Target->m_iRecord_Die;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE_DIE* DieWrite = (DB_WORK_CONTENT_UPDATE_DIE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
+			DieWrite->m_iCount = Target->m_iRecord_Die;
 
 			DieWrite->AccountNo = TargetAccountNo;
 
@@ -1383,12 +1386,6 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&HitPointZ, 4);
 
 		NowRoom->SendPacket_BroadCast(SendBuff, m_Int64AccountNo);
-
-
-
-		// 5. 패킷을 받은 시간 갱신
-		// 패킷을 브로드캐스트 하는 시간은 100m/s에 안잡히게 하기 위해 여기서 시간 갱신
-		m_dwFire2_StartTime = timeGetTime();
 	}
 
 	// KickDamage
@@ -1425,30 +1422,13 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
 
 
-
-		// 2. Fire_2 패킷을 받은 시간 체크
-		DWORD FireTime = m_dwFire2_StartTime;
-
-		// 기존 시간은 0으로 초기화.
-		m_dwFire2_StartTime = 0;
-
-		// 100m/s 이내로 왔는지 체크
-		if ((timeGetTime() - FireTime) > 100)
-		{
-			// 100m/s가 지난 후에 왔다면 패킷 무시
-			return;
-		}
-
-
-
-		// 3. 100 m/s 이내로 왔다면 마샬링
+		// 2. 방이 있다면, 마샬링
 		INT64 TargetAccountNo; // 피해자 AccountNo
 
 		Packet->GetData((char*)&TargetAccountNo, 8);
 
 
-
-		// 4. 해당 방에 피해자 AccountNo가 있나 체크
+		// 3. 해당 방에 피해자 AccountNo가 있나 체크
 		CGameSession* Target = NowRoom->Find(TargetAccountNo);
 
 		if (Target == nullptr)
@@ -1462,6 +1442,10 @@ namespace Library_Jingyu
 
 			return;
 		}
+
+		// 4. 타겟이 사망 상태라면 그냥 리턴
+		if (Target->m_bAliveFlag == false)
+			return;
 
 
 		// 5. 공격자와 피격자의 거리 구하기.
@@ -1536,10 +1520,10 @@ namespace Library_Jingyu
 			++m_iRecord_Kill;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE_KILL* KillWrite = (DB_WORK_CONTENT_UPDATE_KILL*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
-			KillWrite->m_iRecord_Kill = m_iRecord_Kill;
+			KillWrite->m_iCount = m_iRecord_Kill;
 
 			KillWrite->AccountNo = m_Int64AccountNo;
 
@@ -1553,10 +1537,10 @@ namespace Library_Jingyu
 			++Target->m_iRecord_Die;
 
 			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE_DIE* DieWrite = (DB_WORK_CONTENT_UPDATE_DIE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-			DieWrite->m_iRecord_Die = Target->m_iRecord_Die;
+			DieWrite->m_iCount = Target->m_iRecord_Die;
 
 			DieWrite->AccountNo = TargetAccountNo;
 
@@ -1671,8 +1655,8 @@ namespace Library_Jingyu
 
 		// 4. 아이템과 유저의 거리 체크.
 		// +2 ~ -2 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)
-		if (m_fPosX + 2 < NowItem->m_fPosX || m_fPosX - 2 > NowItem->m_fPosX ||
-			m_fPosY + 2 < NowItem->m_fPosY || m_fPosY - 2 < NowItem->m_fPosY)
+		if(fabs(NowItem->m_fPosX - m_fPosX) > m_pParent->m_stConst.m_fGetItem_Correction ||
+			fabs(NowItem->m_fPosY - m_fPosY) > m_pParent->m_stConst.m_fGetItem_Correction)
 		{
 			return;
 		}
@@ -1992,10 +1976,10 @@ namespace Library_Jingyu
 
 
 				// 승리 카운트 DB에 저장.
-				DB_WORK_CONTENT_UPDATE_WIN* WriteWork = (DB_WORK_CONTENT_UPDATE_WIN*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+				DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 				WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
-				WriteWork->m_iRecord_Win = m_JoinUser_Vector[Index]->m_iRecord_PlayTime;
+				WriteWork->m_iCount = m_JoinUser_Vector[Index]->m_iRecord_PlayTime;
 
 				WriteWork->AccountNo = m_JoinUser_Vector[Index]->m_Int64AccountNo;
 
@@ -2072,10 +2056,20 @@ namespace Library_Jingyu
 
 		DWORD NowTime = timeGetTime();
 
+		// 초기 정보를 셋팅할 좌표값 셋팅
+		int SourceIndex = rand() % m_iJoinUserCount;
+
 		while (Index < Size)
 		{
-			m_JoinUser_Vector[Index]->m_fPosX = 1;
-			m_JoinUser_Vector[Index]->m_fPosY = 1;
+			m_JoinUser_Vector[Index]->m_fPosX = g_Data_Position[SourceIndex][0];
+			m_JoinUser_Vector[Index]->m_fPosY = g_Data_Position[SourceIndex][1];
+
+			// 이번에 셋팅한 좌표가, 인원수 비례 마지막 위치라면 다시 0으로 돌아간다.
+			if (SourceIndex == m_iJoinUserCount)
+				SourceIndex = 0;
+
+			else
+				SourceIndex++;
 
 			// 첫 HP
 			m_JoinUser_Vector[Index]->m_iHP = g_Data_HP;
@@ -2096,8 +2090,11 @@ namespace Library_Jingyu
 			++Index;
 		}
 
+		// 5. m_dwReaZoneTime과  m_dwTick갱신.
+		m_dwReaZoneTime = NowTime;
+		m_dwTick = NowTime;
 
-		// 5. 순회하며 패킷 보냄.		
+		// 6. 순회하며 패킷 보냄.		
 		int NowUserIndex = 0;
 		while (NowUserIndex < Size)
 		{
@@ -2114,13 +2111,13 @@ namespace Library_Jingyu
 					WORD Type = en_PACKET_CS_GAME_RES_CREATE_MY_CHARACTER;
 
 					MySendBuff->PutData((char*)&Type, 2);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosX, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosY, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iHP, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iBullet, 4);
+					MySendBuff->PutData((char*)&m_JoinUser_Vector[NowUserIndex]->m_fPosX, 4);
+					MySendBuff->PutData((char*)&m_JoinUser_Vector[NowUserIndex]->m_fPosY, 4);
+					MySendBuff->PutData((char*)&m_JoinUser_Vector[NowUserIndex]->m_iHP, 4);
+					MySendBuff->PutData((char*)&m_JoinUser_Vector[NowUserIndex]->m_iBullet, 4);
 
 					// 패킷 보내기	
-					m_JoinUser_Vector[Index]->SendPacket(MySendBuff);
+					m_JoinUser_Vector[NowUserIndex]->SendPacket(MySendBuff);
 				}
 
 
@@ -2128,20 +2125,20 @@ namespace Library_Jingyu
 				else
 				{
 					// 패킷 만들기
-					CProtocolBuff_Net* MySendBuff = CProtocolBuff_Net::Alloc();
+					CProtocolBuff_Net* OtherSendBuff = CProtocolBuff_Net::Alloc();
 
 					WORD Type = en_PACKET_CS_GAME_RES_CREATE_OTHER_CHARACTER;
 
-					MySendBuff->PutData((char*)&Type, 2);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_Int64AccountNo, 8);
-					MySendBuff->PutData((char*)m_JoinUser_Vector[Index]->m_tcNickName, 40);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosX, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosY, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iHP, 4);
-					MySendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iBullet, 4);
+					OtherSendBuff->PutData((char*)&Type, 2);
+					OtherSendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_Int64AccountNo, 8);
+					OtherSendBuff->PutData((char*)m_JoinUser_Vector[Index]->m_tcNickName, 40);
+					OtherSendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosX, 4);
+					OtherSendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_fPosY, 4);
+					OtherSendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iHP, 4);
+					OtherSendBuff->PutData((char*)&m_JoinUser_Vector[Index]->m_iBullet, 4);
 
 					// 패킷 보내기	
-					m_JoinUser_Vector[Index]->SendPacket(MySendBuff);
+					m_JoinUser_Vector[NowUserIndex]->SendPacket(OtherSendBuff);
 				}
 
 				++Index;
@@ -2199,10 +2196,10 @@ namespace Library_Jingyu
 			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
 			NowPlayer->m_bLastDBWriteFlag = true;
 
-			DB_WORK_CONTENT_UPDATE_PLAYTIME* WriteWork = (DB_WORK_CONTENT_UPDATE_PLAYTIME*)NowPlayer->m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)NowPlayer->m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime;
+			WriteWork->m_iCount = NowPlayer->m_iRecord_PlayTime;
 
 			WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
@@ -2354,7 +2351,6 @@ namespace Library_Jingyu
 				SendBuff->PutData((char*)&Type, 2);
 
 				// 아이템 ID
-				m_uiItemID++;
 				SendBuff->PutData((char*)&m_uiItemID, 4);
 
 				// 아이템 좌표
@@ -2720,6 +2716,251 @@ namespace Library_Jingyu
 
 		return true;
 	}
+
+	// ------------
+	// 레드존 관련 함수
+	// ------------
+
+	// 레드존 경고
+	// 이 함수는, 레드존 경고를 보내야 할 시점에 호출된다.
+	// 이미 밖에서, 호출 시점 다 체크 후 이 함수 호출.
+	//
+	// Parameter : 경고 시간(BYTE). 
+	// return : 없음
+	void CBattleServer_Room::stRoom::RedZone_Warning(BYTE AlertTimeSec)
+	{
+		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
+		if (m_iJoinUserCount <= 0)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
+		size_t Size = m_JoinUser_Vector.size();
+		if (m_iJoinUserCount != Size)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 3. 20초 뒤에 활성화 될 레드존의 타입을 알아낸다.
+		int RedZoneType = m_arrayRedZone[m_iRedZoneCount];
+
+		// 4. 레드존에 따라 타입 설정
+		WORD Type;
+		switch (RedZoneType)
+		{
+			// 왼쪽
+		case eu_REDZONE_TYPE::LEFT:
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_LEFT;
+			break;
+
+			// 오른쪽
+		case eu_REDZONE_TYPE::RIGHT:
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_RIGHT;
+			break;
+
+			// 위
+		case eu_REDZONE_TYPE::TOP:
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_TOP;
+			break;
+
+			// 아래
+		case eu_REDZONE_TYPE::BOTTOM:
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_BOTTOM;
+			break;
+
+		default:
+			g_BattleServer_Room_Dump->Crash();
+			break;
+		}
+
+		// 5. 방 안의 모든 유저에게 레드존 경고 패킷 보내기
+		CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+
+		SendBUff->PutData((char*)&Type, 2);
+		SendBUff->PutData((char*)&AlertTimeSec, 1);
+
+		if (SendPacket_BroadCast(SendBUff) == false)
+			g_BattleServer_Room_Dump->Crash();
+
+	}
+
+	// 레드존 활성화
+	// 이 함수는, 레드존이 활성화 될 시점에만 호출된다
+	// 즉, 활성화 할지 말지는 밖에서 정한 다음에 이 함수 호출
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattleServer_Room::stRoom::RedZone_Active()
+	{
+		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
+		if (m_iJoinUserCount <= 0)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
+		size_t Size = m_JoinUser_Vector.size();
+		if (m_iJoinUserCount != Size)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 3. 이번에 활성시킬 레드존을 알아낸다
+		int RedZoneType = m_arrayRedZone[m_iRedZoneCount];
+		m_iRedZoneCount++;
+
+		// 4. 활성화 시킬 레드존에 따라 안전지대를 갱신한다.
+		WORD Type;
+		switch (RedZoneType)
+		{
+			// 왼쪽
+		case eu_REDZONE_TYPE::LEFT:
+			m_fSafePos[0][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][1];
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_LEFT;
+			break;
+
+			// 오른쪽
+		case eu_REDZONE_TYPE::RIGHT:
+			m_fSafePos[1][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][1];
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_RIGHT;
+			break;
+
+			// 위
+		case eu_REDZONE_TYPE::TOP:
+			m_fSafePos[0][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][0];
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_TOP;
+			break;
+
+			// 아래
+		case eu_REDZONE_TYPE::BOTTOM:
+			m_fSafePos[1][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][0];
+			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_BOTTOM;
+			break;
+
+		default:
+			g_BattleServer_Room_Dump->Crash();
+			break;
+		}
+
+		// 5. 방 안의 모든 유저에게 레드존 활성화 패킷 보내기
+		CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+
+		SendBUff->PutData((char*)&Type, 2);
+
+		if(SendPacket_BroadCast(SendBUff) == false)
+			g_BattleServer_Room_Dump->Crash();
+	}
+
+	// 레드존 데미지 체크
+	// 이 함수는, 유저에게 데미지를 줘야 할 시점에 호출
+	// 즉, 줄지 말지는 밖에서 장한 다음에 이 함수 호출
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattleServer_Room::stRoom::RedZone_Damage()
+	{
+		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
+		if (m_iJoinUserCount <= 0)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 2. 백터 안의 유저와 변수가 다르면 크래시
+		size_t Size = m_JoinUser_Vector.size();
+		if (m_iJoinUserCount != Size)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 3. 룸 안의 모든 유저를 확인.
+		// 좌표가 안전지대가 맞는지 체크.
+		// 안전지대가 아니라면 데미지를 입힐 유저.
+		size_t Index = 0;
+		while (Index < Size)
+		{
+			// 생존한 유저만, 좌표 체크
+			if (m_JoinUser_Vector[Index]->m_bAliveFlag == true)
+			{
+				CGameSession* NowPlayer = m_JoinUser_Vector[Index];
+				
+				// 플레이어 X가
+				// - safe[0]의 X보다 작거나
+				// - safe[1]의 X보다 크거나
+				//
+				// 플레이어 Y가
+				// - safe[0]의 Y보다 작거나
+				// - safe[1]의 Y보다 크거나
+				if (NowPlayer->m_fPosX < m_fSafePos[0][0] ||
+					NowPlayer->m_fPosX > m_fSafePos[1][0] ||
+					NowPlayer->m_fPosY < m_fSafePos[0][1] ||
+					NowPlayer->m_fPosY > m_fSafePos[1][1])
+				{
+					// 위에 해당되면, 안전지대 밖에 있는것.
+					// 레드존 데미지 패킷 보냄 (데미지는 1씩 감소)
+					int HP = NowPlayer->m_iHP - 1;
+					if (HP < 0)
+						HP = 0;
+
+					NowPlayer->m_iHP = HP;
+
+					CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+					WORD Type = en_PACKET_CS_GAME_RES_REDZONE_DAMAGE;
+
+					SendBuff->PutData((char*)&Type, 2);
+					SendBuff->PutData((char*)&NowPlayer->m_Int64AccountNo, 8);
+					SendBuff->PutData((char*)&HP, 4);
+
+					// 모든 유저에게 보냄(자기자신 포함)
+					if (SendPacket_BroadCast(SendBuff) == false)
+						g_BattleServer_Room_Dump->Crash();
+
+					// 유저 HP가 0이되어 사망했다면, 사망 패킷 보냄
+					if (HP == 0)
+					{
+						INT64 AccountNo = NowPlayer->m_Int64AccountNo;
+
+						// 생존 플래그를 false로 변경
+						NowPlayer->m_bAliveFlag = false;
+
+						// 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
+						// 모든 유저가 죽었는데 또 죽었다고 한 것.
+						if (m_iAliveUserCount == 0)
+							g_BattleServer_Room_Dump->Crash();
+
+						// 룸의 생존 유저 수 카운트 1 감소
+						--m_iAliveUserCount;
+
+						// 패킷 보내기
+						CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+						WORD Type = en_PACKET_CS_GAME_RES_DIE;
+
+						SendBuff->PutData((char*)&Type, 2);
+						SendBuff->PutData((char*)&AccountNo, 8);
+
+						if (SendPacket_BroadCast(SendBuff) == false)
+							g_BattleServer_Room_Dump->Crash();
+
+
+						// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
+						CreateItem(NowPlayer);
+
+
+						// DB 저장 파트 -----------------------------------
+
+						// 사망자의 Die 카운트 증가
+						++NowPlayer->m_iRecord_Die;
+
+						// DBWrite 구조체 셋팅
+						DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+						DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
+						DieWrite->m_iCount = NowPlayer->m_iRecord_Die;
+
+						DieWrite->AccountNo = AccountNo;
+
+						// 요청하기
+						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
+						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);						
+					}
+
+				}
+			}
+
+			++Index;
+		}
+
+	}
+
 }
 
 // ----------------------------------------
@@ -3376,7 +3617,6 @@ namespace Library_Jingyu
 		if (NowPlayer->m_int64ClientKey != DBData->m_i64UniqueKey)
 			return;
 
-
 		// 2. Json데이터 파싱하기 (UTF-16)
 		GenericDocument<UTF16<>> Doc;
 		Doc.Parse(DBData->m_tcResponse);
@@ -3456,26 +3696,29 @@ namespace Library_Jingyu
 
 	// DB_Write에 대한 작업 후처리
 	//
-	// Parameter : DB_WORK_CONTENT_UPDATE*
+	// Parameter : DB_WORK*
 	// return : 없음
-	void CBattleServer_Room::Game_DBWrite(DB_WORK_CONTENT_UPDATE* DBData)
-	{
-		// 1. Json데이터 파싱하기 (UTF-16)
+	void CBattleServer_Room::Game_DBWrite(DB_WORK* DBData)
+	{	
+		// 1. 형 변환
+		DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)DBData;
+
+		// 2. Json데이터 파싱하기 (UTF-16)
 		GenericDocument<UTF16<>> Doc;
-		Doc.Parse(DBData->m_tcResponse);
+		Doc.Parse(NowWork->m_tcResponse);
 
 		int iResult = Doc[_T("result")].GetInt();
 
 
-		// 2. DB 요청 결과 확인
+		// 3. DB 요청 결과 확인
 		// 결과가 1이 아니라면 Crash.
 		// Write는 무조건 성공한다는 가정
 		if (iResult != 1)
 			g_BattleServer_Room_Dump->Crash();
 
 
-		// 3. DBWriteCount 1 줄이기
-		MinDBWriteCountFunc(DBData->AccountNo);		
+		// 4. DBWriteCount 1 줄이기
+		MinDBWriteCountFunc(NowWork->AccountNo);
 	}
 
 
@@ -3576,15 +3819,15 @@ namespace Library_Jingyu
 
 	// DBWrite 카운트 관리 자료구조에 유저를 추가하는 함수
 	//
-	// Parameter : AccountNo, Count(int)
+	// Parameter : AccountNo
 	// return : 성공 시 true
 	//		  : 실패(키 중복) 시 false
-	bool CBattleServer_Room::InsertDBWriteCountFunc(INT64 AccountNo, int WriteCount)
+	bool CBattleServer_Room::InsertDBWriteCountFunc(INT64 AccountNo)
 	{
 		AcquireSRWLockExclusive(&m_DBWrite_Umap_srwl);		// ----- DBWrite Umap Exclusive 락
 
 		// 1. 추가
-		auto ret = m_DBWrite_Umap.insert(make_pair(AccountNo, WriteCount));
+		auto ret = m_DBWrite_Umap.insert(make_pair(AccountNo, 1));
 
 		// 추가 실패 시 (중복 키) return false
 		if (ret.second == false)
@@ -3827,10 +4070,6 @@ namespace Library_Jingyu
 							// 때문에 리턴값 안받는다.
 							NowRoom->AliveFlag_True();
 
-							// 아이템 생성 후 stRoom의 아이템 자료구조에 추가.
-							// 그리고 모든 유저에게 아이템 생성 패킷 보냄
-							NowRoom->StartCreateItem();
-
 							// 방 안의 모든 유저에게, 배틀서버 대기방 플레이 시작 패킷 보내기
 							CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -3843,6 +4082,10 @@ namespace Library_Jingyu
 							// 카운트다운이 끝나기 전에 모든 유저가 나갈 가능성.
 							// 그래서 리턴값 안받는다.
 							NowRoom->SendPacket_BroadCast(SendBuff);
+
+							// 아이템 생성 후 stRoom의 아이템 자료구조에 추가.
+							// 그리고 모든 유저에게 아이템 생성 패킷 보냄
+							NowRoom->StartCreateItem();
 						}
 
 						InterlockedDecrement(&m_lReadyRoomCount);
@@ -3920,6 +4163,31 @@ namespace Library_Jingyu
 						NowRoom->m_bShutdownFlag = false;
 						NowRoom->m_uiItemID = 0;
 						NowRoom->m_pBattleServer = this;
+						NowRoom->m_bRedZoneWarningFlag = false;
+
+						// 레드존 생성 순서 셋팅
+						int RedIndex = rand() % 24;
+
+						int i = 0;
+						while (i < 4)
+						{
+							NowRoom->m_arrayRedZone[i] = m_arrayRedZoneCreate[RedIndex][i];
+							++i;
+						}
+						
+						// 그 외 레드존 관련 셋팅
+						NowRoom->m_dwReaZoneTime = 0;
+						NowRoom->m_dwTick = 0;
+						NowRoom->m_iRedZoneCount = 0;
+											
+
+						// 최초 안전지대 좌표 셋팅
+						NowRoom->m_fSafePos[0][0] = 0;
+						NowRoom->m_fSafePos[0][1] = 0;
+
+						NowRoom->m_fSafePos[1][0] = 153;
+						NowRoom->m_fSafePos[1][1] = 170;
+						
 
 						// 방 안의 아이템 클리어시키기
 						auto itor_begin = NowRoom->m_RoomItem_umap.begin();
@@ -4055,21 +4323,18 @@ namespace Library_Jingyu
 
 			try
 			{
-				// 일감 타입에 따라 일감 처리
-				switch (DBData->m_wWorkType)
+				// Write가 맞는지 체크
+				if (DBData->m_wWorkType < eu_PLAYCOUNT_UPDATE ||
+					DBData->m_wWorkType > eu_WIN_UPDATE)
 				{
-					// DB_Write 작업 후처리
-				case eu_DB_AFTER_TYPE::eu_WRITE:
-					Game_DBWrite((DB_WORK_CONTENT_UPDATE*)DBData);
-					break;
-
-					// 없는 일감 타입이면 에러.
-				default:
 					TCHAR str[200];
 					StringCchPrintf(str, 200, _T("OnGame_Update(). HTTP Type Error. Type : %d"), DBData->m_wWorkType);
 
 					throw CException(str);
 				}
+
+				// 맞다면 Write 함수 처리
+				Game_DBWrite(DBData);				
 
 			}
 			catch (CException& exc)
@@ -4108,6 +4373,7 @@ namespace Library_Jingyu
 		// Step 2. 게임 종료된 방 처리 	
 		// Setp 3. 게임 종료 체크
 		// Step 4. 생존자가 0명인 경우에도 게임 종료.
+		// Step 5. 정상적으로 플레이 중인 방의 경우 처리.
 
 		// 모든 방을 순회하며, PLAY 모드인 방에 한해 작업 진행
 		while (itor_Now != itor_End)
@@ -4193,6 +4459,67 @@ namespace Library_Jingyu
 					// 현 시점의 시간 저장
 					// 방 파괴 체크 용도
 					NowRoom->m_dwGameEndMSec = timeGetTime();
+				}
+
+				// Step 5. 정상적으로 플레이 중인 방의 경우
+				else
+				{
+					// -- 레드존 관련 체크
+					// 현재 게임이 시작된 방인지 체크
+					// 룸의 상태만 PLAY로 넘어오고, 아직 모든 유저가 Game모드로 넘어오지 않았을 경우에도
+					// 이 로직을 탈 수 있으니, 정말로 모든 유저가 Game모드로 넘어와서 게임이 시작했는지 체크
+					if (NowRoom->m_dwReaZoneTime > 0)
+					{
+						// 현재 시간 구해둠
+						DWORD NowTime = timeGetTime();
+
+						// -- 레드존 경고 체크						
+						if (NowRoom->m_bRedZoneWarningFlag == false)
+						{
+							// 레드존 경고를 안보낸 상태라면, 시간 체크 후 경고패킷 보냄
+							if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwRedZoneWarningTime)
+							{
+								// 레드존 경고 함수 호출
+								NowRoom->RedZone_Warning((BYTE)(m_stConst.m_dwRedZoneWarningTime / 1000));
+
+								// 레드존 경고 보냄 플래그를 true로 만든다.
+								NowRoom->m_bRedZoneWarningFlag = true;
+							}
+						}
+
+						// -- 레드존 알람을 보낸 상태라면 레드존 활성화 체크
+						else
+						{
+							// -- 레드존 활성화 체크
+							if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwReaZoneActiveTime)
+							{
+								// 레드존 활성화 함수 호출
+								NowRoom->RedZone_Active();
+
+								// 레드존 활성화 시간 갱신. 다시 40초를 기다려야함.
+								NowRoom->m_dwReaZoneTime = NowTime;
+
+								// 레드존 알람 보냄 플래그 원복
+								NowRoom->m_bRedZoneWarningFlag = false;
+
+							}
+						}
+
+						// -- 레드존 데미지 체크						
+						// 활성화된 레드존이 하나라도 있는 경우에만 해당 로직 진행
+						if (NowRoom->m_iRedZoneCount > 0)
+						{
+							// 1초가 되었나 체크. 데미지는 1초단위로 체크하기 때문에
+							if ((NowTime - NowRoom->m_dwTick) >= 1000)
+							{
+								// 레드존 틱 데미지 체크 함수 호출
+								NowRoom->RedZone_Damage();
+
+								// tick 갱신
+								NowRoom->m_dwTick = NowTime;
+							}						
+						}
+					}
 				}
 			}
 
@@ -4377,8 +4704,49 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_Room_Umap_srwl);
 		InitializeSRWLock(&m_DBWrite_Umap_srwl);
 
-		// 게임 내에서 사용되는, 거리당 데미지.
+		// 게임 내에서 사용되는, 거리 1당 데미지.
 		m_fFire1_Damage = g_Data_HitDamage / (float)15;	// 총알 데미지
+
+
+		// next_permutation을 이용해 레드존 생성 순서를 미리 만들어둠.
+		// 방생성 시, 이것 중 하나를 랜덤으로 뽑아서 방에게 할당해준다.
+		vector<int> v(4);
+
+		for (int i = 0; i < 4; ++i)
+			v[i] = i;
+
+		int h = 0;
+		do 
+		{
+			for (int i = 0; i < 4; i++)
+				m_arrayRedZoneCreate[h][i] = v[i];
+
+			h++;
+
+		} while (next_permutation(v.begin(), v.end()));
+
+		// 레드존 타입에 따른 활성 위치 미리 정해줌.
+		m_arrayRedZoneRange[0][0][0] = 0;	// Left x1
+		m_arrayRedZoneRange[0][0][1] = 0;	// Left y1
+		m_arrayRedZoneRange[0][1][0] = 153;	// Left x2
+		m_arrayRedZoneRange[0][1][1] = 50;	// Left y2
+
+		m_arrayRedZoneRange[1][0][0] = 0;	// Right x1
+		m_arrayRedZoneRange[1][0][1] = 115;	// Right y1
+		m_arrayRedZoneRange[1][1][0] = 153;	// Right x2
+		m_arrayRedZoneRange[1][1][1] = 170;	// Right y2
+
+		m_arrayRedZoneRange[2][0][0] = 0;	// Top x1
+		m_arrayRedZoneRange[2][0][1] = 0;	// Top y1
+		m_arrayRedZoneRange[2][1][0] = 44;	// Top x2
+		m_arrayRedZoneRange[2][1][1] = 170;	// Top y2
+
+
+		m_arrayRedZoneRange[3][0][0] = 102;	// bottom x1
+		m_arrayRedZoneRange[3][0][1] = 0;	// bottom y1
+		m_arrayRedZoneRange[3][1][0] = 153;	// bottom x2
+		m_arrayRedZoneRange[3][1][1] = 170;	// bottom y2
+
 	}
 
 	CBattleServer_Room::~CBattleServer_Room()

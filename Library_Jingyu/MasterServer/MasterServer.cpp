@@ -663,6 +663,10 @@ namespace Library_Jingyu
 		UINT64 ClinetKey;
 		Payload->GetData((char*)&ClinetKey, 8);
 
+		// ------------ 배틀 랜 서버의 자료구조에서 삭제	
+		pBattleServer->RoomEnter_Fail_Func(ClinetKey);
+
+		/*
 		// ------------ 배틀 랜 서버의 자료구조에서 삭제		
 		// 1. 배틀의 함수 호출.
 		// Room을 체크해 카운트 증감처리
@@ -676,6 +680,7 @@ namespace Library_Jingyu
 		// 이 중, 0, 2, 3은 정상. 1만 비정상
 		if (Ret == 1)
 			g_MasterDump->Crash();
+		*/
 	}
 
 

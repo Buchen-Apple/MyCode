@@ -229,7 +229,7 @@ namespace Library_Jingyu
 	// Parameter : 없음
 	// return : 없음
 	void Matchmaking_Net_Server::ServerInfo_DBInsert()
-	{		
+	{	
 		// 1. Insert 쿼리 날린다.	
 		char cQurey[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
 		m_MatchDBcon->Query_Save(cQurey, m_iServerNo, m_cServerIP, m_stConfig.Port);
@@ -244,7 +244,7 @@ namespace Library_Jingyu
 			// 만약 중복 키 에러라면, 이미 데이터가 존재한다는 것. Update 쿼리 날림
 			if (Error == 1062)
 			{
-				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW(), `connectuser` = 10 WHERE `serverno` = %d\0";
+				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW() WHERE `serverno` = %d\0";
 				m_MatchDBcon->Query_Save(cUpdateQuery, m_iServerNo);
 
 				// 에러 체크
@@ -701,6 +701,15 @@ namespace Library_Jingyu
 
 		// 5. 마스터에게 Send
 		m_pLanClient->SendPacket(m_pLanClient->m_ullClientID, SendBuff);
+
+		// 6. 클라이언트에게 방 입장 성공 확인 패킷 보냄
+		CProtocolBuff_Net* ClientSendBuff = CProtocolBuff_Net::Alloc();
+
+		Type = en_PACKET_CS_MATCH_RES_GAME_ROOM_ENTER;
+		ClientSendBuff->PutData((char*)&Type, 2);
+
+		SendPacket(SessionID, ClientSendBuff);
+
 	}
 	
 	// 방 입장 실패
@@ -961,12 +970,12 @@ namespace Library_Jingyu
 			ErasePlayer->m_bLoginCheck = false;
 		}		
 
-		// 4. 방 정보를 받은 유저 중, 배틀 방 접속 성공 패킷을 안보낸 유저라면, 
+		// 4. 방 입장 요청을 보낸 유저 중, 배틀 방 접속 성공 패킷을 안보낸 유저라면, 
 		// 방 입장 실패 패킷을 마스터에게 보냄
-		if (ErasePlayer->m_bRoomInfoOK == true)
+		if (ErasePlayer->m_bSendMaster_RoomInfo == true)
 		{
-			// 마스터에게 방 정보 받음 플래그 변경
-			ErasePlayer->m_bRoomInfoOK = false;
+			// 방 입장 요청 플래그 변경
+			ErasePlayer->m_bSendMaster_RoomInfo = false;
 
 			if (ErasePlayer->m_bBattleRoomEnterCheck == false)
 			{
@@ -1181,7 +1190,10 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 3. 마스터와 연결되어 있으면, 보낼 패킷 제작
+		// 3. 배틀방 정보 요청을 보낸 유저임. 플래그 변경
+		NowPlayer->m_bSendMaster_RoomInfo = true;
+
+		// 4. 마스터와 연결되어 있으면, 보낼 패킷 제작
 		// Lan 직렬화 버퍼 사용
 		WORD Type = en_PACKET_MAT_MAS_REQ_GAME_ROOM;
 
@@ -1190,7 +1202,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&Type, 2);
 		SendBuff->PutData((char*)&NowPlayer->m_ui64ClientKey, 8);
 
-		// 3. 데이터 Send
+		// 5. 데이터 Send
 		SendPacket(m_ullClientID, SendBuff);
 	}
 
@@ -1291,11 +1303,8 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&ChatServerPort, 2);
 		SendBuff->PutData((char*)&ClinetKey, 8);
 
-		// 6. 마스터에게, 방 정보 받았음 플래그 변경
-		NowPlayer->m_bRoomInfoOK = true;
 
-
-		// 7. 클라에게 보내기 (Net으로 보내기)
+		// 6. 클라에게 보내기 (Net으로 보내기)
 		m_pParent->SendPacket(NowPlayer->m_ullSessionID, SendBuff);
 	}
 

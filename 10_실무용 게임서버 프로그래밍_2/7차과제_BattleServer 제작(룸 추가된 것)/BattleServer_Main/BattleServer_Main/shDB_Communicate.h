@@ -41,84 +41,15 @@ namespace Library_Jingyu
 		INT64 AccountNo;
 	};
 
-	// Game스레드에서 contents 정보 갱신할 때 사용하는 프로토콜
+	// ContentDB에 유저 정보를 Write할 떄 사용
 	struct DB_WORK_CONTENT_UPDATE
 	{
 		WORD m_wWorkType;
 
-		int		m_iRecord_PlayCount;	// 플레이 횟수
-		int		m_iRecord_PlayTime;		// 플레이 시간 초단위
-		int		m_iRecord_Kill;			// 죽인 횟수
-		int		m_iRecord_Die;			// 죽은 횟수
-		int		m_iRecord_Win;			// 최종승리 횟수
-
 		// Update의 res는 굉장히 짧음. 보통 result : 1임
 		TCHAR m_tcResponse[30];
 
-		INT64 AccountNo;		
-	};
-
-	// 유저의 PlayCount 횟수를 업데이트 할 때 사용
-	struct DB_WORK_CONTENT_UPDATE_PLAYCOUNT
-	{
-		WORD m_wWorkType;
-
-		// Update의 res는 굉장히 짧음. 보통 result : 1임
-		TCHAR m_tcResponse[30];
-
-		int		m_iRecord_PlayCount;	// 플레이 횟수		
-
-		INT64 AccountNo;
-	};
-
-	// 유저의 PlayTime을 업데이트 할 때 사용
-	struct DB_WORK_CONTENT_UPDATE_PLAYTIME
-	{
-		WORD m_wWorkType;
-
-		// Update의 res는 굉장히 짧음. 보통 result : 1임
-		TCHAR m_tcResponse[30];
-
-		int		m_iRecord_PlayTime;	// 플레이 횟수		
-
-		INT64 AccountNo;
-	};
-
-	// 유저의 Kill 횟수를 업데이트 할 때 사용
-	struct DB_WORK_CONTENT_UPDATE_KILL
-	{
-		WORD m_wWorkType;
-
-		// Update의 res는 굉장히 짧음. 보통 result : 1임
-		TCHAR m_tcResponse[30];
-
-		int		m_iRecord_Kill;			// 죽인 횟수	
-
-		INT64 AccountNo;
-	};
-
-	// 유저의 Die 횟수를 업데이트 할 때 사용
-	struct DB_WORK_CONTENT_UPDATE_DIE
-	{
-		WORD m_wWorkType;
-
-		// Update의 res는 굉장히 짧음. 보통 result : 1임
-		TCHAR m_tcResponse[30];
-
-		int		m_iRecord_Die;			// 죽은 횟수		
-
-		INT64 AccountNo;
-	};
-
-	// 유저의 Win 횟수를 업데이트 할 때 사용
-	struct DB_WORK_CONTENT_UPDATE_WIN
-	{
-		WORD m_wWorkType;
-
-		// Update의 res는 굉장히 짧음. 보통 result : 1임
-		TCHAR m_tcResponse[30];
-
-		int		m_iRecord_Win;			// 최종승리 횟수		
+		int		m_iCount;	// 갱신할 카운트		
 
 		INT64 AccountNo;
 	};
@@ -150,9 +81,6 @@ namespace Library_Jingyu
 
 		// 로그인 패킷에 대한 정보 가져오기
 		eu_LOGIN_INFO,
-
-		// DB Write 작업(전체 저장)
-		eu_WRITE,
 
 		// PlayCount 저장
 		eu_PLAYCOUNT_UPDATE,

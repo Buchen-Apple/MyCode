@@ -40,6 +40,15 @@ namespace Library_Jingyu
 			MEDKIT = 2		// 메드킷
 		};
 
+		// 레드존 타입
+		enum eu_REDZONE_TYPE
+		{
+			LEFT = 0,	// 왼쪽 레드존
+			RIGHT,		// 오른쪽
+			TOP,		// 위
+			BOTTOM		// 아래
+		};
+
 		// CMMOServer의 cSession을 상속받는 세션 클래스
 		class CGameSession :public CMMOServer::cSession
 		{
@@ -93,15 +102,6 @@ namespace Library_Jingyu
 
 
 			// -----------------------
-			// DBWrite 체크.
-			// -----------------------
-
-			// DBWrite 카운트 증가.
-			// 이게 0이 되면 빠진다.
-			int m_iDBWriteCount;
-
-
-			// -----------------------
 			// 전적 정보
 			// -----------------------
 			int		m_iRecord_PlayCount;	// 플레이 횟수
@@ -147,13 +147,6 @@ namespace Library_Jingyu
 			// 패킷을 받은 순간 값이 들어가며, 데미지 패킷이 오면 다시 0으로 초기화
 			// 즉, 해당 값이 0이면 Fire_1 공격이 안온 상태
 			DWORD m_dwFire1_StartTime;
-
-			// Fire_2(발차기)를 시작한 시간
-			// 이 시간부터 100m/s이내에 데미지 패킷이 와야 정상으로 처리해줌.
-			// 패킷을 받은 순간 값이 들어가며, 데미지 패킷이 오면 다시 0으로 초기화
-			// 즉, 해당 값이 0이면 Fire_2 공격이 안온 상태
-			DWORD m_dwFire2_StartTime;
-
 
 			
 		private:
@@ -366,7 +359,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const BYTE m_iMaxJoinCount = 2;	
+			const int m_iMaxJoinCount = 2;	
 
 			// ------------
 
@@ -384,6 +377,37 @@ namespace Library_Jingyu
 			// ------------
 
 			CBattleServer_Room* m_pBattleServer;
+
+
+			// ------------
+
+			// 레드존 활성화 순서.
+			// eu_REDZONE_TYPE와 비교해 체크한다.
+			int m_arrayRedZone[4];
+
+			// 레드존 활성화 체크를 위한 시간.
+			// 이 시간으로부터 40초가 지났으면 레드존 활성화.
+			DWORD m_dwReaZoneTime;
+
+			// 레드존 데미지 Tick 체크를 위한 시간.
+			// 1초단위로 갱신
+			DWORD m_dwTick;
+
+			// 현재 활성화된 레드존의 수.
+			// 사실, bool 형태로 활성화 여부만 체크해도 되지만
+			// 이왕 체크하는거 그냥 ++해봄. 
+			// 혹시 나중에 현재 활성화된 레드존의 수가 필요할 수도 있으니..
+			int m_iRedZoneCount;
+
+			// 안전지대 X,Y 좌표.
+			// 레드존이 활성화 될 때 마다 변경된다.
+			float m_fSafePos[2][2];
+
+			// 이번에 생성될, 레드존에 대한 경고 패킷 보냄 여부.
+			// 레드존 활성화 후 다시 false로 되돌린다.
+			bool m_bRedZoneWarningFlag;
+		
+			// ------------
 
 
 			// ------------
@@ -519,6 +543,35 @@ namespace Library_Jingyu
 			//		  : 실패 시  false
 			bool Item_Erase(stRoomItem* InsertPlayer);
 
+
+			// ------------
+			// 레드존 관련 함수
+			// ------------
+			
+			// 레드존 경고
+			// 이 함수는, 레드존 경고를 보내야 할 시점에 호출된다.
+			// 이미 밖에서, 호출 시점 다 체크 후 이 함수 호출.
+			//
+			// Parameter : 경고 시간(BYTE). 
+			// return : 없음
+			void RedZone_Warning(BYTE AlertTimeSec);
+
+			// 레드존 활성화
+			// 이 함수는, 레드존이 활성화 될 시점에만 호출된다
+			// 즉, 활성화 할지 말지는 밖에서 정한 다음에 이 함수 호출
+			//
+			// Parameter : 없음
+			// return : 없음
+			void RedZone_Active();
+
+			// 레드존 데미지 체크
+			// 이 함수는, 유저에게 데미지를 줘야 할 시점에 호출
+			// 즉, 줄지 말지는 밖에서 장한 다음에 이 함수 호출
+			//
+			// Parameter : 없음
+			// return : 없음
+			void RedZone_Damage();
+
 		};
 
 		// 방 상태 state
@@ -543,7 +596,7 @@ namespace Library_Jingyu
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
-			const LONG m_lMaxTotalRoomCount = 500;
+			const LONG m_lMaxTotalRoomCount = 200;
 
 			// 최대 존재할 수 있는 대기방 수
 			// 고정 값
@@ -574,6 +627,17 @@ namespace Library_Jingyu
 			// Play상태의 방이, 게임 종료 후 몇 초동안 대기하는지.
 			// 밀리세컨드 단위
 			const int m_iRoomCloseDelay = 5000;
+
+			// 아이템 획득 좌표 오차
+			float m_fGetItem_Correction = 2;
+
+			// 레드존 활성화 시간.
+			// 게임 시작 후, 아래 시간마다 하나씩 활성화
+			DWORD m_dwReaZoneActiveTime = 40000; // (현재 40초)
+		
+			// 레드존 경고 보내는 시간.
+			// 레드존 활성화 시간이, 이 변수만큼 남았을 경우, 경고 패킷을 보낸다.
+			DWORD m_dwRedZoneWarningTime = 20000; // (현재 20초)
 		};
 
 
@@ -611,6 +675,18 @@ namespace Library_Jingyu
 		// 나의 서버 No
 		// 마스터 서버가 할당해 준다.
 		int m_iServerNo;
+
+
+		// -----------------------
+		// 레드존 관련 변수
+		// -----------------------
+
+		// 레드존 생성 순서를 위한 순열. 생성자에서 next_permutation을 이용해 생성
+		// 4!
+		int m_arrayRedZoneCreate[24][4];
+
+		// 레드존 타입에 따른 활성 위치
+		float m_arrayRedZoneRange[4][2][2];
 
 
 
@@ -811,9 +887,9 @@ namespace Library_Jingyu
 		
 		// DB_Write에 대한 작업 후 처리
 		//
-		// Parameter : DB_WORK_CONTENT_UPDATE*
+		// Parameter : DB_WORK*
 		// return : 없음
-		void Game_DBWrite(DB_WORK_CONTENT_UPDATE* DBData);
+		void Game_DBWrite(DB_WORK* DBData);
 
 
 
@@ -851,10 +927,10 @@ namespace Library_Jingyu
 
 		// DBWrite 카운트 관리 자료구조에 유저를 추가하는 함수
 		//
-		// Parameter : AccountNo, Count(int)
+		// Parameter : AccountNo
 		// return : 성공 시 true
 		//		  : 실패(키 중복) 시 false
-		bool InsertDBWriteCountFunc(INT64 AccountNo, int WriteCount);
+		bool InsertDBWriteCountFunc(INT64 AccountNo);
 
 		// DBWrite 카운트 관리 자료구조에서 유저를 검색 후, 
 		// 카운트(Value)를 1 증가하는 함수

@@ -72,17 +72,17 @@ namespace Library_Jingyu
 			// 실제 로그인 패킷을 받았는지 체크. true면 받음. false면 안받음
 			bool m_bLoginCheck;			
 
-			// 방 접속 성공 패킷을 받았는지 체크. true면 받음
+			// 배틀서버 방 접속 성공 패킷을 보낸 유저인지 체크. true면 보낸유저.
 			bool m_bBattleRoomEnterCheck;
 
-			// 마스터 서버로부터 방 정보를, 정상적으로 받은 유저. true면 받음
-			bool m_bRoomInfoOK;
+			// 마스터 서버로 방 정보 요청을 보낸 유저. true면 보낸 유저.
+			bool m_bSendMaster_RoomInfo;
 
 			stPlayer()
 			{
 				m_bLoginCheck = false;	// 최초 생성시에는 flase로 시작
 				m_bBattleRoomEnterCheck = false;	// 최초 생성시에는 flase로 시작
-				m_bRoomInfoOK = false;
+				m_bSendMaster_RoomInfo = false;
 			}
 		};
 		

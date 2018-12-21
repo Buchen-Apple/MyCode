@@ -1557,7 +1557,30 @@ namespace Library_Jingyu
 				if (NowSession->m_iWSASendCount > 0)
 					cMMOServer_Dump->Crash();
 
+				int i = 0;
+
+				while (i < UseSize)
+				{
+					if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[i]) == -1)
+						cMMOServer_Dump->Crash();
+
+					// 헤더를 넣어서, 패킷 완성하기		
+					//NowSession->m_PacketArray[iPacketIndex]->Encode(Head, XORCode1, XORCode2);
+					NowSession->m_PacketArray[i]->Encode2(Head, XORCode);
+
+					// WSABUF에 포인터 복사
+					wsabuf[i].buf = NowSession->m_PacketArray[i]->GetBufferPtr();
+					wsabuf[i].len = NowSession->m_PacketArray[i]->GetUseSize();
+
+					++i;
+				}
+
+				/*
 				int iPacketIndex = UseSize -1;
+				
+				WORD Temp = NowSession->m_Client_sock;
+				TypeTest.push_back(Temp);
+
 				while (iPacketIndex >= 0)
 				{
 					if (NowSession->m_SendQueue->Dequeue(NowSession->m_PacketArray[iPacketIndex]) == -1)
@@ -1578,6 +1601,7 @@ namespace Library_Jingyu
 
 					--iPacketIndex;
 				}
+				*/
 
 				NowSession->m_iWSASendCount = UseSize;
 
