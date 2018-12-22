@@ -238,7 +238,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer_Room::RoomClearFunc()
 	{
-		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 락
+		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 락		
 
 		// 룸이 있을 경우 룸 클리어 진행
 		if (m_Room_Umap.size() > 0)
@@ -248,13 +248,39 @@ namespace Library_Jingyu
 
 			while (itor_Now != itor_End)
 			{
-				// 해당 방에 유저가 있는 경우, 유저를 쫒아낸다.
+				// 해당 방에 유저가 있는 경우, 방 안의 모든 유저에게 셧다운 날림.
+				// 이 방은, OnClientLeave에서 방 파괴
+				if (itor_Now->second->m_iJoinUser > 0)
+				{
+					stRoom* NowRoom = itor_Now->second;
 
-				m_pRoom_Pool->Free(itor_Now->second);
+					NowRoom->m_bDeleteFlag = true;
 
-				InterlockedDecrement(&m_lRoomCount);
+					size_t Size = NowRoom->m_JoinUser_vector.size();
 
-				itor_Now = m_Room_Umap.erase(itor_Now);				
+					if (Size != NowRoom->m_iJoinUser)
+						g_ChatDump->Crash();
+
+					size_t Index = 0;
+					while (Index < Size)
+					{
+						// 셧다운
+						Disconnect(NowRoom->m_JoinUser_vector[Index]);
+						++Index;
+					}
+
+					++itor_Now;
+				}
+
+				// 방에 유저가 없는 경우, 즉시 삭제
+				else
+				{
+					m_pRoom_Pool->Free(itor_Now->second);
+
+					InterlockedDecrement(&m_lRoomCount);
+
+					itor_Now = m_Room_Umap.erase(itor_Now);
+				}
 			}
 		}
 
