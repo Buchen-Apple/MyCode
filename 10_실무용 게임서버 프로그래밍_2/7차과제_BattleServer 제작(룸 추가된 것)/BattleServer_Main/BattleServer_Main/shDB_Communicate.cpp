@@ -33,7 +33,7 @@ namespace Library_Jingyu
 		// --------------------
 		// 변수 선언
 		// --------------------
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 80);	
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);	
 
 		DWORD APIType;
 		DB_WORK* pWork;
@@ -155,7 +155,7 @@ namespace Library_Jingyu
 
 		DB_WORK* pWork;
 
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 80);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
 		
 		while (1)
 		{

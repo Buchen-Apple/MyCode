@@ -46,7 +46,7 @@ namespace Library_Jingyu
 			LEFT = 0,	// 왼쪽 레드존
 			RIGHT,		// 오른쪽
 			TOP,		// 위
-			BOTTOM		// 아래
+			BOTTOM,		// 아래
 		};
 
 		// CMMOServer의 cSession을 상속받는 세션 클래스
@@ -394,9 +394,6 @@ namespace Library_Jingyu
 			DWORD m_dwTick;
 
 			// 현재 활성화된 레드존의 수.
-			// 사실, bool 형태로 활성화 여부만 체크해도 되지만
-			// 이왕 체크하는거 그냥 ++해봄. 
-			// 혹시 나중에 현재 활성화된 레드존의 수가 필요할 수도 있으니..
 			int m_iRedZoneCount;
 
 			// 안전지대 X,Y 좌표.
@@ -406,6 +403,10 @@ namespace Library_Jingyu
 			// 이번에 생성될, 레드존에 대한 경고 패킷 보냄 여부.
 			// 레드존 활성화 후 다시 false로 되돌린다.
 			bool m_bRedZoneWarningFlag;
+
+			// Last 레드존 시, 어디가 안전지대가 될 것인지.
+			// 방 생성 시 이미 결정된다.
+			BYTE m_bLastRedZoneSafeType;
 		
 			// ------------
 
@@ -629,15 +630,19 @@ namespace Library_Jingyu
 			const int m_iRoomCloseDelay = 5000;
 
 			// 아이템 획득 좌표 오차
-			float m_fGetItem_Correction = 2;
+			const float m_fGetItem_Correction = 2.8f;
 
 			// 레드존 활성화 시간.
 			// 게임 시작 후, 아래 시간마다 하나씩 활성화
-			DWORD m_dwReaZoneActiveTime = 40000; // (현재 40초)
+			const DWORD m_dwReaZoneActiveTime = 40000; // (현재 40초)
 		
 			// 레드존 경고 보내는 시간.
 			// 레드존 활성화 시간이, 이 변수만큼 남았을 경우, 경고 패킷을 보낸다.
-			DWORD m_dwRedZoneWarningTime = 20000; // (현재 20초)
+			const DWORD m_dwRedZoneWarningTime = 20000; // (현재 20초)
+
+			// 레드존 최대 수.
+			// 이 횟수 이상은 레드존 활성화 불가능
+			const int m_iRedZoneActiveLimit = 5;
 		};
 
 
@@ -687,6 +692,10 @@ namespace Library_Jingyu
 
 		// 레드존 타입에 따른 활성 위치
 		float m_arrayRedZoneRange[4][2][2];
+
+		// 마지막 레드존의 안전지대.
+		// 배열 0번에 1번 타입의 안전지대 좌표가 들어있음.
+		float m_arrayLastRedZoneSafeRange[4][2][2];
 
 
 

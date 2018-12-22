@@ -1654,12 +1654,15 @@ namespace Library_Jingyu
 			return;
 
 		// 4. 아이템과 유저의 거리 체크.
-		// +2 ~ -2 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)
-		if(fabs(NowItem->m_fPosX - m_fPosX) > m_pParent->m_stConst.m_fGetItem_Correction ||
-			fabs(NowItem->m_fPosY - m_fPosY) > m_pParent->m_stConst.m_fGetItem_Correction)
+		// +2.8 ~ -2.8 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)
+		// 1번인자 <= 2번인자 : true
+		// 1번인자 > 2번인자 : false
+		if (islessequal(fabs(NowItem->m_fPosX - m_fPosX), m_pParent->m_stConst.m_fGetItem_Correction) == false ||
+			islessequal(fabs(NowItem->m_fPosY - m_fPosY), m_pParent->m_stConst.m_fGetItem_Correction) == false)
 		{
 			return;
 		}
+
 
 		// 5. 거리도 맞으면 정상적으로 획득한 아이템.
 		// 아이템 자료구조에서 아이템 삭제
@@ -2738,46 +2741,65 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 3. 20초 뒤에 활성화 될 레드존의 타입을 알아낸다.
-		int RedZoneType = m_arrayRedZone[m_iRedZoneCount];
-
-		// 4. 레드존에 따라 타입 설정
-		WORD Type;
-		switch (RedZoneType)
+		// 3. 마지막 레드존이라면, 마지막 레드존 처리 진행
+		if (m_iRedZoneCount + 1 == m_pBattleServer->m_stConst.m_iRedZoneActiveLimit)
 		{
-			// 왼쪽
-		case eu_REDZONE_TYPE::LEFT:
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_LEFT;
-			break;
+			// 방 안의 모든 유저에게 마지막 레드존 경고 패킷 보냄.
+			CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+			WORD Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_FINAL;
 
-			// 오른쪽
-		case eu_REDZONE_TYPE::RIGHT:
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_RIGHT;
-			break;
+			SendBUff->PutData((char*)&Type, 2);
+			SendBUff->PutData((char*)&AlertTimeSec, 1);
+			SendBUff->PutData((char*)&m_bLastRedZoneSafeType, 1);
 
-			// 위
-		case eu_REDZONE_TYPE::TOP:
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_TOP;
-			break;
-
-			// 아래
-		case eu_REDZONE_TYPE::BOTTOM:
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_BOTTOM;
-			break;
-
-		default:
-			g_BattleServer_Room_Dump->Crash();
-			break;
+			if (SendPacket_BroadCast(SendBUff) == false)
+				g_BattleServer_Room_Dump->Crash();
 		}
 
-		// 5. 방 안의 모든 유저에게 레드존 경고 패킷 보내기
-		CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+		// 4. 마지막 레드존이 아니라면, 일반 처리
+		else
+		{
+			// 20초 뒤에 활성화 될 레드존의 타입을 알아낸다.
+			int RedZoneType = m_arrayRedZone[m_iRedZoneCount];
 
-		SendBUff->PutData((char*)&Type, 2);
-		SendBUff->PutData((char*)&AlertTimeSec, 1);
+			// 레드존에 따라 타입 설정
+			WORD Type;
+			switch (RedZoneType)
+			{
+				// 왼쪽
+			case eu_REDZONE_TYPE::LEFT:
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_LEFT;
+				break;
 
-		if (SendPacket_BroadCast(SendBUff) == false)
-			g_BattleServer_Room_Dump->Crash();
+				// 오른쪽
+			case eu_REDZONE_TYPE::RIGHT:
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_RIGHT;
+				break;
+
+				// 위
+			case eu_REDZONE_TYPE::TOP:
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_TOP;
+				break;
+
+				// 아래
+			case eu_REDZONE_TYPE::BOTTOM:
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ALERT_BOTTOM;
+				break;
+
+			default:
+				g_BattleServer_Room_Dump->Crash();
+				break;
+			}
+
+			// 방 안의 모든 유저에게 레드존 경고 패킷 보내기
+			CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+
+			SendBUff->PutData((char*)&Type, 2);
+			SendBUff->PutData((char*)&AlertTimeSec, 1);
+
+			if (SendPacket_BroadCast(SendBUff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
 
 	}
 
@@ -2802,46 +2824,73 @@ namespace Library_Jingyu
 		int RedZoneType = m_arrayRedZone[m_iRedZoneCount];
 		m_iRedZoneCount++;
 
-		// 4. 활성화 시킬 레드존에 따라 안전지대를 갱신한다.
-		WORD Type;
-		switch (RedZoneType)
-		{
-			// 왼쪽
-		case eu_REDZONE_TYPE::LEFT:
-			m_fSafePos[0][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][1];
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_LEFT;
-			break;
+		// 4. 마지막 레드존일 경우
+		if (m_iRedZoneCount == m_pBattleServer->m_stConst.m_iRedZoneActiveLimit)
+		{			
+			float (*LastSafe)[2] = m_pBattleServer->m_arrayLastRedZoneSafeRange[m_bLastRedZoneSafeType - 1];
 
-			// 오른쪽
-		case eu_REDZONE_TYPE::RIGHT:
-			m_fSafePos[1][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][1];
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_RIGHT;
-			break;
+			// 안전지대 갱신
+			m_fSafePos[0][0] = LastSafe[0][0];
+			m_fSafePos[0][1] = LastSafe[0][1];
+			m_fSafePos[1][0] = LastSafe[1][0];
+			m_fSafePos[1][1] = LastSafe[1][1];
 
-			// 위
-		case eu_REDZONE_TYPE::TOP:
-			m_fSafePos[0][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][0];
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_TOP;
-			break;
+			// 방 안의 모든 유저에게 마지막 레드존 활성화 패킷 보냄
+			CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
 
-			// 아래
-		case eu_REDZONE_TYPE::BOTTOM:
-			m_fSafePos[1][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][0];
-			Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_BOTTOM;
-			break;
+			WORD Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_FINAL;
 
-		default:
-			g_BattleServer_Room_Dump->Crash();
-			break;
+			SendBUff->PutData((char*)&Type, 2);
+			SendBUff->PutData((char*)&m_bLastRedZoneSafeType, 1);
+
+			if (SendPacket_BroadCast(SendBUff) == false)
+				g_BattleServer_Room_Dump->Crash();
 		}
 
-		// 5. 방 안의 모든 유저에게 레드존 활성화 패킷 보내기
-		CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+		// 5. 마지막 레드존이 아닐 경우
+		else
+		{
+			// 활성화 시킬 레드존에 따라 안전지대를 갱신한다.
+			WORD Type;
+			switch (RedZoneType)
+			{
+				// 왼쪽
+			case eu_REDZONE_TYPE::LEFT:
+				m_fSafePos[0][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][1];
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_LEFT;
+				break;
 
-		SendBUff->PutData((char*)&Type, 2);
+				// 오른쪽
+			case eu_REDZONE_TYPE::RIGHT:
+				m_fSafePos[1][1] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][1];
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_RIGHT;
+				break;
 
-		if(SendPacket_BroadCast(SendBUff) == false)
-			g_BattleServer_Room_Dump->Crash();
+				// 위
+			case eu_REDZONE_TYPE::TOP:
+				m_fSafePos[0][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][1][0];
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_TOP;
+				break;
+
+				// 아래
+			case eu_REDZONE_TYPE::BOTTOM:
+				m_fSafePos[1][0] = m_pBattleServer->m_arrayRedZoneRange[RedZoneType][0][0];
+				Type = en_PACKET_CS_GAME_RES_REDZONE_ACTIVE_BOTTOM;
+				break;
+
+			default:
+				g_BattleServer_Room_Dump->Crash();
+				break;
+			}
+
+			// 방 안의 모든 유저에게 레드존 활성화 패킷 보내기
+			CProtocolBuff_Net* SendBUff = CProtocolBuff_Net::Alloc();
+
+			SendBUff->PutData((char*)&Type, 2);
+
+			if (SendPacket_BroadCast(SendBUff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
 	}
 
 	// 레드존 데미지 체크
@@ -2879,10 +2928,15 @@ namespace Library_Jingyu
 				// 플레이어 Y가
 				// - safe[0]의 Y보다 작거나
 				// - safe[1]의 Y보다 크거나
-				if (NowPlayer->m_fPosX < m_fSafePos[0][0] ||
-					NowPlayer->m_fPosX > m_fSafePos[1][0] ||
-					NowPlayer->m_fPosY < m_fSafePos[0][1] ||
-					NowPlayer->m_fPosY > m_fSafePos[1][1])
+				//if (NowPlayer->m_fPosX < m_fSafePos[0][0] ||
+				//	NowPlayer->m_fPosX > m_fSafePos[1][0] ||
+				//	NowPlayer->m_fPosY < m_fSafePos[0][1] ||
+				//	NowPlayer->m_fPosY > m_fSafePos[1][1])
+
+				if (isless(NowPlayer->m_fPosX, m_fSafePos[0][0]) ||
+					isgreater(NowPlayer->m_fPosX, m_fSafePos[1][0]) ||
+					isless(NowPlayer->m_fPosY, m_fSafePos[0][1]) ||
+					isgreater(NowPlayer->m_fPosY, m_fSafePos[1][1]) )
 				{
 					// 위에 해당되면, 안전지대 밖에 있는것.
 					// 레드존 데미지 패킷 보냄 (데미지는 1씩 감소)
@@ -4179,6 +4233,10 @@ namespace Library_Jingyu
 						NowRoom->m_dwReaZoneTime = 0;
 						NowRoom->m_dwTick = 0;
 						NowRoom->m_iRedZoneCount = 0;
+						
+						// 라스트 레드존 타입.
+						// 1 ~ 4까지의 값.
+						NowRoom->m_bLastRedZoneSafeType = (rand() % 4) + 1;
 											
 
 						// 최초 안전지대 좌표 셋팅
@@ -4473,35 +4531,40 @@ namespace Library_Jingyu
 						// 현재 시간 구해둠
 						DWORD NowTime = timeGetTime();
 
-						// -- 레드존 경고 체크						
-						if (NowRoom->m_bRedZoneWarningFlag == false)
+						// -- 레드존이 활성화 되어도 되는지 체크.
+						// 이미, 모든 레드존이 활성화 되었다면, 더 이상 활성화되면 안됨.
+						if (NowRoom->m_iRedZoneCount < m_stConst.m_iRedZoneActiveLimit)
 						{
-							// 레드존 경고를 안보낸 상태라면, 시간 체크 후 경고패킷 보냄
-							if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwRedZoneWarningTime)
+							// -- 레드존 경고 체크						
+							if (NowRoom->m_bRedZoneWarningFlag == false)
 							{
-								// 레드존 경고 함수 호출
-								NowRoom->RedZone_Warning((BYTE)(m_stConst.m_dwRedZoneWarningTime / 1000));
+								// 레드존 경고를 안보낸 상태라면, 시간 체크 후 경고패킷 보냄
+								if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwRedZoneWarningTime)
+								{
+									// 레드존 경고 함수 호출
+									NowRoom->RedZone_Warning((BYTE)(m_stConst.m_dwRedZoneWarningTime / 1000));
 
-								// 레드존 경고 보냄 플래그를 true로 만든다.
-								NowRoom->m_bRedZoneWarningFlag = true;
+									// 레드존 경고 보냄 플래그를 true로 만든다.
+									NowRoom->m_bRedZoneWarningFlag = true;
+								}
 							}
-						}
 
-						// -- 레드존 알람을 보낸 상태라면 레드존 활성화 체크
-						else
-						{
-							// -- 레드존 활성화 체크
-							if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwReaZoneActiveTime)
+							// -- 레드존 알람을 보낸 상태라면 레드존 활성화 체크
+							else
 							{
-								// 레드존 활성화 함수 호출
-								NowRoom->RedZone_Active();
+								// -- 레드존 활성화 체크
+								if ((NowTime - NowRoom->m_dwReaZoneTime) >= m_stConst.m_dwReaZoneActiveTime)
+								{
+									// 레드존 활성화 함수 호출
+									NowRoom->RedZone_Active();
 
-								// 레드존 활성화 시간 갱신. 다시 40초를 기다려야함.
-								NowRoom->m_dwReaZoneTime = NowTime;
+									// 레드존 활성화 시간 갱신. 다시 40초를 기다려야함.
+									NowRoom->m_dwReaZoneTime = NowTime;
 
-								// 레드존 알람 보냄 플래그 원복
-								NowRoom->m_bRedZoneWarningFlag = false;
+									// 레드존 경고 보냄 플래그 원복
+									NowRoom->m_bRedZoneWarningFlag = false;
 
+								}
 							}
 						}
 
@@ -4741,12 +4804,31 @@ namespace Library_Jingyu
 		m_arrayRedZoneRange[2][1][0] = 44;	// Top x2
 		m_arrayRedZoneRange[2][1][1] = 170;	// Top y2
 
-
 		m_arrayRedZoneRange[3][0][0] = 102;	// bottom x1
 		m_arrayRedZoneRange[3][0][1] = 0;	// bottom y1
 		m_arrayRedZoneRange[3][1][0] = 153;	// bottom x2
 		m_arrayRedZoneRange[3][1][1] = 170;	// bottom y2
 
+		// 마지막 레드존 활성 시 안전지대
+		m_arrayLastRedZoneSafeRange[0][0][0] = 47;	//Level1 안전구역 x1
+		m_arrayLastRedZoneSafeRange[0][0][1] = 51;	//Level1 안전구역 y1
+		m_arrayLastRedZoneSafeRange[0][1][0] = 75;	//Level1 안전구역 x2
+		m_arrayLastRedZoneSafeRange[0][1][1] = 84;	//Level1 안전구역 y2
+
+		m_arrayLastRedZoneSafeRange[1][0][0] = 47;	//Level2 안전구역 x1
+		m_arrayLastRedZoneSafeRange[1][0][1] = 82;	//Level2 안전구역 y1
+		m_arrayLastRedZoneSafeRange[1][1][0] = 75;	//Level2 안전구역 x2
+		m_arrayLastRedZoneSafeRange[1][1][1] = 112;	//Level2 안전구역 y2
+
+		m_arrayLastRedZoneSafeRange[2][0][0] = 76;	//Level3 안전구역 x1
+		m_arrayLastRedZoneSafeRange[2][0][1] = 51;	//Level3 안전구역 y1
+		m_arrayLastRedZoneSafeRange[2][1][0] = 101;	//Level3 안전구역 x2
+		m_arrayLastRedZoneSafeRange[2][1][1] = 85;	//Level3 안전구역 y2
+
+		m_arrayLastRedZoneSafeRange[3][0][0] = 74;	//Level4 안전구역 x1
+		m_arrayLastRedZoneSafeRange[3][0][1] = 84;	//Level4 안전구역 y1
+		m_arrayLastRedZoneSafeRange[3][1][0] = 100;	//Level4 안전구역 x2
+		m_arrayLastRedZoneSafeRange[3][1][1] = 114;	//Level4 안전구역 y2
 	}
 
 	CBattleServer_Room::~CBattleServer_Room()

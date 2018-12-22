@@ -1107,7 +1107,7 @@ namespace Library_Jingyu
 		m_MatchDBcon = new CBConnectorTLS(m_stConfig.DB_IP, m_stConfig.DB_User, m_stConfig.DB_Password,	m_stConfig.DB_Name, m_stConfig.DB_Port);
 		
 		// HTTP_Exchange 동적할당
-		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 80);
+		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 11902);
 
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	
@@ -1229,9 +1229,10 @@ namespace Library_Jingyu
 		payload->GetData((char*)&Status, 1);
 
 		// 2. 유저 검색
+		// 유저가 정보 요청만 보내고 나갈 수도 있기 때문에, 없다고 Crash내면 안됨
 		Matchmaking_Net_Server::stPlayer* NowPlayer = m_pParent->FindPlayerFunc_ClientKey(ClinetKey);
 		if (NowPlayer == nullptr)
-			gMatchServerDump->Crash();
+			return;
 
 		// 3. Status 확인
 		// 1이 아니면 모두 잘못된 것.

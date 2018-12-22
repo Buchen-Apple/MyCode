@@ -248,6 +248,8 @@ namespace Library_Jingyu
 
 			while (itor_Now != itor_End)
 			{
+				// 해당 방에 유저가 있는 경우, 유저를 쫒아낸다.
+
 				m_pRoom_Pool->Free(itor_Now->second);
 
 				InterlockedDecrement(&m_lRoomCount);

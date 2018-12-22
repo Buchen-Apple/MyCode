@@ -1421,6 +1421,7 @@ namespace Library_Jingyu
 		NewPlayer->m_iJoinRoomNo = iSendRoomNo;
 		NewPlayer->m_iBattleServerNo = iBattleServerNo;
 		NewPlayer->m_iMatchServerNo = MatchServerNo;
+		NewPlayer->m_ullRoomKey = Create_RoomKey(iBattleServerNo, iSendRoomNo);
 
 
 		// 배틀의 자료구조에 추가
