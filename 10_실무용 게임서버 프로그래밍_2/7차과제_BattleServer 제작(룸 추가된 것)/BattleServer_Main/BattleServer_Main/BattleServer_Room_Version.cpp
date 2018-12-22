@@ -387,8 +387,7 @@ namespace Library_Jingyu
 		if (m_bLastDBWriteFlag == false)
 		{
 			// 플레이 타임 갱신
-			int AddTime = (timeGetTime() - m_dwGameStartTime) / 1000;
-			m_iRecord_PlayTime = m_iRecord_PlayTime + AddTime;
+			m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 
 			// DB에 Write 준비
 			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
@@ -522,7 +521,6 @@ namespace Library_Jingyu
 		m_bLogoutFlag = false;
 		m_lLoginHTTPCount = 0;		
 		m_bLastDBWriteFlag = false;		
-		m_iHelmetCount = 0;
 	}
 
 
@@ -1201,17 +1199,22 @@ namespace Library_Jingyu
 		float c = sqrtf((a*a) + (b*b));
 
 		// 계산 결과, 타겟이 범위 내에 없다면, 패킷 안보냄
-		if (c >= (float)17)
+		// if(c >= 17) 와 같음
+		if (isgreaterequal(c, 17))
 			return;
 
 
 		// 7. hp 차감 처리
-		// 여기까지 오면 데미지 대상이 있는것.
-
-		// 타겟에게 입힐 데미지 계산
-		// 데미지가 0보다 적을 순 없음. 위에서 거리 내에 있다고 확인했기 때문에.
+		// 여기까지 오면 데미지 대상이 있는것. 타겟에게 입힐 데미지 계산		
 		int MinusDamage = m_pParent->GetDamage(c);
-		if (MinusDamage <= 0)
+
+		// 데미지가 0은 나올 수 있다. HP는 정수계산이기 때문에, 0.67...이 나와도 0임.
+		// 0일 경우는 패킷 무시.
+		if (MinusDamage == 0)
+			return;
+
+		// 데미지가 0보다 적을 순 없음. 위에서 거리 내에 있다고 확인했기 때문에.
+		else if (MinusDamage < 0)
 			g_BattleServer_Room_Dump->Crash();		
 
 		// 타겟에게 헬멧이 있는 경우, 헬멧만 1 차감
@@ -1264,6 +1267,8 @@ namespace Library_Jingyu
 		// 9. 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
 		if (TargetHP == 0)
 		{
+			NowRoom->Player_Die(this, Target);
+			/*
 			// 피해자의 생존 플래그를 false로 변경
 			Target->m_bAliveFlag = false;
 
@@ -1324,6 +1329,30 @@ namespace Library_Jingyu
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
 			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+
+
+
+
+
+			// 사망자의 플레이 타임 갱신
+			Target->m_iRecord_PlayTime = Target->m_iRecord_PlayTime + ((timeGetTime() - Target->m_dwGameStartTime) / 1000);
+
+			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+			Target->m_bLastDBWriteFlag = true;
+
+			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
+			WriteWork->m_iCount = Target->m_iRecord_PlayTime;
+
+			WriteWork->AccountNo = TargetAccountNo;
+
+			// Write 하기 전에, DBWrite카운트 올려야함.
+			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
+
+			// DBWrite 시도
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+			*/
 		}
 	}
 
@@ -1458,8 +1487,9 @@ namespace Library_Jingyu
 		float c = sqrtf((a*a) + (b*b));
 
 		// 두 점의 거리가 2보다 멀다면, 공격 무시
-		if (c > (float)2)
-			return;
+		// c > 2와 같음
+		if (isgreater(c, 2))
+			return; 
 
 
 		// 6. 타겟의 hp 감소 및 갱신
@@ -1487,6 +1517,8 @@ namespace Library_Jingyu
 		// 7. 피격자가 사망했다면 해당 유저 사망 패킷을 방 전체에 뿌린다.
 		if (TargetHP == 0)
 		{
+			NowRoom->Player_Die(this, Target);
+			/*
 			// 피해자의 생존 플래그를 false로 변경
 			Target->m_bAliveFlag = false;
 
@@ -1547,6 +1579,29 @@ namespace Library_Jingyu
 			// 요청하기
 			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
 			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+
+
+
+
+			// 사망자의 플레이 타임 갱신
+			Target->m_iRecord_PlayTime = Target->m_iRecord_PlayTime + ((timeGetTime() - Target->m_dwGameStartTime) / 1000);
+
+			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+			Target->m_bLastDBWriteFlag = true;
+
+			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
+			WriteWork->m_iCount = Target->m_iRecord_PlayTime;
+
+			WriteWork->AccountNo = TargetAccountNo;
+
+			// Write 하기 전에, DBWrite카운트 올려야함.
+			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
+
+			// DBWrite 시도
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+			*/
 		}
 	}
 
@@ -1719,8 +1774,9 @@ namespace Library_Jingyu
 			// 메드킷
 		case MEDKIT:			
 		{
-			//  유저의 hp 2 회복
-			m_iHP = m_iHP + 2;	
+			//  유저의 hp 회복
+			// g_Data_HP /2 만큼 회복
+			m_iHP = m_iHP + (g_Data_HP/2);
 
 			// 최대 hp 이상 회복 불가능.
 			if (m_iHP > g_Data_HP)
@@ -1959,8 +2015,10 @@ namespace Library_Jingyu
 			// 유저가 승리자일 경우 (생존자)
 			if (m_JoinUser_Vector[Index]->m_bAliveFlag == true)
 			{
+				CGameSession* NowPlayer = m_JoinUser_Vector[Index];				
+
 				// 미리 초기화.
-				m_JoinUser_Vector[Index]->m_bAliveFlag = false;
+				NowPlayer->m_bAliveFlag = false;
 
 				// 한 게임에 승리자는 1명.
 				// WinUserCount가 1인데 여기 들어왔다면, 승리자가 1명 이상이 되었다는 의미.
@@ -1969,28 +2027,50 @@ namespace Library_Jingyu
 					g_BattleServer_Room_Dump->Crash();
 
 				// 전적 카운트 중, 승리 카운트 증가
-				++m_JoinUser_Vector[Index]->m_iRecord_Win;
+				++NowPlayer->m_iRecord_Win;
 
 				// 승리 패킷 보내기
-				m_JoinUser_Vector[Index]->SendPacket(winPacket);
+				NowPlayer->SendPacket(winPacket);
 
 				// 승리패킷 보낸 수 증가
 				++WinUserCount;
 
 
 				// 승리 카운트 DB에 저장.
+				// 승리자는, 아직 플레이 타임 갱신 안함. 여기서 갱신
+				NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + ((timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000);
+
 				DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 				WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
-				WriteWork->m_iCount = m_JoinUser_Vector[Index]->m_iRecord_PlayTime;
+				WriteWork->m_iCount = NowPlayer->m_iRecord_Win;
 
-				WriteWork->AccountNo = m_JoinUser_Vector[Index]->m_Int64AccountNo;
+				WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
 				// Write 하기 전에, DBWrite카운트 올려야함.
-				m_JoinUser_Vector[Index]->m_pParent->AddDBWriteCountFunc(m_JoinUser_Vector[Index]->m_Int64AccountNo);
+				NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
 
 				// DBWrite 시도
-				m_JoinUser_Vector[Index]->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);							
+				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+
+
+
+				// 플레이 타임 저장
+				// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+				NowPlayer->m_bLastDBWriteFlag = true;
+
+				DB_WORK_CONTENT_UPDATE* WriteWork_PlayTime = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+				WriteWork_PlayTime->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
+				WriteWork_PlayTime->m_iCount = NowPlayer->m_iRecord_PlayTime;
+
+				WriteWork_PlayTime->AccountNo = NowPlayer->m_Int64AccountNo;
+
+				// Write 하기 전에, DBWrite카운트 올려야함.
+				NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
+
+				// DBWrite 시도
+				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork_PlayTime);
 			}
 
 			// 유저가 패배자일 경우 (사망자)
@@ -2174,12 +2254,7 @@ namespace Library_Jingyu
 		{
 			CGameSession* NowPlayer = m_JoinUser_Vector[Index];
 
-			// 1. 플레이 타임 갱신
-			int AddTime = (timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000;
-			NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + AddTime;
-
-
-			// 2. 전적 패킷 만들어서 보내기.
+			// 1. 전적 패킷 만들어서 보내기.
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD Type = en_PACKET_CS_GAME_RES_RECORD;
@@ -2192,25 +2267,7 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&NowPlayer->m_iRecord_Die, 4);
 			SendBuff->PutData((char*)&NowPlayer->m_iRecord_Win, 4);
 
-			NowPlayer->SendPacket(SendBuff);
-
-
-			// 3. 플레이 타임 저장
-			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-			NowPlayer->m_bLastDBWriteFlag = true;
-
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)NowPlayer->m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iCount = NowPlayer->m_iRecord_PlayTime;
-
-			WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
-
-			// Write 하기 전에, DBWrite카운트 올려야함.
-			NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
-
-			// DBWrite 시도
-			NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+			NowPlayer->SendPacket(SendBuff);	
 
 			Index++;
 		}
@@ -2566,6 +2623,100 @@ namespace Library_Jingyu
 
 			++Index;
 		}
+	}
+
+	// 누군가의 공격으로, 방 안의 유저 사망 시 처리 함수
+	//
+	// Parameter : 공격자(CGameSession*), 사망자(CGameSession*) 
+	// return : 없음
+	void CBattleServer_Room::stRoom::Player_Die(CGameSession* AttackPlayer, CGameSession* DiePlayer)
+	{
+		// 1. 공격자, 피해자의 AccountNo 로컬로 받아두기
+		INT64 AtkAccountNo = AttackPlayer->m_Int64AccountNo;
+		INT64 DieAccountNo = DiePlayer->m_Int64AccountNo;
+
+		// 2. 피해자의 생존 플래그를 false로 변경
+		DiePlayer->m_bAliveFlag = false;
+
+		// 3. 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
+		// 모든 유저가 죽었는데 또 죽었다고 한 것.
+		if (m_iAliveUserCount == 0)
+			g_BattleServer_Room_Dump->Crash();
+
+		// 4. 룸의 생존 유저 수 카운트 1 감소
+		--m_iAliveUserCount;
+
+		// 5. 패킷 보내기
+		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+		WORD Type = en_PACKET_CS_GAME_RES_DIE;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&DieAccountNo, 8);
+
+		SendPacket_BroadCast(SendBuff);
+
+
+		// 6. 유저가 사망한 위치에 신규 아이템 생성
+		CreateItem(DiePlayer);
+
+
+		// 7. DB 저장 파트
+		// 공격자의 Kill 카운트 증가 -----------------------------------
+		++AttackPlayer->m_iRecord_Kill;
+
+		// DBWrite 구조체 셋팅
+		DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+		KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
+		KillWrite->m_iCount = AttackPlayer->m_iRecord_Kill;
+
+		KillWrite->AccountNo = AtkAccountNo;
+
+		// 요청하기
+		m_pBattleServer->AddDBWriteCountFunc(AtkAccountNo);
+		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
+
+
+
+
+		// 사망자의 Die 카운트 증가  -----------------------------------
+		++DiePlayer->m_iRecord_Die;
+
+		// DBWrite 구조체 셋팅
+		DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+		DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
+		DieWrite->m_iCount = DiePlayer->m_iRecord_Die;
+
+		DieWrite->AccountNo = DieAccountNo;
+
+		// 요청하기
+		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
+		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+
+
+
+
+
+		// 사망자의 플레이 타임 갱신 -----------------------------------
+		DiePlayer->m_iRecord_PlayTime = DiePlayer->m_iRecord_PlayTime + ((timeGetTime() - DiePlayer->m_dwGameStartTime) / 1000);
+
+		// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+		DiePlayer->m_bLastDBWriteFlag = true;
+
+		DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+		WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
+		WriteWork->m_iCount = DiePlayer->m_iRecord_PlayTime;
+
+		WriteWork->AccountNo = DieAccountNo;
+
+		// Write 하기 전에, DBWrite카운트 올려야함.
+		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
+
+		// DBWrite 시도
+		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
 	}
 
 
@@ -2928,11 +3079,6 @@ namespace Library_Jingyu
 				// 플레이어 Y가
 				// - safe[0]의 Y보다 작거나
 				// - safe[1]의 Y보다 크거나
-				//if (NowPlayer->m_fPosX < m_fSafePos[0][0] ||
-				//	NowPlayer->m_fPosX > m_fSafePos[1][0] ||
-				//	NowPlayer->m_fPosY < m_fSafePos[0][1] ||
-				//	NowPlayer->m_fPosY > m_fSafePos[1][1])
-
 				if (isless(NowPlayer->m_fPosX, m_fSafePos[0][0]) ||
 					isgreater(NowPlayer->m_fPosX, m_fSafePos[1][0]) ||
 					isless(NowPlayer->m_fPosY, m_fSafePos[0][1]) ||
@@ -3004,7 +3150,27 @@ namespace Library_Jingyu
 
 						// 요청하기
 						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
-						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);						
+						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);		
+
+
+
+
+						// 플레이 타임 갱신
+						NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + ((timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000);
+
+						// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+						NowPlayer->m_bLastDBWriteFlag = true;
+
+						DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+
+						WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
+						WriteWork->m_iCount = NowPlayer->m_iRecord_PlayTime;
+
+						WriteWork->AccountNo = AccountNo;
+
+						// 요청하기
+						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
+						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
 					}
 
 				}
@@ -3516,7 +3682,8 @@ namespace Library_Jingyu
 		// 공격 비율에 의해 입힐 데미지 계산
 
 		// 거리가 2보다 짧다면 100%데미지
-		if (Range <= 2)
+		// Range <= 2 와 같음
+		if (islessequal(Range, 2))
 			return g_Data_HitDamage;
 
 		// 그게 아니라면 비율에 따라 계산

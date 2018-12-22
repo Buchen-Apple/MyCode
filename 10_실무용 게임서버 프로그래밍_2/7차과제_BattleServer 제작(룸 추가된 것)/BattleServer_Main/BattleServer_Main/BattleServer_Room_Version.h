@@ -359,7 +359,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 2;	
+			const int m_iMaxJoinCount = 3;	
 
 			// ------------
 
@@ -492,7 +492,12 @@ namespace Library_Jingyu
 			// Parameter : 이번에 입장한 유저 CGameSession*
 			// return : 없음
 			void Send_AddUser(CGameSession* NowPlayer);
-			
+
+			// 누군가의 공격으로, 방 안의 유저 사망 시 처리 함수
+			//
+			// Parameter : 공격자(CGameSession*), 사망자(CGameSession*) 
+			// return : 없음
+			void Player_Die(CGameSession* AttackPlayer, CGameSession* DiePlayer);
 
 
 			// ------------

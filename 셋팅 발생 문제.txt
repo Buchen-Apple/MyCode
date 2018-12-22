@@ -99,3 +99,12 @@ Mysql의 바이너리 로그는 '로그 순환' 시 삭제된다.
 로그 순환 시점이라고 한다. 
 더 정확히 이야기하면 이진 로그는, 로그 사이즈가 max_binlog_size에 도달하면 새로 파일을 생성하며 로그 순환이 발생.
 로그 순환 시점에, 기존의 파일 시간을 체크해 binlog_expire_logs_seconds시간만큼 지났다면(초 단위) 기존 파일 삭제
+
+
+
+12. mysql의 wait_timeout과 interactive_timeout이 너무 적으면 send byte 어쩌고 하는 에러 발생
+지속연결 사용 시, timeout으로 mysql과 php간의 연결이 끊어질 경우, 아파치가 인지를 못함.
+이 때, 아파치에게 해당 연결을 요청하면 send byte 어쩌꼬 에러가 뜬다.
+즉, 문제로 안봐도 됨.
+
+찝찝해서, 일단은 wiat_timeout과 interactive_timeout의 시간을 엄청나게 길게 함.
