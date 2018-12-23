@@ -2,6 +2,8 @@
 #include "MatchmakingServer.h"
 #include "Parser/Parser_Class.h"
 #include "Log/Log.h"
+#include "CPUUsage/CPUUsage.h"
+#include "PDHClass/PDHCheck.h"
 #include "Protocol_Set/CommonProtocol_2.h"		// 궁극적으로는 CommonProtocol.h로 이름 변경 필요. 지금은 채팅서버에서 로그인 서버를 이용하는 프로토콜이 있어서 _2로 만듬.
 
 #include "rapidjson\document.h"
@@ -181,6 +183,35 @@ namespace Library_Jingyu
 
 		// Nodelay
 		if (Parser.GetValue_Int(_T("ClientNodelay"), &pConfig->ClientNodelay) == false)
+			return false;
+
+
+		////////////////////////////////////////////////////////
+		// 모니터링 LanClient의 Config 읽어오기
+		////////////////////////////////////////////////////////
+
+		// 구역 지정 -------------------------
+		if (Parser.AreaCheck(_T("MONITORLANCLINET")) == false)
+			return false;
+
+		// MasterServerIP
+		if (Parser.GetValue_String(_T("MonitorServerIP"), pConfig->MonitorServerIP) == false)
+			return false;
+
+		// MasterServerPort
+		if (Parser.GetValue_Int(_T("MonitorServerPort"), &pConfig->MonitorServerPort) == false)
+			return false;
+
+		// 생성 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientCreateWorker"), &pConfig->MonitorClientCreateWorker) == false)
+			return false;
+
+		// 활성화 워커 수
+		if (Parser.GetValue_Int(_T("MonitorClientActiveWorker"), &pConfig->MonitorClientActiveWorker) == false)
+			return false;
+
+		// Nodelay
+		if (Parser.GetValue_Int(_T("MonitorClientNodelay"), &pConfig->MonitorClientNodelay) == false)
 			return false;
 
 
@@ -750,6 +781,7 @@ namespace Library_Jingyu
 		m_lLoginUser = 0;
 		m_lstPlayer_AllocCount = 0;
 		m_lNot_BattleRoom_Enter = 0;
+		m_lRoomEnter_OK = 0;
 
 
 		// ------------------- 매치메이킹 DB에 초기 데이터 생성
@@ -770,6 +802,11 @@ namespace Library_Jingyu
 		//------------------- 마스터와 연결되는 랜 클라 가동 및 this 전달
 		m_pLanClient->SetParent(this);
 		if (m_pLanClient->ClientStart() == false)
+			return false;
+
+		//------------------- 모니터링 서버와 연결되는 랜 클라 가동 및 this 전달
+		m_pMonitorLanClient->SetParent(this);
+		if (m_pMonitorLanClient->ClientStart() == false)
 			return false;
 
 		// ------------------- 넷서버 가동
@@ -820,6 +857,7 @@ namespace Library_Jingyu
 	{
 		// 화면 출력할 것 셋팅
 		/*
+		MasterConnect  :		MonitorConnect	:		- 마스터 서버와 모니터 서버 접속 여부
 		SessionNum : 	- NetServer 의 세션수
 		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
 
@@ -842,6 +880,7 @@ namespace Library_Jingyu
 		*/
 
 		printf("========================================================\n"
+			"MasterConenct : %d, MonitorConnect : %d\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n\n"
 
@@ -864,6 +903,7 @@ namespace Library_Jingyu
 			"========================================================\n\n",
 
 			// ------------ 매치메이킹 Net 서버용
+			m_pLanClient->GetClinetState(), m_pMonitorLanClient->GetClinetState(),
 			GetClientCount(), 
 			CProtocolBuff_Net::GetNodeCount(),
 
@@ -1116,6 +1156,9 @@ namespace Library_Jingyu
 		// 마스터와 통신하는 Lan클라 동적할당
 		m_pLanClient = new Matchmaking_Lan_Client();
 
+		// 모니터링 서버와 통신하는 Lan클라 동적할당
+		m_pMonitorLanClient = new Monitor_Lan_Clinet();
+
 		// 시간
 		timeBeginPeriod(1);
 	}
@@ -1145,6 +1188,10 @@ namespace Library_Jingyu
 
 		// 시간
 		timeEndPeriod(1);
+
+		// 랜클라 동적해제
+		delete m_pLanClient;
+		delete m_pMonitorLanClient;
 	}
 	
 }
@@ -1261,6 +1308,9 @@ namespace Library_Jingyu
 			else
 				gMatchServerDump->Crash();
 		}
+
+		// 방 배정에 성공한 유저 수 증가(정확히는, 방 정보 요청을 받아온 유저. 아직 배틀서버엔 안갔음)
+		InterlockedIncrement(&m_pParent->m_lRoomEnter_OK);
 
 		// 4. 상태가 1이라면, 방 정보가 온 것. 나머지 마샬링
 		WORD	BattleServerNo;		
@@ -1501,4 +1551,284 @@ namespace Library_Jingyu
 	{
 		// 특별히 할 거 없음
 	}	
+}
+
+// ---------------------------------------------
+// 
+// 모니터링 LanClient
+//
+// ---------------------------------------------
+namespace Library_Jingyu
+{
+	// -----------------------
+	// 생성자와 소멸자
+	// -----------------------
+	Monitor_Lan_Clinet::Monitor_Lan_Clinet()
+		:CLanClient()
+	{
+		// 모니터링 서버 정보전송 스레드를 종료시킬 이벤트 생성
+		//
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		m_hMonitorThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+		m_ullSessionID = 0xffffffffffffffff;
+	}
+
+	Monitor_Lan_Clinet::~Monitor_Lan_Clinet()
+	{
+		// 아직 연결이 되어있으면, 연결 해제
+		if (GetClinetState() == true)
+			ClientStop();
+
+		// 이벤트 삭제
+		CloseHandle(m_hMonitorThreadExitEvent);
+	}
+
+
+
+	// -----------------------
+	// 외부에서 사용 가능한 함수
+	// -----------------------
+
+	// 시작 함수
+	// 내부적으로, 상속받은 CLanClient의 Start호출.
+	//
+	// Parameter : 없음
+	// return : 성공 시 true , 실패 시 falsel 
+	bool Monitor_Lan_Clinet::ClientStart()
+	{
+		// 모니터링 서버에 연결
+		if (Start(m_MatchServer_this->m_stConfig.MonitorServerIP, m_MatchServer_this->m_stConfig.MonitorServerPort, 
+			m_MatchServer_this->m_stConfig.MonitorClientCreateWorker, m_MatchServer_this->m_stConfig.MonitorClientActiveWorker,
+			m_MatchServer_this->m_stConfig.MonitorClientNodelay) == false)
+		{
+			// 모니터 랜클라 시작 에러
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Monitor LanClient Start Error");
+
+			return false;
+		}
+
+		// 모니터링 서버로 정보 전송할 스레드 생성
+		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
+
+		// 모니터 랜클라 시작 로그
+		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Monitor LanClient Star");
+
+		return true;
+	}
+
+	// 종료 함수
+	// 내부적으로, 상속받은 CLanClient의 Stop호출.
+	// 추가로, 리소스 해제 등
+	//
+	// Parameter : 없음
+	// return : 없음
+	void Monitor_Lan_Clinet::ClientStop()
+	{
+		// 1. 모니터링 서버 정보전송 스레드 종료
+		SetEvent(m_hMonitorThreadExitEvent);
+
+		// 종료 대기
+		if (WaitForSingleObject(m_hMonitorThread, INFINITE) == WAIT_FAILED)
+		{
+			DWORD Error = GetLastError();
+			printf("MonitorThread Exit Error!!! (%d) \n", Error);
+		}
+
+		// 2. 스레드 핸들 반환
+		CloseHandle(m_hMonitorThread);
+
+		// 3. 모니터링 서버와 연결 종료
+		Stop();
+	}
+
+	// 채팅서버의 this를 입력받는 함수
+	// 
+	// Parameter : 쳇 서버의 this
+	// return : 없음
+	void Monitor_Lan_Clinet::SetParent(Matchmaking_Net_Server* ChatThis)
+	{
+		m_MatchServer_this = ChatThis;
+	}
+
+
+
+
+
+
+
+	// -----------------------
+	// 내부에서만 사용하는 기능 함수
+	// -----------------------
+
+	// 일정 시간마다 모니터링 서버로 정보를 전송하는 스레드
+	UINT	WINAPI Monitor_Lan_Clinet::MonitorThread(LPVOID lParam)
+	{
+		// this 받아두기
+		Monitor_Lan_Clinet* g_This = (Monitor_Lan_Clinet*)lParam;
+
+		// 종료 신호 이벤트 받아두기
+		HANDLE hEvent = g_This->m_hMonitorThreadExitEvent;
+
+		// CPU 사용율 체크 클래스 (매칭서버 소프트웨어)
+		CCpuUsage_Process CProcessCPU;
+
+		// PDH용 클래스
+		CPDH	CPdh;
+
+		while (1)
+		{
+			// 1초에 한번 깨어나서 정보를 보낸다.
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("MoniterThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그게 아니라면, 일을 한다.
+			// 모니터링 서버와 연결중일 때만!
+			if (g_This->GetClinetState() == false)
+				continue;
+
+			// 프로세서 CPU 사용율, PDH 정보 갱신
+			CProcessCPU.UpdateCpuTime();
+			CPdh.SetInfo();
+
+			// 매칭서버가 On일 경우, 패킷을 보낸다.
+			if (g_This->m_MatchServer_this->GetServerState() == true)
+			{
+				// 타임스탬프 구하기
+				int TimeStamp = (int)(time(NULL));
+
+				// 1. 매칭서버 ON		
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_SERVER_ON, TRUE, TimeStamp);
+
+				// 2. 매칭서버 CPU 사용률 (커널 + 유저)
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_CPU, (int)CProcessCPU.ProcessTotal(), TimeStamp);
+
+				// 3. 매칭서버 메모리 유저 커밋 사용량 (Private) MByte
+				int Data = (int)(CPdh.Get_UserCommit() / 1024 / 1024);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_MEMORY_COMMIT, Data, TimeStamp);
+
+				// 4. 매칭서버 패킷풀 사용량
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_PACKET_POOL, CProtocolBuff_Net::GetNodeCount() + CProtocolBuff_Lan::GetNodeCount(), TimeStamp);
+
+				// 5. 매칭서버 접속 세션전체
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_SESSION, (int)g_This->m_MatchServer_this->GetClientCount(), TimeStamp);
+
+				// 6. 매칭서버 로그인을 성공한 전체 인원				
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_PLAYER, g_This->m_MatchServer_this->m_lLoginUser, TimeStamp);
+
+				// 7. 매칭서버 방 배정 성공 수(초당)		
+				LONG RoomOkCount = InterlockedExchange(&g_This->m_MatchServer_this->m_lRoomEnter_OK, 0);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_MATCH_MATCHSUCCESS, RoomOkCount, TimeStamp);
+			}
+
+		}
+
+		return 0;
+	}
+
+	// 모니터링 서버로 데이터 전송
+	//
+	// Parameter : DataType(BYTE), DataValue(int), TimeStamp(int)
+	// return : 없음
+	void Monitor_Lan_Clinet::InfoSend(BYTE DataType, int DataValue, int TimeStamp)
+	{
+		WORD Type = en_PACKET_SS_MONITOR_DATA_UPDATE;
+
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&DataType, 1);
+		SendBuff->PutData((char*)&DataValue, 4);
+		SendBuff->PutData((char*)&TimeStamp, 4);
+
+		SendPacket(m_ullSessionID, SendBuff);
+	}
+
+
+
+
+	// -----------------------
+	// 순수 가상함수
+	// -----------------------
+
+	// 목표 서버에 연결 성공 후, 호출되는 함수 (ConnectFunc에서 연결 성공 후 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void Monitor_Lan_Clinet::OnConnect(ULONGLONG SessionID)
+	{
+		m_ullSessionID = SessionID;
+
+		// 모니터링 서버(Lan)로 로그인 패킷 보냄
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_SS_MONITOR_LOGIN;
+		int ServerNo = dfSERVER_NO;
+
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ServerNo, 4);
+
+		SendPacket(SessionID, SendBuff);
+	}
+
+	// 목표 서버에 연결 종료 후 호출되는 함수 (InDIsconnect 안에서 호출)
+	//
+	// parameter : 세션키
+	// return : 없음
+	void Monitor_Lan_Clinet::OnDisconnect(ULONGLONG SessionID)
+	{
+		m_ullSessionID = 0xffffffffffffffff;
+	}
+
+	// 패킷 수신 완료 후 호출되는 함수.
+	//
+	// parameter : 유저 세션키, CProtocolBuff_Lan*
+	// return : 없음
+	void Monitor_Lan_Clinet::OnRecv(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
+	{}
+
+	// 패킷 송신 완료 후 호출되는 함수
+	//
+	// parameter : 유저 세션키, Send 한 사이즈
+	// return : 없음
+	void Monitor_Lan_Clinet::OnSend(ULONGLONG SessionID, DWORD SendSize)
+	{}
+
+	// 워커 스레드가 깨어날 시 호출되는 함수.
+	// GQCS 바로 하단에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void Monitor_Lan_Clinet::OnWorkerThreadBegin()
+	{}
+
+	// 워커 스레드가 잠들기 전 호출되는 함수
+	// GQCS 바로 위에서 호출
+	// 
+	// parameter : 없음
+	// return : 없음
+	void Monitor_Lan_Clinet::OnWorkerThreadEnd()
+	{}
+
+	// 에러 발생 시 호출되는 함수.
+	//
+	// parameter : 에러 코드(실제 윈도우 에러코드는 WinGetLastError() 함수로 얻기 가능. 없을 경우 0이 리턴됨)
+	//			 : 에러 코드에 대한 스트링
+	// return : 없음
+	void Monitor_Lan_Clinet::OnError(int error, const TCHAR* errorStr)
+	{}
+
 }

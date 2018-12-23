@@ -685,33 +685,11 @@ namespace Library_Jingyu
 					tval.tv_usec = 500000;
 
 					// Select()
-					DWORD retval = select(0, 0, &wset, &exset, &tval);
-
-
-					// 에러 발생여부 체크
-					if (retval == SOCKET_ERROR)
-					{
-						// printf("Select error..(%d)\n", WSAGetLastError());
-						// 최대 n회 시도						
-					}
-
-					// 타임아웃 체크
-					else if (retval == 0)
-					{
-						//printf("Select Timeout..\n");
-						//printf("%d\n", WSAGetLastError());
-					}
-
-					// 반응이 있다면, 예외셋에 반응이 왔는지 체크
-					else if (exset.fd_count > 0)
-					{
-						//예외셋 반응이면 실패한 것.
-						//printf("Select ---> exset problem..\n");
-					}
-
+					select(0, 0, &wset, &exset, &tval);
+					
 					// 쓰기셋에 반응이 왔는지 체크
-					// 여기까지 오면 성공이지만 한번 더 체크해봄
-					else if (wset.fd_count > 0)
+					// 그 외에는 모두 실패.
+					if (wset.fd_count > 0)
 					{
 						// 다시 소켓을 블락으로 변경
 						ULONG on = 0;
@@ -729,28 +707,26 @@ namespace Library_Jingyu
 
 						// 정상적으로 잘 됐으니 break;
 						break;
-
-					}
-
-					// 5회 시도했는데도 안됐으면, 다음에 시도.					
-					if (ConnectTryCount == 5)
-					{
-						closesocket(m_stSession.m_Client_sock);						
-
-						// ConnectFlag 변경
-						m_lClienetConnect = FALSE;
-
-						return false;
-					}
-
-					// 5회가 안됐으면 다시 접속 시도.
-					Sleep(0);
-					continue;
+					}	
 				}				
 
 				// 이미 연결이 되었다면 break;
 				else if (Check == WSAEISCONN)
-					break;					
+					break;	
+
+				// 5회 시도했는데도 안됐으면, 다음에 시도.					
+				if (ConnectTryCount == 5)
+				{
+					closesocket(m_stSession.m_Client_sock);
+
+					// ConnectFlag 변경
+					m_lClienetConnect = FALSE;
+
+					return false;
+				}
+
+				// 5회가 안됐으면 다시 접속 시도.
+				Sleep(0);
 			}
 
 			// ------------------			

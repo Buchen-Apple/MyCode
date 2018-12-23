@@ -5635,7 +5635,7 @@ namespace Library_Jingyu
 		// 종료 신호 이벤트 받아두기
 		HANDLE* hEvent = &g_This->m_hMonitorThreadExitEvent;
 
-		// CPU 사용율 체크 클래스 (채팅서버 소프트웨어)
+		// CPU 사용율 체크 클래스 (배틀서버 소프트웨어)
 		CCpuUsage_Process CProcessCPU;
 
 		// CPU 사용율 체크 클래스 (하드웨어)
@@ -5734,8 +5734,10 @@ namespace Library_Jingyu
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SESSION_GAME, g_This->m_BattleServer_this->GetGameModeUserCount(), TimeStamp);
 
 				// 10. 대기방 수
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_ROOM_WAIT, g_This->m_BattleServer_this->m_lNowWaitRoomCount, TimeStamp);
 
 				// 11. 플레이 방 수
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_ROOM_PLAY, g_This->m_BattleServer_this->m_lPlayRoomCount, TimeStamp);
 			}
 
 		}

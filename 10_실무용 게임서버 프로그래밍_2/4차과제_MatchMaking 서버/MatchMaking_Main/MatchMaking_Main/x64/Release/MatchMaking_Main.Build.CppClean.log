@@ -5,6 +5,7 @@ c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\ringbuff.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\protocolbuff_objectpool.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\protocolbuff(net)_objectpool.obj
+c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\pdhcheck.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\parser_class.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\networklib_netserver.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\networklib_lanclient.obj
@@ -13,6 +14,7 @@ c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\http_exchange.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\db_connector.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\crashdump.obj
+c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\cpuusage.obj
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\x64\release\matchmaking_main.exe
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\x64\release\matchmaking_main.pdb
 c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\x64\release\matchmaking_main.ipdb

@@ -162,6 +162,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\Library_Jingyu\CPUUsage\CPUUsage.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\DB_Connector\DB_Connector.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Http_Exchange\HTTP_Exchange.cpp" />
@@ -170,6 +171,7 @@
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_LanClient.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\NetworkLib\NetworkLib_NetServer.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\Parser\Parser_Class.cpp" />
+    <ClCompile Include="..\..\..\..\Library_Jingyu\PDHClass\PDHCheck.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff(Net)_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\ProtocolBuff\ProtocolBuff_ObjectPool.cpp" />
     <ClCompile Include="..\..\..\..\Library_Jingyu\RingBuff\RingBuff.cpp" />

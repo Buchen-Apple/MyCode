@@ -555,26 +555,20 @@ namespace Library_Jingyu
 	// ¿¢¼ÁÆ® TPS ¾ò±â
 	LONG CLanServer::GetAcceptTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lAcceptTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lAcceptTPS, 0);
 	}
 
 	// »÷µå TPS ¾ò±â
 	LONG CLanServer::GetSendTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lSendPostTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lSendPostTPS, 0);
 	}
 
 
 	// ¸®½Ãºê TPS ¾ò±â
 	LONG CLanServer::GetRecvTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lRecvTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lRecvTPS, 0);
 	}
 
 

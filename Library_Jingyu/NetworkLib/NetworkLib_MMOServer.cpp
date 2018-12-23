@@ -266,25 +266,19 @@ namespace Library_Jingyu
 	// AcceptTPS 얻기
 	LONG CMMOServer::GetAccpetTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lAcceptTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lAcceptTPS, 0);
 	}
 
 	// SendTPS 얻기
 	LONG CMMOServer::GetSendTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lSendPostTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lSendPostTPS, 0);
 	}
 
 	// RecvTPS 얻기
 	LONG CMMOServer::GetRecvTPS()
 	{
-		LONG ret = InterlockedExchange(&m_lRecvTPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lRecvTPS, 0);
 	}
 
 	// Auth모드 유저 수 얻기
@@ -302,17 +296,13 @@ namespace Library_Jingyu
 	// AuthFPS 얻기
 	LONG CMMOServer::GetAuthFPS()
 	{
-		LONG ret = InterlockedExchange(&m_lAuthFPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lAuthFPS, 0);
 	}
 
 	// GameFPS 얻기
 	LONG CMMOServer::GetGameFPS()
 	{
-		LONG ret = InterlockedExchange(&m_lGameFPS, 0);
-
-		return ret;
+		return InterlockedExchange(&m_lGameFPS, 0);
 	}
 
 

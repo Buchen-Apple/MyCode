@@ -611,20 +611,14 @@ namespace Library_Jingyu
 	// 반환과 동시에 기존 값은 0으로 초기화
 	LONG CNetServer::GetAccpetTPS()
 	{
-		LONG Ret = m_lSendPostTPS;
-		m_lSendPostTPS = 0;
-
-		return Ret;
+		return InterlockedExchange(&m_lAcceptTPS, 0);;
 	}
 
 	// SendTPS 얻기
 	// 반환과 동시에 기존 값은 0으로 초기화
 	LONG CNetServer::GetSendTPS()
 	{
-		LONG Ret = m_lSendPostTPS;
-		m_lSendPostTPS = 0;
-
-		return Ret;
+		return InterlockedExchange(&m_lSendPostTPS, 0);
 	}
 
 

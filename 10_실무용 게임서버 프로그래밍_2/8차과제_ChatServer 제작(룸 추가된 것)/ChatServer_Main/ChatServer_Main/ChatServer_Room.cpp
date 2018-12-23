@@ -1967,6 +1967,9 @@ namespace Library_Jingyu
 
 				// 6. 채팅서버 로그인을 성공한 전체 인원				
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_PLAYER, g_This->m_ChatServer_this->m_lChatLoginCount, TimeStamp);
+
+				// 7. 배틀서버 방 수				
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_CHAT_ROOM, g_This->m_ChatServer_this->m_lRoomCount, TimeStamp);
 			}
 
 		}
