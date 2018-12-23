@@ -4,6 +4,8 @@
   Log.cpp
   NetworkLib_LanClient.cpp
   NetworkLib_NetServer.cpp
+c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(759): warning C4311: '형식 캐스트': 'DWORD *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(759): warning C4302: '형식 캐스트': 'DWORD *'에서 'UINT'(으)로 잘립니다.
   Parser_Class.cpp
   PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
@@ -12,6 +14,6 @@
   ChatServer_Main.cpp
   ChatServer_Room.cpp
   코드를 생성하고 있습니다.
-  All 1113 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 1112 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   ChatServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\8차과제_ChatServer 제작(룸 추가된 것)\ChatServer_Main\x64\Release\ChatServer_Main.exe

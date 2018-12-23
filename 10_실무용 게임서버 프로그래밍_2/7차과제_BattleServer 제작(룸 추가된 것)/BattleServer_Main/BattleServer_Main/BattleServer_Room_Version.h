@@ -359,7 +359,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 3;	
+			const int m_iMaxJoinCount = 2;	
 
 			// ------------
 
@@ -635,7 +635,7 @@ namespace Library_Jingyu
 			const int m_iRoomCloseDelay = 5000;
 
 			// 아이템 획득 좌표 오차
-			const float m_fGetItem_Correction = 2.8f;
+			const float m_fGetItem_Correction = 3.0f;
 
 			// 레드존 활성화 시간.
 			// 게임 시작 후, 아래 시간마다 하나씩 활성화

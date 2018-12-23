@@ -143,9 +143,6 @@ namespace Library_Jingyu
 		m_lAcceptTPS = 0;
 		m_lSendPostTPS = 0;
 
-		// rand설정
-		srand((UINT)time(NULL));
-
 		// Config 데이터 셋팅
 		m_bCode = Code;
 		m_bXORCode = XORCode;
@@ -757,6 +754,9 @@ namespace Library_Jingyu
 		OVERLAPPED* overlapped;
 
 		OVERLAPPED* PQCSoverlapped = &g_This->m_overPQCSOverlapped;
+
+		// rand설정
+		srand((UINT)&cbTransferred);
 		
 		while (1)
 		{

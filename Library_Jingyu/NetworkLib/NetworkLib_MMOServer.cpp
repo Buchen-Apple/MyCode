@@ -897,7 +897,7 @@ namespace Library_Jingyu
 			{
 				int Error = WSAGetLastError();
 				// 10004번(WSAEINTR) 에러면 정상종료. 함수호출이 중단되었다는 것.
-				// 10038번(WSAEINTR) 은 소켓이 아닌 항목에 작업을 시도했다는 것. 이미 리슨소켓은 closesocket된것이니 에러 아님.
+				// 10038번(WSAENOTSOCK) 은 소켓이 아닌 항목에 작업을 시도했다는 것. 이미 리슨소켓은 closesocket된것이니 에러 아님.
 				if (Error == WSAEINTR || Error == WSAENOTSOCK)
 				{
 					// Accept 스레드 정상 종료
@@ -973,7 +973,7 @@ namespace Library_Jingyu
 		const int NEWUSER_PACKET_COUNT = g_This->m_stConfig.AuthNewUser_PacketCount;
 
 		// 종료 이벤트
-		HANDLE* ExitEvent = &g_This->m_hAuthExitEvent;
+		HANDLE ExitEvent = g_This->m_hAuthExitEvent;
 
 		// Accept Socket Pool
 		CMemoryPoolTLS<stAuthWork>* pAcceptPool = g_This->m_pAcceptPool;
@@ -990,12 +990,15 @@ namespace Library_Jingyu
 		// 미사용 인덱스 관리 스택
 		CLF_Stack<WORD>* EmptyIndexStack = g_This->m_stEmptyIndexStack;
 
+		// rand설정
+		srand((UINT)&ullUniqueSessionID);
+
 		while (1)
 		{
 			// ------------------
 			// iSleepValuea 만큼 자다가 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(*ExitEvent, SLEEP_VALUE);
+			DWORD Ret = WaitForSingleObject(ExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -1282,17 +1285,20 @@ namespace Library_Jingyu
 		const int NEWUSER_PACKET_COUNT = g_This->m_stConfig.GameNewUser_PacketCount;
 
 		// 종료 이벤트
-		HANDLE* ExitEvent = &g_This->m_hGameExitEvent;
+		HANDLE ExitEvent = g_This->m_hGameExitEvent;
 
 		// 세션 관리 배열
 		cSession** SessionArray = g_This->m_stSessionArray;
+
+		// rand설정
+		srand((UINT)&MAX_USER);
 
 		while (1)
 		{
 			// ------------------
 			// SLEEP_VALUE만큼 자다가 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(*ExitEvent, SLEEP_VALUE);
+			DWORD Ret = WaitForSingleObject(ExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -1422,7 +1428,7 @@ namespace Library_Jingyu
 		int iEndIndex = g_This->m_stSendConfig[Index].m_iEndIndex;
 
 		// 종료 이벤트
-		HANDLE* ExitEvent = &g_This->m_hSendExitEvent;
+		HANDLE ExitEvent = g_This->m_hSendExitEvent;
 
 		// 세션 관리 배열
 		cSession** SessionArray = g_This->m_stSessionArray;
@@ -1439,7 +1445,7 @@ namespace Library_Jingyu
 			// ------------------
 			// 1미리 세컨드마다 1회씩 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(*ExitEvent, SLEEP_VALUE);
+			DWORD Ret = WaitForSingleObject(ExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -1669,7 +1675,7 @@ namespace Library_Jingyu
 		const int SLEEP_VALUE = g_This->m_stConfig.ReleaseSleep;
 
 		// 종료 이벤트
-		HANDLE* ExitEvent = &g_This->m_hReleaseExitEvent;
+		HANDLE ExitEvent = g_This->m_hReleaseExitEvent;
 
 		// 현재 접속중인 유저 수
 		ULONGLONG* ullJoinUserCount = &g_This->m_ullJoinUserCount;		
@@ -1685,7 +1691,7 @@ namespace Library_Jingyu
 			// ------------------
 			// SLEEP_VALUE만큼 자다가 일어난다.
 			// ------------------	
-			DWORD Ret = WaitForSingleObject(*ExitEvent, SLEEP_VALUE);
+			DWORD Ret = WaitForSingleObject(ExitEvent, SLEEP_VALUE);
 
 			// 이상한 신호라면 
 			if (Ret == WAIT_FAILED)
@@ -1871,9 +1877,6 @@ namespace Library_Jingyu
 		m_lAuthFPS = 0;
 		m_lGameFPS = 0;
 
-
-		// rand설정
-		srand((UINT)time(NULL));
 
 		// Config 데이터 셋팅
 		m_bCode = Code;

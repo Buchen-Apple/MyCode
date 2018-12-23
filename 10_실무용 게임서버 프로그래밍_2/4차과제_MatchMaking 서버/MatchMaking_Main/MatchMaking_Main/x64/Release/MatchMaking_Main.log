@@ -1,5 +1,4 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppClean.targets(76,5): warning : 'c:\git_public\10_실무용 게임서버 프로그래밍_2\4차과제_matchmaking 서버\matchmaking_main\matchmaking_main\x64\release\db_connector.obj' 파일은 다른 프로세스에서 사용 중이므로 프로세스에서 액세스할 수 없습니다.
-  pch.cpp
+﻿  pch.cpp
   CPUUsage.cpp
   CrashDump.cpp
   DB_Connector.cpp
@@ -8,6 +7,8 @@
   MatchmakingServer.cpp
   NetworkLib_LanClient.cpp
   NetworkLib_NetServer.cpp
+c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(759): warning C4311: '형식 캐스트': 'DWORD *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(759): warning C4302: '형식 캐스트': 'DWORD *'에서 'UINT'(으)로 잘립니다.
   Parser_Class.cpp
   PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
@@ -15,6 +16,6 @@
   RingBuff.cpp
   MatchMaking_Main.cpp
   코드를 생성하고 있습니다.
-  All 857 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 856 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   MatchMaking_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\4차과제_MatchMaking 서버\MatchMaking_Main\x64\Release\MatchMaking_Main.exe
