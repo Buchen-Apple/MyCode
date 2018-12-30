@@ -423,7 +423,7 @@ namespace Library_Jingyu
 			if (Check == WAIT_FAILED)
 			{
 				DWORD Error = GetLastError();
-				printf("JobAddThread Exit Error!!! (%d) \n", Error);
+				printf("HBThread Exit Error!!! (%d) \n", Error);
 				break;
 			}
 
@@ -1362,7 +1362,7 @@ namespace Library_Jingyu
 		// 이름 없는 Event	
 		hDB_HBThread_ExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		hDB_HBThread_WorkerEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
-		m_hHBThread = CreateEvent(NULL, FALSE, FALSE, NULL);
+		m_hHBThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 		// SRWLOCK 초기화
 		InitializeSRWLock(&m_srwlPlayer);
