@@ -518,14 +518,6 @@ namespace Library_Jingyu
 	template <typename DATA>
 	CMemoryPoolTLS<DATA>::stChunk::~stChunk()
 	{
-		// 플레이스먼트 뉴 여부가 false라면, 청크Free 시, 소멸자가 호출 안된것이니 여기서 소멸자 호출시켜줘야 함
-		if (m_bPlacementNew == false)
-		{
-			for (int i = 0; i < NODE_COUNT; ++i)
-			{
-				m_arrayNode[i].m_Data.~DATA();
-			}
-		}
 	}
 
 	// ----------------------

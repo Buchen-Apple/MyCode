@@ -10,6 +10,7 @@
 
 #include <unordered_set>
 #include <unordered_map>
+#include <forward_list>
 
 using namespace std;
 
@@ -47,6 +48,14 @@ namespace Library_Jingyu
 			RIGHT,		// 오른쪽
 			TOP,		// 위
 			BOTTOM,		// 아래
+		};
+
+		// 플레이어의 현재 모드
+		enum eu_PLATER_MODE
+		{
+			AUTH = 0,	// 어스
+			GAME,		// 게임
+			LOG_OUT,	// 로그아웃
 		};
 
 		// CMMOServer의 cSession을 상속받는 세션 클래스
@@ -100,6 +109,9 @@ namespace Library_Jingyu
 			// 총 2개의 HTTP가 호출. 이 값이 2라면 모두 셋팅된 것.
 			LONG m_lLoginHTTPCount;
 
+			// 유저의 모드 타입. 컨텐츠 레벨의 타입
+			eu_PLATER_MODE m_euModeType;
+
 
 			// -----------------------
 			// 전적 정보
@@ -147,7 +159,6 @@ namespace Library_Jingyu
 			// 패킷을 받은 순간 값이 들어가며, 데미지 패킷이 오면 다시 0으로 초기화
 			// 즉, 해당 값이 0이면 Fire_1 공격이 안온 상태
 			DWORD m_dwFire1_StartTime;
-
 			
 		private:
 			// -----------------------
@@ -824,7 +835,7 @@ namespace Library_Jingyu
 
 
 		// -----------------------
-		// 아직 DB에 Write 중인 유저 관리 자료구조 변수
+		// 아직 DB에 Write 중인 유저 + 중복로그인 관리 자료구조 변수
 		// -----------------------
 
 		// AccountNo를 이용해 DBWrite 중인 카운트 관리.
@@ -834,6 +845,20 @@ namespace Library_Jingyu
 
 		// m_DBWrite_Umap용 SRW락
 		SRWLOCK m_DBWrite_Umap_srwl;
+
+
+
+		// -----------------------
+		// 중복 로그인으로 인해 끊겨야 하는 Game 모드의(컨텐츠 레벨) 유저 관리 자료구조 변수
+		// -----------------------
+
+		// ClientKey, CGameSession*를 다루는 forward_list
+		//
+		// pair를 이용해 채움
+		forward_list<pair<INT64, CGameSession*>> m_Overlap_list;
+
+		// m_Overlap_list용 SRW락
+		SRWLOCK m_Overlap_list_srwl;
 
 
 	public:
@@ -966,7 +991,7 @@ namespace Library_Jingyu
 
 	private:
 		// ---------------------------------
-		// 방 관리 자료구조 변수
+		// 방 자료구조 관리 함수
 		// ---------------------------------
 
 		// 방을 Room 자료구조에 Insert하는 함수
@@ -976,7 +1001,18 @@ namespace Library_Jingyu
 		//		  : 실패(중복 키) 시 false	
 		bool InsertRoomFunc(int RoomNo, stRoom* InsertRoom);
 
-		
+
+
+	private:
+		// -----------------------
+		// 중복로그인 자료구조(list) 관리 함수
+		// -----------------------
+
+		// 중복로그인 자료구조(list)에 Insert
+		//
+		// Parameter : ClientKey, CGameSession*
+		// return : 없음
+		void InsertOverlapFunc(INT64 ClientKey, CGameSession* InsertPlayer);		
 
 
 

@@ -396,7 +396,86 @@ namespace Library_Jingyu
 
 		return 0;
 	}
+	
+	// 접속자 하트비트를 체크하는 스레드
+	UINT WINAPI Matchmaking_Net_Server::HeartbeatThread(LPVOID lParam)
+	{
+		Matchmaking_Net_Server* g_this = (Matchmaking_Net_Server*)lParam;
 
+		// [종료 신호] 인자로 받아두기
+		HANDLE hEvent = g_this->m_hHBThreadExitEvent;
+
+		// 셧다운 시킬 SessionID를 받아둘 Array.
+		// 따로 Array를 두는 이유
+		// 1. 락 경합 감소
+		// 2. 데드락 위험 피하기
+		// --> Disconnect() 안에서, 셧다운 후에, GetSessionUnLOCK()함수에서 InDisconnect()가 뜰 수 있다
+		// --> InDisconenct()에서는 OnClientLeave()를 호출하는데, 이 안에서 Erase하기 위해 다시 락을 건다.
+		// --> 즉, 데드락 발생 가능성
+		ULONGLONG* SessionArray = new ULONGLONG[g_this->m_stConfig.MaxJoinUser];
+
+		while (1)
+		{
+			// 대기 (10초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 10000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("JobAddThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면 하트비트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그 무엇도 아니라면, 일을 한다.	
+			int Size = 0;
+
+			AcquireSRWLockShared(&g_this->m_srwlPlayer);	// 락 -----------
+
+			// 유저 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
+			if (g_this->m_umapPlayer.size() > 0)
+			{
+				auto itor_Begin = g_this->m_umapPlayer.begin();
+				auto itor_End = g_this->m_umapPlayer.end();
+
+				while (itor_Begin != itor_End)
+				{
+					// 마지막 패킷을 받은지 30초 이상이 되었다면
+					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 30000)
+					{
+						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
+						Size++;
+					}
+
+					++itor_Begin;
+				}
+			}
+
+			ReleaseSRWLockShared(&g_this->m_srwlPlayer);	// 언락 -----------
+
+			// Size가 있다면, 반복문 돌면서 셧다운 진행
+			if (Size > 0)
+			{
+				// 예를 들어, SessionArray안에 10개의 데이터가 들어있으면 Size도 10
+				// Size를 인덱스로 사용할 것이기 때문에 1 감소
+				// 따로 변수를 두는 것 보다, '0'과 같은 고정값과 비교하는 것이 훨씬 속도가 빠르기 때문에 
+				// 이렇게 처리.
+				Size--;
+
+				while (Size >= 0)
+				{
+					g_this->Disconnect(SessionArray[Size]);
+					Size--;
+				}
+			}
+		}
+
+		return 0;
+	}
 
 
 
@@ -526,6 +605,89 @@ namespace Library_Jingyu
 	}
 
 
+		
+
+
+	// -------------------------------------
+	// 로그인한 유저 관리 자료구조
+	// -------------------------------------
+
+	// 로그인 유저 관리 자료구조에 추가
+	//
+	// Parameter : AccountNo, SessionID
+	// return : 성공 시 true / 실패 시 false
+	bool Matchmaking_Net_Server::InsertLoginPlayerFunc(INT64 AccountNo, ULONGLONG SessionID)
+	{
+		AcquireSRWLockExclusive(&m_srwlLoginPlayer);	// ------- Exclusive 락
+
+		// 1. 삽입
+		auto ret = m_umapLoginPlayer.insert(make_pair(AccountNo, SessionID));
+
+		// 2. 중복된 키일 시 false 리턴.
+		if (ret.second == false)
+		{
+			ReleaseSRWLockExclusive(&m_srwlLoginPlayer);		// ------- Exclusive 언락
+			return false;
+		}
+
+		// 중복이 아닐 시 true 리턴
+		ReleaseSRWLockExclusive(&m_srwlLoginPlayer);		// ------- Exclusive 언락
+		return true;
+	}
+
+	// 로그인 유저 관리 자료구조에서 검색
+	//
+	// Parameter : AccountNo, (out)SessionID
+	// return : 성공 시 true와 함께 인자로 던진 SessionID를 채워줌
+	//		  : 실패 시 false와 함께 인자로 던진 SessionID 채우지 않음
+	bool Matchmaking_Net_Server::FindLoginPlayerFunc(INT64 AccountNo, ULONGLONG* SessionID)
+	{
+		AcquireSRWLockShared(&m_srwlLoginPlayer);	// ------- Shared 락
+
+		// 1. 검색
+		auto ret = m_umapLoginPlayer.find(AccountNo);
+
+		// 2. 검색 실패 시 false 리턴
+		if (ret == m_umapLoginPlayer.end())
+		{
+			ReleaseSRWLockShared(&m_srwlLoginPlayer);		// ------- Shared 언락
+			return false;
+		}
+
+		// 3. 검색 성공 시, 인자로 받은 값을 채운다
+		// 그리고 true 리턴
+		*SessionID = ret->second;
+
+		ReleaseSRWLockShared(&m_srwlLoginPlayer);		// ------- Shared 언락
+		return true;
+	}
+
+	// 로그인 한 유저 관리 자료구조에서 유저 삭제
+	//
+	// Parameter : AccountNo
+	// return : 제거 성공 시 true / 실패 시 false
+	bool Matchmaking_Net_Server::EraseLoginPlayerFunc(INT64 AccountNo)
+	{
+		AcquireSRWLockExclusive(&m_srwlLoginPlayer);	// ------- Exclusive 락
+
+		// 1. 검색
+		auto ret = m_umapLoginPlayer.find(AccountNo);
+
+		// 2. 없으면 false 리턴
+		if (ret == m_umapLoginPlayer.end())
+		{
+			ReleaseSRWLockExclusive(&m_srwlLoginPlayer);		// ------- Exclusive 언락
+			return false;
+		}
+
+		// 3. 있으면 Erase 후 true 리턴
+		m_umapLoginPlayer.erase(ret);
+
+		ReleaseSRWLockExclusive(&m_srwlLoginPlayer);		// ------- Exclusive 언락
+		return true;
+	}
+
+
 
 
 
@@ -558,7 +720,10 @@ namespace Library_Jingyu
 		// 3. 만약 이미 Login 된 유저거나, 배틀 방에 입장된 유저라면 Crash
 		if (NowPlayer->m_bLoginCheck == true ||
 			NowPlayer->m_bBattleRoomEnterCheck == true)
-			gMatchServerDump->Crash();
+			gMatchServerDump->Crash();	
+
+		// 마지막 패킷 시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
 
 		// 4. AccountNo로 DB에서 찾아오기
@@ -673,8 +838,34 @@ namespace Library_Jingyu
 		// 2) 로그인 상태로 변경
 		NowPlayer->m_bLoginCheck = true;
 
-		// 로그인 유저 수 증가
+		// 3) 로그인 유저 수 증가
 		InterlockedIncrement(&m_lLoginUser);
+
+		// 4) 로그인 유저에 추가
+		if (InsertLoginPlayerFunc(AccountNo, SessionID) == false)
+		{
+			// 실패라면 중복 로그인임.
+			// 기타 오류 패킷을 리턴.
+			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
+			BYTE Status = 4; // 기타 오류
+
+			CProtocolBuff_Net* SendData = CProtocolBuff_Net::Alloc();
+
+			SendData->PutData((char*)&Type, 2);
+			SendData->PutData((char*)&Status, 1);
+
+			SendPacket(SessionID, SendData);
+
+			// 기존에 접속중인 유저도 종료시킨다.
+			// 기존 유저 검색 시, 없을수도 있다. 이미 종료했을 가능성
+			// 없을 때는 Disconnect 안하고 그냥 나간다.
+			ULONGLONG TempSessionID;
+			if (FindLoginPlayerFunc(AccountNo, &TempSessionID))
+				Disconnect(TempSessionID);
+			
+			return;
+		}
+
 
 
 		// 8. 정상 패킷 응답
@@ -718,6 +909,7 @@ namespace Library_Jingyu
 			gMatchServerDump->Crash();
 		
 		NowPlayer->m_bBattleRoomEnterCheck = true;
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
 
 		// 4. 마스터 서버에게 보낼 패킷 제작 (Lan 직렬화 버퍼 사용)
@@ -787,17 +979,25 @@ namespace Library_Jingyu
 		// ------------------- 매치메이킹 DB에 초기 데이터 생성
 		ServerInfo_DBInsert();
 
-		// ------------------- 하트비트 스레드 생성
+		// ------------------- DB 하트비트 스레드 생성
 		hDB_HBThread = (HANDLE)_beginthreadex(NULL, 0, DBHeartbeatThread, this, 0, 0);
 		if (hDB_HBThread == 0)
 		{
 			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, 
-				L"ServerStart() --> HeartBeatThread Create Fail...");
+				L"ServerStart() --> DBHeartBeatThread Create Fail...");
 
 			return false;
 		}
 
-		
+		// 일반 하트비트 스레드 생성
+		m_hHBThread = (HANDLE)_beginthreadex(NULL, 0, HeartbeatThread, this, 0, 0);
+		if (hDB_HBThread == 0)
+		{
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
+				L"ServerStart() --> HeartBeatThread Create Fail...");
+
+			return false;
+		}		
 
 		//------------------- 마스터와 연결되는 랜 클라 가동 및 this 전달
 		m_pLanClient->SetParent(this);
@@ -828,19 +1028,39 @@ namespace Library_Jingyu
 	// return : 없음
 	void Matchmaking_Net_Server::ServerStop()
 	{
+		// 모니터링 서버와 연결되는 랜 클라 종료
+		m_pMonitorLanClient->Stop();
+
+		// 마스터 서버와 연결되는 랜 클라 종료
+		m_pLanClient->Stop();
+
 		// 넷서버 스탑 (엑셉트, 워커 종료)
 		Stop();	
 
 		// 하트비트 스레드 종료 신호
 		SetEvent(hDB_HBThread_ExitEvent);
 
-		// 하트비트 스레드 종료 대기
-		if (WaitForSingleObject(hDB_HBThread, INFINITE) == WAIT_FAILED)
+		// DB 하트비트 스레드 종료 대기
+		if (WaitForSingleObject(hDB_HBThread, INFINITE) != WAIT_OBJECT_0)
 		{
 			// 종료에 실패한다면, 에러 찍기
 			DWORD Error = GetLastError();
 			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, 
 				L"ServerStop() --> DBHeartbeatThread Exit Error!!!(%d)", Error);
+
+			gMatchServerDump->Crash();
+		}
+
+		// 일반 하트비트 스레드 종료 신호
+		SetEvent(m_hHBThreadExitEvent);
+
+		// 일반 하트비트 스레드 종료 대기
+		if (WaitForSingleObject(m_hHBThread, INFINITE) != WAIT_OBJECT_0)
+		{
+			// 종료에 실패한다면, 에러 찍기
+			DWORD Error = GetLastError();
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
+				L"ServerStop() --> HeartbeatThread Exit Error!!!(%d)", Error);
 
 			gMatchServerDump->Crash();
 		}
@@ -945,10 +1165,12 @@ namespace Library_Jingyu
 		stPlayer* NowPlayer = m_PlayerPool->Alloc();
 		InterlockedIncrement(&m_lstPlayer_AllocCount);
 
-		// 2. stPlayer에 SessionID, ClientKey 셋팅
+		// 2. stPlayer에 SessionID, ClientKey, 마지막 패킷 시간 갱신 셋팅
 		NowPlayer->m_ullSessionID = SessionID;	
 		UINT64 TempCKey = CreateClientKey();
 		NowPlayer->m_ui64ClientKey = TempCKey;
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
+	
 
 		// 3. Player 관리 umap에 추가.
 		if (InsertPlayerFunc(SessionID, TempCKey, NowPlayer) == false)
@@ -957,10 +1179,10 @@ namespace Library_Jingyu
 		// 4. umap에 유저 수 체크.
 		// umap의 유저수가 m_ChangeConnectUser +m_iMatchDBConnectUserChange 보다 많다면, 이전 값 기준 100명 이상 들어온것.
 		// 매치메이킹 DB에 하트비트 한다.	
-		// 카운트를 명확하게 하기 위해 락 사용	
-		size_t NowumapCount = (int)m_umapPlayer.size();
-		
+		// 카운트를 명확하게 하기 위해 락 사용			
 		AcquireSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 락 -----------
+
+		size_t NowumapCount = (int)m_umapPlayer.size();
 
 		if (m_ChangeConnectUser + m_iMatchDBConnectUserChange <= NowumapCount)
 		{
@@ -986,9 +1208,9 @@ namespace Library_Jingyu
 		// umap의 유저수가 m_ChangeConnectUser - m_iMatchDBConnectUserChange 보다 적다면, 이전 값 기준 100명 이상 나간것.
 		// 매치메이킹 DB에 하트비트 한다.	
 		// 카운트를 명확하게 하기 위해 락 사용	
-		size_t NowumapCount = m_umapPlayer.size();
-
 		AcquireSRWLockExclusive(&m_srwlChangeConnectUser);	// Exclusive 락 -----------
+
+		size_t NowumapCount = m_umapPlayer.size();
 
 		if (m_ChangeConnectUser - m_iMatchDBConnectUserChange >= NowumapCount)
 		{
@@ -1005,6 +1227,10 @@ namespace Library_Jingyu
 		if (ErasePlayer->m_bLoginCheck == true)
 		{
 			InterlockedDecrement(&m_lLoginUser);
+
+			// 로그인 유저 관리 자료구조에서 제거
+			if (EraseLoginPlayerFunc(ErasePlayer->m_i64AccountNo) == false)
+				gMatchServerDump->Crash();
 
 			// 유저 로그인 상태를 false로 만듬.
 			ErasePlayer->m_bLoginCheck = false;
@@ -1127,17 +1353,21 @@ namespace Library_Jingyu
 		cMatchServerLog->SetDirectory(L"MatchServer");
 		cMatchServerLog->SetLogLeve((CSystemLog::en_LogLevel)m_stConfig.LogLevel);
 
-		// DBThread 종료용 이벤트, 일 시키기용 이벤트 생성
+		// DBThread 종료용 이벤트
+		// DBThread 일 시키기용 이벤트 생성
+		// 일반 접속유저 하트비트 스레드 종료용 이벤트
 		// 
 		// 자동 리셋 Event 
 		// 최초 생성 시 non-signalled 상태
 		// 이름 없는 Event	
 		hDB_HBThread_ExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 		hDB_HBThread_WorkerEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+		m_hHBThread = CreateEvent(NULL, FALSE, FALSE, NULL);
 
 		// SRWLOCK 초기화
 		InitializeSRWLock(&m_srwlPlayer);
 		InitializeSRWLock(&m_srwlChangeConnectUser);
+		InitializeSRWLock(&m_srwlLoginPlayer);
 
 		// stPlayer 구조체를 다루는 TLS 동적할당
 		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
@@ -1218,6 +1448,9 @@ namespace Library_Jingyu
 		Matchmaking_Net_Server::stPlayer* NowPlayer = m_pParent->FindPlayerFunc(SessionID);
 		if (NowPlayer == nullptr)
 			gMatchServerDump->Crash();
+
+		// 마지막 패킷 시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
 		// 2. 마스터와 연결되어 있지 않다면, 바로 방없음 패킷 보냄.
 		if (m_bLoginCheck == false)

@@ -86,6 +86,9 @@ namespace Library_Jingyu
 			// 마스터 서버로 방 정보 요청을 보낸 유저. true면 보낸 유저.
 			bool m_bSendMaster_RoomInfo;
 
+			// 마지막으로 패킷을 받은 시간 보관 변ㅅ
+			DWORD m_dwLastPacketTime;
+
 			stPlayer()
 			{
 				m_bLoginCheck = false;	// 최초 생성시에는 flase로 시작
@@ -166,6 +169,14 @@ namespace Library_Jingyu
 		HANDLE hDB_HBThread_WorkerEvent;
 		
 		// -----------------------------------
+
+		// HeartbeatThread의 핸들
+		HANDLE m_hHBThread;
+
+		// HeartbeatThread 종료용 이벤트
+		HANDLE m_hHBThreadExitEvent;
+
+		// -----------------------------------
 		
 
 
@@ -194,6 +205,20 @@ namespace Library_Jingyu
 
 		// stPlayer 구조체를 다루는 TLS
 		CMemoryPoolTLS<stPlayer> *m_PlayerPool;
+
+		// -----------------------------------
+
+
+		// -----------------------------------
+
+		// 로그인 한 유저를 관리하는 자료구조
+		// umap
+		//
+		// Key : AccountNo / Value : SessionID
+		unordered_map<UINT64, ULONGLONG> m_umapLoginPlayer;
+
+		// m_umapLoginPlayer를 관리하는 LOCK
+		SRWLOCK m_srwlLoginPlayer;
 
 		// -----------------------------------
 			  
@@ -264,6 +289,9 @@ namespace Library_Jingyu
 		// matchmakingDB에 일정 시간마다 하트비트를 쏘는 스레드.
 		static UINT WINAPI DBHeartbeatThread(LPVOID lParam);
 
+		// 접속자 하트비트를 체크하는 스레드
+		static UINT WINAPI HeartbeatThread(LPVOID lParam);
+
 
 
 	private:
@@ -304,6 +332,32 @@ namespace Library_Jingyu
 		// return : 성공 시, 제거된 유저 stPalyer*
 		//		  : 검색 실패 시(접속중이지 않은 유저) nullptr
 		stPlayer* ErasePlayerFunc(ULONGLONG SessionID);
+
+
+
+	private:
+		// -------------------------------------
+		// 로그인한 유저 관리 자료구조
+		// -------------------------------------
+
+		// 로그인 유저 관리 자료구조에 추가
+		//
+		// Parameter : AccountNo, SessionID
+		// return : 성공 시 true / 실패 시 false
+		bool InsertLoginPlayerFunc(INT64 AccountNo, ULONGLONG SessionID);
+
+		// 로그인 유저 관리 자료구조에서 검색
+		//
+		// Parameter : AccountNo, (out)SessionID
+		// return : 성공 시 true와 함께 인자로 던진 SessionID를 채워줌
+		//		  : 실패 시 false와 함께 인자로 던진 SessionID 채우지 않음
+		bool FindLoginPlayerFunc(INT64 AccountNo, ULONGLONG* SessionID);
+
+		// 로그인 한 유저 관리 자료구조에서 유저 삭제
+		//
+		// Parameter : AccountNo
+		// return : 제거 성공 시 true / 실패 시 false
+		bool EraseLoginPlayerFunc(INT64 AccountNo);
 
 
 

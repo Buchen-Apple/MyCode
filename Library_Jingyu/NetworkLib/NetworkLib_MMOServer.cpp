@@ -24,6 +24,10 @@ list<WORD> TypeTest;
 // ------------------------
 namespace Library_Jingyu
 {
+	// -----------------
+	// 생성자와 소멸자
+	// -----------------
+
 	// 생성자
 	CMMOServer::cSession::cSession()
 	{
@@ -45,6 +49,10 @@ namespace Library_Jingyu
 		delete m_CRPacketQueue;
 	}
 
+
+	// -----------------
+	// 네트워크용 기능함수
+	// -----------------
 
 	// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
 	// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
@@ -98,6 +106,11 @@ namespace Library_Jingyu
 		m_lAuthToGameFlag = TRUE;
 	}
 
+
+
+	// -----------------
+	// 가상함수
+	// -----------------
 
 	// Auth 스레드에서 처리
 	void CMMOServer::cSession::OnAuth_ClientJoin() {}
@@ -390,6 +403,11 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("MaxSendThread"), &pConfig->CreateSendThreadCount) == false)
 			return false;
 
+
+
+		// 하트비트 플래그
+		if (Parser.GetValue_Int(_T("HeartBeatFlag"), &pConfig->HeartBeatFlag) == false)
+			return false;
 
 		return true;
 	}
@@ -702,6 +720,15 @@ namespace Library_Jingyu
 		return 0;
 
 	}
+
+	// 하트비트 체크 함수
+	// 
+	// Parameter : cSession*
+	// return : 없음
+	void CMMOServer::HeartBeatCheck(cSession* NowSession)
+	{
+
+	}
 	
 
 
@@ -990,6 +1017,12 @@ namespace Library_Jingyu
 		// 미사용 인덱스 관리 스택
 		CLF_Stack<WORD>* EmptyIndexStack = g_This->m_stEmptyIndexStack;
 
+		// 하트비트 플래그
+		bool HeartBeatFlag = g_This->m_stConfig.HeartBeatFlag;
+
+		// 마지막 패킷으로부터, 아래 변수만큼 시간이 지나면 셧다운 대상
+		DWORD shutdownCheck = 30000;	// 30초
+
 		// rand설정
 		srand((UINT)&ullUniqueSessionID);
 
@@ -1105,10 +1138,12 @@ namespace Library_Jingyu
 				// 4) 셋팅이 모두 끝났으면 Auth 상태로 변경
 
 				// Auth 모드 유저 수 증가
-				++g_This->m_lAuthModeUserCount;
+				++g_This->m_lAuthModeUserCount;				
 
 				SessionArray[wIndex]->m_euMode = euSessionModeState::MODE_AUTH;
 
+				// 마지막으로 패킷을 받은 시간 갱신
+				SessionArray[wIndex]->m_dwLastPacketTime = timeGetTime();
 
 
 				// 5. IOCP 연결
@@ -1205,6 +1240,9 @@ namespace Library_Jingyu
 							// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
 							if (iQSize > 0)
 							{
+								// 마지막으로 패킷을 받은 시간 갱신
+								NowSession->m_dwLastPacketTime = timeGetTime();
+
 								// !! 패킷 처리 횟수 제한을 두기 위해, PACKET_WORK_COUNT보다 노드의 수가 더 많으면, PACKET_WORK_COUNT로 변경 !!
 								if (iQSize > PACKET_WORK_COUNT)
 									iQSize = PACKET_WORK_COUNT;
@@ -1226,6 +1264,15 @@ namespace Library_Jingyu
 									// 패킷 1개 처리했으니 남은 수 감소.
 									--iQSize;
 								}
+							}
+
+							// 3. 하트비트 체크
+							// Flag가 true라면 하트비트 체크
+							if (HeartBeatFlag)
+							{
+								// 셧다운 대상인지 체크
+								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+									NowSession->Disconnect();
 							}
 						}
 
@@ -1289,6 +1336,12 @@ namespace Library_Jingyu
 
 		// 세션 관리 배열
 		cSession** SessionArray = g_This->m_stSessionArray;
+
+		// 하트비트 플래그
+		bool HeartBeatFlag = g_This->m_stConfig.HeartBeatFlag;
+
+		// 마지막 패킷으로부터, 아래 변수만큼 시간이 지나면 셧다운 대상
+		DWORD shutdownCheck = 30000;	// 30초
 
 		// rand설정
 		srand((UINT)&MAX_USER);
@@ -1378,6 +1431,15 @@ namespace Library_Jingyu
 								// 패킷 1개 처리했으니 남은 수 감소.
 								--iQSize;
 							}
+						}
+
+						// 3. 하트비트 체크
+						// Flag가 true라면 하트비트 체크
+						if (HeartBeatFlag)
+						{
+							// 셧다운 대상인지 체크
+							if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+								NowSession->Disconnect();
 						}
 
 					}

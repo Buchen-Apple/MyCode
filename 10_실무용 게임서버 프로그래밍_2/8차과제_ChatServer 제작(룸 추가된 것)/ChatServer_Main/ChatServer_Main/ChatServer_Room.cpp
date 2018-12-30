@@ -27,6 +27,99 @@ namespace Library_Jingyu
 	CSystemLog* g_ChatLog = CSystemLog::GetInstance();
 
 
+	// -----------------------
+	// 스레드
+	// -----------------------
+
+	// 하트비트 스레드
+	UINT WINAPI CChatServer_Room::HeartBeatThread(LPVOID lParam)
+	{
+		CChatServer_Room* g_this = (CChatServer_Room*)lParam;
+
+		// [종료 신호] 인자로 받아두기
+		HANDLE hEvent = g_this->m_hHBThreadExitEvent;
+
+		// 셧다운 시킬 SessionID를 받아둘 Array.
+		// 따로 Array를 두는 이유
+		// 1. 락 경합 감소
+		// 2. 데드락 위험 피하기
+		// --> Disconnect() 안에서, 셧다운 후에, GetSessionUnLOCK()함수에서 InDisconnect()가 뜰 수 있다
+		// --> InDisconenct()에서는 OnClientLeave()를 호출하는데, 이 안에서 Erase하기 위해 다시 락을 건다.
+		// --> 즉, 데드락 발생 가능성
+		ULONGLONG* SessionArray = new ULONGLONG[g_this->m_Paser.MaxJoinUser];
+
+		while (1)
+		{
+			// 대기 (10초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 10000);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("JobAddThread Exit Error!!! (%d) \n", Error);
+				break;
+			}
+
+			// 만약, 종료 신호가 왔다면 하트비트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// 그 무엇도 아니라면, 일을 한다.	
+
+			int Size = 0;
+
+			AcquireSRWLockShared(&g_this->m_Player_Umap_srwl);	// 락 -----------
+
+			// 유저 자료구조에 사이즈가 0 이상인지 체크 후 로직 진행
+			if (g_this->m_Player_Umap.size() > 0)
+			{
+				auto itor_Begin = g_this->m_Player_Umap.begin();
+				auto itor_End = g_this->m_Player_Umap.end();
+
+				while (itor_Begin != itor_End)
+				{
+					// 마지막 패킷을 받은지 30초 이상이 되었다면
+					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 30000)
+					{
+						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
+						Size++;
+					}
+
+					++itor_Begin;
+				}
+			}
+
+			ReleaseSRWLockShared(&g_this->m_Player_Umap_srwl);	// 언락 -----------
+
+			// Size가 있다면, 반복문 돌면서 셧다운 진행
+			if (Size > 0)
+			{
+				// 예를 들어, SessionArray안에 10개의 데이터가 들어있으면 Size도 10
+				// Size를 인덱스로 사용할 것이기 때문에 1 감소
+				// 따로 변수를 두는 것 보다, '0'과 같은 고정값과 비교하는 것이 훨씬 속도가 빠르기 때문에 
+				// 이렇게 처리.
+				Size--;
+
+				while (Size >= 0)
+				{
+					g_this->Disconnect(SessionArray[Size]);
+					Size--;
+				}
+			}
+		}
+
+		printf("HB_Thread Exit!!\n");
+
+		delete[] SessionArray;
+
+		return 0;
+	}
+
+
+
+
+
 	// ----------------------------
 	// 플레이어 관리 자료구조 함수
 	// ----------------------------
@@ -159,7 +252,7 @@ namespace Library_Jingyu
 		// 1. 검색
 		auto FindPlayer = m_LoginPlayer_Umap.find(AccountNo);
 
-		// 못찾았으면 nullptr 리턴
+		// 못찾았으면 false 리턴
 		if (FindPlayer == m_LoginPlayer_Umap.end())
 		{
 			ReleaseSRWLockExclusive(&m_LoginPlayer_Umap_srwl);	 // ----- 로그인 Player Umap Exclusive 언락
@@ -437,6 +530,9 @@ namespace Library_Jingyu
 			
 			return false;
 		}	
+
+		// 하트비트 스레드 생성
+		m_hHBthreadHandle = (HANDLE)_beginthreadex(NULL, 0, HeartBeatThread, this, 0, 0);
 		
 		// 서버 오픈 로그 찍기 (로그 레벨 : 에러)
 		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
@@ -451,12 +547,27 @@ namespace Library_Jingyu
 	void CChatServer_Room::ServerStop()
 	{
 		// 모니터링 서버와 연결되는 랜 클라 종료
+		m_pMonitor_Client->Stop();
 
 		// 배틀과 연결되는 랜 클라 종료
-		m_pBattle_Client->Stop();
+		m_pBattle_Client->Stop();		
 
 		// 채팅 Net 서버 종료
 		Stop();
+
+		// 하트비트 스레드 종료
+		SetEvent(m_hHBThreadExitEvent);
+
+		// 하트비트 스레드가 이상한 신호로 종료되었다면, 
+		if (WaitForSingleObject(m_hHBthreadHandle, INFINITE) != WAIT_OBJECT_0)
+		{
+			// 종료에 실패한다면, 에러 찍기
+			DWORD Error = GetLastError();
+			g_ChatLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
+				L"ServerStop() --> HBThread Exit Error!!!(%d)", Error);
+
+			g_ChatDump->Crash();
+		}
 
 		// 서버 닫힘 로그 찍기 (로그 레벨 : 에러)
 		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"All Server Stop...");
@@ -700,7 +811,10 @@ namespace Library_Jingyu
 
 			throw CException(str);	
 			*/
-		}		
+		}	
+
+		// 마지막으로 패킷 받은시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
 
 
@@ -754,7 +868,7 @@ namespace Library_Jingyu
 			AcquireSRWLockShared(&m_LoginPlayer_Umap_srwl);	// ----- 로그인 Player Shared 락
 
 			// 1) 검색
-			auto FindPlayer = m_LoginPlayer_Umap.find(SessionID);
+			auto FindPlayer = m_LoginPlayer_Umap.find(AccountNo);
 
 			// 2) 없을 수 있음. 이 로직을 처리하는데 종료됐을 가능성
 			if (FindPlayer == m_LoginPlayer_Umap.end())
@@ -845,6 +959,9 @@ namespace Library_Jingyu
 			throw CException(str);
 			*/
 		}
+
+		// 마지막으로 패킷 받은시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
 		// 5. 룸 검색
 		AcquireSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 락
@@ -979,7 +1096,11 @@ namespace Library_Jingyu
 
 			throw CException(str);
 			*/
-		}		
+		}	
+
+		// 마지막으로 패킷 받은시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
+
 
 
 		// 5.  채팅 응답 패킷 만들기
@@ -1030,6 +1151,37 @@ namespace Library_Jingyu
 		CProtocolBuff_Net::Free(SendBuff);
 	}
 
+	// 하트비트
+	//
+	// Parameter : SessionID
+	// return : 없음
+	void CChatServer_Room::Packet_HeartBeat(ULONGLONG SessionID)
+	{
+		// 1. 플레이어 검색
+		stPlayer* NowPlayer = FindPlayerFunc(SessionID);
+
+		// 없으면 크래시
+		if (NowPlayer == nullptr)
+			g_ChatDump->Crash();
+
+		// 3. 로그인 상태 체크. 
+		// 로그인 중이 아니면 Crash
+		if (NowPlayer->m_bLoginCheck == false)
+		{
+			g_ChatDump->Crash();
+
+			/*
+			TCHAR str[100];
+			StringCchPrintf(str, 100, _T("Packet_Message(). LoginFlag True. SessionID : %lld, AccountNo : %lld"),
+				SessionID, AccountNo);
+
+			throw CException(str);
+			*/
+		}		
+
+		// 마지막으로 패킷 받은시간 갱신
+		NowPlayer->m_dwLastPacketTime = timeGetTime();
+	}
 
 
 
@@ -1059,6 +1211,9 @@ namespace Library_Jingyu
 
 		// 2. 초기 셋팅
 		NewPlayer->m_ullSessionID = SessionID;
+
+		// 마지막 패킷 받은 시간 갱신
+		NewPlayer->m_dwLastPacketTime = timeGetTime();
 
 		// 3. 자료구조에 추가
 		InsertPlayerFunc(SessionID, NewPlayer);
@@ -1158,6 +1313,7 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer_Room::OnRecv(ULONGLONG SessionID, CProtocolBuff_Net* Payload)
 	{
+
 		// 타입 마샬링
 		WORD Type;
 		Payload->GetData((char*)&Type, 2);
@@ -1188,6 +1344,7 @@ namespace Library_Jingyu
 
 				// 하트비트
 			case en_PACKET_CS_CHAT_REQ_HEARTBEAT:
+				Packet_HeartBeat(SessionID);
 				break;
 
 
@@ -1297,6 +1454,13 @@ namespace Library_Jingyu
 		// TLS Pool 동적할당
 		m_pPlayer_Pool = new CMemoryPoolTLS<stPlayer>(0, false);
 		m_pRoom_Pool = new CMemoryPoolTLS<stRoom>(0, false);
+
+		// 하트비트 스레드 종료 용도 Event
+		// 
+		// 자동 리셋 Event 
+		// 최초 생성 시 non-signalled 상태
+		// 이름 없는 Event	
+		m_hHBThreadExitEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	}
 
 	// 소멸자

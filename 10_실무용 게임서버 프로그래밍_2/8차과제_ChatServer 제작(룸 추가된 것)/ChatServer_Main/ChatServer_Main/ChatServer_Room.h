@@ -51,6 +51,9 @@ namespace Library_Jingyu
 			// true면 로그인 중.
 			bool m_bLoginCheck;
 
+			// 마지막으로 패킷을 받은 시간
+			DWORD m_dwLastPacketTime;
+
 			stPlayer()
 			{
 				// 시작 시, 룸 번호는 -1
@@ -327,6 +330,26 @@ namespace Library_Jingyu
 
 
 
+		// --------------------------
+		// 하트비트 스레드 변수
+		// --------------------------
+
+		// 하트비트 스레드 핸들
+		HANDLE m_hHBthreadHandle;
+
+		// 하트비트 스레드 종료 이벤트
+		HANDLE m_hHBThreadExitEvent;
+
+
+	private:
+		// -----------------------
+		// 스레드
+		// -----------------------
+
+		// 하트비트 스레드
+		static UINT WINAPI HeartBeatThread(LPVOID lParam);
+
+
 
 
 	private:
@@ -360,7 +383,7 @@ namespace Library_Jingyu
 
 	private:
 		// ----------------------------
-		// 플레이어 관리 자료구조 함수
+		// 로그인 한 플레이어 관리 자료구조 함수
 		// ----------------------------
 
 		// 로그인 한 플레이어 관리 자료구조에 Insert
@@ -471,6 +494,12 @@ namespace Library_Jingyu
 		// Parameter : SessionID, CProtocolBuff_Net*
 		// return : 없음
 		void Packet_Message(ULONGLONG SessionID, CProtocolBuff_Net* Packet);
+
+		// 하트비트
+		//
+		// Parameter : SessionID
+		// return : 없음
+		void Packet_HeartBeat(ULONGLONG SessionID);
 
 
 

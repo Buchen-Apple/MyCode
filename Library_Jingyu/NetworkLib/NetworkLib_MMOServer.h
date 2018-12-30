@@ -133,6 +133,9 @@ namespace Library_Jingyu
 			// 마지막 패킷 저장소
 			void* m_LastPacket = nullptr;			
 
+			// 마지막으로 패킷을 받은 시간
+			DWORD m_dwLastPacketTime;
+
 		public:
 			// -----------------
 			// 생성자와 소멸자
@@ -223,10 +226,13 @@ namespace Library_Jingyu
 			// ******* RELEASE 스레드용 *******
 			int ReleaseSleep;					// Sleep하는 시간(밀리세컨드)	
 
+
 			// ******* SEND 스레드용 *******
 			int SendSleep;					// Sleep하는 시간(밀리세컨드)	
 			int CreateSendThreadCount;		// 생성할 샌드스레드 수
 
+			// ******* 하트비트 플래그 (Auth, Game스레드 공용) *******
+			int HeartBeatFlag;	// 		// 하트비트 flag. true면 하트비트 체크한다.
 		};
 
 		// Send 스레드에서 처리할 Index의 Start와 End 보관 구조체
@@ -440,6 +446,12 @@ namespace Library_Jingyu
 		// return 2 : I/O 카운트가 0이되어 삭제된 유저
 		int RecvPost(cSession* NowSession);	
 
+		// 하트비트 체크 함수
+		// 
+		// Parameter : cSession*
+		// return : 없음
+		void HeartBeatCheck(cSession* NowSession);
+
 
 
 
@@ -536,11 +548,6 @@ namespace Library_Jingyu
 		//			 : 에러 코드에 대한 스트링
 		// return : 없음
 		virtual void OnError(int error, const TCHAR* errorStr) = 0;
-
-	
-
-
-
 	};
 }
 

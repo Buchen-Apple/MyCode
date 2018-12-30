@@ -65,6 +65,9 @@ namespace Library_Jingyu
 
 		// 마지막 전적 저장 상태 확인
 		m_bLastDBWriteFlag = false;
+
+		// 최초는 로그아웃 상태
+		m_euModeType = eu_PLATER_MODE::LOG_OUT;
 	}
 
 	// 소멸자
@@ -87,7 +90,11 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnAuth_ClientJoin()
 	{
-		// 할거 없음
+		// 컨텐츠 레벨의 모드 변경
+		if (m_euModeType != LOG_OUT)
+			g_BattleServer_Room_Dump->Crash();
+
+		m_euModeType = eu_PLATER_MODE::AUTH;
 	}
 
 	// 유저가 Auth 모드에서 나감
@@ -99,12 +106,22 @@ namespace Library_Jingyu
 		// 모드 변경일 경우
 		if (bGame == true)
 		{
-			
+			// 모드 변경
+			if (m_euModeType != eu_PLATER_MODE::AUTH)
+				g_BattleServer_Room_Dump->Crash();
+
+			m_euModeType = eu_PLATER_MODE::GAME;
 		}
 
 		// 실제 게임 종료일 경우
 		else
 		{
+			// 모드 변경
+			if (m_euModeType != eu_PLATER_MODE::AUTH)
+				g_BattleServer_Room_Dump->Crash();
+
+			m_euModeType = eu_PLATER_MODE::LOG_OUT;
+
 			// ClientKey 초기값으로 셋팅.
 			// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
 			// !! Auth_Update에서 이미 샌드큐가 모두 정리된 유저에게 또 SendPacket 가능성 !!
@@ -299,6 +316,12 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnGame_ClientLeave()
 	{
+		// 모드 변경
+		if (m_euModeType != eu_PLATER_MODE::GAME)
+			g_BattleServer_Room_Dump->Crash();
+
+		m_euModeType = eu_PLATER_MODE::LOG_OUT;
+
 		// ClientKey 초기값으로 셋팅.
 		// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
 		// !! Game_Update에서 이미 샌드큐가 모두 정리된 유저에게 또 SendPacket 가능성 !!
@@ -503,6 +526,10 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::CGameSession::OnGame_ClientRelease()
 	{
+		// 모드가 LOG_OUT이 아니면 크래스
+		if (m_euModeType != eu_PLATER_MODE::LOG_OUT)
+			g_BattleServer_Room_Dump->Crash();
+
 		// m_bStructFlag가 true라면, 자료구조에 들어간 유저
 		if (m_bStructFlag == true)
 		{
@@ -565,6 +592,9 @@ namespace Library_Jingyu
 
 			// SendPacket
 			SendPacket(SendBuff);
+
+			// 중복 로그인 처리된 유저도 접속 종료 요청
+			m_pParent->DisconnectAccountNoFunc(AccountNo);
 
 			return;
 		}
@@ -1268,91 +1298,6 @@ namespace Library_Jingyu
 		if (TargetHP == 0)
 		{
 			NowRoom->Player_Die(this, Target);
-			/*
-			// 피해자의 생존 플래그를 false로 변경
-			Target->m_bAliveFlag = false;
-
-			// 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
-			// 모든 유저가 죽었는데 또 죽었다고 한 것.
-			if (NowRoom->m_iAliveUserCount == 0)
-				g_BattleServer_Room_Dump->Crash();
-			
-			// 룸의 생존 유저 수 카운트 1 감소
-			--NowRoom->m_iAliveUserCount;
-
-			// 패킷 보내기
-			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
-
-			WORD Type = en_PACKET_CS_GAME_RES_DIE;
-
-			SendBuff->PutData((char*)&Type, 2);
-			SendBuff->PutData((char*)&TargetAccountNo, 8);			
-
-			NowRoom->SendPacket_BroadCast(SendBuff);
-
-
-			// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
-			NowRoom->CreateItem(Target);
-
-
-			// DB 저장 파트 -----------------------------------
-
-			// 공격자의 Kill 카운트 증가
-			++m_iRecord_Kill;
-
-			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-		
-			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
-			KillWrite->m_iCount = m_iRecord_Kill;
-
-			KillWrite->AccountNo = m_Int64AccountNo;
-
-			// 요청하기
-			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);	
-
-
-			
-
-			// 사망자의 Die 카운트 증가
-			++Target->m_iRecord_Die;
-
-			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-			DieWrite->m_iCount = Target->m_iRecord_Die;
-
-			DieWrite->AccountNo = TargetAccountNo;
-
-			// 요청하기
-			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
-
-
-
-
-
-			// 사망자의 플레이 타임 갱신
-			Target->m_iRecord_PlayTime = Target->m_iRecord_PlayTime + ((timeGetTime() - Target->m_dwGameStartTime) / 1000);
-
-			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-			Target->m_bLastDBWriteFlag = true;
-
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iCount = Target->m_iRecord_PlayTime;
-
-			WriteWork->AccountNo = TargetAccountNo;
-
-			// Write 하기 전에, DBWrite카운트 올려야함.
-			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-
-			// DBWrite 시도
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
-			*/
 		}
 	}
 
@@ -1518,90 +1463,6 @@ namespace Library_Jingyu
 		if (TargetHP == 0)
 		{
 			NowRoom->Player_Die(this, Target);
-			/*
-			// 피해자의 생존 플래그를 false로 변경
-			Target->m_bAliveFlag = false;
-
-			// 룸의 생존 유저 수가 이미 0이었으면 문제 있음. 
-			// 모든 유저가 죽었는데 또 죽었다고 한 것.
-			if (NowRoom->m_iAliveUserCount == 0)
-				g_BattleServer_Room_Dump->Crash();
-
-			// 룸의 생존 유저 수 카운트 1 감소
-			--NowRoom->m_iAliveUserCount;
-
-			// 패킷 보내기
-			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
-
-			WORD Type = en_PACKET_CS_GAME_RES_DIE;
-
-			SendBuff->PutData((char*)&Type, 2);
-			SendBuff->PutData((char*)&TargetAccountNo, 8);
-
-			NowRoom->SendPacket_BroadCast(SendBuff);
-
-
-			// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
-			NowRoom->CreateItem(Target);
-
-
-
-			// DB 저장 파트 -----------------------------------
-
-			// 공격자의 Kill 카운트 증가
-			++m_iRecord_Kill;
-
-			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
-			KillWrite->m_iCount = m_iRecord_Kill;
-
-			KillWrite->AccountNo = m_Int64AccountNo;
-
-			// 요청하기
-			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
-
-
-
-			// 사망자의 Die 카운트 증가
-			++Target->m_iRecord_Die;
-
-			// DBWrite 구조체 셋팅
-			DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-			DieWrite->m_iCount = Target->m_iRecord_Die;
-
-			DieWrite->AccountNo = TargetAccountNo;
-
-			// 요청하기
-			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
-
-
-
-
-			// 사망자의 플레이 타임 갱신
-			Target->m_iRecord_PlayTime = Target->m_iRecord_PlayTime + ((timeGetTime() - Target->m_dwGameStartTime) / 1000);
-
-			// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-			Target->m_bLastDBWriteFlag = true;
-
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iCount = Target->m_iRecord_PlayTime;
-
-			WriteWork->AccountNo = TargetAccountNo;
-
-			// Write 하기 전에, DBWrite카운트 올려야함.
-			m_pParent->AddDBWriteCountFunc(TargetAccountNo);
-
-			// DBWrite 시도
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
-			*/
 		}
 	}
 
@@ -3800,6 +3661,7 @@ namespace Library_Jingyu
 
 		// 5. 닉네임 복사
 		const TCHAR* TempNick = Doc[_T("nick")].GetString();
+		ZeroMemory(&NowPlayer->m_tcNickName, _Mycountof(NowPlayer->m_tcNickName));
 		StringCchCopy(NowPlayer->m_tcNickName, _Mycountof(NowPlayer->m_tcNickName), TempNick);
 
 
@@ -3994,8 +3856,13 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 3. 있는 유저라면 Disconnect
-		ret->second->Disconnect();
+		// 3. Auth라면 즉시 Disconnect
+		if (ret->second->m_euModeType == eu_PLATER_MODE::AUTH)
+			ret->second->Disconnect();
+
+		// Auth가 아니라면, Game모드이거나 LogOut이니, Game으로 이관시킨다.
+		else
+			InsertOverlapFunc(ret->second->m_int64ClientKey, ret->second);
 
 		ReleaseSRWLockShared(&m_AccountNo_Umap_srwl);		// AccountNo uamp Shared 언락
 	}
@@ -4155,6 +4022,26 @@ namespace Library_Jingyu
 		return true;
 	}
 
+
+
+
+	// -----------------------
+	// 중복로그인 자료구조(list) 관리 함수
+	// -----------------------
+
+	// 중복로그인 자료구조(list)에 Insert
+	//
+	// Parameter : ClientKey, CGameSession*
+	// return : 없음
+	void CBattleServer_Room::InsertOverlapFunc(INT64 ClientKey, CGameSession* InsertPlayer)
+	{		
+		AcquireSRWLockExclusive(&m_Overlap_list_srwl);		// Exclusive 락	-----------------
+
+		// Push
+		m_Overlap_list.push_front(make_pair(ClientKey, InsertPlayer));
+
+		ReleaseSRWLockExclusive(&m_Overlap_list_srwl);		// Exclusive 락 해제-------------
+	}
 
 
 
@@ -4829,6 +4716,45 @@ namespace Library_Jingyu
 			}
 
 		}
+
+
+
+
+		// ------------------- 게임 모드의 중복 로그인 유저 삭제
+
+		AcquireSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 락 ------- 
+
+		// 처음부터 끝까지 순회
+		auto itor_listBegin = m_Overlap_list.begin();
+		auto itor_listEnd = m_Overlap_list.end();
+
+		while (itor_listBegin != itor_listEnd)
+		{
+			CGameSession* NowPlayer = itor_listBegin->second;
+
+			// 1. 모드 확인
+			// Auth일 경우, 아예 이 자료구조에 안들어오며, Game이었다가 LOG_OUT이 되는 것은 OnGame_ClientLeave에서 처리하기 때문에, 
+			// 여기서 Game이라는 것은 정말 Game모드 유저라는게 확정
+			if (NowPlayer->m_euModeType == eu_PLATER_MODE::GAME)
+			{
+				// ClientKey 비교
+				// 여기서 ClientKey가 다르다는 것은, 모드는 같지만 다른 유저가 됐다는 것.
+				// 이 list에 들어올 당시의 유저는 이미 나간것.		
+				if (NowPlayer->m_int64ClientKey == itor_listBegin->first)
+				{
+					// shutdown 날림
+					NowPlayer->Disconnect();
+				}
+			}
+
+			// 2. itor_listBegin을 Next로 이동
+			// 그리고 m_Overlap_list의 가장 앞 데이터(금방 확인한 데이터)를 pop 한다
+			// 다른 유저였더라도 list에서는 제거되어야 함.
+			itor_listBegin = next(itor_listBegin);
+			m_Overlap_list.pop_front();
+		}
+
+		ReleaseSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 언락 ------- 
 	}
 
 	// 새로운 유저 접속 시, Auth에서 호출된다.
@@ -4933,6 +4859,7 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_AccountNo_Umap_srwl);
 		InitializeSRWLock(&m_Room_Umap_srwl);
 		InitializeSRWLock(&m_DBWrite_Umap_srwl);
+		InitializeSRWLock(&m_Overlap_list_srwl);
 
 		// 게임 내에서 사용되는, 거리 1당 데미지.
 		m_fFire1_Damage = g_Data_HitDamage / (float)15;	// 총알 데미지
