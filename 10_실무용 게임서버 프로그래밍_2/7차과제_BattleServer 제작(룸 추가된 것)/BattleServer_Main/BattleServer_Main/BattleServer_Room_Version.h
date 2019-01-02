@@ -737,11 +737,8 @@ namespace Library_Jingyu
 		// auth의 로그인 패킷에서, 유저가 들고 온 버전이 다를 경우
 		LONG m_lVerError;
 
-		// auth의 로그인 패킷에서, 중복 로그인 시
-		LONG m_DuplicateCount;
-
-		// auth의 로그인 패킷에서, DBWrite 중인데 들어올 경우
-		LONG m_DBWrie_LoginCount;
+		// auth의 로그인 패킷에서 중복로그인 시
+		LONG m_OverlapLoginCount;
 
 		// Ready 방 수
 		LONG m_lReadyRoomCount;

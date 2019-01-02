@@ -571,10 +571,10 @@ namespace Library_Jingyu
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
-		// 3. 혹시 아직 DBWrite 중인지 체크
+		// 3. 아직 접속중인지 체크(혹은 DB에 Write중인지)
 		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
-			InterlockedIncrement(&m_pParent->m_DBWrie_LoginCount);
+			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -583,12 +583,12 @@ namespace Library_Jingyu
 			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
 			SendBuff->PutData((char*)&Type, 2);
 
-			// Status
-			BYTE Status = 6;		// 중복 로그인
-			SendBuff->PutData((char*)&Status, 1);
-
 			// AccountNo
 			SendBuff->PutData((char*)&AccountNo, 8);
+
+			// Result
+			BYTE Result = 6;		// 중복 로그인
+			SendBuff->PutData((char*)&Result, 1);
 
 			// SendPacket
 			SendPacket(SendBuff);
@@ -676,7 +676,7 @@ namespace Library_Jingyu
 		// 현재 유저에게는 실패 패킷, 접속 중인 유저는 DIsconnect.
 		if (m_pParent->InsertAccountNoFunc(AccountNo, this) == false)
 		{	
-			InterlockedIncrement(&m_pParent->m_DuplicateCount);
+			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -685,12 +685,12 @@ namespace Library_Jingyu
 			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
 			SendBuff->PutData((char*)&Type, 2);
 
-			// Status
-			BYTE Status = 6;		// 중복 로그인
-			SendBuff->PutData((char*)&Status, 1);
-
 			// AccountNo
-			SendBuff->PutData((char*)&AccountNo, 8);			
+			SendBuff->PutData((char*)&AccountNo, 8);
+
+			// Result
+			BYTE Result = 6;		// 중복 로그인
+			SendBuff->PutData((char*)&Result, 1);				
 
 			// SendPacket
 			SendPacket(SendBuff);
@@ -3078,8 +3078,7 @@ namespace Library_Jingyu
 		m_lTempError = 0;
 		m_lTokenError = 0;
 		m_lVerError = 0;
-		m_DuplicateCount = 0;
-		m_DBWrie_LoginCount = 0;
+		m_OverlapLoginCount = 0;
 		m_lReadyRoomCount = 0;
 		m_lPlayRoomCount = 0;
 
@@ -3242,8 +3241,7 @@ namespace Library_Jingyu
 			"Login_Query_Temp : %d\n"
 			"Login_UserTokenError : %d\n"
 			"Login_VerError : %d\n"
-			"Login_Duplicate :%d\n"
-			"Login_DBWrite :%d\n\n"
+			"Login_Overlap :%d\n\n"
 
 			"---------- Battle LanServer(Chat) ---------\n"
 			"SessionNum : %lld\n"
@@ -3290,8 +3288,7 @@ namespace Library_Jingyu
 			m_lTempError,
 			m_lTokenError,
 			m_lVerError,
-			m_DuplicateCount,
-			m_DBWrie_LoginCount,
+			m_OverlapLoginCount,
 
 			// ----------- 배틀 랜서버
 			m_Chat_LanServer->GetClientCount(),
