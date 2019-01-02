@@ -6,13 +6,219 @@
 #include "NetworkLib/NetworkLib_LanServer.h"
 
 #include "Http_Exchange/HTTP_Exchange.h"
-#include "shDB_Communicate.h"
 
 #include <unordered_set>
 #include <unordered_map>
 #include <forward_list>
 
 using namespace std;
+
+
+// --------------------------------------------
+// shDB 내부에서 메모리풀로 관리되는 구조체들
+// --------------------------------------------
+namespace Library_Jingyu
+{
+	// Auth 스레드에서 로그인 응답을 받을 시, 세션키 체크를 위한 프로토콜
+	struct DB_WORK_LOGIN
+	{
+		WORD m_wWorkType;
+		INT64 m_i64UniqueKey;
+
+		// Player 포인터
+		LPVOID pPointer;
+		TCHAR m_tcResponse[420];
+
+		INT64 AccountNo;
+	};
+
+	// Auth 스레드에서 로그인 요청을 받을 시, 유저 전적 정보를 저장하기 위한 프로토콜.
+	struct DB_WORK_LOGIN_CONTENTS
+	{
+		WORD m_wWorkType;
+		INT64 m_i64UniqueKey;
+
+		// Player 포인터
+		LPVOID pPointer;
+		TCHAR m_tcResponse[200];
+
+		INT64 AccountNo;
+	};
+
+	// ContentDB에 유저 정보를 Write할 때 사용
+	struct DB_WORK_CONTENT_UPDATE
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iCount;	// 갱신할 카운트		
+
+		INT64 AccountNo;
+		DWORD StartTime;	// 테스트용
+	};
+
+	// Content DB에 유저 정보 2개를 Write할 때 사용
+	struct DB_WORK_CONTENT_UPDATE_2
+	{
+		WORD m_wWorkType;
+
+		// Update의 res는 굉장히 짧음. 보통 result : 1임
+		TCHAR m_tcResponse[30];
+
+		int		m_iCount1;	// 갱신할 카운트1
+		int		m_iCount2;	// 갱신할 카운트2
+
+		INT64 AccountNo;
+		DWORD StartTime;	// 테스트용
+	};
+
+	// shDB의 어떤 API를 호출할 것인지. API Type
+	enum en_PHP_TYPE
+	{
+		// Seelct_account.php
+		SELECT_ACCOUNT = 1,
+
+		// Seelct_contents.php
+		SELECT_CONTENTS,
+
+		// Update_account.php
+		UPDATE_ACCOUN,
+
+		// Updated_contents.php
+		UPDATE_CONTENTS,
+
+		// DB_Read 스레드 종료 신호
+		EXIT = 9999
+	};
+
+	// DB 요청에 대한 후처리를 위한, Type
+	enum eu_DB_AFTER_TYPE
+	{
+		// 로그인 패킷에 대한 인증 처리
+		eu_LOGIN_AUTH = 0,
+
+		// 로그인 패킷에 대한 정보 가져오기
+		eu_LOGIN_INFO,
+
+		// PlayCount 저장
+		eu_PLAYCOUNT_UPDATE,
+
+		// Kill 저장
+		eu_KILL_UPDATE,
+
+		// Die, 플레이타임 저장
+		eu_DIE_UPDATE,
+
+		// Win, 플레이타임 저장
+		eu_WIN_UPDATE
+	};
+}
+
+// -----------------------
+// shDB와 통신하는 클래스
+// -----------------------
+namespace Library_Jingyu
+{
+	// 메모리풀에서 관리할 구조체.
+	// 가장 크기가 큰 것 1개를 정의한다.
+#define DB_WORK	DB_WORK_LOGIN
+
+	class shDB_Communicate
+	{
+		friend class CBattleServer_Room;
+
+		// ---------------
+		// 멤버 변수
+		// ---------------		
+
+		// 덤프
+		CCrashDump* m_Dump;
+
+		// DB_Read용 입출력 완료포트 핸들
+		HANDLE m_hDB_Read;
+
+		// DB_Read용 워커 스레드 핸들
+		HANDLE* m_hDB_Read_Thread;
+
+		// 배틀서버 this
+		CBattleServer_Room* m_pBattleServer;
+
+		// ---------------		
+
+		// DB Write 스레드에게 일시키기 용 큐(Normal 큐)
+		CNormalQueue<DB_WORK*>* m_pDB_Wirte_Start_Queue;
+
+		// DB Write용 스레드용 일시키기 용이벤트.
+		HANDLE m_hDBWrite_Event;
+
+		// DB Write용 스레드 종료용 이벤트
+		HANDLE m_hDBWrite_Exit_Event;
+
+		// DB_Write용 스레드 핸들
+		HANDLE m_hDB_Write_Thread;
+
+
+	public:
+		// ---------------
+		// 외부에서 접근 가능한 멤버 변수
+		// ---------------		
+
+		// DB_WORK를 관리하는 메모리 풀
+		CMemoryPoolTLS<DB_WORK>* m_pDB_Work_Pool;
+
+		// Read가 완료된 DB_WORK* 를 저장해두는 락프리 큐
+		CLF_Queue<DB_WORK*> *m_pDB_ReadComplete_Queue;
+
+
+	private:
+		// --------------
+		// 스레드
+		// --------------
+
+		// DB_Read 스레드
+		static UINT WINAPI DB_ReadThread(LPVOID lParam);
+
+		// DB_Write 스레드
+		static UINT WINAPI DB_WriteThread(LPVOID lParam);
+
+
+	public:
+		// ---------------
+		// 기능 함수. 외부에서 호출 가능
+		// ---------------
+
+		// DB에 Read할 것이 있을 때 호출되는 함수
+		// 인자로 받은 구조체의 정보를 확인해 로직 처리
+		// 
+		// Parameter : DB_WORK*, APIType
+		// return : 없음
+		void DBReadFunc(DB_WORK* Protocol, WORD APIType);
+
+		// DB에 Write 할 것이 있을 때 호출되는 함수.
+		// 인자로 받은 구조체의 정보를 확인해 로직 처리
+		//
+		// Parameter : DB_WORK*
+		// return : 없음
+		void DBWriteFunc(DB_WORK* Protocol);
+
+		// Battle서버 this를 받아둔다.
+		void ParentSet(CBattleServer_Room* Parent);
+
+
+	public:
+		// ---------------
+		// 생성자와 소멸자
+		// ---------------
+
+		// 생성자
+		shDB_Communicate();
+
+		// 소멸자
+		virtual ~shDB_Communicate();
+	};
+}
 
 // ----------------------------------------
 // 
@@ -25,7 +231,8 @@ namespace Library_Jingyu
 	{
 		friend class CGame_MinitorClient;
 		friend class CBattle_Master_LanClient;
-		friend class CBattle_Chat_LanServer;		
+		friend class CBattle_Chat_LanServer;	
+		friend class shDB_Communicate;
 
 
 
@@ -56,6 +263,15 @@ namespace Library_Jingyu
 			AUTH = 0,	// 어스
 			GAME,		// 게임
 			LOG_OUT,	// 로그아웃
+		};
+
+		// 아이템 구조체
+		struct stRoomItem
+		{
+			UINT m_uiID;
+			eu_ITEM_TYPE m_euType;
+			float m_fPosX;
+			float m_fPosY;
 		};
 
 		// CMMOServer의 cSession을 상속받는 세션 클래스
@@ -305,16 +521,7 @@ namespace Library_Jingyu
 				
 		// 방 구조체
 		struct stRoom
-		{
-			// 아이템 구조체
-			struct stRoomItem
-			{
-				UINT m_uiID;
-				eu_ITEM_TYPE m_euType;
-				float m_fPosX;
-				float m_fPosY;
-			};			
-
+		{	
 			// 배틀서버 번호
 			int m_iBattleServerNo;
 
@@ -370,16 +577,13 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 2;	
+			const int m_iMaxJoinCount = 5;	
 
 			// ------------
 
 			// 방 별로, 고유하게 아이템ID를 부여하기 위한 변수.
 			// 아이템 생성 시 ++한다.
-			UINT m_uiItemID;
-			
-			// 아이템 구조체 관리 메모리풀 TLS
-			CMemoryPoolTLS<stRoomItem> *m_Item_Pool;
+			UINT m_uiItemID;		
 
 			// 해당 방에 생성된 아이템 자료구조
 			// Key : ItemID, Value : stRoomTiem*
@@ -609,7 +813,7 @@ namespace Library_Jingyu
 		{
 			// Auth_Update에서 한 프레임에 처리할 HTTP통신 후처리
 			// 고정 값
-			const int m_iHTTP_MAX = 100;
+			const int m_iHTTP_MAX = 1000;
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
@@ -621,12 +825,12 @@ namespace Library_Jingyu
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 30;
+			const int m_iLoopCreateRoomCount = 50;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
 			// 고정 값
-			const int m_iLoopRoomModeChange = 30;
+			const int m_iLoopRoomModeChange = 50;
 
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.
@@ -737,6 +941,9 @@ namespace Library_Jingyu
 		// auth의 로그인 패킷에서, 유저가 들고 온 버전이 다를 경우
 		LONG m_lVerError;
 
+		// auth의 로그인 패킷에서 아직 DBWrite일 시
+		LONG m_OverlapLoginCount_DB;
+
 		// auth의 로그인 패킷에서 중복로그인 시
 		LONG m_OverlapLoginCount;
 
@@ -771,8 +978,6 @@ namespace Library_Jingyu
 		char m_cConnectToken_Before[32];
 
 
-
-
 		// -----------------------
 		// 방 관련 변수
 		// -----------------------
@@ -794,6 +999,13 @@ namespace Library_Jingyu
 		// stRoom 관리 Pool
 		CMemoryPoolTLS<stRoom> *m_Room_Pool;
 
+
+		// -----------------------
+		// 아이템 관련 변수
+		// -----------------------
+
+		// 아이템 구조체 관리 메모리풀 TLS
+		CMemoryPoolTLS<stRoomItem> *m_Item_Pool;
 		
 
 		
@@ -920,12 +1132,6 @@ namespace Library_Jingyu
 		// Parameter : DB_WORK_LOGIN*
 		// return : 없음
 		void Auth_LoginPacket_Info(DB_WORK_LOGIN_CONTENTS* DBData);
-		
-		// DB_Write에 대한 작업 후 처리
-		//
-		// Parameter : DB_WORK*
-		// return : 없음
-		void Game_DBWrite(DB_WORK* DBData);
 
 
 

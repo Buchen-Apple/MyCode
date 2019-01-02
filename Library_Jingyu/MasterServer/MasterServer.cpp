@@ -1302,7 +1302,8 @@ namespace Library_Jingyu
 				SendBuff->PutData((char*)&ClientKey, 8);
 				SendBuff->PutData((char*)&Status, 1);
 
-				SendPacket(SessionID, SendBuff);
+				// 매칭 랜서버로 방 없음 패킷 보내기
+				pMatchServer->SendPacket(SessionID, SendBuff);
 
 				return;
 			}

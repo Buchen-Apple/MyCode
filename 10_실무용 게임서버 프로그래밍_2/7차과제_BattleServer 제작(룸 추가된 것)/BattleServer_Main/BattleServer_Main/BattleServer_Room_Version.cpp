@@ -7,8 +7,6 @@
 #include "CPUUsage\CPUUsage.h"
 #include "PDHClass\PDHCheck.h"
 
-#include "shDB_Communicate.h"
-
 #include "rapidjson\document.h"
 #include "rapidjson\writer.h"
 #include "rapidjson\stringbuffer.h"
@@ -17,14 +15,16 @@
 #include <strsafe.h>
 #include <cmath>
 #include <algorithm>
+#include <list>
 
 using namespace rapidjson;
+using namespace std;
 
+list<DWORD> WriteTimeTest;
 
-// ------------------
-// CGameSession의 함수
-// (CBattleServer_Room의 이너클래스)
-// ------------------
+// -----------------------
+// shDB와 통신하는 클래스
+// -----------------------
 namespace Library_Jingyu
 {
 	// 덤프용
@@ -33,7 +33,535 @@ namespace Library_Jingyu
 	// 로그용
 	CSystemLog* g_BattleServer_RoomLog = CSystemLog::GetInstance();
 
+	// --------------
+	// 스레드
+	// --------------
 
+	// DB_Read 스레드
+	UINT WINAPI shDB_Communicate::DB_ReadThread(LPVOID lParam)
+	{
+		shDB_Communicate* gThis = (shDB_Communicate*)lParam;
+
+		// --------------------
+		// 로컬로 받아두기
+		// --------------------
+
+		// IOCP 핸들
+		HANDLE hIOCP = gThis->m_hDB_Read;
+
+		// Read가 완료된 DB_WORK* 를 저장해두는 락프리 큐 받아두기
+		CLF_Queue<DB_WORK*> *m_pComQueue = gThis->m_pDB_ReadComplete_Queue;
+
+
+		// --------------------
+		// 변수 선언
+		// --------------------
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+
+		DWORD APIType;
+		DB_WORK* pWork;
+		OVERLAPPED* overlapped;
+
+		while (1)
+		{
+			// 변수들 초기화
+			APIType = 0;
+			pWork = nullptr;
+			overlapped = nullptr;
+
+			// 신호 기다리기
+			GetQueuedCompletionStatus(hIOCP, &APIType, (PULONG_PTR)&pWork, &overlapped, INFINITE);
+
+			// 종료 신호일 경우 처리
+			if (APIType == en_PHP_TYPE::EXIT)
+				break;
+
+
+			// 1. APIType 확인
+			switch (APIType)
+			{
+
+				// Seelct_account.php
+			case SELECT_ACCOUNT:
+			{
+				DB_WORK_LOGIN* NowWork = (DB_WORK_LOGIN*)pWork;
+
+				// DB에 쿼리 날려서 확인.
+				TCHAR Body[1000];
+
+				ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+				ZeroMemory(Body, sizeof(Body));
+
+				// 1. Body 만들기
+				swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", NowWork->AccountNo);
+
+				// 2. http 통신 및 결과 얻기
+				int TryCount = 5;
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, NowWork->m_tcResponse) == false)
+				{
+					TryCount--;
+
+					if (TryCount == 0)
+						gThis->m_Dump->Crash();
+				}
+
+				// 3. Read 완료 큐에 넣기
+				m_pComQueue->Enqueue(pWork);
+			}
+			break;
+
+
+			// Seelct_contents.php
+			case SELECT_CONTENTS:
+			{
+				DB_WORK_LOGIN_CONTENTS* NowWork = (DB_WORK_LOGIN_CONTENTS*)pWork;
+
+				// DB에 쿼리 날려서 확인.
+				TCHAR Body[1000];
+
+				ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+				ZeroMemory(Body, sizeof(Body));
+
+				// 1. Body 만들기
+				swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", NowWork->AccountNo);
+
+				// 2. http 통신 및 결과 얻기
+				int TryCount = 5;
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_contents.php"), Body, NowWork->m_tcResponse) == false)
+				{
+					TryCount--;
+
+					if (TryCount == 0)
+						gThis->m_Dump->Crash();
+				}
+
+				// 3. Read 완료 큐에 넣기
+				m_pComQueue->Enqueue(pWork);
+
+			}
+			break;
+
+
+			// 없는 타입이면 크래시
+			default:
+				gThis->m_Dump->Crash();
+				break;
+			}
+		}
+
+		return 0;
+	}
+
+	// DB_Write 스레드
+	UINT WINAPI shDB_Communicate::DB_WriteThread(LPVOID lParam)
+	{
+		shDB_Communicate* gThis = (shDB_Communicate*)lParam;
+
+		// --------------------
+		// 로컬로 받아두기
+		// --------------------
+
+		// 나한테 날라온 일감 큐
+		CNormalQueue<DB_WORK*> *pWorkerQueue = gThis->m_pDB_Wirte_Start_Queue;
+
+
+		// --------------
+		// 변수 선언
+		// --------------
+
+		// 일 시키기용, 종료용 이벤트 받아두기
+		// [종료 신호, 일하기 신호] 순서대로
+		HANDLE hEvent[2] = { gThis->m_hDBWrite_Exit_Event , gThis->m_hDBWrite_Event };
+
+		DB_WORK* pWork;
+
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+
+		while (1)
+		{
+			// 이벤트 대기
+			DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
+
+			// 이상한 신호라면
+			if (Check == WAIT_FAILED)
+			{
+				DWORD Error = GetLastError();
+				printf("DB_WriteThread Exit Error!!! (%d) \n", Error);
+
+				gThis->m_Dump->Crash();
+			}
+
+			// 종료 신호가 왔다면업데이트 스레드 종료.
+			else if (Check == WAIT_OBJECT_0)
+				break;
+
+			// ----------------- 일감 있으면 일한다.
+			// 일감 수를 스냅샷으로 받아둔다.
+			// 해당 일감만큼만 처리하고 자러간다.
+			// 처리 못한 일감은, 다음에 깨서 처리한다.
+
+			int Size = pWorkerQueue->GetNodeSize();
+
+			while (Size > 0)
+			{
+				Size--;
+
+				// 1. 큐에서 일감 1개 빼오기	
+				if (pWorkerQueue->Dequeue(pWork) == -1)
+					gThis->m_Dump->Crash();
+
+				// 2. 일감 타입에 따라 로직 처리
+				switch (pWork->m_wWorkType)
+				{
+					// 플레이 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"playcount\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount);
+
+					DWORD Start = timeGetTime();
+					
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					WriteTimeTest.push_back(timeGetTime() - Start);
+
+					// 3. Json데이터 파싱하기 (UTF-16)
+					GenericDocument<UTF16<>> Doc;
+					Doc.Parse(NowWork->m_tcResponse);
+
+					int iResult = Doc[_T("result")].GetInt();
+
+
+					// 4. DB 요청 결과 확인
+					// 결과가 1이 아니라면 Crash.
+					// Write는 무조건 성공한다는 가정
+					if (iResult != 1)
+						g_BattleServer_Room_Dump->Crash();
+
+					// 5. DBWrite 카운트1 감소
+					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+				}
+				break;
+
+				// 킬 카운트 저장
+				case eu_DB_AFTER_TYPE::eu_KILL_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"kill\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
+
+					// 3. Json데이터 파싱하기 (UTF-16)
+					GenericDocument<UTF16<>> Doc;
+					Doc.Parse(NowWork->m_tcResponse);
+
+					int iResult = Doc[_T("result")].GetInt();
+
+					// 4. DB 요청 결과 확인
+					// 결과가 1이 아니라면 Crash.
+					// Write는 무조건 성공한다는 가정
+					if (iResult != 1)
+						g_BattleServer_Room_Dump->Crash();
+
+					// 5. DBWrite 카운트1 감소
+					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+
+				}
+				break;
+
+				// 사망 카운트, 플레이 타임 저장
+				case eu_DB_AFTER_TYPE::eu_DIE_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_2* NowWork = (DB_WORK_CONTENT_UPDATE_2*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"die\" : \"%d\", \"playtime\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount1, NowWork->m_iCount2);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
+
+
+					// 3. Json데이터 파싱하기 (UTF-16)
+					GenericDocument<UTF16<>> Doc;
+					Doc.Parse(NowWork->m_tcResponse);
+
+					int iResult = Doc[_T("result")].GetInt();
+
+
+					// 4. DB 요청 결과 확인
+					// 결과가 1이 아니라면 Crash.
+					// Write는 무조건 성공한다는 가정
+					if (iResult != 1)
+						g_BattleServer_Room_Dump->Crash();
+
+					// 5. DBWrite 카운트1 감소
+					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+
+				}
+				break;
+
+				// 승리 카운트, 플레이타임 저장
+				case eu_DB_AFTER_TYPE::eu_WIN_UPDATE:
+				{
+					DB_WORK_CONTENT_UPDATE_2* NowWork = (DB_WORK_CONTENT_UPDATE_2*)pWork;
+
+					// DB에 쿼리 날림
+					TCHAR Body[1000];
+
+					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
+					ZeroMemory(Body, sizeof(Body));
+
+					// 1. Body 만들기
+					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"win\" : \"%d\", \"playtime\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount1, NowWork->m_iCount2);
+
+					// 2. HTTP 통신
+					int TryCount = 5;
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					{
+						TryCount--;
+
+						if (TryCount == 0)
+							gThis->m_Dump->Crash();
+					}
+
+					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
+
+					// 3. Json데이터 파싱하기 (UTF-16)
+					GenericDocument<UTF16<>> Doc;
+					Doc.Parse(NowWork->m_tcResponse);
+
+					int iResult = Doc[_T("result")].GetInt();
+
+					// 4. DB 요청 결과 확인
+					// 결과가 1이 아니라면 Crash.
+					// Write는 무조건 성공한다는 가정
+					if (iResult != 1)
+						g_BattleServer_Room_Dump->Crash();
+
+					// 5. DBWrite 카운트1 감소
+					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+
+				}
+				break;
+
+				default:
+					gThis->m_Dump->Crash();
+				}			
+
+				// 3. DB_WORK 반환
+				gThis->m_pDB_Work_Pool->Free(pWork);
+
+			}
+		}
+
+		return 0;
+	}
+
+
+
+	// ---------------
+	// 기능 함수. 외부에서 호출 가능
+	// ---------------
+
+	// DB에 Read할 것이 있을 때 호출되는 함수
+	// 인자로 받은 구조체의 정보를 확인해 로직 처리
+	// 
+	// Parameter : DB_WORK*, APIType
+	// return : 없음
+	void shDB_Communicate::DBReadFunc(DB_WORK* Protocol, WORD APIType)
+	{
+		// Read용 스레드에게 일감 던짐 (PQCS)
+		// 이게 끝
+		PostQueuedCompletionStatus(m_hDB_Read, APIType, (ULONG_PTR)Protocol, 0);
+	}
+
+	// DB에 Write 할 것이 있을 때 호출되는 함수.
+	// 인자로 받은 구조체의 정보를 확인해 로직 처리
+	//
+	// Parameter : DB_WORK*
+	// return : 없음
+	void shDB_Communicate::DBWriteFunc(DB_WORK* Protocol)
+	{
+		// Wirte용 스레드에게 일감 던짐 (Normal Q 사용)
+		m_pDB_Wirte_Start_Queue->Enqueue(Protocol);
+
+		// Write 스레드 깨우기
+		SetEvent(m_hDBWrite_Event);
+	}
+
+	// Battle서버 this를 받아둔다.
+	void shDB_Communicate::ParentSet(CBattleServer_Room* Parent)
+	{
+		m_pBattleServer = Parent;
+	}
+
+
+
+
+	// ---------------
+	// 생성자와 소멸자
+	// ---------------
+
+	// 생성자
+	shDB_Communicate::shDB_Communicate()
+	{
+
+		// DB Write용 스레드용 일시키기 용이벤트 만들기
+		// 자동 리셋 이벤트.
+		m_hDBWrite_Event = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+		// DB Write용 스레드 종료용 이벤트 만들기
+		// 자동 리셋 이벤트.
+		m_hDBWrite_Exit_Event = CreateEvent(NULL, FALSE, FALSE, NULL);
+
+		// 덤프 받기
+		m_Dump = CCrashDump::GetInstance();
+
+		// DB_WORK 메모리풀 동적할당
+		m_pDB_Work_Pool = new CMemoryPoolTLS<DB_WORK>(0, false);
+
+		// Read 완료 락프리 큐 동적할당
+		m_pDB_ReadComplete_Queue = new CLF_Queue<DB_WORK*>(0);
+
+		// Write 스레드에게 일시키기용 큐 동적할당.
+		m_pDB_Wirte_Start_Queue = new CNormalQueue<DB_WORK*>();
+
+		// DB_Read용 입출력 완료포트 생성
+		// 4개의 스레드 생성, 2개의 스레드 활성화
+		int Create = 4;
+		int Active = 2;
+
+		m_hDB_Read = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Active);
+		if (m_hDB_Read == NULL)
+			m_Dump->Crash();
+
+		// DB_Read용 워커 스레드 생성
+		m_hDB_Read_Thread = new HANDLE[Create];
+		for (int i = 0; i < Create; ++i)
+		{
+			m_hDB_Read_Thread[i] = (HANDLE)_beginthreadex(0, 0, DB_ReadThread, this, 0, 0);
+			if (m_hDB_Read_Thread[i] == NULL)
+				m_Dump->Crash();
+		}
+
+		// DB_Write용 스레드
+		m_hDB_Write_Thread = (HANDLE)_beginthreadex(0, 0, DB_WriteThread, this, 0, 0);
+		if (m_hDB_Write_Thread == NULL)
+			m_Dump->Crash();
+	}
+
+	// 소멸자
+	shDB_Communicate::~shDB_Communicate()
+	{
+		// 1. DB_ReadThread 종료
+		for (int i = 0; i < 4; ++i)
+			PostQueuedCompletionStatus(m_hDB_Read, en_PHP_TYPE::EXIT, 0, 0);
+
+		WaitForMultipleObjects(4, m_hDB_Read_Thread, TRUE, INFINITE);
+
+		// 2. 입출력 완료포트 닫기
+		CloseHandle(m_hDB_Read);
+
+		// 3. Read 완료 락프리 큐 비우기
+		DB_WORK* Delete;
+		while (1)
+		{
+			// 꺼내기
+			if (m_pDB_ReadComplete_Queue->Dequeue(Delete) == -1)
+				break;
+
+			// 반환
+			m_pDB_Work_Pool->Free(Delete);
+		}
+
+		// 4. DB_WriteThread 종료
+		SetEvent(m_hDBWrite_Exit_Event);
+
+		WaitForSingleObject(m_hDB_Write_Thread, INFINITE);
+
+		// 5. Write 일시키기 용 큐 비우기
+		while (1)
+		{
+			// 꺼내기
+			if (m_pDB_Wirte_Start_Queue->Dequeue(Delete) == -1)
+				break;
+
+			// 반환
+			m_pDB_Work_Pool->Free(Delete);
+		}		
+
+
+		// 6. 각종 동적해제
+
+		// 워커 스레드 핸들 동적해제
+		delete[] m_hDB_Read_Thread;
+
+		// DB_WORK 메모리풀 동적해제
+		delete m_pDB_Work_Pool;
+
+		// Read 완료 락프리 큐 동적해제
+		delete m_pDB_ReadComplete_Queue;
+
+		// Write 스레드에게 일시키기용 큐 동적해제
+		delete m_pDB_Wirte_Start_Queue;
+	}
+}
+
+// ------------------
+// CGameSession의 함수
+// (CBattleServer_Room의 이너클래스)
+// ------------------
+namespace Library_Jingyu
+{
 	// -----------------------
 	// 생성자와 소멸자
 	// -----------------------
@@ -192,6 +720,21 @@ namespace Library_Jingyu
 				// 6. 룸 키 -1로 초기화
 				m_iRoomNo = -1;
 			}			
+
+			// 7. m_bStructFlag가 true라면, 자료구조에 들어간 유저
+			// 자료구조에서 제거한다.
+			if (m_bStructFlag == true)
+			{
+				if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+					g_BattleServer_Room_Dump->Crash();
+
+				// DBWrite에서 제거 시도.
+				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
+				if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+					g_BattleServer_Room_Dump->Crash();
+
+				m_bStructFlag = false;
+			}
 		}
 
 	}
@@ -300,6 +843,7 @@ namespace Library_Jingyu
 
 		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
 		CountWrite->m_iCount = m_iRecord_PlayCount;
+		CountWrite->StartTime = timeGetTime();
 
 		CountWrite->AccountNo = m_Int64AccountNo;
 
@@ -412,19 +956,37 @@ namespace Library_Jingyu
 			// 플레이 타임 갱신
 			m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 
-			// DB에 Write 준비
-			DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+			// 플레이 타임 저장 안하고 나가는 유저는, Die카운트도 같이 증가시킨다.
+			++m_iRecord_Die;
 
-			WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-			WriteWork->m_iCount = m_iRecord_PlayTime;
+			// DBWrite 구조체 셋팅 (Die카운트 + 플레이 타임)
+			DB_WORK_CONTENT_UPDATE_2* DieWrite = (DB_WORK_CONTENT_UPDATE_2*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
-			WriteWork->AccountNo = m_Int64AccountNo;
+			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
+			DieWrite->m_iCount1 = m_iRecord_Die;
+			DieWrite->m_iCount2 = m_iRecord_PlayTime;
+			DieWrite->StartTime = timeGetTime();
 
-			// Write 하기 전에, WriteCount 증가.
+			DieWrite->AccountNo = m_Int64AccountNo;
+
+			// 요청하기
 			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+		}
 
-			// DBWrite
-			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+		// 7. m_bStructFlag가 true라면, 자료구조에 들어간 유저
+		// 자료구조에서 제거한다.
+		if (m_bStructFlag == true)
+		{
+			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
+
+			// DBWrite에서 제거 시도.
+			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
+			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
+
+			m_bStructFlag = false;
 		}
 	}
 
@@ -530,19 +1092,21 @@ namespace Library_Jingyu
 		if (m_euModeType != eu_PLATER_MODE::LOG_OUT)
 			g_BattleServer_Room_Dump->Crash();
 
+		/*
 		// m_bStructFlag가 true라면, 자료구조에 들어간 유저
 		if (m_bStructFlag == true)
 		{
 			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
 				g_BattleServer_Room_Dump->Crash();
 
-			m_bStructFlag = false;
-		}
+			// DBWrite에서 제거 시도.
+			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
+			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
 
-		// DBWrite에서 제거 시도.
-		// Auth모드에서, 로그인 패킷을 안보내고 나갈 경우, 없을 수도 있음 (리턴값이 false가 나올 수 있음)
-		// 그래서 리턴값 안받음.
-		m_pParent->MinDBWriteCountFunc(m_Int64AccountNo);
+			m_bStructFlag = false;
+		}		
+		*/
 		
 		m_bLoginFlag = false;	
 		m_bLogoutFlag = false;
@@ -571,10 +1135,13 @@ namespace Library_Jingyu
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
-		// 3. 아직 접속중인지 체크(혹은 DB에 Write중인지)
+		// 3. 아직 DB에 Write중인지
 		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
-			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
+			InterlockedIncrement(&m_pParent->m_OverlapLoginCount_DB);
+
+			if (m_pParent->m_OverlapLoginCount_DB == 300)
+				g_BattleServer_Room_Dump->Crash();
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -619,8 +1186,9 @@ namespace Library_Jingyu
 		if (memcmp(ConnectToken, m_pParent->m_cConnectToken_Now, 32) != 0)
 		{
 			// 다르다면 "이전" 토큰과 비교
-			if (memcpy(ConnectToken, m_pParent->m_cConnectToken_Before, 32) != 0)
+			if (memcmp(ConnectToken, m_pParent->m_cConnectToken_Before, 32) != 0)
 			{
+
 				// 에러 로그 찍기
 				// 로그 찍기 (로그 레벨 : 에러)
 				g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -1563,7 +2131,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)&ItemID, 4);
 
 		// 3. 아이템 검색
-		stRoom::stRoomItem* NowItem = NowRoom->Item_Find(ItemID);
+		stRoomItem* NowItem = NowRoom->Item_Find(ItemID);
 
 		// 없는 아이템이면 무시한다.
 		if (NowItem == nullptr)
@@ -1681,9 +2249,7 @@ namespace Library_Jingyu
 	{
 		// 미리 메모리 공간 잡아두기
 		m_JoinUser_Vector.reserve(10);
-		m_RoomItem_umap.reserve(30);
-
-		m_Item_Pool = new CMemoryPoolTLS<stRoomItem>(0, false);
+		m_RoomItem_umap.reserve(30);		
 
 		m_iJoinUserCount = 0;
 	}
@@ -1691,7 +2257,6 @@ namespace Library_Jingyu
 	// 소멸자
 	CBattleServer_Room::stRoom::~stRoom()
 	{
-		delete m_Item_Pool;
 	}
 
 	// ------------
@@ -1896,15 +2461,20 @@ namespace Library_Jingyu
 				// 승리패킷 보낸 수 증가
 				++WinUserCount;
 
+				// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+				NowPlayer->m_bLastDBWriteFlag = true;
+
 
 				// 승리 카운트 DB에 저장.
 				// 승리자는, 아직 플레이 타임 갱신 안함. 여기서 갱신
 				NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + ((timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000);
 
-				DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+				DB_WORK_CONTENT_UPDATE_2* WriteWork = (DB_WORK_CONTENT_UPDATE_2*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 				WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
-				WriteWork->m_iCount = NowPlayer->m_iRecord_Win;
+				WriteWork->m_iCount1 = NowPlayer->m_iRecord_Win;
+				WriteWork->m_iCount2 = NowPlayer->m_iRecord_PlayTime;
+				WriteWork->StartTime = timeGetTime();
 
 				WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
@@ -1913,25 +2483,6 @@ namespace Library_Jingyu
 
 				// DBWrite 시도
 				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
-
-
-
-				// 플레이 타임 저장
-				// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-				NowPlayer->m_bLastDBWriteFlag = true;
-
-				DB_WORK_CONTENT_UPDATE* WriteWork_PlayTime = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-				WriteWork_PlayTime->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-				WriteWork_PlayTime->m_iCount = NowPlayer->m_iRecord_PlayTime;
-
-				WriteWork_PlayTime->AccountNo = NowPlayer->m_Int64AccountNo;
-
-				// Write 하기 전에, DBWrite카운트 올려야함.
-				NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
-
-				// DBWrite 시도
-				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork_PlayTime);
 			}
 
 			// 유저가 패배자일 경우 (사망자)
@@ -2162,7 +2713,7 @@ namespace Library_Jingyu
 			++m_uiItemID;	
 
 			// 아이템 정보 셋팅
-			stRoomItem* Item = m_Item_Pool->Alloc();
+			stRoomItem* Item = m_pBattleServer->m_Item_Pool->Alloc();
 			Item->m_uiID = m_uiItemID;
 			Item->m_fPosX = g_Data_ItemPoint_Redzone[i][0];
 			Item->m_fPosY = g_Data_ItemPoint_Redzone[i][1];
@@ -2223,7 +2774,7 @@ namespace Library_Jingyu
 			++m_uiItemID;
 
 			// 룸 안의, 아이템 자료구조에 추가
-			stRoomItem* Item = m_Item_Pool->Alloc();
+			stRoomItem* Item = m_pBattleServer->m_Item_Pool->Alloc();
 			Item->m_uiID = m_uiItemID;
 			Item->m_fPosX = g_Data_ItemPoint_Playzone[i][0];
 			Item->m_fPosY = g_Data_ItemPoint_Playzone[i][1];
@@ -2311,7 +2862,7 @@ namespace Library_Jingyu
 			float itemY = DiePlayer->m_fPosY + Add;
 
 			// 아이템 정보 셋팅
-			stRoomItem* Item = m_Item_Pool->Alloc();
+			stRoomItem* Item = m_pBattleServer->m_Item_Pool->Alloc();
 			Item->m_uiID = m_uiItemID;
 			Item->m_fPosX = itemX;
 			Item->m_fPosY = itemY;
@@ -2356,7 +2907,7 @@ namespace Library_Jingyu
 		++m_uiItemID;
 
 		// 룸 안의, 아이템 자료구조에 추가
-		stRoomItem* Item = m_Item_Pool->Alloc();
+		stRoomItem* Item = m_pBattleServer->m_Item_Pool->Alloc();
 		Item->m_uiID = m_uiItemID;
 		Item->m_fPosX = itemX;
 		Item->m_fPosY = itemY;
@@ -2531,6 +3082,7 @@ namespace Library_Jingyu
 
 		KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
 		KillWrite->m_iCount = AttackPlayer->m_iRecord_Kill;
+		KillWrite->StartTime = timeGetTime();
 
 		KillWrite->AccountNo = AtkAccountNo;
 
@@ -2540,44 +3092,29 @@ namespace Library_Jingyu
 
 
 
+		// 사망자의 플레이 타임 갱신 -----------------------------------
+		DiePlayer->m_iRecord_PlayTime = DiePlayer->m_iRecord_PlayTime + ((timeGetTime() - DiePlayer->m_dwGameStartTime) / 1000);
+
 
 		// 사망자의 Die 카운트 증가  -----------------------------------
+		// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+		DiePlayer->m_bLastDBWriteFlag = true;
+
 		++DiePlayer->m_iRecord_Die;
 
 		// DBWrite 구조체 셋팅
-		DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+		DB_WORK_CONTENT_UPDATE_2* DieWrite = (DB_WORK_CONTENT_UPDATE_2*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-		DieWrite->m_iCount = DiePlayer->m_iRecord_Die;
+		DieWrite->m_iCount1 = DiePlayer->m_iRecord_Die;
+		DieWrite->m_iCount2 = DiePlayer->m_iRecord_PlayTime;
+		DieWrite->StartTime = timeGetTime();
 
 		DieWrite->AccountNo = DieAccountNo;
 
 		// 요청하기
 		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
 		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
-
-
-
-
-
-		// 사망자의 플레이 타임 갱신 -----------------------------------
-		DiePlayer->m_iRecord_PlayTime = DiePlayer->m_iRecord_PlayTime + ((timeGetTime() - DiePlayer->m_dwGameStartTime) / 1000);
-
-		// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-		DiePlayer->m_bLastDBWriteFlag = true;
-
-		DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-		WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-		WriteWork->m_iCount = DiePlayer->m_iRecord_PlayTime;
-
-		WriteWork->AccountNo = DieAccountNo;
-
-		// Write 하기 전에, DBWrite카운트 올려야함.
-		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
-
-		// DBWrite 시도
-		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
 	}
 
 
@@ -2698,7 +3235,7 @@ namespace Library_Jingyu
 	// Parameter : itemID
 	// return : 찾은 아이템의 stRoomItem*
 	//		  : 아이템이 없을 시 nullptr
-	CBattleServer_Room::stRoom::stRoomItem* CBattleServer_Room::stRoom::Item_Find(UINT ID)
+	CBattleServer_Room::stRoomItem* CBattleServer_Room::stRoom::Item_Find(UINT ID)
 	{
 		// 아이템 검색
 		auto itor = m_RoomItem_umap.find(ID);
@@ -2727,7 +3264,7 @@ namespace Library_Jingyu
 		m_RoomItem_umap.erase(itor);
 
 		// stRoomItem* 반환
-		m_Item_Pool->Free(InsertPlayer);
+		m_pBattleServer->m_Item_Pool->Free(InsertPlayer);
 
 		return true;
 	}
@@ -2994,44 +3531,34 @@ namespace Library_Jingyu
 
 						// 유저가 사망한 위치에 신규 아이템 생성 -------------------------------
 						CreateItem(NowPlayer);
+						
 
+						// 플레이 타임 갱신
+						NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + ((timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000);
+						
 
 						// DB 저장 파트 -----------------------------------
+
+						// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
+						NowPlayer->m_bLastDBWriteFlag = true;
 
 						// 사망자의 Die 카운트 증가
 						++NowPlayer->m_iRecord_Die;
 
-						// DBWrite 구조체 셋팅
-						DB_WORK_CONTENT_UPDATE* DieWrite = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
+						// DBWrite 구조체 셋팅 (사망 카운트 + 플레이 타임)
+						DB_WORK_CONTENT_UPDATE_2* DieWrite = (DB_WORK_CONTENT_UPDATE_2*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 						DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
-						DieWrite->m_iCount = NowPlayer->m_iRecord_Die;
+						DieWrite->m_iCount1 = NowPlayer->m_iRecord_Die;
+						DieWrite->m_iCount2 = NowPlayer->m_iRecord_PlayTime;
+						DieWrite->StartTime = timeGetTime();
 
 						DieWrite->AccountNo = AccountNo;
 
 						// 요청하기
 						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
-						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);		
-
-
-
-
-						// 플레이 타임 갱신
-						NowPlayer->m_iRecord_PlayTime = NowPlayer->m_iRecord_PlayTime + ((timeGetTime() - NowPlayer->m_dwGameStartTime) / 1000);
-
-						// 강제 종료시(OnGame_ClientLeave)에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 두고 저장 했나 안했나 체크한다.
-						NowPlayer->m_bLastDBWriteFlag = true;
-
-						DB_WORK_CONTENT_UPDATE* WriteWork = (DB_WORK_CONTENT_UPDATE*)m_pBattleServer->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
-
-						WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYTIME_UPDATE;
-						WriteWork->m_iCount = NowPlayer->m_iRecord_PlayTime;
-
-						WriteWork->AccountNo = AccountNo;
-
-						// 요청하기
-						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
-						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);				   
+						
 					}
 
 				}
@@ -3079,8 +3606,11 @@ namespace Library_Jingyu
 		m_lTokenError = 0;
 		m_lVerError = 0;
 		m_OverlapLoginCount = 0;
+		m_OverlapLoginCount_DB = 0;
 		m_lReadyRoomCount = 0;
 		m_lPlayRoomCount = 0;
+
+		m_shDB_Communicate.ParentSet(this);
 
 		// 1. 세션 셋팅
 		m_cGameSession = new CGameSession[m_stConfig.MaxJoinUser];
@@ -3241,7 +3771,8 @@ namespace Library_Jingyu
 			"Login_Query_Temp : %d\n"
 			"Login_UserTokenError : %d\n"
 			"Login_VerError : %d\n"
-			"Login_Overlap :%d\n\n"
+			"Login_Overlap_DB : %d\n"
+			"Login_Overlap : %d\n\n"
 
 			"---------- Battle LanServer(Chat) ---------\n"
 			"SessionNum : %lld\n"
@@ -3288,6 +3819,7 @@ namespace Library_Jingyu
 			m_lTempError,
 			m_lTokenError,
 			m_lVerError,
+			m_OverlapLoginCount_DB,
 			m_OverlapLoginCount,
 
 			// ----------- 배틀 랜서버
@@ -3773,35 +4305,7 @@ namespace Library_Jingyu
 		}
 
 	}
-
-	// DB_Write에 대한 작업 후처리
-	//
-	// Parameter : DB_WORK*
-	// return : 없음
-	void CBattleServer_Room::Game_DBWrite(DB_WORK* DBData)
-	{	
-		// 1. 형 변환
-		DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)DBData;
-
-		// 2. Json데이터 파싱하기 (UTF-16)
-		GenericDocument<UTF16<>> Doc;
-		Doc.Parse(NowWork->m_tcResponse);
-
-		int iResult = Doc[_T("result")].GetInt();
-
-
-		// 3. DB 요청 결과 확인
-		// 결과가 1이 아니라면 Crash.
-		// Write는 무조건 성공한다는 가정
-		if (iResult != 1)
-			g_BattleServer_Room_Dump->Crash();
-
-
-		// 4. DBWriteCount 1 줄이기
-		MinDBWriteCountFunc(NowWork->AccountNo);
-	}
-
-
+	   
 
 
 
@@ -4305,7 +4809,7 @@ namespace Library_Jingyu
 						while (itor_begin != itor_end)
 						{
 							// 아이템 구조체 반환
-							NowRoom->m_Item_Pool->Free(itor_begin->second);
+							m_Item_Pool->Free(itor_begin->second);
 
 							// Erase
 							itor_begin = NowRoom->m_RoomItem_umap.erase(itor_begin);
@@ -4413,58 +4917,41 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::OnGame_Update()
 	{
+		// ------------------- 게임 모드의 중복 로그인 유저 삭제
+		AcquireSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 락 ------- 
 
-		// ------------------- HTTP 통신 후, 후처리
-		// 1. Q 사이즈 확인
-		int iQSize = m_shDB_Communicate.m_pDB_Wirte_End_Queue->GetNodeSize();
+		// 처음부터 끝까지 순회
+		auto itor_listBegin = m_Overlap_list.begin();
+		auto itor_listEnd = m_Overlap_list.end();
 
-		// 한 프레임에 최대 m_iHTTP_MAX개의 후처리.
-		if (iQSize > m_stConst.m_iHTTP_MAX)
-			iQSize = m_stConst.m_iHTTP_MAX;
-
-		// 2. 있으면 로직 진행
-		DB_WORK* DBData;
-		while (iQSize > 0)
+		while (itor_listBegin != itor_listEnd)
 		{
-			// 일감 디큐		
-			if (m_shDB_Communicate.m_pDB_Wirte_End_Queue->Dequeue(DBData) == -1)
-				g_BattleServer_Room_Dump->Crash();
+			CGameSession* NowPlayer = itor_listBegin->second;
 
-			try
+			// 1. 모드 확인
+			// Auth일 경우, 아예 이 자료구조에 안들어오며, Game이었다가 LOG_OUT이 되는 것은 OnGame_ClientLeave에서 처리하기 때문에, 
+			// 여기서 Game이라는 것은 정말 Game모드 유저라는게 확정
+			if (NowPlayer->m_euModeType == eu_PLATER_MODE::GAME)
 			{
-				// Write가 맞는지 체크
-				if (DBData->m_wWorkType < eu_PLAYCOUNT_UPDATE ||
-					DBData->m_wWorkType > eu_WIN_UPDATE)
+				// ClientKey 비교
+				// 여기서 ClientKey가 다르다는 것은, 모드는 같지만 다른 유저가 됐다는 것.
+				// 이 list에 들어올 당시의 유저는 이미 나간것.		
+				if (NowPlayer->m_int64ClientKey == itor_listBegin->first)
 				{
-					TCHAR str[200];
-					StringCchPrintf(str, 200, _T("OnGame_Update(). HTTP Type Error. Type : %d"), DBData->m_wWorkType);
-
-					throw CException(str);
+					// shutdown 날림
+					NowPlayer->Disconnect();
 				}
-
-				// 맞다면 Write 함수 처리
-				Game_DBWrite(DBData);				
-
-			}
-			catch (CException& exc)
-			{
-				// 로그 찍기 (로그 레벨 : 에러)
-				g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
-					(TCHAR*)exc.GetExceptionText());
-
-				// 덤프
-				g_BattleServer_Room_Dump->Crash();
 			}
 
-			// DB_WORK 반환
-			m_shDB_Communicate.m_pDB_Work_Pool->Free(DBData);
-
-			--iQSize;			 
+			// 2. itor_listBegin을 Next로 이동
+			// 그리고 m_Overlap_list의 가장 앞 데이터(금방 확인한 데이터)를 pop 한다
+			// 다른 유저였더라도 list에서는 제거되어야 함.
+			itor_listBegin = next(itor_listBegin);
+			m_Overlap_list.pop_front();
 		}
 
-
-
-
+		ReleaseSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 언락 ------- 
+		
 
 		// ------------------- 방 체크
 
@@ -4713,45 +5200,6 @@ namespace Library_Jingyu
 			}
 
 		}
-
-
-
-
-		// ------------------- 게임 모드의 중복 로그인 유저 삭제
-
-		AcquireSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 락 ------- 
-
-		// 처음부터 끝까지 순회
-		auto itor_listBegin = m_Overlap_list.begin();
-		auto itor_listEnd = m_Overlap_list.end();
-
-		while (itor_listBegin != itor_listEnd)
-		{
-			CGameSession* NowPlayer = itor_listBegin->second;
-
-			// 1. 모드 확인
-			// Auth일 경우, 아예 이 자료구조에 안들어오며, Game이었다가 LOG_OUT이 되는 것은 OnGame_ClientLeave에서 처리하기 때문에, 
-			// 여기서 Game이라는 것은 정말 Game모드 유저라는게 확정
-			if (NowPlayer->m_euModeType == eu_PLATER_MODE::GAME)
-			{
-				// ClientKey 비교
-				// 여기서 ClientKey가 다르다는 것은, 모드는 같지만 다른 유저가 됐다는 것.
-				// 이 list에 들어올 당시의 유저는 이미 나간것.		
-				if (NowPlayer->m_int64ClientKey == itor_listBegin->first)
-				{
-					// shutdown 날림
-					NowPlayer->Disconnect();
-				}
-			}
-
-			// 2. itor_listBegin을 Next로 이동
-			// 그리고 m_Overlap_list의 가장 앞 데이터(금방 확인한 데이터)를 pop 한다
-			// 다른 유저였더라도 list에서는 제거되어야 함.
-			itor_listBegin = next(itor_listBegin);
-			m_Overlap_list.pop_front();
-		}
-
-		ReleaseSRWLockExclusive(&m_Overlap_list_srwl);		// forward_list 자료구조 Exclusive 언락 ------- 
 	}
 
 	// 새로운 유저 접속 시, Auth에서 호출된다.
@@ -4845,7 +5293,8 @@ namespace Library_Jingyu
 
 
 		// TLS 동적할당
-		m_Room_Pool = new CMemoryPoolTLS<stRoom>(0, false);		
+		m_Room_Pool = new CMemoryPoolTLS<stRoom>(0, false);	
+		m_Item_Pool = new CMemoryPoolTLS<stRoomItem>(0, false);
 
 		// reserve 셋팅
 		m_AccountNo_Umap.reserve(m_stConfig.MaxJoinUser);
@@ -4932,6 +5381,7 @@ namespace Library_Jingyu
 
 		// TLS 동적 해제
 		delete m_Room_Pool;
+		delete m_Item_Pool;
 	}
 
 }
@@ -5836,7 +6286,7 @@ namespace Library_Jingyu
 			m_dwTokenSendTime = NowTime;
 
 			// 2. "현재" 토큰을 "이전" 토큰에 복사
-			memcpy_s(m_BattleServer->m_cConnectToken_Now, 32, m_BattleServer->m_cConnectToken_Before, 32);
+			memcpy_s(m_BattleServer->m_cConnectToken_Before, 32, m_BattleServer->m_cConnectToken_Now, 32);
 
 			// 3. "현재" 토큰 다시 만들기
 			int i = 0;
@@ -5858,7 +6308,7 @@ namespace Library_Jingyu
 			SendBuff->PutData((char*)&ReqSequence, 4);
 
 
-			// 5. 마스터에게 패킷 보내기
+			// 5. 채팅에게 토큰 패킷 보내기
 			SendPacket(m_ullSessionID, SendBuff);
 		}
 	}

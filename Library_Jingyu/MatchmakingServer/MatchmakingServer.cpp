@@ -416,7 +416,7 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			// 대기 (10초에 1회 깨어난다)
+			// 대기 (5초에 1회 깨어난다)
 			DWORD Check = WaitForSingleObject(hEvent, 10000);
 
 			// 이상한 신호라면
@@ -444,8 +444,8 @@ namespace Library_Jingyu
 
 				while (itor_Begin != itor_End)
 				{
-					// 마지막 패킷을 받은지 30초 이상이 되었다면
-					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 30000)
+					// 마지막 패킷을 받은지 10초 이상이 되었다면
+					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 10000)
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
 						Size++;
@@ -833,17 +833,16 @@ namespace Library_Jingyu
 
 		// 7. 여기까지 왔으면 정상적인 플레이어. 셋팅 시작
 		// 1) AccountNo 셋팅
-		NowPlayer->m_i64AccountNo = AccountNo;	
+		NowPlayer->m_i64AccountNo = AccountNo;			
 
-		// 2) 로그인 상태로 변경
-		NowPlayer->m_bLoginCheck = true;
-
-		// 3) 로그인 유저 수 증가
+		// 2) 로그인 유저 수 증가
 		InterlockedIncrement(&m_lLoginUser);
 
-		// 4) 로그인 유저에 추가
+		// 3) 로그인 유저에 추가
 		if (InsertLoginPlayerFunc(AccountNo, SessionID) == false)
 		{
+			InterlockedIncrement(&m_lOverlapError);
+
 			// 실패라면 중복 로그인임.
 			// 기타 오류 패킷을 리턴.
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
@@ -865,6 +864,9 @@ namespace Library_Jingyu
 			
 			return;
 		}
+
+		// 4) 로그인 유저 관리 자료구조에 추가됐을 시, 로그인 플래그 변경
+		NowPlayer->m_bLoginCheck = true;
 
 
 
@@ -970,6 +972,7 @@ namespace Library_Jingyu
 		m_lAccountError = 0;
 		m_lTempError = 0;
 		m_lVerError = 0;
+		m_lOverlapError = 0;
 		m_lLoginUser = 0;
 		m_lstPlayer_AllocCount = 0;
 		m_lNot_BattleRoom_Enter = 0;
@@ -1096,6 +1099,7 @@ namespace Library_Jingyu
 		TempError :			- Selecet.account.php에 쿼리 날렸는데, -10 외에 기타 에러가 뜸
 		VerError :			- 로그인 요청한 유저가 들고온 VerCode와 서버가 들고있는 VerCode가 다름
 		NotRoomEnter :		- 배틀 방 입장 성공 패킷을 안보내고 끊은 유저 수
+		OverlapError :		- 중복 로그인 1씩 증가
 
 		*/
 
@@ -1118,7 +1122,8 @@ namespace Library_Jingyu
 			"AccountError : %d\n"
 			"TempError : %d\n"
 			"VerError : %d\n"
-			"NotRoomEnter : %d\n\n"
+			"NotRoomEnter : %d\n"
+			"OverlapError : %d\n\n"
 
 			"========================================================\n\n",
 
@@ -1141,7 +1146,8 @@ namespace Library_Jingyu
 			m_lAccountError, 
 			m_lTempError, 
 			m_lVerError, 
-			m_lNot_BattleRoom_Enter);
+			m_lNot_BattleRoom_Enter,
+			m_lOverlapError);
 
 	}
 
@@ -1377,7 +1383,7 @@ namespace Library_Jingyu
 		m_MatchDBcon = new CBConnectorTLS(m_stConfig.DB_IP, m_stConfig.DB_User, m_stConfig.DB_Password,	m_stConfig.DB_Name, m_stConfig.DB_Port);
 		
 		// HTTP_Exchange 동적할당
-		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 11902);
+		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.0.0.1"), 11902);
 
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	

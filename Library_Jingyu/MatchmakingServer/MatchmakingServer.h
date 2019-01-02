@@ -232,6 +232,7 @@ namespace Library_Jingyu
 		LONG m_lAccountError;
 		LONG m_lTempError;
 		LONG m_lVerError;
+		LONG m_lOverlapError;
 
 		// 로그인에 성공한 유저 수
 		LONG m_lLoginUser;
