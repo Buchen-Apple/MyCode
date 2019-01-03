@@ -120,6 +120,7 @@ namespace Library_Jingyu
 		ULONGLONG m_ullAcceptTotal;
 		LONG	  m_lAcceptTPS;
 		LONG	m_lSendPostTPS;
+		LONG	m_lRecvTPS;
 
 
 
@@ -255,6 +256,10 @@ namespace Library_Jingyu
 		// SendTPS 얻기
 		// 반환과 동시에 기존 값은 0으로 초기화
 		LONG GetSendTPS();
+
+		// RecvTPS 얻기
+		// 반환과 동시에 기존 값은 0으로 초기화
+		LONG GetRecvTPS();
 
 
 

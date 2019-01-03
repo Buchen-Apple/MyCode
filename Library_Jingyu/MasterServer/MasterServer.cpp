@@ -1093,7 +1093,7 @@ namespace Library_Jingyu
 		// 2. list 내에 방에 있을 경우, list의 0번 인덱스가 해당 유저가 입장하려고 했던 방인지 확인
 		if (m_Room_List.size() > 0)
 		{
-			stRoom* NowRoom = *(m_Room_List.begin());
+			stRoom* NowRoom = *(m_Room_List.begin());			
 
 			// 해당 유저가 입장했던 방이 Room_list의 0번 인덱스가 맞을 경우
 			// Room 내부의 유저 수 및 set 갱신
@@ -1104,7 +1104,7 @@ namespace Library_Jingyu
 
 				// 존재하지 않으면 return 3
 				if (TempUser == NowRoom->m_uset_JoinUser.end())
-				{
+				{					
 					ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락
 					return 3;
 				}
@@ -1120,9 +1120,9 @@ namespace Library_Jingyu
 					g_MasterDump->Crash();
 
 				bFalg = true;
-
-				ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락			
-			}			
+				
+				ReleaseSRWLockExclusive(&m_srwl_Room_List);		// ----- Room list 자료구조 Exclusive 언락	
+			}				
 		}
 
 
@@ -1266,8 +1266,8 @@ namespace Library_Jingyu
 					ullBattleSessionID = NowRoom->m_ullBattleSessionID;
 					memcpy_s(cSendEnterToken, 32, NowRoom->m_cEnterToken, 32);
 
-					ReleaseSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 언락
 					NowRoom->RoomUNLOCK();						// ----- 룸 1개에 대한 언락
+					ReleaseSRWLockShared(&m_srwl_Room_Umap);	// ----- umap 룸 Shared 언락					
 
 					// 4.방 찾았음 Flag 변경
 					bSearchFlag = true;
@@ -1311,7 +1311,6 @@ namespace Library_Jingyu
 
 			// 2. 가장 앞의 룸 얻기
 			stRoom* NowRoom = *(m_Room_List.begin());
-
 
 			// 3. 룸 안의 여유 유저 수 확인
 			// 0명이면 여기 있으면 안됨.
@@ -1381,9 +1380,8 @@ namespace Library_Jingyu
 		{
 			ReleaseSRWLockShared(&m_srwl_BattleServer_Umap);	// ------------- 배틀서버 자료구조 Shared 언락
 
-			g_MasterDump->Crash();
+			//g_MasterDump->Crash();
 
-			/*
 			// 배틀서버가 죽었기 때문에, 방 없음 패킷 리턴
 			BYTE Status = 0;
 
@@ -1392,7 +1390,6 @@ namespace Library_Jingyu
 			SendPacket(SessionID, SendBuff);
 
 			return;
-			*/
 		}
 
 		stBattle* NowBattle = FindBattle->second;

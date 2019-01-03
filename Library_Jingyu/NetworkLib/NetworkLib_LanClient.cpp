@@ -46,6 +46,8 @@ namespace Library_Jingyu
 		// 새로 시작하니까 에러코드들 초기화
 		m_iOSErrorCode = 0;
 		m_iMyErrorCode = (euError)0;
+		m_lSendPostTPS = 0;
+		m_lRecvTPS = 0;
 
 		// 접속할 서버의 IP와 Port 복사해두기
 		StringCchCopy(m_tcServerIP, _MyCountof(m_tcServerIP), ConnectIP);
@@ -275,6 +277,20 @@ namespace Library_Jingyu
 		return m_bConnectFlag;
 	}
 
+	// Send TPS 얻기
+	// 반환과 동시에 기존 값은 0으로 초기화
+	LONG CLanClient::GetSendTPS()
+	{
+		return InterlockedExchange(&m_lSendPostTPS, 0);
+	}
+
+	// Recv TPS 얻기
+	// 반환과 동시에 기존 값은 0으로 초기화
+	LONG CLanClient::GetRecvTPS()
+	{
+		return InterlockedExchange(&m_lRecvTPS, 0);
+	}
+
 
 
 	// -----------------------------
@@ -492,6 +508,10 @@ namespace Library_Jingyu
 			// WSAsend()가 완료된 경우, 받은 데이터가 0이 아니면 로직처리
 			else if (&stNowSession->m_overSendOverlapped == overlapped && cbTransferred > 0)
 			{
+				// !! 테스트 출력용 !!
+				// sendpostTPS 추가
+				InterlockedAdd(&g_This->m_lSendPostTPS, stNowSession->m_iWSASendCount);
+
 				// 1. 샌드 완료됐다고 컨텐츠에 알려줌
 				g_This->OnSend(stNowSession->m_ullSessionID, cbTransferred);
 
@@ -940,6 +960,7 @@ namespace Library_Jingyu
 			PayloadBuff->MoveWritePos(DequeueSize);
 
 			// 8. Recv받은 데이터의 헤더 타입에 따라 분기처리.
+			InterlockedIncrement(&m_lRecvTPS);
 			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
 			CProtocolBuff_Lan::Free(PayloadBuff);

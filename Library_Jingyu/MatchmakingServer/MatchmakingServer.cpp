@@ -416,8 +416,8 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			// 대기 (5초에 1회 깨어난다)
-			DWORD Check = WaitForSingleObject(hEvent, 10000);
+			// 대기 (1초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
@@ -470,6 +470,7 @@ namespace Library_Jingyu
 				{
 					g_this->Disconnect(SessionArray[Size]);
 					Size--;
+					InterlockedIncrement(&g_this->m_lHeartBeatCount);
 				}
 			}
 		}
@@ -515,8 +516,7 @@ namespace Library_Jingyu
 
 		return true;
 	}
-
-
+	
 	// Player 관리 자료구조에서, 유저 검색
 	// 현재 map으로 관리중
 	// !!SessionID!! 를 이용해 검색
@@ -529,16 +529,20 @@ namespace Library_Jingyu
 		// 1. umap에서 검색
 		AcquireSRWLockShared(&m_srwlPlayer);		// ------- Shared 락
 
-		auto FindPlayer = m_umapPlayer.find(SessionID);
-
-		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
+		auto FindPlayer = m_umapPlayer.find(SessionID);		
 
 		// 2. 검색 실패 시 nullptr 리턴
 		if (FindPlayer == m_umapPlayer.end())
+		{
+			ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
 			return nullptr;
+		}
+
+		stPlayer* RetPlayer = FindPlayer->second;
+		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
 
 		// 3. 검색 성공 시, 찾은 stPlayer* 리턴
-		return FindPlayer->second;
+		return RetPlayer;
 	}
 
 	// Player 관리 자료구조에서, 유저 검색
@@ -555,11 +559,15 @@ namespace Library_Jingyu
 
 		auto FindPlayer = m_umapPlayer_ClientKey.find(ClientKey);
 
-		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
-
 		// 2. 검색 실패 시 nullptr 리턴
 		if (FindPlayer == m_umapPlayer_ClientKey.end())
+		{
+			ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
 			return nullptr;
+		}
+
+		stPlayer* RetPlayer = FindPlayer->second;
+		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
 
 		// 3. 검색 성공 시, 찾은 stPlayer* 리턴
 		return FindPlayer->second;
@@ -977,6 +985,7 @@ namespace Library_Jingyu
 		m_lstPlayer_AllocCount = 0;
 		m_lNot_BattleRoom_Enter = 0;
 		m_lRoomEnter_OK = 0;
+		m_lHeartBeatCount = 0;
 
 
 		// ------------------- 매치메이킹 DB에 초기 데이터 생성
@@ -1100,11 +1109,12 @@ namespace Library_Jingyu
 		VerError :			- 로그인 요청한 유저가 들고온 VerCode와 서버가 들고있는 VerCode가 다름
 		NotRoomEnter :		- 배틀 방 입장 성공 패킷을 안보내고 끊은 유저 수
 		OverlapError :		- 중복 로그인 1씩 증가
+		HeartBeatCount :	- 하트비트로 끊긴 유저 수
 
 		*/
 
-		printf("========================================================\n"
-			"MasterConenct : %d, MonitorConnect : %d\n"
+		printf("==================== Match Server ====================\n"
+			"MonitorConnect : %d\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n\n"
 
@@ -1113,7 +1123,8 @@ namespace Library_Jingyu
 
 			"Accept Total : %lld\n"
 			"Accept TPS : %d\n"
-			"Send TPS : %d\n\n"
+			"Net Send TPS : %d\n"
+			"Net Recv TPS : %d\n\n"
 
 			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 			"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
@@ -1123,31 +1134,47 @@ namespace Library_Jingyu
 			"TempError : %d\n"
 			"VerError : %d\n"
 			"NotRoomEnter : %d\n"
-			"OverlapError : %d\n\n"
+			"OverlapError : %d\n"
+			"HeartBeatCount : %d\n\n"
+
+			"------------------- Master Lan Clinet ----------------\n"
+			"MasterConenct : %d\n"
+			"Send TPS : %d\n"
+			"Recv TPS : %d\n\n"
 
 			"========================================================\n\n",
 
 			// ------------ 매치메이킹 Net 서버용
-			m_pLanClient->GetClinetState(), m_pMonitorLanClient->GetClinetState(),
-			GetClientCount(), 
+			m_pMonitorLanClient->GetClinetState(),
+			GetClientCount(),
 			CProtocolBuff_Net::GetNodeCount(),
 
-			m_lstPlayer_AllocCount, 
+			m_lstPlayer_AllocCount,
 			m_umapPlayer.size(),
 
 			GetAcceptTotal(),
-			GetAccpetTPS(), 
+			GetAccpetTPS(),
 			GetSendTPS(),
+			GetRecvTPS(),
 
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_PlayerPool->GetAllocChunkCount(), m_PlayerPool->GetOutChunkCount(),
 
-			m_lTokenError, 
-			m_lAccountError, 
-			m_lTempError, 
-			m_lVerError, 
+			m_lTokenError,
+			m_lAccountError,
+			m_lTempError,
+			m_lVerError,
 			m_lNot_BattleRoom_Enter,
-			m_lOverlapError);
+			m_lOverlapError,
+			m_lHeartBeatCount,
+
+			// --------- 마스터 랜 클라
+			m_pLanClient->GetClinetState(),
+			m_pLanClient->GetSendTPS(),
+			m_pLanClient->GetRecvTPS()
+		
+		);
+
 
 	}
 

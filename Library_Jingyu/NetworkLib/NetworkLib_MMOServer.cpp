@@ -124,6 +124,9 @@ namespace Library_Jingyu
 
 	// Release용
 	void CMMOServer::cSession::OnGame_ClientRelease() {}
+
+	// 테스트용
+	void CMMOServer::cSession::OnSemaphore() {}
 }
 
 
@@ -316,6 +319,12 @@ namespace Library_Jingyu
 	LONG CMMOServer::GetGameFPS()
 	{
 		return InterlockedExchange(&m_lGameFPS, 0);
+	}
+
+	// 121 에러 횟수 얻기
+	LONG CMMOServer::GetSemCount()
+	{
+		return m_lSemCount;
 	}
 
 
@@ -761,7 +770,14 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
+			{
+				if (GetLastError() == 121)
+				{
+					InterlockedIncrement(&g_This->m_lSemCount);
+					stNowSession->OnSemaphore();
+				}
+			}
 
 
 			// --------------
@@ -1410,6 +1426,9 @@ namespace Library_Jingyu
 						// 2. 큐에 노드가 1개 이상 있으면, 패킷 처리
 						if (iQSize > 0)
 						{
+							// 마지막으로 패킷을 받은 시간 갱신
+							NowSession->m_dwLastPacketTime = timeGetTime();
+
 							// !! 패킷 처리 횟수 제한을 두기 위해, PACKET_WORK_COUNT보다 노드의 수가 더 많으면, PACKET_WORK_COUNT로 변경 !!
 							if (iQSize > PACKET_WORK_COUNT)
 								iQSize = PACKET_WORK_COUNT;
@@ -1440,6 +1459,7 @@ namespace Library_Jingyu
 							// 셧다운 대상인지 체크
 							if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
 								NowSession->Disconnect();
+
 						}
 
 					}
@@ -1938,6 +1958,7 @@ namespace Library_Jingyu
 
 		m_lAuthFPS = 0;
 		m_lGameFPS = 0;
+		m_lSemCount = 0;
 
 
 		// Config 데이터 셋팅

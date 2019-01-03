@@ -142,6 +142,7 @@ namespace Library_Jingyu
 		m_ullAcceptTotal = 0;
 		m_lAcceptTPS = 0;
 		m_lSendPostTPS = 0;
+		m_lRecvTPS = 0;
 
 		// Config 데이터 셋팅
 		m_bCode = Code;
@@ -616,6 +617,13 @@ namespace Library_Jingyu
 	LONG CNetServer::GetSendTPS()
 	{
 		return InterlockedExchange(&m_lSendPostTPS, 0);
+	}
+
+	// RecvTPS 얻기
+	// 반환과 동시에 기존 값은 0으로 초기화
+	LONG CNetServer::GetRecvTPS()
+	{
+		return InterlockedExchange(&m_lRecvTPS, 0);
 	}
 
 
@@ -1317,6 +1325,7 @@ namespace Library_Jingyu
 			}
 
 			// 11. Recv받은 데이터의 헤더 타입에 따라 분기처리.
+			InterlockedIncrement(&m_lRecvTPS);
 			OnRecv(NowSession->m_ullSessionID, PayloadBuff);
 
 			CProtocolBuff_Net::Free(PayloadBuff);

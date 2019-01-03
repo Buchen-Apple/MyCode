@@ -136,6 +136,7 @@ namespace Library_Jingyu
 			// 마지막으로 패킷을 받은 시간
 			DWORD m_dwLastPacketTime;
 
+
 		public:
 			// -----------------
 			// 생성자와 소멸자
@@ -161,6 +162,8 @@ namespace Library_Jingyu
 			// Release용
 			virtual void OnGame_ClientRelease();
 
+			// 테스트용
+			virtual void OnSemaphore();
 
 		protected:
 			// -----------------
@@ -336,6 +339,8 @@ namespace Library_Jingyu
 		LONG m_lAuthFPS;
 		LONG m_lGameFPS;
 
+		LONG m_lSemCount;
+
 
 
 
@@ -405,6 +410,9 @@ namespace Library_Jingyu
 
 		// GameFPS 얻기
 		LONG GetGameFPS();
+
+		// 121 에러 횟수 얻기
+		LONG GetSemCount();
 
 
 

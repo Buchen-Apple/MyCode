@@ -246,6 +246,8 @@ namespace Library_Jingyu
 		// 방 배정에 성공한 유저 수(초당)
 		LONG m_lRoomEnter_OK;
 
+		// 하트비트로 끊긴 유저
+		LONG m_lHeartBeatCount;
 
 
 

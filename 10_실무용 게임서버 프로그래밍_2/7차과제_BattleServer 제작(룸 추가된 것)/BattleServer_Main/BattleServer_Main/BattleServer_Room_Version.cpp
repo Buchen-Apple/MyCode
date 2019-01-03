@@ -20,8 +20,6 @@
 using namespace rapidjson;
 using namespace std;
 
-list<DWORD> WriteTimeTest;
-
 // -----------------------
 // shDB와 통신하는 클래스
 // -----------------------
@@ -180,7 +178,9 @@ namespace Library_Jingyu
 		while (1)
 		{
 			// 이벤트 대기
-			DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
+			//DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
+			DWORD Check = WaitForSingleObject(gThis->m_hDBWrite_Exit_Event, 1);
+
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
@@ -195,21 +195,9 @@ namespace Library_Jingyu
 			else if (Check == WAIT_OBJECT_0)
 				break;
 
-			// ----------------- 일감 있으면 일한다.
-			// 일감 수를 스냅샷으로 받아둔다.
-			// 해당 일감만큼만 처리하고 자러간다.
-			// 처리 못한 일감은, 다음에 깨서 처리한다.
-
-			int Size = pWorkerQueue->GetNodeSize();
-
-			while (Size > 0)
+			// 1. 큐에서 일감 1개 빼오기	
+			while (pWorkerQueue->Dequeue(pWork) != -1)
 			{
-				Size--;
-
-				// 1. 큐에서 일감 1개 빼오기	
-				if (pWorkerQueue->Dequeue(pWork) == -1)
-					gThis->m_Dump->Crash();
-
 				// 2. 일감 타입에 따라 로직 처리
 				switch (pWork->m_wWorkType)
 				{
@@ -227,8 +215,6 @@ namespace Library_Jingyu
 					// 1. Body 만들기
 					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"playcount\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount);
 
-					DWORD Start = timeGetTime();
-					
 					// 2. HTTP 통신
 					int TryCount = 5;
 					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
@@ -238,8 +224,6 @@ namespace Library_Jingyu
 						if (TryCount == 0)
 							gThis->m_Dump->Crash();
 					}
-
-					WriteTimeTest.push_back(timeGetTime() - Start);
 
 					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
@@ -255,7 +239,7 @@ namespace Library_Jingyu
 						g_BattleServer_Room_Dump->Crash();
 
 					// 5. DBWrite 카운트1 감소
-					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 				}
 				break;
 
@@ -283,8 +267,6 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
-
 					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
@@ -298,7 +280,7 @@ namespace Library_Jingyu
 						g_BattleServer_Room_Dump->Crash();
 
 					// 5. DBWrite 카운트1 감소
-					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
 				break;
@@ -327,9 +309,6 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
-
-
 					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
@@ -344,7 +323,7 @@ namespace Library_Jingyu
 						g_BattleServer_Room_Dump->Crash();
 
 					// 5. DBWrite 카운트1 감소
-					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
 				break;
@@ -373,8 +352,6 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					WriteTimeTest.push_back(timeGetTime() - NowWork->StartTime);
-
 					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
@@ -388,19 +365,20 @@ namespace Library_Jingyu
 						g_BattleServer_Room_Dump->Crash();
 
 					// 5. DBWrite 카운트1 감소
-					gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
 				break;
 
 				default:
 					gThis->m_Dump->Crash();
-				}			
+				}
 
 				// 3. DB_WORK 반환
 				gThis->m_pDB_Work_Pool->Free(pWork);
 
 			}
+
 		}
 
 		return 0;
@@ -476,8 +454,8 @@ namespace Library_Jingyu
 		m_pDB_Wirte_Start_Queue = new CNormalQueue<DB_WORK*>();
 
 		// DB_Read용 입출력 완료포트 생성
-		// 4개의 스레드 생성, 2개의 스레드 활성화
-		int Create = 4;
+		// 10개의 스레드 생성, 2개의 스레드 활성화
+		int Create = 6;
 		int Active = 2;
 
 		m_hDB_Read = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Active);
@@ -730,8 +708,8 @@ namespace Library_Jingyu
 
 				// DBWrite에서 제거 시도.
 				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-				if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-					g_BattleServer_Room_Dump->Crash();
+				/*if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+					g_BattleServer_Room_Dump->Crash();*/
 
 				m_bStructFlag = false;
 			}
@@ -843,12 +821,11 @@ namespace Library_Jingyu
 
 		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
 		CountWrite->m_iCount = m_iRecord_PlayCount;
-		CountWrite->StartTime = timeGetTime();
 
 		CountWrite->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, WriteCount 증가.
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
@@ -902,26 +879,28 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
 
 
-
-		// 2. 현재 룸 안에 있는 유저 수 감소
+		// 2. 현재 룸 안에 있는 유저 수, 게임모드 유저 수 감소
 		--NowRoom->m_iJoinUserCount;
+		--NowRoom->m_iGameModeUser;
 
-		// 감소 후, 룸 안의 유저 수가 0보다 적으면 말도 안됨.
-		if (NowRoom->m_iJoinUserCount < 0)
+		// 감소 후, 룸 안의 유저 수가 0보다 작거나,
+		// 게임 모드 유저 수가 0보다 작으면 말도 안됨. Crash
+		if (NowRoom->m_iJoinUserCount < 0 || NowRoom->m_iGameModeUser < 0)
 			g_BattleServer_Room_Dump->Crash();
-
 
 
 		// 3. 나가는 유저가 생존한 유저였을 경우, 생존한 유저 수 감소.
 		// 생존한 유저 수로 승리여부를 판단해야 하기 때문에 
 		// 유저가 게임에서 나가거나 HP가 0이되어 사망할 경우 감소시켜야 함
-		if(m_bAliveFlag == true)
+		if (m_bAliveFlag == true)
+		{
 			--NowRoom->m_iAliveUserCount;
+			m_bAliveFlag = false;
+		}
 
 		// 감소 후, 0보다 적으면 말도 안됨.
 		if (NowRoom->m_iAliveUserCount < 0)
 			g_BattleServer_Room_Dump->Crash();
-
 
 
 
@@ -965,12 +944,11 @@ namespace Library_Jingyu
 			DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
 			DieWrite->m_iCount1 = m_iRecord_Die;
 			DieWrite->m_iCount2 = m_iRecord_PlayTime;
-			DieWrite->StartTime = timeGetTime();
 
 			DieWrite->AccountNo = m_Int64AccountNo;
 
 			// 요청하기
-			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+			//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 		}
 
@@ -983,8 +961,8 @@ namespace Library_Jingyu
 
 			// DBWrite에서 제거 시도.
 			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
+			/*if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();*/
 
 			m_bStructFlag = false;
 		}
@@ -1091,22 +1069,6 @@ namespace Library_Jingyu
 		// 모드가 LOG_OUT이 아니면 크래스
 		if (m_euModeType != eu_PLATER_MODE::LOG_OUT)
 			g_BattleServer_Room_Dump->Crash();
-
-		/*
-		// m_bStructFlag가 true라면, 자료구조에 들어간 유저
-		if (m_bStructFlag == true)
-		{
-			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
-
-			// DBWrite에서 제거 시도.
-			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
-
-			m_bStructFlag = false;
-		}		
-		*/
 		
 		m_bLoginFlag = false;	
 		m_bLogoutFlag = false;
@@ -1114,6 +1076,14 @@ namespace Library_Jingyu
 		m_bLastDBWriteFlag = false;		
 	}
 
+	// 테스트용
+	void CBattleServer_Room::CGameSession::OnSemaphore()
+	{
+		// 에러 로그 찍기
+		// 로그 찍기 (로그 레벨 : 에러)
+		g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			L"Semaphore!! AccoutnNo : %lld", m_Int64AccountNo);
+	}
 
 
 
@@ -1135,13 +1105,14 @@ namespace Library_Jingyu
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
+		/*
 		// 3. 아직 DB에 Write중인지
 		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount_DB);
 
-			if (m_pParent->m_OverlapLoginCount_DB == 300)
-				g_BattleServer_Room_Dump->Crash();
+			//if (m_pParent->m_OverlapLoginCount_DB == 300)
+				//g_BattleServer_Room_Dump->Crash();
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1157,14 +1128,15 @@ namespace Library_Jingyu
 			BYTE Result = 6;		// 중복 로그인
 			SendBuff->PutData((char*)&Result, 1);
 
-			// SendPacket
-			SendPacket(SendBuff);
+			// SendPacket. 보내고 끊기
+			SendPacket(SendBuff, TRUE);
 
 			// 중복 로그인 처리된 유저도 접속 종료 요청
 			m_pParent->DisconnectAccountNoFunc(AccountNo);
 
 			return;
 		}
+		*/
 		
 		// 4. 나머지 마샬링 후, 세션키, AccountNo, 클라이언트키를 멤버에 셋팅
 		Packet->GetData(m_cSessionKey, 64);
@@ -1260,8 +1232,8 @@ namespace Library_Jingyu
 			BYTE Result = 6;		// 중복 로그인
 			SendBuff->PutData((char*)&Result, 1);				
 
-			// SendPacket
-			SendPacket(SendBuff);
+			// SendPacket. 보내고 끊기
+			SendPacket(SendBuff, TRUE);
 
 			// 중복 로그인 처리된 유저도 접속 종료 요청
 			m_pParent->DisconnectAccountNoFunc(AccountNo);
@@ -2441,10 +2413,7 @@ namespace Library_Jingyu
 			// 유저가 승리자일 경우 (생존자)
 			if (m_JoinUser_Vector[Index]->m_bAliveFlag == true)
 			{
-				CGameSession* NowPlayer = m_JoinUser_Vector[Index];				
-
-				// 미리 초기화.
-				NowPlayer->m_bAliveFlag = false;
+				CGameSession* NowPlayer = m_JoinUser_Vector[Index];	
 
 				// 한 게임에 승리자는 1명.
 				// WinUserCount가 1인데 여기 들어왔다면, 승리자가 1명 이상이 되었다는 의미.
@@ -2474,12 +2443,11 @@ namespace Library_Jingyu
 				WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
 				WriteWork->m_iCount1 = NowPlayer->m_iRecord_Win;
 				WriteWork->m_iCount2 = NowPlayer->m_iRecord_PlayTime;
-				WriteWork->StartTime = timeGetTime();
 
 				WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
 				// Write 하기 전에, DBWrite카운트 올려야함.
-				NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
+				//NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
 
 				// DBWrite 시도
 				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
@@ -2643,11 +2611,11 @@ namespace Library_Jingyu
 		}		
 	}
 	
-	// 방 안의 모든 유저들에게 전적 변경내용 보내기.
+	// 승리자에게 전적 보내기
 	//
 	// Parameter : 없음
 	// return : 없음
-	void CBattleServer_Room::stRoom::RecodeSend()
+	void CBattleServer_Room::stRoom::WInRecodeSend()
 	{
 		// 1. 방 안에 유저가 0명이면 말이 안됨. 밖에서 이미 0이 아니라는것을 알고 왔기 때문에.
 		if (m_iJoinUserCount <= 0)
@@ -2658,28 +2626,32 @@ namespace Library_Jingyu
 		if (m_iJoinUserCount != Size)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 4. 순회하면서 모든 유저에게 전적 내용 보냄.
-		// 동시에 플레이 타임도 갱신. 초단위
+		// 4. 승리자에게 전적 보냄
 		size_t Index = 0;
 
 		while (Index < Size)
 		{
+			// 해당 유저가 생존자인지 체크. 생존자만 승리자임
 			CGameSession* NowPlayer = m_JoinUser_Vector[Index];
 
-			// 1. 전적 패킷 만들어서 보내기.
-			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+			if (NowPlayer->m_bAliveFlag == true)
+			{
+				// 1. 전적 패킷 만들어서 보내기.
+				CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
-			WORD Type = en_PACKET_CS_GAME_RES_RECORD;
+				WORD Type = en_PACKET_CS_GAME_RES_RECORD;
 
-			SendBuff->PutData((char*)&Type, 2);
+				SendBuff->PutData((char*)&Type, 2);
 
-			SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayCount, 4);
-			SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayTime, 4);
-			SendBuff->PutData((char*)&NowPlayer->m_iRecord_Kill, 4);
-			SendBuff->PutData((char*)&NowPlayer->m_iRecord_Die, 4);
-			SendBuff->PutData((char*)&NowPlayer->m_iRecord_Win, 4);
+				SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayCount, 4);
+				SendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayTime, 4);
+				SendBuff->PutData((char*)&NowPlayer->m_iRecord_Kill, 4);
+				SendBuff->PutData((char*)&NowPlayer->m_iRecord_Die, 4);
+				SendBuff->PutData((char*)&NowPlayer->m_iRecord_Win, 4);
 
-			NowPlayer->SendPacket(SendBuff);	
+				NowPlayer->SendPacket(SendBuff);
+				break;
+			}
 
 			Index++;
 		}
@@ -3082,12 +3054,11 @@ namespace Library_Jingyu
 
 		KillWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_KILL_UPDATE;
 		KillWrite->m_iCount = AttackPlayer->m_iRecord_Kill;
-		KillWrite->StartTime = timeGetTime();
 
 		KillWrite->AccountNo = AtkAccountNo;
 
 		// 요청하기
-		m_pBattleServer->AddDBWriteCountFunc(AtkAccountNo);
+		//m_pBattleServer->AddDBWriteCountFunc(AtkAccountNo);
 		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
 
 
@@ -3108,13 +3079,26 @@ namespace Library_Jingyu
 		DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
 		DieWrite->m_iCount1 = DiePlayer->m_iRecord_Die;
 		DieWrite->m_iCount2 = DiePlayer->m_iRecord_PlayTime;
-		DieWrite->StartTime = timeGetTime();
 
 		DieWrite->AccountNo = DieAccountNo;
 
 		// 요청하기
-		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
+		//m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
 		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+
+
+		// 8. 사망자에게 전적 내용 보내기
+		CProtocolBuff_Net* DieSendBuff = CProtocolBuff_Net::Alloc();
+		Type = en_PACKET_CS_GAME_RES_RECORD;
+
+		DieSendBuff->PutData((char*)&Type, 2);
+		DieSendBuff->PutData((char*)&DiePlayer->m_iRecord_PlayCount, 4);
+		DieSendBuff->PutData((char*)&DiePlayer->m_iRecord_PlayTime, 4);
+		DieSendBuff->PutData((char*)&DiePlayer->m_iRecord_Kill, 4);
+		DieSendBuff->PutData((char*)&DiePlayer->m_iRecord_Die, 4);
+		DieSendBuff->PutData((char*)&DiePlayer->m_iRecord_Win, 4);
+
+		DiePlayer->SendPacket(DieSendBuff);
 	}
 
 
@@ -3551,14 +3535,27 @@ namespace Library_Jingyu
 						DieWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_DIE_UPDATE;
 						DieWrite->m_iCount1 = NowPlayer->m_iRecord_Die;
 						DieWrite->m_iCount2 = NowPlayer->m_iRecord_PlayTime;
-						DieWrite->StartTime = timeGetTime();
 
 						DieWrite->AccountNo = AccountNo;
 
 						// 요청하기
-						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
-						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);				   
-						
+						//m_pBattleServer->AddDBWriteCountFunc(AccountNo);
+						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);	
+
+
+
+						// 사망자에게 전적 내용 보내기
+						CProtocolBuff_Net* DieSendBuff = CProtocolBuff_Net::Alloc();
+						Type = en_PACKET_CS_GAME_RES_RECORD;
+
+						DieSendBuff->PutData((char*)&Type, 2);
+						DieSendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayCount, 4);
+						DieSendBuff->PutData((char*)&NowPlayer->m_iRecord_PlayTime, 4);
+						DieSendBuff->PutData((char*)&NowPlayer->m_iRecord_Kill, 4);
+						DieSendBuff->PutData((char*)&NowPlayer->m_iRecord_Die, 4);
+						DieSendBuff->PutData((char*)&NowPlayer->m_iRecord_Win, 4);
+
+						NowPlayer->SendPacket(DieSendBuff);					
 					}
 
 				}
@@ -3711,6 +3708,9 @@ namespace Library_Jingyu
 
 		Room_ChunkAlloc_Count : - 할당받은 룸 청크 수(밖에서 사용중인 수)
 
+		------------------ DBWrite -------------------
+		Node Alloc Count :	- DBWrite 스레드에게 일시키용 큐 내부 사이즈
+
 		------------------ Error -------------------
 		Battle_EnterTokenError:		- 배틀서버 입장 토큰 에러
 		Room_EnterTokenError:		- 방 입장 토큰 에러
@@ -3720,6 +3720,7 @@ namespace Library_Jingyu
 		Login_VerError :			- auth의 로그인 패킷에서, 유저가 들고온 버전이 다름
 		Login_Duplicate :			- 중복 로그인
 		Login_DBWrite :				- DBWrite중인데 또 들어올 경우
+		SemCount :					- 세마포어(121)에러 시 1 증가
 
 		---------- Battle LanServer(Chat) ---------
 		SessionNum :				- 배틀 랜서버 (채팅서버)에 접속한 세션 수
@@ -3764,6 +3765,9 @@ namespace Library_Jingyu
 
 			"Room_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
+			"------------------DBWrite------------------\n"
+			"Node Alloc Count : %d\n\n"
+
 			"------------------ Error -------------------\n"
 			"Battle_EnterTokenError : %d\n"
 			"Room_EnterTokenError : %d\n"
@@ -3772,7 +3776,8 @@ namespace Library_Jingyu
 			"Login_UserTokenError : %d\n"
 			"Login_VerError : %d\n"
 			"Login_Overlap_DB : %d\n"
-			"Login_Overlap : %d\n\n"
+			"Login_Overlap : %d\n"
+			"SemCount : %d\n\n"
 
 			"---------- Battle LanServer(Chat) ---------\n"
 			"SessionNum : %lld\n"
@@ -3812,6 +3817,8 @@ namespace Library_Jingyu
 			m_Room_Umap.size(),
 			m_Room_Pool->GetAllocChunkCount(), m_Room_Pool->GetOutChunkCount(),
 
+			m_shDB_Communicate.m_pDB_Wirte_Start_Queue->GetNodeSize(),
+
 			// ----------- 에러
 			m_lBattleEnterTokenError,
 			m_lRoomEnterTokenError,
@@ -3821,6 +3828,7 @@ namespace Library_Jingyu
 			m_lVerError,
 			m_OverlapLoginCount_DB,
 			m_OverlapLoginCount,
+			GetSemCount(),
 
 			// ----------- 배틀 랜서버
 			m_Chat_LanServer->GetClientCount(),
@@ -4692,6 +4700,8 @@ namespace Library_Jingyu
 							// 그래서 리턴값 안받는다.
 							NowRoom->SendPacket_BroadCast(SendBuff);
 
+							NowRoom->StartTime = timeGetTime();						
+
 							// 아이템 생성 후 stRoom의 아이템 자료구조에 추가.
 							// 그리고 모든 유저에게 아이템 생성 패킷 보냄
 							NowRoom->StartCreateItem();
@@ -4773,6 +4783,7 @@ namespace Library_Jingyu
 						NowRoom->m_uiItemID = 0;
 						NowRoom->m_pBattleServer = this;
 						NowRoom->m_bRedZoneWarningFlag = false;
+						NowRoom->StartTime = 0;
 
 						// 레드존 생성 순서 셋팅
 						int RedIndex = rand() % 24;
@@ -5001,7 +5012,7 @@ namespace Library_Jingyu
 					if (NowRoom->m_bShutdownFlag == false)
 					{
 						// 삭제 시간이 되었는지 체크
-						if ((NowRoom->m_dwGameEndMSec + m_stConst.m_iRoomCloseDelay) <= timeGetTime())
+						if((timeGetTime() - NowRoom->m_dwGameEndMSec) >= m_stConst.m_iRoomCloseDelay)
 						{		
 							// 셧다운 날렸다는 플래그 변경.
 							NowRoom->m_bShutdownFlag = true;
@@ -5021,8 +5032,8 @@ namespace Library_Jingyu
 					// - 나머지 접속자들에겐 패배 패킷
 					NowRoom->GameOver();
 
-					// 방 내 유저에게 전적 변경내용 보내기
-					NowRoom->RecodeSend();
+					// 방 내 승리자에게 전적 보내기
+					NowRoom->WInRecodeSend();
 
 					// 게임 방 종료 플래그 변경
 					NowRoom->m_bGameEndFlag = true;
@@ -5046,8 +5057,8 @@ namespace Library_Jingyu
 
 					NowRoom->SendPacket_BroadCast(SendBuff);
 
-					// 방 내 유저에게 전적 변경내용 보내기
-					NowRoom->RecodeSend();
+					// 방 내 승리자 없음
+					// NowRoom->WInRecodeSend();
 
 					// 게임 방 종료 플래그 변경
 					NowRoom->m_bGameEndFlag = true;

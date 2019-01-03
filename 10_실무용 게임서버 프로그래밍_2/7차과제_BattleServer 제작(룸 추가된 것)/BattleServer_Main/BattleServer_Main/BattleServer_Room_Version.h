@@ -56,7 +56,6 @@ namespace Library_Jingyu
 		int		m_iCount;	// 갱신할 카운트		
 
 		INT64 AccountNo;
-		DWORD StartTime;	// 테스트용
 	};
 
 	// Content DB에 유저 정보 2개를 Write할 때 사용
@@ -71,7 +70,6 @@ namespace Library_Jingyu
 		int		m_iCount2;	// 갱신할 카운트2
 
 		INT64 AccountNo;
-		DWORD StartTime;	// 테스트용
 	};
 
 	// shDB의 어떤 API를 호출할 것인지. API Type
@@ -344,8 +342,7 @@ namespace Library_Jingyu
 
 			// 마지막 전적이 저장되었는지 체크하는 플래그
 			// 강제 종료시에도 저장해야 하기 때문에, LastDBWriteFlag를 하나 둔다.
-			bool m_bLastDBWriteFlag;
-			
+			bool m_bLastDBWriteFlag;	
 
 
 			// -----------------------
@@ -401,7 +398,10 @@ namespace Library_Jingyu
 			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
 
 			// Release용
-			virtual void OnGame_ClientRelease();
+			virtual void OnGame_ClientRelease();			
+
+			// 테스트용
+			virtual void OnSemaphore();
 
 
 			// -----------------
@@ -625,6 +625,8 @@ namespace Library_Jingyu
 		
 			// ------------
 
+			DWORD StartTime;		// 테스트
+
 
 			// ------------
 			// 멤버 함수
@@ -682,11 +684,11 @@ namespace Library_Jingyu
 			// return : 없음
 			void CreateCharacter();
 
-			// 방 안의 모든 유저들에게 전적 변경내용 보내기.
+			// 승리자에게 전적 보내기
 			//
 			// Parameter : 없음
 			// return : 없음
-			void RecodeSend();
+			void WInRecodeSend();
 
 			// 해당 방에, 아이템 생성 (최초 게임 시작 시 생성)
 			// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
@@ -813,24 +815,24 @@ namespace Library_Jingyu
 		{
 			// Auth_Update에서 한 프레임에 처리할 HTTP통신 후처리
 			// 고정 값
-			const int m_iHTTP_MAX = 1000;
+			const int m_iHTTP_MAX = 50;
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
-			const LONG m_lMaxTotalRoomCount = 200;
+			const LONG m_lMaxTotalRoomCount = 600;
 
 			// 최대 존재할 수 있는 대기방 수
 			// 고정 값
-			const LONG m_lMaxWaitRoomCount = 200;
+			const LONG m_lMaxWaitRoomCount = 600;
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 50;
+			const int m_iLoopCreateRoomCount = 100;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
 			// 고정 값
-			const int m_iLoopRoomModeChange = 50;
+			const int m_iLoopRoomModeChange = 100;
 
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.
@@ -847,7 +849,7 @@ namespace Library_Jingyu
 
 			// Play상태의 방이, 게임 종료 후 몇 초동안 대기하는지.
 			// 밀리세컨드 단위
-			const int m_iRoomCloseDelay = 5000;
+			const UINT m_iRoomCloseDelay = 5000;
 
 			// 아이템 획득 좌표 오차
 			const float m_fGetItem_Correction = 3.0f;

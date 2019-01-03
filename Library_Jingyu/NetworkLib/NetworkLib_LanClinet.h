@@ -168,6 +168,12 @@ namespace Library_Jingyu
 		// 무조건 1명이겠지만, stop()함수에서 모두 종료되면 워커스레드를 종료시키기 때문에, 체크용도로 보유.
 		ULONGLONG m_ullJoinUserCount;
 
+		// 샌드 TPS
+		LONG m_lSendPostTPS;
+
+		// 리시브 TPS
+		LONG m_lRecvTPS;
+
 		// --------------------------
 
 		// Connect 시도 중인지 체크하는 용도. TRUE면 접속중 or 이미 누군가가 Connect 시도중, FALSE면 접속중 아님
@@ -288,6 +294,14 @@ namespace Library_Jingyu
 		// return true : 접속중
 		// return false : 접속중 아님
 		bool GetClinetState();
+
+		// Send TPS 얻기
+		// 반환과 동시에 기존 값은 0으로 초기화
+		LONG GetSendTPS();
+
+		// Recv TPS 얻기
+		// 반환과 동시에 기존 값은 0으로 초기화
+		LONG GetRecvTPS();
 
 
 	protected:
