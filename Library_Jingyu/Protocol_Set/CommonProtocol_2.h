@@ -220,7 +220,7 @@ enum en_PACKET_TYPE
 	//	{
 	//		WORD	Type
 	//
-	//		BYTE	Status				// 0:실패	1:성공
+	//		BYTE	Status				//  0:토큰오류		1:성공    2:중복로그인 
 	//		INT64	AccountNo
 	//	}
 	//

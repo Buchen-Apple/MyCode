@@ -169,6 +169,12 @@ namespace Library_Jingyu
 		// Read가 완료된 DB_WORK* 를 저장해두는 락프리 큐
 		CLF_Queue<DB_WORK*> *m_pDB_ReadComplete_Queue;
 
+		// DBWrite의 TPS
+		LONG m_lDBWriteTPS;
+
+		// 초당 DBWrite 큐에 들어오는 데이터의 수
+		LONG m_lDBWriteCountTPS;
+
 
 	private:
 		// --------------
@@ -815,7 +821,7 @@ namespace Library_Jingyu
 		{
 			// Auth_Update에서 한 프레임에 처리할 HTTP통신 후처리
 			// 고정 값
-			const int m_iHTTP_MAX = 50;
+			const int m_iHTTP_MAX = 100;
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
@@ -827,12 +833,12 @@ namespace Library_Jingyu
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 5;
+			const int m_iLoopCreateRoomCount = 100;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
 			// 고정 값
-			const int m_iLoopRoomModeChange = 5;
+			const int m_iLoopRoomModeChange = 100;
 
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.
@@ -957,7 +963,6 @@ namespace Library_Jingyu
 
 		// 총알 공격 시 유저에게 입혀야하는 데미지(거리 1당 데미지)
 		float m_fFire1_Damage;
-
 
 		
 

@@ -252,6 +252,9 @@ namespace Library_Jingyu
 		// 채팅서버 내 방 수 (모드 상관 없이)
 		LONG m_lRoomCount;
 
+		// 중복 로그인 횟수
+		LONG m_lLoginOverlap;
+
 
 
 
@@ -305,9 +308,9 @@ namespace Library_Jingyu
 		// 로그인 한 플레이어 관리 자료구조
 		//
 		// Key : AccountNo, Value : stPlayer*
-		unordered_map<INT64, stPlayer*> m_LoginPlayer_Umap;
+		unordered_map<INT64, ULONGLONG> m_LoginPlayer_Umap;
 
-		//m_Player_Umap용 srw락
+		//m_Player_map용 srw락
 		SRWLOCK m_LoginPlayer_Umap_srwl;
 
 
@@ -388,10 +391,10 @@ namespace Library_Jingyu
 
 		// 로그인 한 플레이어 관리 자료구조에 Insert
 		//
-		// Parameter : AccountNo, stPlayer*
+		// Parameter : AccountNo, SessionID
 		// return : 정상 추가 시 true
 		//		  : 키 중복 시 flase
-		bool InsertLoginPlayerFunc(INT64 AccountNo, stPlayer* InsertPlayer);	
+		bool InsertLoginPlayerFunc(INT64 AccountNo, ULONGLONG SessionID);	
 
 		// 로그인 한 플레이어 관리 자료구조에서 제거
 		//
@@ -460,9 +463,9 @@ namespace Library_Jingyu
 
 		// 방 안의 모든 유저에게 인자로 받은 패킷 보내기.
 		//
-		// Parameter : stRoom* CProtocolBuff_Net*
+		// Parameter : ULONGLONG 배열, 배열의 수,  CProtocolBuff_Net*
 		// return : 자료구조에 0명이면 false. 그 외에는 true
-		bool Room_BroadCast(stRoom* NowRoom, CProtocolBuff_Net* SendBuff);
+		bool Room_BroadCast(ULONGLONG Array[], int ArraySize, CProtocolBuff_Net* SendBuff);
 
 		// Config 셋팅
 		//

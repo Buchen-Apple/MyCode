@@ -242,7 +242,15 @@ namespace Library_Jingyu
 		CProtocolBuff_Lan::Free(payloadBuff);
 
 		// 5. SendPost()
-		SendPost(NowSession);		
+		//SendPost(NowSession);	
+
+		// 5. PQCS 건다.
+		// 샌드 flag가 false일 때, 건다.
+		if (NowSession->m_lSendFlag == FALSE)
+		{
+			InterlockedIncrement(&NowSession->m_lIOCount);
+			PostQueuedCompletionStatus(m_hIOCPHandle, 0, (ULONG_PTR)NowSession, &NowSession->m_overPQCSOverlapped);
+		}
 
 		// 6. 세션 락 해제(락 아니지만 락처럼 사용) ----------------------
 		// 여기서 false가 리턴되면 이미 다른곳에서 삭제되었어야 했는데 SendPacket이 I/O카운트를 올림으로 인해 삭제되지 못한 유저였음.
@@ -487,10 +495,19 @@ namespace Library_Jingyu
 			g_This->OnWorkerThreadBegin();
 
 			// -----------------
+			// PQCS 요청 로직
+			// -----------------
+			if (&stNowSession->m_overPQCSOverlapped == overlapped)
+			{
+				// 1. SendPost()
+				g_This->SendPost(stNowSession);
+			}
+
+			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			else if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);

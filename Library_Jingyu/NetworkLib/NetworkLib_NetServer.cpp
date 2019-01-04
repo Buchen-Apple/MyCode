@@ -143,6 +143,7 @@ namespace Library_Jingyu
 		m_lAcceptTPS = 0;
 		m_lSendPostTPS = 0;
 		m_lRecvTPS = 0;
+		m_lSemCount = 0;
 
 		// Config 데이터 셋팅
 		m_bCode = Code;
@@ -626,6 +627,12 @@ namespace Library_Jingyu
 		return InterlockedExchange(&m_lRecvTPS, 0);
 	}
 
+	// 세마포어 카운트 얻기
+	LONG CNetServer::GetSemCount()
+	{
+		return m_lSemCount;
+	}
+
 
 
 
@@ -761,8 +768,6 @@ namespace Library_Jingyu
 		stSession* stNowSession;
 		OVERLAPPED* overlapped;
 
-		OVERLAPPED* PQCSoverlapped = &g_This->m_overPQCSOverlapped;
-
 		// rand설정
 		srand((UINT)&cbTransferred);
 		
@@ -778,7 +783,13 @@ namespace Library_Jingyu
 
 			// 비동기 입출력 완료 대기
 			// GQCS 대기
-			GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE);
+			if (GetQueuedCompletionStatus(g_This->m_hIOCPHandle, &cbTransferred, (PULONG_PTR)&stNowSession, &overlapped, INFINITE) == FALSE)
+			{
+				if (GetLastError() == 121)
+				{
+					InterlockedIncrement(&g_This->m_lSemCount);
+				}
+			}
 		
 			// --------------
 			// 완료 체크
@@ -819,21 +830,14 @@ namespace Library_Jingyu
 			if (&stNowSession->m_overPQCSOverlapped == overlapped)
 			{		
 				// 1. SendPost()
-				g_This->SendPost(stNowSession);
-
-				// 2. I/O 카운트 1 감소
-				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					g_This->InDisconnect(stNowSession);
-				
-				continue;
+				g_This->SendPost(stNowSession);				
 			}
-
 
 			// -----------------
 			// Recv 로직
 			// -----------------
 			// WSArecv()가 완료된 경우, 받은 데이터가 0이 아니면 로직 처리
-			if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
+			else if (&stNowSession->m_overRecvOverlapped == overlapped && cbTransferred > 0)
 			{
 				// rear 이동
 				stNowSession->m_RecvQueue.MoveWritePos(cbTransferred);

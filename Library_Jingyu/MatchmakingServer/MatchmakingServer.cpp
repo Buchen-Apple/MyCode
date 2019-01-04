@@ -1110,6 +1110,7 @@ namespace Library_Jingyu
 		NotRoomEnter :		- 배틀 방 입장 성공 패킷을 안보내고 끊은 유저 수
 		OverlapError :		- 중복 로그인 1씩 증가
 		HeartBeatCount :	- 하트비트로 끊긴 유저 수
+		SemCount :			- 세마포어 카운트
 
 		*/
 
@@ -1135,7 +1136,8 @@ namespace Library_Jingyu
 			"VerError : %d\n"
 			"NotRoomEnter : %d\n"
 			"OverlapError : %d\n"
-			"HeartBeatCount : %d\n\n"
+			"HeartBeatCount : %d\n"
+			"SemCount : %d\n\n"
 
 			"------------------- Master Lan Clinet ----------------\n"
 			"MasterConenct : %d\n"
@@ -1167,6 +1169,7 @@ namespace Library_Jingyu
 			m_lNot_BattleRoom_Enter,
 			m_lOverlapError,
 			m_lHeartBeatCount,
+			GetSemCount(),
 
 			// --------- 마스터 랜 클라
 			m_pLanClient->GetClinetState(),

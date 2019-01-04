@@ -121,6 +121,7 @@ namespace Library_Jingyu
 		LONG	  m_lAcceptTPS;
 		LONG	m_lSendPostTPS;
 		LONG	m_lRecvTPS;
+		LONG	m_lSemCount;
 
 
 
@@ -260,6 +261,9 @@ namespace Library_Jingyu
 		// RecvTPS 얻기
 		// 반환과 동시에 기존 값은 0으로 초기화
 		LONG GetRecvTPS();
+
+		// 세마포어 카운트 얻기
+		LONG GetSemCount();
 
 
 

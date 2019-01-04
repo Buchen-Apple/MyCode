@@ -217,15 +217,15 @@ namespace Library_Jingyu
 
 	// 로그인 한 플레이어 관리 자료구조에 Insert
 	//
-	// Parameter : AccountNo, stPlayer*
+	// Parameter : AccountNo, SessionID
 	// return : 정상 추가 시 true
 	//		  : 키 중복 시 flase
-	bool CChatServer_Room::InsertLoginPlayerFunc(INT64 AccountNo, stPlayer* InsertPlayer)
+	bool CChatServer_Room::InsertLoginPlayerFunc(INT64 AccountNo, ULONGLONG SessionID)
 	{
 		AcquireSRWLockExclusive(&m_LoginPlayer_Umap_srwl);	 // ----- 로그인 Player Umap Exclusive 락
 
 		// 1. 추가
-		auto ret = m_LoginPlayer_Umap.insert(make_pair(AccountNo, InsertPlayer));
+		auto ret = m_LoginPlayer_Umap.insert(make_pair(AccountNo, SessionID));
 
 		// 중복키면 false 리턴
 		if (ret.second == false)
@@ -416,6 +416,7 @@ namespace Library_Jingyu
 
 		Server_EnterToken_Miss : 		- 채팅서버 입장 토큰 미스
 		Room_EnterTokenNot_Miss : 	- 방 입장토큰 미스
+		Sem Count :					- 121 에러 발생 수
 
 		----------------------------------------------------
 		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
@@ -440,13 +441,16 @@ namespace Library_Jingyu
 
 			"Accept Total : %lld\n"
 			"Accept TPS : %d\n"
-			"Send TPS : %d\n\n"
+			"Send TPS : %d\n"
+			"Recv TPS : %d\n\n"
 
 			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
 			"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
 
 			"Server_EnterToken_Miss : %d\n"
-			"Room_EnterTokenNot_Miss : %d\n\n"
+			"Room_EnterTokenNot_Miss : %d\n"
+			"Sem_Count : %d\n"
+			"Login_Overlap : %d\n\n"
 
 			"------------------------------------------------\n"
 			"TotalRoom_Pool : %lld\n"
@@ -472,12 +476,15 @@ namespace Library_Jingyu
 			GetAcceptTotal(),
 			GetAccpetTPS(),
 			GetSendTPS(),
+			GetRecvTPS(),			
 
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			m_pPlayer_Pool->GetAllocChunkCount(), m_pPlayer_Pool->GetOutChunkCount(),
 
 			m_lEnterTokenMiss,
 			m_lRoom_EnterTokenMiss,
+			GetSemCount(),
+			m_lLoginOverlap,
 
 			m_Room_Umap.size(),
 			m_lRoomCount,
@@ -505,6 +512,7 @@ namespace Library_Jingyu
 		m_lEnterTokenMiss = 0;
 		m_lRoom_EnterTokenMiss = 0;
 		m_lRoomCount = 0;
+		m_lLoginOverlap = 0;
 
 
 		// 모니터링 서버와 연결되는 랜 클라 시작
@@ -522,7 +530,7 @@ namespace Library_Jingyu
 		}
 
 		// 채팅 Net 서버 시작
-		if (Start(m_Paser.BindIP, m_Paser.Port, m_Paser.CreateWorker, m_Paser.ActiveWorker, m_Paser.ActiveWorker,
+		if (Start(m_Paser.BindIP, m_Paser.Port, m_Paser.CreateWorker, m_Paser.ActiveWorker, m_Paser.CreateAccept,
 			m_Paser.Nodelay, m_Paser.MaxJoinUser, m_Paser.HeadCode, m_Paser.XORCode) == false)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
@@ -584,24 +592,19 @@ namespace Library_Jingyu
 
 	// 방 안의 모든 유저에게 인자로 받은 패킷 보내기.
 	//
-	// Parameter : stRoom* CProtocolBuff_Net*
+	// Parameter : ULONGLONG 배열, 배열의 수,  CProtocolBuff_Net*
 	// return : 자료구조에 0명이면 false. 그 외에는 true
-	bool CChatServer_Room::Room_BroadCast(stRoom* NowRoom, CProtocolBuff_Net* SendBuff)
+	bool CChatServer_Room::Room_BroadCast(ULONGLONG Array[], int ArraySize, CProtocolBuff_Net* SendBuff)
 	{
-		// 자료구조 사이즈가 0이면 false
-		size_t Size = NowRoom->m_JoinUser_vector.size();
-		if (Size == 0)
-			return false;
-
 		// 직렬화 버퍼 레퍼런스 카운트 증가
-		SendBuff->Add((int)Size);
+		SendBuff->Add((int)ArraySize);
 
 		// 처음부터 순회하며 보낸다.
-		size_t Index = 0;
+		int Index = 0;
 
-		while (Index < Size)
+		while (Index < ArraySize)
 		{
-			SendPacket(NowRoom->m_JoinUser_vector[Index], SendBuff);
+			SendPacket(Array[Index], SendBuff);
 
 			++Index;
 		}
@@ -824,6 +827,11 @@ namespace Library_Jingyu
 			// 다르면 "이전" 패킷과 비교
 			if (memcmp(m_cConnectToken_Before, ConnectToken, 32) != 0)
 			{
+				InterlockedIncrement(&m_lEnterTokenMiss);
+
+				// 에러 찍기
+				g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Server Token Error !!  AccountNo : %lld", AccountNo);
+
 				// 그래도 다르면, 실패 패킷
 				CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -848,19 +856,22 @@ namespace Library_Jingyu
 
 
 		// 6. 로그인 플레이어 관리용 자료구조에 추가 (중복 로그인 체크)
-		if (InsertLoginPlayerFunc(AccountNo, NowPlayer) == false)
+		if (InsertLoginPlayerFunc(AccountNo, SessionID) == false)
 		{
+			InterlockedIncrement(&m_lLoginOverlap);
+
 			// 실패 패킷 -------
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD Type = en_PACKET_CS_CHAT_RES_LOGIN;
-			BYTE Status = 0;
+			BYTE Status = 2;
 
 			SendBuff->PutData((char*)&Type, 2);
 			SendBuff->PutData((char*)&Status, 1);
 			SendBuff->PutData((char*)&AccountNo, 8);
 
-			SendPacket(SessionID, SendBuff);
+			// 보내고 끊기
+			SendPacket(SessionID, SendBuff, TRUE);
 
 
 			// 기존에 접속중이던 유저 접속 종료	-------
@@ -877,10 +888,13 @@ namespace Library_Jingyu
 				return;
 			}
 
-			// 3) 있으면 접속 종료 요청
-			Disconnect(FindPlayer->second->m_ullSessionID);
+			ULONGLONG TempSessionID = FindPlayer->second;
 
+			// 락을 안풀고 Disconnect하면 데드락 가능성
 			ReleaseSRWLockShared(&m_LoginPlayer_Umap_srwl);	// ----- 로그인 Player Shared 언락
+
+			// 3) 접속 종료 요청
+			Disconnect(TempSessionID);
 
 			return;
 		}
@@ -999,6 +1013,10 @@ namespace Library_Jingyu
 			NowRoom->ROOM_UNLOCK();							// ----- 룸 언락	
 			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
 			
+			InterlockedIncrement(&m_lRoom_EnterTokenMiss);
+
+			// 에러 찍기
+			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Room Token Error !!  AccountNo : %lld", AccountNo);
 
 			// 토큰	불일치 패킷
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1134,16 +1152,28 @@ namespace Library_Jingyu
 
 		// 7. 룸 안의 모든 유저에게 채팅 응답 패킷 BroadCast	
 		// 자기 자신 포함
+		// SessionID를 받아둔다. 락을 걸고 Room_BroadCast를 하면 데드락 가능성
+		ULONGLONG SessionArray[10];
+		int ArraySize = 0;
 
-		NowRoom->ROOM_LOCK();	// ----- 룸 락			
+		NowRoom->ROOM_LOCK();	// ----- 룸 락	
 
-		// BoradCast		
-		if(Room_BroadCast(NowRoom, SendBuff) == false)
+		size_t Size = NowRoom->m_JoinUser_vector.size();
+		if (Size == 0)
 			g_ChatDump->Crash();
 
-		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
+		while (ArraySize < Size)
+		{
+			SessionArray[ArraySize] = NowRoom->m_JoinUser_vector[ArraySize];
+			ArraySize++;
+		}
 
+		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
 		ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
+
+		// BoradCast		
+		if(Room_BroadCast(SessionArray, ArraySize, SendBuff) == false)
+			g_ChatDump->Crash();		
 
 		// BroadCast했던 패킷 Free
 		// Room_BroadCast() 함수에서, 유저 수 만큼 래퍼런스 카운트를 증가시켰기 때문에
@@ -1417,7 +1447,6 @@ namespace Library_Jingyu
 
 
 
-
 	// --------------
 	// 생성자와 소멸자
 	// --------------
@@ -1655,6 +1684,9 @@ namespace Library_Jingyu
 
 
 		// 2. 룸 검색
+		// 셧다운 날릴 배열
+		ULONGLONG DisconnectArray[10];
+		int ArraySize = 0;
 
 		AcquireSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 락
 
@@ -1672,8 +1704,6 @@ namespace Library_Jingyu
 		}
 
 		CChatServer_Room::stRoom* NowRoom = FindRoom->second;
-
-		NowRoom->ROOM_LOCK();	// ----- 룸 락
 
 
 		// 3. 오류 체크
@@ -1694,7 +1724,8 @@ namespace Library_Jingyu
 			g_ChatDump->Crash();
 
 		if (NowRoom->m_iJoinUser > 0)
-		{
+		{		
+
 			NowRoom->m_bDeleteFlag = true;
 
 			size_t Size = NowRoom->m_JoinUser_vector.size();
@@ -1702,34 +1733,44 @@ namespace Library_Jingyu
 			if (Size != NowRoom->m_iJoinUser)
 				g_ChatDump->Crash();
 
+			ArraySize = Size;
+
 			size_t Index = 0;
 			while (Size > Index)
 			{
-				// 셧다운
-				m_pNetServer->Disconnect(NowRoom->m_JoinUser_vector[Index]);
-
+				// 여기서 셧다운 날리면 데드락 위험.
+				// 받아둔다.
+				DisconnectArray[Index] = NowRoom->m_JoinUser_vector[Index];	
 				++Index;
 			}
-
-			NowRoom->ROOM_UNLOCK();	// ----- 룸 언락
 
 			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
 		}
 
 		// 5. 접속자 수가 0명이면 방 즉시 제거
 		else
-		{
-			NowRoom->ROOM_UNLOCK();	// ----- 룸 언락
+		{		
+			m_pNetServer->m_Room_Umap.erase(FindRoom);
+			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
 
 			InterlockedDecrement(&m_pNetServer->m_lRoomCount);
-
-			m_pNetServer->m_Room_Umap.erase(FindRoom);
-
-			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
 		}		
 
+		// 6. 만약, ArraySize가 있으면, 셧다운 시킬 유저가 있는 것.
+		if (ArraySize > 0)
+		{
+			ArraySize--;
 
-		// 6. 응답 패킷
+			while (ArraySize >=0)
+			{
+				m_pNetServer->Disconnect(DisconnectArray[ArraySize]);
+				ArraySize--;
+			}
+		}
+
+
+
+		// 7. 응답 패킷
 		// 이 때, 방이 아직 삭제되지 않았을 수도 있지만, 곧 삭제될 예정이기 때문에 상관없다.
 		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
 

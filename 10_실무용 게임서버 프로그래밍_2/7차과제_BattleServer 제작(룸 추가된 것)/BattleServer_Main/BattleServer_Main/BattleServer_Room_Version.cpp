@@ -162,6 +162,9 @@ namespace Library_Jingyu
 		// 나한테 날라온 일감 큐
 		CNormalQueue<DB_WORK*> *pWorkerQueue = gThis->m_pDB_Wirte_Start_Queue;
 
+		// DB_WORK를 관리하는 메모리풀
+		CMemoryPoolTLS<DB_WORK>* pDBWorkPool = gThis->m_pDB_Work_Pool;
+
 
 		// --------------
 		// 변수 선언
@@ -175,11 +178,13 @@ namespace Library_Jingyu
 
 		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
 
+		// 출력 체크용
+		LONG* TempDBWriteTPS = &gThis->m_lDBWriteTPS;
+
 		while (1)
 		{
 			// 이벤트 대기
-			//DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
-			DWORD Check = WaitForSingleObject(gThis->m_hDBWrite_Exit_Event, 1);
+			DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
 
 
 			// 이상한 신호라면
@@ -195,9 +200,14 @@ namespace Library_Jingyu
 			else if (Check == WAIT_OBJECT_0)
 				break;
 
+			int Size = pWorkerQueue->GetNodeSize();
+
 			// 1. 큐에서 일감 1개 빼오기	
-			while (pWorkerQueue->Dequeue(pWork) != -1)
+			while (Size > 0)
 			{
+				if (pWorkerQueue->Dequeue(pWork) == -1)
+					g_BattleServer_Room_Dump->Crash();
+
 				// 2. 일감 타입에 따라 로직 처리
 				switch (pWork->m_wWorkType)
 				{
@@ -225,20 +235,23 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. Json데이터 파싱하기 (UTF-16)
+					// 3. DBWrite TPS 증가
+					InterlockedIncrement(TempDBWriteTPS);
+
+					// 4. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
 
-					// 4. DB 요청 결과 확인
+					// 5. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
+					// 6. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 				}
 				break;
@@ -267,19 +280,22 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. Json데이터 파싱하기 (UTF-16)
+					// 3. DBWrite TPS 증가
+					InterlockedIncrement(TempDBWriteTPS);
+
+					// 4. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-					// 4. DB 요청 결과 확인
+					// 5. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
+					// 6. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -309,20 +325,23 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. Json데이터 파싱하기 (UTF-16)
+					// 3. DBWrite TPS 증가
+					InterlockedIncrement(TempDBWriteTPS);
+
+					// 4. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
 
-					// 4. DB 요청 결과 확인
+					// 5. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
+					// 6. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -352,19 +371,22 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. Json데이터 파싱하기 (UTF-16)
+					// 3. DBWrite TPS 증가
+					InterlockedIncrement(TempDBWriteTPS);
+
+					// 4. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-					// 4. DB 요청 결과 확인
+					// 5. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
+					// 6. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -372,11 +394,12 @@ namespace Library_Jingyu
 
 				default:
 					gThis->m_Dump->Crash();
-				}
+				}							
 
 				// 3. DB_WORK 반환
-				gThis->m_pDB_Work_Pool->Free(pWork);
+				pDBWorkPool->Free(pWork);
 
+				Size--;
 			}
 
 		}
@@ -411,6 +434,7 @@ namespace Library_Jingyu
 	{
 		// Wirte용 스레드에게 일감 던짐 (Normal Q 사용)
 		m_pDB_Wirte_Start_Queue->Enqueue(Protocol);
+		InterlockedIncrement(&m_lDBWriteCountTPS);
 
 		// Write 스레드 깨우기
 		SetEvent(m_hDBWrite_Event);
@@ -432,6 +456,8 @@ namespace Library_Jingyu
 	// 생성자
 	shDB_Communicate::shDB_Communicate()
 	{
+		m_lDBWriteTPS = 0;
+		m_lDBWriteCountTPS = 0;
 
 		// DB Write용 스레드용 일시키기 용이벤트 만들기
 		// 자동 리셋 이벤트.
@@ -454,8 +480,8 @@ namespace Library_Jingyu
 		m_pDB_Wirte_Start_Queue = new CNormalQueue<DB_WORK*>();
 
 		// DB_Read용 입출력 완료포트 생성
-		// 4개의 스레드 생성, 2개의 스레드 활성화
-		int Create = 4;
+		// 30개의 스레드 생성, 2개의 스레드 활성화
+		int Create = 20;
 		int Active = 2;
 
 		m_hDB_Read = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Active);
@@ -3709,7 +3735,8 @@ namespace Library_Jingyu
 		Room_ChunkAlloc_Count : - 할당받은 룸 청크 수(밖에서 사용중인 수)
 
 		------------------ DBWrite -------------------
-		Node Alloc Count :	- DBWrite 스레드에게 일시키용 큐 내부 사이즈
+		Node Alloc Count :	(Add : )	- DBWrite 스레드에게 일시키용 큐 내부 사이즈. - Add는 초당 큐에 들어온 데이터의 수.
+		DBWrite TPS :	- DBWrite의 TPS
 
 		------------------ Error -------------------
 		Battle_EnterTokenError:		- 배틀서버 입장 토큰 에러
@@ -3736,6 +3763,8 @@ namespace Library_Jingyu
 
 		LONG AuthUser = GetAuthModeUserCount();
 		LONG GameUser = GetGameModeUserCount();
+		LONG TempDBWriteTPS = InterlockedExchange(&m_shDB_Communicate.m_lDBWriteTPS, 0);
+		LONG TempDBWriteCountTPS = InterlockedExchange(&m_shDB_Communicate.m_lDBWriteCountTPS, 0);
 
 		printf("================== Battle Server ==================\n"
 			"Total SessionNum : %lld\n"
@@ -3766,7 +3795,8 @@ namespace Library_Jingyu
 			"Room_ChunkAlloc_Count : %d (Out : %d)\n\n"
 
 			"------------------DBWrite------------------\n"
-			"Node Alloc Count : %d\n\n"
+			"Node Alloc Count : %d (Add : %d)\n"
+			"DBWrite TPS : %d\n\n"
 
 			"------------------ Error -------------------\n"
 			"Battle_EnterTokenError : %d\n"
@@ -3817,7 +3847,8 @@ namespace Library_Jingyu
 			m_Room_Umap.size(),
 			m_Room_Pool->GetAllocChunkCount(), m_Room_Pool->GetOutChunkCount(),
 
-			m_shDB_Communicate.m_pDB_Wirte_Start_Queue->GetNodeSize(),
+			m_shDB_Communicate.m_pDB_Wirte_Start_Queue->GetNodeSize(), TempDBWriteCountTPS,
+			TempDBWriteTPS,
 
 			// ----------- 에러
 			m_lBattleEnterTokenError,
@@ -4647,24 +4678,22 @@ namespace Library_Jingyu
 			// 해당 방이 준비방일 경우
 			if (NowRoom->m_iRoomState == eu_ROOM_STATE::READY_ROOM)
 			{
-				// 게임이 종료된 방인지 체크
-				// Auth모드에서 이 로직을 타는 경우는, 중간에 채팅 or 마스터 서버가 죽어서 방을 파괴해야 할 경우.
-				if (NowRoom->m_bGameEndFlag == true)
+				// 유저 수가 0명이면 바로 삭제
+				// Auth모드에서 이 로직을 타는 경우는, 
+				// 1. 중간에 채팅 or 마스터 서버가 죽어서 방을 파괴해야 할 경우.
+				// 2. Ready상태의 모든 유저가 나간 경우
+				// Play방으로 넘겨서 자연스럽게 종료되도록 함
+				if (NowRoom->m_iJoinUserCount == 0)
 				{
-					// 방 안의 유저 수가 0명이라면, Play로 변경
-					// 아래, 채팅 or 마스터가 종료되었을 경우, 모든 방의 유저에게 shutdown을 날렸음
-					// 때문에, 0이 될 때 까지 기다리다가 0이 되는 순간 Play방으로 넘겨서
-					// 자연스럽게 종료되도록 함
-					if (NowRoom->m_iJoinUserCount == 0)
-					{
-						InterlockedDecrement(&m_lReadyRoomCount);
-						InterlockedIncrement(&m_lPlayRoomCount);
+					InterlockedDecrement(&m_lReadyRoomCount);
+					InterlockedIncrement(&m_lPlayRoomCount);
 
-						// 방 상태를 Play로 변경
-						NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;		
+					// 방 상태를 Play로 변경
+					// Game스레드는 방 체크 로직중 가장 먼저 인원수가 0인지 체크한다.
+					// 때문에, 넘어가면 자동으로 파괴될 것.
+					NowRoom->m_iRoomState = eu_ROOM_STATE::PLAY_ROOM;
 
-						--ModeChangeCount;
-					}
+					--ModeChangeCount;
 				}
 
 				// 게임 종료된 방이 아닐 경우 로직.
@@ -4892,9 +4921,6 @@ namespace Library_Jingyu
 
 						// 마스터에게 방 닫힘 패킷 보내기
 						m_Master_LanClient->Packet_RoomClose_Req(NowRoom->m_iRoomNo);
-
-						// 게임 종료 플래그 변경
-						NowRoom->m_bGameEndFlag = true;
 
 						// 방 모드를 Ready로 변경
 						NowRoom->m_iRoomState = eu_ROOM_STATE::READY_ROOM;						
