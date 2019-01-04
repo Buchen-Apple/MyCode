@@ -827,12 +827,12 @@ namespace Library_Jingyu
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 100;
+			const int m_iLoopCreateRoomCount = 5;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
 			// 고정 값
-			const int m_iLoopRoomModeChange = 100;
+			const int m_iLoopRoomModeChange = 5;
 
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.

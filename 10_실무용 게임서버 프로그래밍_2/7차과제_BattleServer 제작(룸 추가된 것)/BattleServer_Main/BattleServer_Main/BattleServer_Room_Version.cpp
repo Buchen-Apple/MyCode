@@ -454,8 +454,8 @@ namespace Library_Jingyu
 		m_pDB_Wirte_Start_Queue = new CNormalQueue<DB_WORK*>();
 
 		// DB_Read용 입출력 완료포트 생성
-		// 10개의 스레드 생성, 2개의 스레드 활성화
-		int Create = 6;
+		// 4개의 스레드 생성, 2개의 스레드 활성화
+		int Create = 4;
 		int Active = 2;
 
 		m_hDB_Read = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Active);
