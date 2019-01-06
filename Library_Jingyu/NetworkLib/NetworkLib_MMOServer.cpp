@@ -327,6 +327,12 @@ namespace Library_Jingyu
 		return m_lSemCount;
 	}
 
+	// 하트비트로 끊긴 유저 수 얻기
+	LONG CMMOServer::GetHeartBeatCount()
+	{
+		return m_lHeartBeatCount;
+	}
+
 
 
 
@@ -727,15 +733,6 @@ namespace Library_Jingyu
 		}
 
 		return 0;
-
-	}
-
-	// 하트비트 체크 함수
-	// 
-	// Parameter : cSession*
-	// return : 없음
-	void CMMOServer::HeartBeatCheck(cSession* NowSession)
-	{
 
 	}
 	
@@ -1288,7 +1285,10 @@ namespace Library_Jingyu
 							{
 								// 셧다운 대상인지 체크
 								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+								{
 									NowSession->Disconnect();
+									InterlockedIncrement(&g_This->m_lHeartBeatCount);
+								}
 							}
 						}
 
@@ -1458,7 +1458,10 @@ namespace Library_Jingyu
 						{
 							// 셧다운 대상인지 체크
 							if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+							{
 								NowSession->Disconnect();
+								InterlockedIncrement(&g_This->m_lHeartBeatCount);
+							}
 
 						}
 
@@ -1959,6 +1962,7 @@ namespace Library_Jingyu
 		m_lAuthFPS = 0;
 		m_lGameFPS = 0;
 		m_lSemCount = 0;
+		m_lHeartBeatCount = 0;
 
 
 		// Config 데이터 셋팅

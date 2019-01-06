@@ -1186,7 +1186,6 @@ namespace Library_Jingyu
 			// 다르다면 "이전" 토큰과 비교
 			if (memcmp(ConnectToken, m_pParent->m_cConnectToken_Before, 32) != 0)
 			{
-
 				// 에러 로그 찍기
 				// 로그 찍기 (로그 레벨 : 에러)
 				g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -1243,6 +1242,11 @@ namespace Library_Jingyu
 		if (m_pParent->InsertAccountNoFunc(AccountNo, this) == false)
 		{	
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
+
+			// 에러 로그 찍기
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Auth_LoginPacket_AUTH()--> Overlapped Login!! AccoutnNo : %lld", m_Int64AccountNo);
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1332,6 +1336,11 @@ namespace Library_Jingyu
 		{
 			ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
 
+			// 에러 로그 찍기
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Enter Room --> Not Find Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
+
 			// 방이 없으면, 에러 리턴
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -1357,9 +1366,14 @@ namespace Library_Jingyu
 		// 락 풀어도 안전하다.
 		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);	// ----- Room umap Shared 언락
 
-		// 5. 방이 대기방이 아닐 경우에러 3 리턴
+		// 5. 방이 대기방이 아닐 경우 에러 3 리턴
 		if (NowRoom->m_iRoomState != eu_ROOM_STATE::WAIT_ROOM)
 		{
+			// 에러 로그 찍기
+		// 로그 찍기 (로그 레벨 : 에러)
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Enter Room --> Not Wait Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
+
 			// 대기방이 아니면, 에러 리턴
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -1381,7 +1395,12 @@ namespace Library_Jingyu
 		// 6. 방 인원수 체크
 		if (NowRoom->m_iJoinUserCount == NowRoom->m_iMaxJoinCount)
 		{
-			BYTE MaxUser = NowRoom->m_iJoinUserCount;		
+			BYTE MaxUser = NowRoom->m_iJoinUserCount;	
+
+			// 에러 로그 찍기
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Enter Room --> Full Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			// 이미 최대 인원수라면, 에러 리턴			
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1404,6 +1423,11 @@ namespace Library_Jingyu
 		if (memcmp(EnterToken, NowRoom->m_cEnterToken, 32) != 0)
 		{
 			BYTE MaxUser = NowRoom->m_iJoinUserCount;
+
+			// 에러 로그 찍기
+			// 로그 찍기 (로그 레벨 : 에러)
+			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				L"Enter Room --> Room Token Error !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			InterlockedIncrement(&m_pParent->m_lRoomEnterTokenError);		
 
@@ -3807,7 +3831,8 @@ namespace Library_Jingyu
 			"Login_VerError : %d\n"
 			"Login_Overlap_DB : %d\n"
 			"Login_Overlap : %d\n"
-			"SemCount : %d\n\n"
+			"SemCount : %d\n"
+			"HeartBeat_Count : %d\n\n"
 
 			"---------- Battle LanServer(Chat) ---------\n"
 			"SessionNum : %lld\n"
@@ -3860,6 +3885,7 @@ namespace Library_Jingyu
 			m_OverlapLoginCount_DB,
 			m_OverlapLoginCount,
 			GetSemCount(),
+			GetHeartBeatCount(),
 
 			// ----------- 배틀 랜서버
 			m_Chat_LanServer->GetClientCount(),

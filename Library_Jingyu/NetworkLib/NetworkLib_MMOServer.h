@@ -341,6 +341,9 @@ namespace Library_Jingyu
 
 		LONG m_lSemCount;
 
+		// 하트비트로 끊긴 유저
+		LONG m_lHeartBeatCount;
+
 
 
 
@@ -414,6 +417,9 @@ namespace Library_Jingyu
 		// 121 에러 횟수 얻기
 		LONG GetSemCount();
 
+		// 하트비트로 끊긴 유저 수 얻기
+		LONG GetHeartBeatCount();
+
 
 
 
@@ -453,12 +459,6 @@ namespace Library_Jingyu
 		// return 1 : RecvQ가 꽉찬 유저
 		// return 2 : I/O 카운트가 0이되어 삭제된 유저
 		int RecvPost(cSession* NowSession);	
-
-		// 하트비트 체크 함수
-		// 
-		// Parameter : cSession*
-		// return : 없음
-		void HeartBeatCheck(cSession* NowSession);
 
 
 

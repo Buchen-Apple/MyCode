@@ -255,6 +255,8 @@ namespace Library_Jingyu
 		// 중복 로그인 횟수
 		LONG m_lLoginOverlap;
 
+		LONG m_lHeartBeat;
+
 
 
 

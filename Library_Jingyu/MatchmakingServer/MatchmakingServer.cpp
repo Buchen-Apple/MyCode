@@ -448,6 +448,8 @@ namespace Library_Jingyu
 					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 10000)
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
+
+						cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
 						Size++;
 					}
 
@@ -470,7 +472,9 @@ namespace Library_Jingyu
 				{
 					g_this->Disconnect(SessionArray[Size]);
 					Size--;
-					InterlockedIncrement(&g_this->m_lHeartBeatCount);
+
+					// 여기서만 접근하기때문에 그냥 올려도 안전
+					g_this->m_lHeartBeatCount++;
 				}
 			}
 		}
@@ -774,6 +778,10 @@ namespace Library_Jingyu
 			{
 				Status = 3;
 				InterlockedIncrement(&m_lAccountError);
+
+				// DB 결과 오류
+				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Login_DB_Result Error!! (Not Find Account) AccountNo : %lld, ErrorCode : %d",
+					AccountNo, iResult);
 			}
 
 			// 그 외 기타 에러일 경우
@@ -781,6 +789,10 @@ namespace Library_Jingyu
 			{
 				Status = 4;
 				InterlockedIncrement(&m_lTempError);
+
+				// DB 결과 오류
+				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Login_DB_Result Error!! (ETC...) AccountNo : %lld, ErrorCode : %d",
+					AccountNo, iResult);
 			}
 
 			CProtocolBuff_Net* SendData = CProtocolBuff_Net::Alloc();
@@ -806,6 +818,14 @@ namespace Library_Jingyu
 			// 토큰이 다를경우 status 2(토큰 오류)를 보낸다.
 			InterlockedIncrement(&m_lTokenError);
 
+			// 토큰 오류 로그 찍기
+			TCHAR tClientToken[64];
+			len = (int)strlen(Token);
+			MultiByteToWideChar(CP_UTF8, 0, Token, (int)strlen(Token), tClientToken, len);
+
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ClientSessionKey Error!! AccountNo : %lld, DBToken : %s, ClientToken : %s",
+				AccountNo, tDBToekn, tClientToken);
+
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
 			BYTE Status = 2;			
 
@@ -823,6 +843,10 @@ namespace Library_Jingyu
 		{
 			// 버전이 다를경우 status 5(버전 오류)를 보낸다.
 			InterlockedIncrement(&m_lVerError);
+
+			// 버전 오류
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Vercode Error!! AccountNo : %lld, ServerVerCode : %d, ClientVerCode : %d", 
+				AccountNo, m_uiVer_Code, Ver_Code);
 
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
 			BYTE Status = 5;
@@ -850,6 +874,9 @@ namespace Library_Jingyu
 		if (InsertLoginPlayerFunc(AccountNo, SessionID) == false)
 		{
 			InterlockedIncrement(&m_lOverlapError);
+
+			// 중복로그인 에러
+			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Overlapped Login!! AccountNo : %lld", AccountNo);
 
 			// 실패라면 중복 로그인임.
 			// 기타 오류 패킷을 리턴.
@@ -1281,6 +1308,8 @@ namespace Library_Jingyu
 
 			if (ErasePlayer->m_bBattleRoomEnterCheck == false)
 			{
+				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Not Battle Room Enter!! AccountNo : %lld", ErasePlayer->m_i64AccountNo);
+
 				InterlockedIncrement(&m_lNot_BattleRoom_Enter);
 				Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
 			}			

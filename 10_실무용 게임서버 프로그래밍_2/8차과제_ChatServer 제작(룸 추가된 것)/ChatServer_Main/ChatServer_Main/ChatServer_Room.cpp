@@ -83,6 +83,11 @@ namespace Library_Jingyu
 					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 30000)
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
+
+						// 하트비트 로그 남기기
+						// 로그 찍기 (로그 레벨 : 에러)
+						g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+
 						Size++;
 					}
 
@@ -104,6 +109,10 @@ namespace Library_Jingyu
 				while (Size >= 0)
 				{
 					g_this->Disconnect(SessionArray[Size]);
+					
+					// 해당 변수는 여기에서만 접근하기 때문에, 인터락 안해도 안전.
+					g_this->m_lHeartBeat++;
+
 					Size--;
 				}
 			}
@@ -418,6 +427,7 @@ namespace Library_Jingyu
 		Room_EnterTokenNot_Miss : 	- 방 입장토큰 미스
 		Sem Count :					- 121 에러 발생 수
 		Login_Overlap :				- 중복로그인 수
+		HeartBeat_Count :			- 하트비트로 끊긴 유저 카운트
 
 		----------------------------------------------------
 		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
@@ -451,7 +461,8 @@ namespace Library_Jingyu
 			"Server_EnterToken_Miss : %d\n"
 			"Room_EnterTokenNot_Miss : %d\n"
 			"Sem_Count : %d\n"
-			"Login_Overlap : %d\n\n"
+			"Login_Overlap : %d\n"
+			"HeartBeat_Count : %d\n\n"
 
 			"------------------------------------------------\n"
 			"TotalRoom_Pool : %lld\n"
@@ -486,6 +497,7 @@ namespace Library_Jingyu
 			m_lRoom_EnterTokenMiss,
 			GetSemCount(),
 			m_lLoginOverlap,
+			m_lHeartBeat,
 
 			m_Room_Umap.size(),
 			m_lRoomCount,
@@ -514,6 +526,7 @@ namespace Library_Jingyu
 		m_lRoom_EnterTokenMiss = 0;
 		m_lRoomCount = 0;
 		m_lLoginOverlap = 0;
+		m_lHeartBeat = 0;
 
 
 		// 모니터링 서버와 연결되는 랜 클라 시작
@@ -861,6 +874,9 @@ namespace Library_Jingyu
 		{
 			InterlockedIncrement(&m_lLoginOverlap);
 
+			// 중복로그인 로그 남기기
+			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Overlapped Login!! AccountNo : %lld", AccountNo);
+
 			// 실패 패킷 -------
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -986,6 +1002,9 @@ namespace Library_Jingyu
 		if (FindRoom == m_Room_Umap.end())
 		{
 			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
+
+			// 에러 찍기
+			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Not Find Room !!  AccountNo : %lld, TryRoomNo : %d", AccountNo, RoomNo);
 
 			// 방이 없을 수 있음. 실패 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
