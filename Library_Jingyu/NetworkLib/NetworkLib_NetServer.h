@@ -324,6 +324,12 @@ namespace Library_Jingyu
 		// return : 없음
 		virtual void OnError(int error, const TCHAR* errorStr) = 0;
 
+		// 세마포어 발생 시 호출되는 함수
+		//
+		// parameter : SessionID
+		// return : 없음
+		virtual void OnSemaphore(ULONGLONG SessionID) = 0;
+
 	};
 
 }

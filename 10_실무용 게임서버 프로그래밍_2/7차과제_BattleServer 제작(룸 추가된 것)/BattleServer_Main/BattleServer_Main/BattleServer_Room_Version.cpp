@@ -507,7 +507,7 @@ namespace Library_Jingyu
 	shDB_Communicate::~shDB_Communicate()
 	{
 		// 1. DB_ReadThread Á¾·á
-		for (int i = 0; i < 4; ++i)
+		for (int i = 0; i < 20; ++i)
 			PostQueuedCompletionStatus(m_hDB_Read, en_PHP_TYPE::EXIT, 0, 0);
 
 		WaitForMultipleObjects(4, m_hDB_Read_Thread, TRUE, INFINITE);

@@ -258,7 +258,6 @@ namespace Library_Jingyu
 
 
 
-
 		// -----------------------
 		// 토큰관리 변수
 		// -----------------------
@@ -562,6 +561,12 @@ namespace Library_Jingyu
 		//			 : 에러 코드에 대한 스트링
 		// return : 없음
 		virtual void OnError(int error, const TCHAR* errorStr);
+
+		// 세마포어 발생 시 호출되는 함수
+		//
+		// parameter : 없음
+		// return : 없음
+		virtual void OnSemaphore(ULONGLONG SessionID);
 
 
 

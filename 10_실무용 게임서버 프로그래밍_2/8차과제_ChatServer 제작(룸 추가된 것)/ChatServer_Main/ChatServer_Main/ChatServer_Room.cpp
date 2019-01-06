@@ -8,7 +8,7 @@
 #include "PDHClass/PDHCheck.h"
 
 #include <strsafe.h>
-
+#include <unordered_set>
 
 // ------------------------
 //
@@ -417,6 +417,7 @@ namespace Library_Jingyu
 		Server_EnterToken_Miss : 		- 채팅서버 입장 토큰 미스
 		Room_EnterTokenNot_Miss : 	- 방 입장토큰 미스
 		Sem Count :					- 121 에러 발생 수
+		Login_Overlap :				- 중복로그인 수
 
 		----------------------------------------------------
 		PacketPool_Lan : 	- 외부에서 사용 중인 Lan 직렬화 버퍼의 수
@@ -1003,16 +1004,13 @@ namespace Library_Jingyu
 
 		stRoom* NowRoom = FindRoom->second;
 
-
-		// 6. 룸 토큰 검사 및 자료구조에 추가
-		NowRoom->ROOM_LOCK();	// ----- 룸 락	
-
-		// 룸 토큰 검사
+		// 6. 토큰 검사
+		// !! 룸 락 걸고 할 필요 없다. !!
+		// !! 룸 락은, 서버 입장 토큰처럼 중간에 변경되는 경우가 없기 때문에, 룸 테이블 락만 걸면 안전하다 !!
 		if (memcmp(EnterToken, NowRoom->m_cEnterToken, 32) != 0)
-		{
-			NowRoom->ROOM_UNLOCK();							// ----- 룸 언락	
+		{	
 			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
-			
+
 			InterlockedIncrement(&m_lRoom_EnterTokenMiss);
 
 			// 에러 찍기
@@ -1033,20 +1031,10 @@ namespace Library_Jingyu
 			return;
 		}
 
-		// 룸 내 자료구조에 유저 추가
-		NowRoom->Insert(SessionID);
-
-		// 룸 내 유저 수 증가
-		++NowRoom->m_iJoinUser;
-
-		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
-
-		ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
-
-		// 유저에게 룸 번호 할당
-		NowPlayer->m_iRoomNo = RoomNo;
-
 		// 7. 성공 패킷 응답
+		// !! 방에 유저가 추가되는 순간, 채팅 메시지를 받을 수 있는 상태가 된다. !!
+		// !! 즉, 클라 입장에서는 방 입장 응답 패킷을 안받았는데 방에 있는 메시지를 받는다. !!
+		// !! 때문에, 미리 응답패킷을 보낸 다음에 방에 추가해야 한다 !!
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 		WORD Type = en_PACKET_CS_CHAT_RES_ENTER_ROOM;
@@ -1058,6 +1046,24 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&Status, 1);
 
 		SendPacket(SessionID, SendBuff);
+
+
+		// 8. 룸 토큰 검사 및 자료구조에 추가
+		NowRoom->ROOM_LOCK();	// ----- 룸 락		
+
+		// 룸 내 자료구조에 유저 추가
+		NowRoom->Insert(SessionID);
+
+		// 룸 내 유저 수 증가
+		++NowRoom->m_iJoinUser;
+
+		// 유저에게 룸 번호 할당
+		NowPlayer->m_iRoomNo = RoomNo;		
+
+		NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
+
+		ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락		
+		
 	}
 
 	// 채팅 보내기
@@ -1443,6 +1449,34 @@ namespace Library_Jingyu
 		g_ChatDump->Crash();
 	}
 
+	// 세마포어 발생 시 호출되는 함수
+	//
+	// parameter : 없음
+	// return : 없음
+	void CChatServer_Room::OnSemaphore(ULONGLONG SessionID)
+	{
+		AcquireSRWLockShared(&m_Player_Umap_srwl);	 // ----- Player Umap Shared 락
+
+		// 1. 검색
+		auto FindPlayer = m_Player_Umap.find(SessionID);
+
+		// 없는 유저라면 Crash
+		if (FindPlayer == m_Player_Umap.end())
+		{
+			ReleaseSRWLockShared(&m_Player_Umap_srwl);	 // ----- Player Umap Shared 언락
+			g_ChatDump->Crash();
+		}
+
+		// 2. 있다면 AccountNo만 받는다.
+		INT64 AccountNo = FindPlayer->second->m_i64AccountNo;
+
+		ReleaseSRWLockShared(&m_Player_Umap_srwl);	 // ----- Player Umap Shared 언락
+
+
+		// 3. 로그 찍기 (로그 레벨 : 에러)
+		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semahore!! AccountNo : %lld", AccountNo);
+	}
+
 
 
 
@@ -1724,8 +1758,7 @@ namespace Library_Jingyu
 			g_ChatDump->Crash();
 
 		if (NowRoom->m_iJoinUser > 0)
-		{		
-
+		{	
 			NowRoom->m_bDeleteFlag = true;
 
 			size_t Size = NowRoom->m_JoinUser_vector.size();
@@ -1749,7 +1782,7 @@ namespace Library_Jingyu
 
 		// 5. 접속자 수가 0명이면 방 즉시 제거
 		else
-		{		
+		{	
 			m_pNetServer->m_Room_Umap.erase(FindRoom);
 			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- 룸 Exclusive 언락
 

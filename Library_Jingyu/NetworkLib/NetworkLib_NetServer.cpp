@@ -788,6 +788,7 @@ namespace Library_Jingyu
 				if (GetLastError() == 121)
 				{
 					InterlockedIncrement(&g_This->m_lSemCount);
+					g_This->OnSemaphore(stNowSession->m_ullSessionID);
 				}
 			}
 		
@@ -1091,8 +1092,6 @@ namespace Library_Jingyu
 			// 접속자 수 증가. disconnect에서도 사용되는 변수이기 때문에 인터락 사용
 			InterlockedIncrement(&g_This->m_ullJoinUserCount);
 
-
-
 			// ------------------
 			// 모든 접속절차가 완료되었으니 접속 후 처리 함수 호출.
 			// ------------------
@@ -1130,6 +1129,7 @@ namespace Library_Jingyu
 	//		  : I/O카운트가 0이되어 삭제된 유저는, nullptr
 	CNetServer::stSession* 	CNetServer::GetSessionLOCK(ULONGLONG SessionID)
 	{
+
 		// 1. SessionID로 세션 알아오기	
 		stSession* retSession = &m_stSessionArray[(WORD)SessionID];
 
@@ -1162,7 +1162,7 @@ namespace Library_Jingyu
 				InDisconnect(retSession);
 
 			return nullptr;
-		}								
+		}		
 
 		// 5. 정상적으로 있는 유저고, 안전하게 처리된 유저라면 해당 유저의 포인터 반환
 		return retSession;

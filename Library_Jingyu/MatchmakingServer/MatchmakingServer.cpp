@@ -1364,6 +1364,27 @@ namespace Library_Jingyu
 			errorStr, error);		
 	}
 
+	void Matchmaking_Net_Server::OnSemaphore(ULONGLONG SessionID)
+	{
+		// 1. umap에서 검색
+		AcquireSRWLockShared(&m_srwlPlayer);		// ------- Shared 락
+
+		auto FindPlayer = m_umapPlayer.find(SessionID);
+
+		// 2. 검색 실패 시 크래시
+		if (FindPlayer == m_umapPlayer.end())
+		{
+			ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
+			gMatchServerDump->Crash();
+		}
+
+		INT64 AccountNo = FindPlayer->second->m_i64AccountNo;
+		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
+
+		// 로그 찍기 (로그 레벨 : 에러)
+		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semaphore!! AccountNO : %lld", AccountNo);
+	}
+
 
 
 

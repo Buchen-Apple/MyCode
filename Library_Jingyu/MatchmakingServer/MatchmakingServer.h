@@ -434,6 +434,8 @@ namespace Library_Jingyu
 
 		virtual void OnError(int error, const TCHAR* errorStr);
 
+		virtual void OnSemaphore(ULONGLONG SessionID);
+
 
 
 	public:	
