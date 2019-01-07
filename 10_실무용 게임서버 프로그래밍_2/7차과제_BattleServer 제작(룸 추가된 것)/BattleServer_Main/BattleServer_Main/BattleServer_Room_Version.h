@@ -585,7 +585,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 5;	
+			const int m_iMaxJoinCount = 4;	
 
 			// ------------
 

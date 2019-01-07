@@ -86,7 +86,8 @@ namespace Library_Jingyu
 
 						// 하트비트 로그 남기기
 						// 로그 찍기 (로그 레벨 : 에러)
-						g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+						g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld, State : %d", 
+							itor_Begin->second->m_i64AccountNo, itor_Begin->second->State);
 
 						Size++;
 					}
@@ -845,6 +846,9 @@ namespace Library_Jingyu
 			*/
 		}	
 
+		// !! 테스트 !! 
+		NowPlayer->State = 2;
+
 		// 마지막으로 패킷 받은시간 갱신
 		NowPlayer->m_dwLastPacketTime = timeGetTime();
 
@@ -963,6 +967,9 @@ namespace Library_Jingyu
 		// 없으면 크래시
 		if (NowPlayer == nullptr)
 			g_ChatDump->Crash();
+
+		// !! 테스트 !! 
+		NowPlayer->State = 3;
 
 
 		// 2. 마샬링
@@ -1309,6 +1316,9 @@ namespace Library_Jingyu
 		// 마지막 패킷 받은 시간 갱신
 		NewPlayer->m_dwLastPacketTime = timeGetTime();
 
+		// !! 테스트 !! 
+		NewPlayer->State = 1;
+
 		// 3. 자료구조에 추가
 		InsertPlayerFunc(SessionID, NewPlayer);
 	}
@@ -1325,6 +1335,9 @@ namespace Library_Jingyu
 		// 없으면 Crash
 		if (DeletePlayer == nullptr)
 			g_ChatDump->Crash();
+
+		// !! 테스트 !! 
+		DeletePlayer->State = 4;
 
 		int RoomNo = DeletePlayer->m_iRoomNo;
 
@@ -1393,6 +1406,9 @@ namespace Library_Jingyu
 				m_pRoom_Pool->Free(DeleteRoom);				
 			}
 		}
+
+		// !! 테스트 !! 
+		DeletePlayer->State = 0;
 
 		// 4. stPlayer* Free
 		m_pPlayer_Pool->Free(DeletePlayer);

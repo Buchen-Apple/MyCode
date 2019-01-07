@@ -54,10 +54,16 @@ namespace Library_Jingyu
 			// 마지막으로 패킷을 받은 시간
 			DWORD m_dwLastPacketTime;
 
+			// 현재 유저의 상태
+			// 1 : 접속 / 2 : 로그인 패킷 보냄 / 3 : 방 입장 / 4 : 삭제 예정
+			BYTE State;
+
 			stPlayer()
 			{
 				// 시작 시, 룸 번호는 -1
 				m_iRoomNo = -1;
+
+				State = 0;
 			}
 		};
 
