@@ -184,7 +184,7 @@ namespace Library_Jingyu
 		}
 
 		// 매칭 서버 오픈 로그 찍기		
-		g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"MatchServerOpen...");
+		g_MasterLog->LogSave(true, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"MatchServerOpen...");
 
 		// 배틀 랜서버 시작
 		if(pBattleServer->ServerStart() == false)
@@ -205,7 +205,7 @@ namespace Library_Jingyu
 		Stop();
 
 		// 매칭 서버 닫힘 로그 찍기		
-		g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"MatchServerClose...");
+		g_MasterLog->LogSave(true, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"MatchServerClose...");
 
 		// 배틀 랜서버 종료
 		if (pBattleServer->GetServerState() == true)
@@ -502,7 +502,7 @@ namespace Library_Jingyu
 
 			/*
 			// 다를 경우, 로그 찍고, 응답 없이 끊는다.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_Login() --> EnterToken Error. SessionID : %lld, ServerNo : %d", SessionID, ServerNo);
 
 			Disconnect(SessionID);
@@ -521,7 +521,7 @@ namespace Library_Jingyu
 			/*
 			// false가 리턴되는 것은 이미 접속중인 매칭 서버.
 			// 로그 찍고, 응답 없이 끊는다.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_Login() --> Duplicate Login. ServerNo : %d", ServerNo);
 
 			Disconnect(SessionID);
@@ -575,7 +575,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_RoomInfo() --> Not Login Packet. ServerNo : %d", NowUser->m_iServerNo);
 
 			Disconnect(SessionID);
@@ -609,7 +609,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_RoomEnter_OK() --> Not Login Packet. ServerNo : %d", NowUser->m_iServerNo);
 
 			Disconnect(SessionID);
@@ -651,7 +651,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lMatch_NotLoginPacket);
 
 			// 로그 남기고 접속 끊음.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_RoomEnter_OK() --> Not Login Packet. ServerNo : %d", NowUser->m_iServerNo);
 
 			Disconnect(SessionID);
@@ -789,7 +789,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			// Crash
@@ -1579,7 +1579,7 @@ namespace Library_Jingyu
 
 			/*
 			// 다를 경우, 로그 찍고, 응답 없이 끊는다.
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Packet_Battle_Login() --> EnterToken Error. SessionID : %lld", SessionID);
 
 			Disconnect(SessionID);
@@ -1961,7 +1961,7 @@ namespace Library_Jingyu
 		}
 
 		// 배틀 랜 서버 오픈 로그 찍기		
-		g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"BattleServerOpen...");
+		g_MasterLog->LogSave(true, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"BattleServerOpen...");
 
 		return true;
 	}
@@ -1975,7 +1975,7 @@ namespace Library_Jingyu
 		Stop();
 		
 		// 배틀 랜 서버 닫힘 로그 찍기		
-		g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"BattleServerClose...");
+		g_MasterLog->LogSave(true, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"BattleServerClose...");
 	}
 
 
@@ -2068,7 +2068,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_MasterLog->LogSave(L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			// Crash

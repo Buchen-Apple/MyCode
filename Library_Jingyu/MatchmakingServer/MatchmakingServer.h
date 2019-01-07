@@ -40,6 +40,7 @@ namespace Library_Jingyu
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;
+			int HeartBeat;
 
 			// 매치메이킹 DB 정보
 			TCHAR DB_IP[20];

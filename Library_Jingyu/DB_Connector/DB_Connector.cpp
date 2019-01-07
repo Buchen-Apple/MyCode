@@ -109,7 +109,7 @@ namespace Library_Jingyu
 			iConnectCount++;
 
 			// 로그에 저장
-			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR, 
+			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Connect() --> Connect Fail... (Error : %d)(Count : %d)", m_iLastError, iConnectCount);
 
 			if (iConnectCount >= 5)
@@ -152,7 +152,7 @@ namespace Library_Jingyu
 		if (retval != S_OK)
 		{
 			// 실패 시 로그 남김
-			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Query --> vlist Change Error...");
 
 			g_DBDump->Crash();
@@ -192,7 +192,7 @@ namespace Library_Jingyu
 					Count++;
 
 					// 실패 시 로그 남김
-					g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 						L"Query() --> Connect Fail... (Error : %d)(Count : %d)", Error, Count);
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
@@ -233,7 +233,7 @@ namespace Library_Jingyu
 		if (retval != S_OK)
 		{
 			// 실패 시 로그 남김
-			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Query_Save --> vlist Change Error...");
 
 			g_DBDump->Crash();
@@ -273,7 +273,7 @@ namespace Library_Jingyu
 					Count++;
 
 					// 실패 시 로그 남김
-					g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 						L"Query() --> Connect Fail... (Count : %d)", Count);
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
@@ -318,7 +318,7 @@ namespace Library_Jingyu
 		if (retval != S_OK)
 		{
 			// 실패 시 로그 남김
-			g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Query_Save(CreatTable) --> vlist Change Error...");
 
 			g_DBDump->Crash();
@@ -358,7 +358,7 @@ namespace Library_Jingyu
 					Count++;
 
 					// 실패 시 로그 남김
-					g_DBLog->LogSave(L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 						L"Query() --> Connect Fail... (Count : %d)", Count);
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.

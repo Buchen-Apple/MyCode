@@ -117,6 +117,10 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
 			return false;
 
+		// 하트비트
+		if (Parser.GetValue_Int(_T("HeartBeat"), &pConfig->HeartBeat) == false)
+			return false;
+
 
 
 		////////////////////////////////////////////////////////
@@ -366,7 +370,7 @@ namespace Library_Jingyu
 			if (Check == WAIT_FAILED)
 			{
 				DWORD Error = GetLastError();
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"DBHeartbeatThread Exit Error!!!(%d)", Error);
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"DBHeartbeatThread Exit Error!!!(%d)", Error);
 				break;
 			}
 
@@ -387,7 +391,7 @@ namespace Library_Jingyu
 			if (Error != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), pMatchDBcon->GetLastError());
 
 				gMatchServerDump->Crash();
@@ -449,7 +453,10 @@ namespace Library_Jingyu
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
 
-						cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+						// 하트비트 로그 남기기
+						// 로그 찍기 (로그 레벨 : 에러)
+						cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+
 						Size++;
 					}
 
@@ -780,7 +787,7 @@ namespace Library_Jingyu
 				InterlockedIncrement(&m_lAccountError);
 
 				// DB 결과 오류
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Login_DB_Result Error!! (Not Find Account) AccountNo : %lld, ErrorCode : %d",
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Login_DB_Result Error!! (Not Find Account) AccountNo : %lld, ErrorCode : %d",
 					AccountNo, iResult);
 			}
 
@@ -791,7 +798,7 @@ namespace Library_Jingyu
 				InterlockedIncrement(&m_lTempError);
 
 				// DB 결과 오류
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Login_DB_Result Error!! (ETC...) AccountNo : %lld, ErrorCode : %d",
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Login_DB_Result Error!! (ETC...) AccountNo : %lld, ErrorCode : %d",
 					AccountNo, iResult);
 			}
 
@@ -823,7 +830,7 @@ namespace Library_Jingyu
 			len = (int)strlen(Token);
 			MultiByteToWideChar(CP_UTF8, 0, Token, (int)strlen(Token), tClientToken, len);
 
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ClientSessionKey Error!! AccountNo : %lld, DBToken : %s, ClientToken : %s",
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ClientSessionKey Error!! AccountNo : %lld, DBToken : %s, ClientToken : %s",
 				AccountNo, tDBToekn, tClientToken);
 
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
@@ -845,7 +852,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lVerError);
 
 			// 버전 오류
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Vercode Error!! AccountNo : %lld, ServerVerCode : %d, ClientVerCode : %d", 
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Vercode Error!! AccountNo : %lld, ServerVerCode : %d, ClientVerCode : %d",
 				AccountNo, m_uiVer_Code, Ver_Code);
 
 			WORD Type = en_PACKET_CS_MATCH_RES_LOGIN;
@@ -876,7 +883,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lOverlapError);
 
 			// 중복로그인 에러
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Overlapped Login!! AccountNo : %lld", AccountNo);
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Overlapped Login!! AccountNo : %lld", AccountNo);
 
 			// 실패라면 중복 로그인임.
 			// 기타 오류 패킷을 리턴.
@@ -990,6 +997,7 @@ namespace Library_Jingyu
 		// 2. 마스터로 패킷 보내기
 		m_pLanClient->SendPacket(m_pLanClient->m_ullClientID, SendBuff);
 	}
+	
 
 
 
@@ -1022,21 +1030,25 @@ namespace Library_Jingyu
 		hDB_HBThread = (HANDLE)_beginthreadex(NULL, 0, DBHeartbeatThread, this, 0, 0);
 		if (hDB_HBThread == 0)
 		{
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, 
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"ServerStart() --> DBHeartBeatThread Create Fail...");
 
 			return false;
 		}
 
-		// 일반 하트비트 스레드 생성
-		m_hHBThread = (HANDLE)_beginthreadex(NULL, 0, HeartbeatThread, this, 0, 0);
-		if (hDB_HBThread == 0)
+		// 컨피그 파일의 하트비트 여부가 true라면 하트비트 스레드 생성
+		if (m_stConfig.HeartBeat != 0)
 		{
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"ServerStart() --> HeartBeatThread Create Fail...");
+			// 일반 하트비트 스레드 생성
+			m_hHBThread = (HANDLE)_beginthreadex(NULL, 0, HeartbeatThread, this, 0, 0);
+			if (hDB_HBThread == 0)
+			{
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"ServerStart() --> HeartBeatThread Create Fail...");
 
-			return false;
-		}		
+				return false;
+			}
+		}
 
 		//------------------- 마스터와 연결되는 랜 클라 가동 및 this 전달
 		m_pLanClient->SetParent(this);
@@ -1052,12 +1064,12 @@ namespace Library_Jingyu
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept, m_stConfig.Nodelay, m_stConfig.MaxJoinUser,
 			m_stConfig.HeadCode, m_stConfig.XORCode) == false)
 		{
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen Fail...");
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ServerOpen Fail...");
 			return false;
 		}
 
 		// 서버 오픈 로그 찍기		
-		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		cMatchServerLog->LogSave(true, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 		return true;
 	}
 
@@ -1084,28 +1096,32 @@ namespace Library_Jingyu
 		{
 			// 종료에 실패한다면, 에러 찍기
 			DWORD Error = GetLastError();
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, 
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"ServerStop() --> DBHeartbeatThread Exit Error!!!(%d)", Error);
 
 			gMatchServerDump->Crash();
 		}
 
-		// 일반 하트비트 스레드 종료 신호
-		SetEvent(m_hHBThreadExitEvent);
-
-		// 일반 하트비트 스레드 종료 대기
-		if (WaitForSingleObject(m_hHBThread, INFINITE) != WAIT_OBJECT_0)
+		// 일반 하트비트를 만들었다면, 종료
+		if (m_stConfig.HeartBeat != 0)
 		{
-			// 종료에 실패한다면, 에러 찍기
-			DWORD Error = GetLastError();
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"ServerStop() --> HeartbeatThread Exit Error!!!(%d)", Error);
+			// 일반 하트비트 스레드 종료 신호
+			SetEvent(m_hHBThreadExitEvent);
 
-			gMatchServerDump->Crash();
+			// 일반 하트비트 스레드 종료 대기
+			if (WaitForSingleObject(m_hHBThread, INFINITE) != WAIT_OBJECT_0)
+			{
+				// 종료에 실패한다면, 에러 찍기
+				DWORD Error = GetLastError();
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"ServerStop() --> HeartbeatThread Exit Error!!!(%d)", Error);
+
+				gMatchServerDump->Crash();
+			}
 		}
 
 		// 서버 종료 로그 찍기		
-		cMatchServerLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
+		cMatchServerLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 	// 출력용 함수
@@ -1119,6 +1135,7 @@ namespace Library_Jingyu
 		MasterConnect  :		MonitorConnect	:		- 마스터 서버와 모니터 서버 접속 여부
 		SessionNum : 	- NetServer 의 세션수
 		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+		HeartBeat :			- 하트비트 여부. 1이면 하트비트 중
 
 		PlayerData_Pool :	- Player 구조체 할당량
 		Player Count : 		- Contents 파트 Player 개수
@@ -1144,7 +1161,8 @@ namespace Library_Jingyu
 		printf("==================== Match Server ====================\n"
 			"MonitorConnect : %d\n"
 			"SessionNum : %lld\n"
-			"PacketPool_Net : %d\n\n"
+			"PacketPool_Net : %d\n"
+			"HeartBeat : %d\n\n"
 
 			"PlayerData_Pool : %d\n"
 			"Player Count : %lld\n\n"
@@ -1177,6 +1195,7 @@ namespace Library_Jingyu
 			m_pMonitorLanClient->GetClinetState(),
 			GetClientCount(),
 			CProtocolBuff_Net::GetNodeCount(),
+			m_stConfig.HeartBeat,
 
 			m_lstPlayer_AllocCount,
 			m_umapPlayer.size(),
@@ -1308,7 +1327,7 @@ namespace Library_Jingyu
 
 			if (ErasePlayer->m_bBattleRoomEnterCheck == false)
 			{
-				cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Not Battle Room Enter!! AccountNo : %lld", ErasePlayer->m_i64AccountNo);
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Not Battle Room Enter!! AccountNo : %lld", ErasePlayer->m_i64AccountNo);
 
 				InterlockedIncrement(&m_lNot_BattleRoom_Enter);
 				Packet_Battle_EnterFail(ErasePlayer->m_ui64ClientKey);
@@ -1365,7 +1384,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());	
 
 			// Crash
@@ -1389,7 +1408,7 @@ namespace Library_Jingyu
 	void Matchmaking_Net_Server::OnError(int error, const TCHAR* errorStr)
 	{
 		// 로그 찍기 (로그 레벨 : 에러)
-		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+		cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);		
 	}
 
@@ -1411,7 +1430,7 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_srwlPlayer);		// ------- Shared 언락
 
 		// 로그 찍기 (로그 레벨 : 에러)
-		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semaphore!! AccountNO : %lld", AccountNo);
+		cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semaphore!! AccountNO : %lld", AccountNo);
 	}
 
 
@@ -1627,6 +1646,7 @@ namespace Library_Jingyu
 			else
 				gMatchServerDump->Crash();
 		}
+		
 
 		// 방 배정에 성공한 유저 수 증가(정확히는, 방 정보 요청을 받아온 유저. 아직 배틀서버엔 안갔음)
 		InterlockedIncrement(&m_pParent->m_lRoomEnter_OK);
@@ -1828,7 +1848,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			// Crash
@@ -1924,7 +1944,7 @@ namespace Library_Jingyu
 			m_MatchServer_this->m_stConfig.MonitorClientNodelay) == false)
 		{
 			// 모니터 랜클라 시작 에러
-			cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Monitor LanClient Start Error");
+			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Monitor LanClient Start Error");
 
 			return false;
 		}
@@ -1933,7 +1953,7 @@ namespace Library_Jingyu
 		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
 
 		// 모니터 랜클라 시작 로그
-		cMatchServerLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Monitor LanClient Star");
+		cMatchServerLog->LogSave(true, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Monitor LanClient Star");
 
 		return true;
 	}

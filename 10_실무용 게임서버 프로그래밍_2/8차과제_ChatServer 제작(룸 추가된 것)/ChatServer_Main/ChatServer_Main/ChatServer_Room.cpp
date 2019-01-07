@@ -50,8 +50,8 @@ namespace Library_Jingyu
 
 		while (1)
 		{
-			// 대기 (10초에 1회 깨어난다)
-			DWORD Check = WaitForSingleObject(hEvent, 10000);
+			// 대기 (1초에 1회 깨어난다)
+			DWORD Check = WaitForSingleObject(hEvent, 1000);
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
@@ -86,7 +86,7 @@ namespace Library_Jingyu
 
 						// 하트비트 로그 남기기
 						// 로그 찍기 (로그 레벨 : 에러)
-						g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+						g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
 
 						Size++;
 					}
@@ -408,6 +408,7 @@ namespace Library_Jingyu
 		MonitorConnect : %d, BattleConnect : %d	- 모니터링 서버에 접속 여부, 배틀 랜 서버에 접속 여부. 1이면 접속함.
 		SessionNum : 	- NetServer 의 세션수
 		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
+		HeartBeat :			- 하트비트 중인지. 1이면 하트비트 중
 
 		PlayerData_Pool :	- Player 구조체 할당량
 		Player Count : 		- Contents 파트 Player 개수
@@ -445,7 +446,8 @@ namespace Library_Jingyu
 		printf("==================== Chat Server =====================\n"
 			"MonitorConnect : %d, BattleConnect : %d\n"
 			"SessionNum : %lld\n"
-			"PacketPool_Net : %d\n\n"
+			"PacketPool_Net : %d\n"
+			"HeartBeat : %d\n\n"
 
 			"PlayerData_Pool : %d\n"
 			"Player Count : %lld\n\n"
@@ -481,6 +483,7 @@ namespace Library_Jingyu
 			m_pMonitor_Client->GetClinetState(), m_pBattle_Client->GetClinetState(),
 			GetClientCount(),
 			CProtocolBuff_Net::GetNodeCount(),
+			m_Paser.HeartBeat,
 
 			m_lUpdateStruct_PlayerCount,
 			m_Player_Umap.size(),
@@ -548,16 +551,20 @@ namespace Library_Jingyu
 			m_Paser.Nodelay, m_Paser.MaxJoinUser, m_Paser.HeadCode, m_Paser.XORCode) == false)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Net ServerOpenError");
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Net ServerOpenError");
 			
 			return false;
 		}	
 
-		// 하트비트 스레드 생성
-		m_hHBthreadHandle = (HANDLE)_beginthreadex(NULL, 0, HeartBeatThread, this, 0, 0);
+		// 컨피그 파일에서 하트비트 여부가 TRUE라면 하트비트 스레드 생성
+		if (m_Paser.HeartBeat != 0)
+		{
+			// 하트비트 스레드 생성
+			m_hHBthreadHandle = (HANDLE)_beginthreadex(NULL, 0, HeartBeatThread, this, 0, 0);
+		}
 		
 		// 서버 오픈 로그 찍기 (로그 레벨 : 에러)
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		g_ChatLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -577,22 +584,26 @@ namespace Library_Jingyu
 		// 채팅 Net 서버 종료
 		Stop();
 
-		// 하트비트 스레드 종료
-		SetEvent(m_hHBThreadExitEvent);
-
-		// 하트비트 스레드가 이상한 신호로 종료되었다면, 
-		if (WaitForSingleObject(m_hHBthreadHandle, INFINITE) != WAIT_OBJECT_0)
+		// 하트비트를 체크했었다면, 하트비트 스레드 종료
+		if (m_Paser.HeartBeat != 0)
 		{
-			// 종료에 실패한다면, 에러 찍기
-			DWORD Error = GetLastError();
-			g_ChatLog->LogSave(L"MatchServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM,
-				L"ServerStop() --> HBThread Exit Error!!!(%d)", Error);
+			// 하트비트 스레드 종료
+			SetEvent(m_hHBThreadExitEvent);
 
-			g_ChatDump->Crash();
+			// 하트비트 스레드가 이상한 신호로 종료되었다면, 
+			if (WaitForSingleObject(m_hHBthreadHandle, INFINITE) != WAIT_OBJECT_0)
+			{
+				// 종료에 실패한다면, 에러 찍기
+				DWORD Error = GetLastError();
+				g_ChatLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"ServerStop() --> HBThread Exit Error!!!(%d)", Error);
+
+				g_ChatDump->Crash();
+			}
 		}
 
 		// 서버 닫힘 로그 찍기 (로그 레벨 : 에러)
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"All Server Stop...");
+		g_ChatLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"All Server Stop...");
 	}
 
 
@@ -701,6 +712,10 @@ namespace Library_Jingyu
 
 		// 로그 레벨
 		if (Parser.GetValue_Int(_T("LogLevel"), &pConfig->LogLevel) == false)
+			return false;
+
+		// 하트비트 여부
+		if (Parser.GetValue_Int(_T("HeartBeat"), &pConfig->HeartBeat) == false)
 			return false;
 
 
@@ -844,7 +859,7 @@ namespace Library_Jingyu
 				InterlockedIncrement(&m_lEnterTokenMiss);
 
 				// 에러 찍기
-				g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Server Token Error !!  AccountNo : %lld", AccountNo);
+				g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Server Token Error !!  AccountNo : %lld", AccountNo);
 
 				// 그래도 다르면, 실패 패킷
 				CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -875,7 +890,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lLoginOverlap);
 
 			// 중복로그인 로그 남기기
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Overlapped Login!! AccountNo : %lld", AccountNo);
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Overlapped Login!! AccountNo : %lld", AccountNo);
 
 			// 실패 패킷 -------
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1004,7 +1019,7 @@ namespace Library_Jingyu
 			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
 
 			// 에러 찍기
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Not Find Room !!  AccountNo : %lld, TryRoomNo : %d", AccountNo, RoomNo);
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Not Find Room !!  AccountNo : %lld, TryRoomNo : %d", AccountNo, RoomNo);
 
 			// 방이 없을 수 있음. 실패 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1033,7 +1048,7 @@ namespace Library_Jingyu
 			InterlockedIncrement(&m_lRoom_EnterTokenMiss);
 
 			// 에러 찍기
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Room Token Error !!  AccountNo : %lld", AccountNo);
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Room Token Error !!  AccountNo : %lld", AccountNo);
 
 			// 토큰	불일치 패킷
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1069,6 +1084,30 @@ namespace Library_Jingyu
 
 		// 8. 룸 토큰 검사 및 자료구조에 추가
 		NowRoom->ROOM_LOCK();	// ----- 룸 락		
+
+		// 만약, 방이 삭제될 방이라면 방 없음 패킷 보냄
+		if (NowRoom->m_bDeleteFlag == true)
+		{
+			NowRoom->ROOM_UNLOCK();	// ----- 룸 언락	
+			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락		
+
+			// 에러 찍기
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Not Find Room(2) !!  AccountNo : %lld, TryRoomNo : %d", AccountNo, RoomNo);
+
+			// 방이 없을 수 있음. 실패 패킷 보냄
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			WORD Type = en_PACKET_CS_CHAT_RES_ENTER_ROOM;
+			BYTE Status = 3;	// 방 없음
+
+			SendBuff->PutData((char*)&Type, 2);
+			SendBuff->PutData((char*)&AccountNo, 8);
+			SendBuff->PutData((char*)&RoomNo, 4);
+			SendBuff->PutData((char*)&Status, 1);
+
+			SendPacket(SessionID, SendBuff);
+			return;
+		}
 
 		// 룸 내 자료구조에 유저 추가
 		NowRoom->Insert(SessionID);
@@ -1296,13 +1335,12 @@ namespace Library_Jingyu
 			// 로그인 유저 카운트 감소
 			InterlockedDecrement(&m_lChatLoginCount);
 
-			// 미리 초기화
-			DeletePlayer->m_bLoginCheck = false;
-
 			// 로그인 자료구조에서 제거
 			if(EraseLoginPlayerFunc(DeletePlayer->m_i64AccountNo) == false)
 				g_ChatDump->Crash();
-		}		
+		}	
+
+		DeletePlayer->m_bLoginCheck = false;
 
 
 		// 3. 룸에 들어가 있다면, 룸에서 제거
@@ -1414,7 +1452,7 @@ namespace Library_Jingyu
 		catch (CException& exc) 
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			g_ChatDump->Crash();
@@ -1462,7 +1500,7 @@ namespace Library_Jingyu
 	void CChatServer_Room::OnError(int error, const TCHAR* errorStr)
 	{
 		// 로그 찍기 (로그 레벨 : 에러)
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+		g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);
 
 		g_ChatDump->Crash();
@@ -1493,7 +1531,7 @@ namespace Library_Jingyu
 
 
 		// 3. 로그 찍기 (로그 레벨 : 에러)
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semahore!! AccountNo : %lld", AccountNo);
+		g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Semahore!! AccountNo : %lld", AccountNo);
 	}
 
 
@@ -1854,14 +1892,14 @@ namespace Library_Jingyu
 		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
 		{
 			// 배틀 랜클라 시작 에러
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Battle LanClient Start Error");
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Battle LanClient Start Error");
 
 			return false;
 		}
 		
 
 		// 배틀 랜클라 시작 로그
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Battle LanClient Start...");
+		g_ChatLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Battle LanClient Start...");
 
 		return true;
 	}
@@ -1875,7 +1913,7 @@ namespace Library_Jingyu
 		Stop();
 
 		// 배틀 랜클라 종료 로그
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Battle LanClient Stop...");
+		g_ChatLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Battle LanClient Stop...");
 	}
 
 
@@ -1982,7 +2020,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			g_ChatDump->Crash();
@@ -2104,7 +2142,7 @@ namespace Library_Jingyu
 		if (Start(ConnectIP, Port, CreateWorker, ActiveWorker, Nodelay) == false)
 		{
 			// 모니터 랜클라 시작 에러
-			g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Monitor LanClient Start Error");
+			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Monitor LanClient Start Error");
 
 			return false;
 		}
@@ -2113,7 +2151,7 @@ namespace Library_Jingyu
 		m_hMonitorThread = (HANDLE)_beginthreadex(NULL, 0, MonitorThread, this, 0, NULL);
 
 		// 모니터 랜클라 시작 로그
-		g_ChatLog->LogSave(L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Monitor LanClient Star");
+		g_ChatLog->LogSave(true, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"Monitor LanClient Start...");
 
 		return true;
 	}

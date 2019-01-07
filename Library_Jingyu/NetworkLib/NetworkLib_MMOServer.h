@@ -153,11 +153,13 @@ namespace Library_Jingyu
 			virtual void OnAuth_ClientJoin();
 			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
+			virtual void OnAuth_HeartBeat();
 
 			// Game 스레드에서 처리
 			virtual void OnGame_ClientJoin();
 			virtual void OnGame_ClientLeave();
 			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
+			virtual void OnGame_HeartBeat();
 
 			// Release용
 			virtual void OnGame_ClientRelease();
@@ -419,6 +421,9 @@ namespace Library_Jingyu
 
 		// 하트비트로 끊긴 유저 수 얻기
 		LONG GetHeartBeatCount();
+
+		// 하트비트 여부
+		int GetHeartBeatFlag();
 
 
 

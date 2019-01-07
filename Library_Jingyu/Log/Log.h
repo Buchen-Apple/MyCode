@@ -128,7 +128,7 @@ namespace Library_Jingyu
 		// return 값
 		// true : 로그 정상적으로 저장됨 or 로그 레벨이 낮은 로그를 저장시도함. 문제는 아니니까 걍 화면에 출력만 하고 true 리턴
 		// false : 로그 저장중 에러가 생김 등 로그 저장이 안된 상황에 false 반환.
-		bool LogSave(const TCHAR* type, en_LogLevel level, const TCHAR* stringFormat, ...);
+		bool LogSave(bool ConsolFalg, const TCHAR* type, en_LogLevel level, const TCHAR* stringFormat, ...);
 
 		// Log를 Hex로 저장하는 함수.
 		// 패킷 오류났을 시 패킷을 남기는 용도이며, 무조건 BYTE형태로 Buff받는다는 가정!!

@@ -199,6 +199,7 @@ namespace Library_Jingyu
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;
+			int HeartBeat;
 
 			// 외부에서 접속할 IP
 			TCHAR ChatIP[20];

@@ -782,7 +782,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			// 덤프
@@ -790,6 +790,17 @@ namespace Library_Jingyu
 		}
 	}
 
+	// Auth 모드의 유저가 하트비트로 끊김
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattleServer_Room::CGameSession::OnAuth_HeartBeat()
+	{
+		// 에러 로그 찍기
+		// 로그 찍기 (로그 레벨 : 에러)
+		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			L"HeartBeat!! AccoutnNo : %lld", m_Int64AccountNo);
+	}
 
 
 	// --------------- GAME 모드용 함수
@@ -1074,7 +1085,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			// 덤프
@@ -1082,6 +1093,17 @@ namespace Library_Jingyu
 		}
 	}
 
+	// Game 모드의 유저가 하트비트로 끊김
+	//
+	// Parameter : 없음
+	// return : 없음
+	void CBattleServer_Room::CGameSession::OnGame_HeartBeat()
+	{
+		// 에러 로그 찍기
+		// 로그 찍기 (로그 레벨 : 에러)
+		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			L"HeartBeat!! AccoutnNo : %lld", m_Int64AccountNo);
+	}
 
 
 	// --------------- Release 모드용 함수
@@ -1107,7 +1129,7 @@ namespace Library_Jingyu
 	{
 		// 에러 로그 찍기
 		// 로그 찍기 (로그 레벨 : 에러)
-		g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 			L"Semaphore!! AccoutnNo : %lld", m_Int64AccountNo);
 	}
 
@@ -1188,7 +1210,7 @@ namespace Library_Jingyu
 			{
 				// 에러 로그 찍기
 				// 로그 찍기 (로그 레벨 : 에러)
-				g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+				g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 					L"Auth_LoginPacket_AUTH()--> BattleEnterToken Error!! AccoutnNo : %lld", m_Int64AccountNo);
 
 				InterlockedIncrement(&m_pParent->m_lBattleEnterTokenError);
@@ -1216,7 +1238,7 @@ namespace Library_Jingyu
 		{
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Auth_LoginPacket_AUTH()--> VerCode Error!! AccoutnNo : %lld, Code : %d", m_Int64AccountNo, Ver_Code);
 
 			// 버전이 다를경우 Result 5(버전 오류)를 보낸다.
@@ -1245,7 +1267,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Auth_LoginPacket_AUTH()--> Overlapped Login!! AccoutnNo : %lld", m_Int64AccountNo);
 
 			// 중복 로그인 패킷 보내기
@@ -1338,7 +1360,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Enter Room --> Not Find Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			// 방이 없으면, 에러 리턴
@@ -1371,7 +1393,7 @@ namespace Library_Jingyu
 		{
 			// 에러 로그 찍기
 		// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Enter Room --> Not Wait Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			// 대기방이 아니면, 에러 리턴
@@ -1399,7 +1421,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Enter Room --> Full Room !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			// 이미 최대 인원수라면, 에러 리턴			
@@ -1426,7 +1448,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Enter Room --> Room Token Error !! AccoutnNo : %lld, RoomNo : %d", m_Int64AccountNo, RoomNo);
 
 			InterlockedIncrement(&m_pParent->m_lRoomEnterTokenError);		
@@ -1799,7 +1821,7 @@ namespace Library_Jingyu
 			// 없을 가능성 있음. 100 m/s 이내에 이미 나갔을 가능성
 
 			//로그 남긴다.
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
 				L"Game_HitDamage_Packet() --> Target Not Find (Attack : %lld, Target : %lld)", m_Int64AccountNo, TargetAccountNo);
 
 			return;
@@ -2001,7 +2023,7 @@ namespace Library_Jingyu
 			// 없을 가능성 있음. 100 m/s 이내에 이미 나갔을 가능성
 
 			//로그 남긴다.
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_DEBUG,
 				L"Game_KickDamage_Packet() --> Target Not Find (Attack : %lld, Target : %lld)", m_Int64AccountNo, TargetAccountNo);
 
 			return;
@@ -3694,7 +3716,7 @@ namespace Library_Jingyu
 			return false;
 
 		// 서버 오픈 로그 찍기		
-		g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		g_BattleServer_RoomLog->LogSave(true, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 
@@ -3796,7 +3818,8 @@ namespace Library_Jingyu
 			"GameMode SessionNum : %d (Auth + Game : %d)\n\n"
 
 			"PacketPool_Net : %d\n"
-			"Accept Socket Queue : %d\n\n"
+			"Accept Socket Queue : %d\n"
+			"HeartBeat : %d\n\n"
 
 			"Accept Total : %lld\n"
 			"Accept TPS : %d\n"
@@ -3853,6 +3876,7 @@ namespace Library_Jingyu
 
 			CProtocolBuff_Net::GetNodeCount(),
 			GetASQ_Count(),
+			GetHeartBeatFlag(),
 
 			GetAccpetTotal(),
 			GetAccpetTPS(),
@@ -4189,7 +4213,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, 
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Auth_LoginPacket_AUTH()--> DB Result Error!! AccoutnNo : %lld, Error : %d", NowPlayer->m_Int64AccountNo, iResult);
 
 			WORD Type = en_PACKET_CS_GAME_RES_LOGIN;
@@ -4229,7 +4253,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Auth_LoginPacket_AUTH()--> SessionKey Error!! AccoutnNo : %lld", NowPlayer->m_Int64AccountNo);
 
 			// 다른 HTTP 요청이 종료 패킷을 또 보내지 못하도록 플래그 변경.
@@ -4311,7 +4335,7 @@ namespace Library_Jingyu
 
 			// 에러 로그 찍기
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
 				L"Auth_LoginPacket_Info()--> DB Result Error!! AccoutnNo : %lld, Error : %d", NowPlayer->m_Int64AccountNo, iResult);
 
 			// 다른 HTTP 요청이 종료 패킷을 또 보내지 못하도록 플래그 변경.
@@ -4667,7 +4691,7 @@ namespace Library_Jingyu
 			catch (CException& exc)
 			{
 				// 로그 찍기 (로그 레벨 : 에러)
-				g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+				g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 					(TCHAR*)exc.GetExceptionText());
 
 				// 덤프
@@ -5303,7 +5327,7 @@ namespace Library_Jingyu
 	void CBattleServer_Room::OnError(int error, const TCHAR* errorStr)
 	{
 		// 로그 찍기 (로그 레벨 : 에러)
-		g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
+		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);
 	}
 
@@ -5895,7 +5919,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			g_BattleServer_Room_Dump->Crash();
@@ -6634,7 +6658,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			g_BattleServer_RoomLog->LogSave(L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			g_BattleServer_Room_Dump->Crash();

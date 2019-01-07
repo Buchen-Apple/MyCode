@@ -397,11 +397,13 @@ namespace Library_Jingyu
 			virtual void OnAuth_ClientJoin();
 			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
+			virtual void OnAuth_HeartBeat();
 
 			// Game 스레드에서 처리
 			virtual void OnGame_ClientJoin();
 			virtual void OnGame_ClientLeave();
 			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
+			virtual void OnGame_HeartBeat();
 
 			// Release용
 			virtual void OnGame_ClientRelease();			
@@ -821,7 +823,7 @@ namespace Library_Jingyu
 		{
 			// Auth_Update에서 한 프레임에 처리할 HTTP통신 후처리
 			// 고정 값
-			const int m_iHTTP_MAX = 100;
+			const int m_iHTTP_MAX = 50;
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
@@ -833,17 +835,17 @@ namespace Library_Jingyu
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 100;
+			const int m_iLoopCreateRoomCount = 200;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
 			// 고정 값
-			const int m_iLoopRoomModeChange = 100;
+			const int m_iLoopRoomModeChange = 50;
 
 			// 토큰 재발급 시간
 			// 밀리세컨드 단위.
 			// ex) 1000일 경우, 1초 단위로 토큰 재발급.
-			const int m_iTokenChangeSlice = 120000;
+			const int m_iTokenChangeSlice = 20000;
 
 			// 방이 Ready상태가 되었을 때 카운트다운.
 			// 초 기준

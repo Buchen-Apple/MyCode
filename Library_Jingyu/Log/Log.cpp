@@ -318,7 +318,7 @@ namespace Library_Jingyu
 	// return 값
 	// true : 로그 정상적으로 저장됨 or 로그 레벨이 낮은 로그를 저장시도함. 문제는 아니니까 걍 화면에 출력만 하고 true 리턴
 	// false : 로그 저장중 에러가 생김 등 로그 저장이 안된 상황에 false 반환.
-	bool CSystemLog::LogSave(const TCHAR* type, en_LogLevel level, const TCHAR* stringFormat, ...)
+	bool CSystemLog::LogSave(bool ConsolFalg, const TCHAR* type, en_LogLevel level, const TCHAR* stringFormat, ...)
 	{
 		// 1. 입력받은 로그 레벨 스트링 생성
 		TCHAR tcLogLevel[10];
@@ -425,32 +425,35 @@ namespace Library_Jingyu
 		}
 
 		// 화면 출력용 스트링 만들기 ---------------------
-		retval = StringCchPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
-			type, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, tcContent);
-
-		// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
-		// 에러나면 에러났다고 로그 저장.
-		if (retval != S_OK)
+		if (ConsolFalg == true)
 		{
-			TCHAR tcLogSaveingError[SYSTEM_LOG_SIZE];
+			retval = StringCchPrintf(tcConsoleBuff, SYSTEM_LOG_SIZE, _T("[%s] [%02d:%02d:%02d / %s ] %s\n"),
+				type, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, tcContent);
 
-			// tcContent가 너무 길 수도 있으니 잘라낸다.
-			// 약 700글자 정도
-			_tcsncpy_s(tcContent, SYSTEM_LOG_SIZE, tcContent, 700);
+			// StringCbPrintf() 에러 처리. S_OK가 아니면 무조건 에러
+			// 에러나면 에러났다고 로그 저장.
+			if (retval != S_OK)
+			{
+				TCHAR tcLogSaveingError[SYSTEM_LOG_SIZE];
 
-			StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
-				_T("LOG_ERROR_ConsoleBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcContent);
+				// tcContent가 너무 길 수도 있으니 잘라낸다.
+				// 약 700글자 정도
+				_tcsncpy_s(tcContent, SYSTEM_LOG_SIZE, tcContent, 700);
 
-			// 파일에 저장
-			FileSave(tcFileName, tcLogSaveingError);
+				StringCchPrintf(tcLogSaveingError, SYSTEM_LOG_SIZE, _T("[%s] [%d-%02d-%02d %02d:%02d:%02d / %s / %09u] %s-->%s\n"),
+					_T("LOG_ERROR_ConsoleBuff"), stNowTime.wYear, stNowTime.wMonth, stNowTime.wDay, stNowTime.wHour, stNowTime.wMinute, stNowTime.wSecond, tcLogLevel, Count, type, tcContent);
 
-			printf("LOG_ERROR_ConsoleBuff. LogSave Error!!\n");
+				// 파일에 저장
+				FileSave(tcFileName, tcLogSaveingError);
 
-			return false;
+				printf("LOG_ERROR_ConsoleBuff. LogSave Error!!\n");
+
+				return false;
+			}
+
+			// 5. 화면에 출력한다.
+			_tprintf(_T("%s"), tcConsoleBuff);
 		}
-
-		// 5. 화면에 출력한다.
-		_tprintf(_T("%s"), tcConsoleBuff);
 
 
 		// 6. 파일에 저장

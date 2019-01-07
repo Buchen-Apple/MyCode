@@ -66,7 +66,7 @@ namespace Library_Jingyu
 			ExitFunc(WorkerThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cLanClientLibLog->LogSave(L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
+			cLanClientLibLog->LogSave(false, L"NetServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -85,7 +85,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
+			cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -109,7 +109,7 @@ namespace Library_Jingyu
 				ExitFunc(i);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
+				cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -132,7 +132,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> ConnectThread Create Error : NetError(%d), OSError(%d)",
+			cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> ConnectThread Create Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -180,7 +180,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
+			cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -210,7 +210,7 @@ namespace Library_Jingyu
 		Reset();
 
 		// 6. 클라 종료 로그 찍기		
-		cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
+		cLanClientLibLog->LogSave(true, L"LanClient", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 	// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
@@ -629,7 +629,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> socket() Error : NetError(%d), OSError(%d)",
+				cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> socket() Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// ConnectFlag 변경
@@ -656,7 +656,7 @@ namespace Library_Jingyu
 					ExitFunc(m_iW_ThreadCount);
 
 					// 로그 찍기 (로그 레벨 : 에러)
-					cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
+					cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"ConnectFunc() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
 						(int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// ConnectFlag 변경
@@ -784,7 +784,7 @@ namespace Library_Jingyu
 				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT;
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
+				cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"accpet(). Abonormal_exit : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// 에러 발생 함수 호출
@@ -1055,7 +1055,7 @@ namespace Library_Jingyu
 					StringCchPrintf(tcErrorString, 300, _T("RecvPost --> WSANOBUFS"));
 
 					// 로그 찍기 (로그 레벨 : 에러)
-					cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// 끊어야하니 셧다운 호출
@@ -1169,7 +1169,7 @@ namespace Library_Jingyu
 						StringCchPrintf(tcErrorString, 300, _T("SendPost --> WSANOBUFS."));
 
 						// 로그 찍기 (로그 레벨 : 에러)
-						cLanClientLibLog->LogSave(L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
+						cLanClientLibLog->LogSave(false, L"LanClient", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 							tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 						// 끊는다.

@@ -116,11 +116,13 @@ namespace Library_Jingyu
 	void CMMOServer::cSession::OnAuth_ClientJoin() {}
 	void CMMOServer::cSession::OnAuth_ClientLeave(bool bGame) {}
 	void CMMOServer::cSession::OnAuth_Packet(CProtocolBuff_Net* Packet) {}
+	void CMMOServer::cSession::OnAuth_HeartBeat() {}
 
 	// Game 스레드에서 처리
 	void CMMOServer::cSession::OnGame_ClientJoin() {}
 	void CMMOServer::cSession::OnGame_ClientLeave() {}
 	void CMMOServer::cSession::OnGame_Packet(CProtocolBuff_Net* Packet) {}
+	void CMMOServer::cSession::OnGame_HeartBeat() {}
 
 	// Release용
 	void CMMOServer::cSession::OnGame_ClientRelease() {}
@@ -331,6 +333,12 @@ namespace Library_Jingyu
 	LONG CMMOServer::GetHeartBeatCount()
 	{
 		return m_lHeartBeatCount;
+	}
+
+	// 하트비트 여부
+	int CMMOServer::GetHeartBeatFlag()
+	{
+		return  m_stConfig.HeartBeatFlag;
 	}
 
 
@@ -720,7 +728,7 @@ namespace Library_Jingyu
 						NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 					// 로그 찍기 (로그 레벨 : 에러)
-					cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
+					cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
 					// 에러 함수 호출
@@ -1286,6 +1294,7 @@ namespace Library_Jingyu
 								// 셧다운 대상인지 체크
 								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
 								{
+									NowSession->OnAuth_HeartBeat();
 									NowSession->Disconnect();
 									InterlockedIncrement(&g_This->m_lHeartBeatCount);
 								}
@@ -1459,6 +1468,7 @@ namespace Library_Jingyu
 							// 셧다운 대상인지 체크
 							if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
 							{
+								NowSession->OnGame_HeartBeat();
 								NowSession->Disconnect();
 								InterlockedIncrement(&g_This->m_lHeartBeatCount);
 							}
@@ -1722,7 +1732,7 @@ namespace Library_Jingyu
 								NowSession->m_ullSessionID, NowSession->m_IP, NowSession->m_prot);
 
 							// 로그 찍기 (로그 레벨 : 에러)
-							cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
+							cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 								tcErrorString, (int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
 
 							// 에러 함수 호출
@@ -2014,7 +2024,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WSAStartup() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2033,7 +2043,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> CreateIoCompletionPort() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2057,7 +2067,7 @@ namespace Library_Jingyu
 				ExitFunc(i);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> WorkerThread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2082,7 +2092,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Send Thread Create Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Send Thread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2106,7 +2116,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Auth Thread Create Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Auth Thread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2131,7 +2141,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Game Thread Create Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Game Thread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2151,7 +2161,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Release Thread Create Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Release Thread Create Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2170,7 +2180,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> socket() Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> socket() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2196,7 +2206,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> bind() Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> bind() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2215,7 +2225,7 @@ namespace Library_Jingyu
 			ExitFunc(m_iW_ThreadCount);
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> listen() Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> listen() Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// false 리턴
@@ -2239,7 +2249,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2263,7 +2273,7 @@ namespace Library_Jingyu
 				ExitFunc(m_iW_ThreadCount);
 
 				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> Accept Thread Create Error : NetError(%d), OSError(%d)",
 					(int)m_iMyErrorCode, m_iOSErrorCode);
 
 				// false 리턴
@@ -2302,7 +2312,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Accept Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2346,7 +2356,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Auth Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Auth Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2375,7 +2385,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Game Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Game Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2403,7 +2413,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Send Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Send Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2431,7 +2441,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__WFSO_ERROR;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Release Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Release Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2461,7 +2471,7 @@ namespace Library_Jingyu
 			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__W_THREAD_ABNORMAL_EXIT;
 
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Stop() --> Worker Thread EXIT Error : NetError(%d), OSError(%d)",
 				(int)m_iMyErrorCode, m_iOSErrorCode);
 
 			// 에러 발생 함수 호출
@@ -2522,7 +2532,7 @@ namespace Library_Jingyu
 		m_bServerLife = false;
 
 		// 11. 서버 종료 로그 찍기		
-		cMMOServer_Log->LogSave(L"MMOServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
+		cMMOServer_Log->LogSave(true, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 	   
 	// 세션 셋팅
