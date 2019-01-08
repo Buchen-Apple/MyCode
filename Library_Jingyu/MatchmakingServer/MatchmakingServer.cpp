@@ -328,8 +328,8 @@ namespace Library_Jingyu
 		CBConnectorTLS* pMatchDBcon = new CBConnectorTLS(g_This->m_stConfig.DB_IP, g_This->m_stConfig.DB_User, g_This->m_stConfig.DB_Password, g_This->m_stConfig.DB_Name, g_This->m_stConfig.DB_Port);
 
 		// 1. Insert 쿼리 날린다.	
-		char cQurey[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
-		pMatchDBcon->Query_Save(cQurey, iServerNo, g_This->m_cServerIP, g_This->m_stConfig.Port);
+		char cQureyStart[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
+		pMatchDBcon->Query_Save(cQureyStart, iServerNo, g_This->m_cServerIP, g_This->m_stConfig.Port);
 
 		// 2. 에러 확인
 		int Error = pMatchDBcon->GetLastError();
@@ -357,6 +357,8 @@ namespace Library_Jingyu
 		}
 
 		// ------- DB 하트비트 로직
+		char cQurey[150] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW(), `connectuser` = %lld WHERE `serverno` = %d\0";
+
 		while (1)
 		{
 			// 메치메이킹DB의 하트비트 갱신 시간만큼 잔다.
@@ -378,8 +380,7 @@ namespace Library_Jingyu
 			// 무엇도 아니라면 할일 한다. (시간이 되어서 깨어났거나, 누군가 일을 시켰거나)
 			// -------------------------------
 
-			// 1. 쿼리 날리기
-			char cQurey[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW(), `connectuser` = %lld WHERE `serverno` = %d\0";
+			// 1. 쿼리 날리기			
 			pMatchDBcon->Query_Save(cQurey, pUmapPlayer->size(), iServerNo);
 
 			// 2. 에러 확인
@@ -387,12 +388,40 @@ namespace Library_Jingyu
 
 			if (Error != 0)
 			{
-				// 에러가 발생했다면 로그 남기고 크래시
-				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
+				if (Error == 2013)
+				{
+					int Loop = 0;
+					cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+						L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error, Loop);
 
-				gMatchServerDump->Crash();
+					while (Loop < 5)
+					{
+						Loop++;
+
+						pMatchDBcon->Query_Save(cQurey, pUmapPlayer->size(), iServerNo);
+
+						int TempError = pMatchDBcon->GetLastError();
+
+						if (TempError == 0)
+							break;
+						
+						cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+							L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error, Loop);
+						
+					}
+				}
+
+				else
+				{
+					// 에러가 발생했다면 로그 남기고 크래시
+					cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+						L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
+
+					gMatchServerDump->Crash();
+				}
 			}			
+
+
 		}
 
 		delete pMatchDBcon;

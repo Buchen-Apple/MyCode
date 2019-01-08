@@ -145,7 +145,7 @@ namespace Library_Jingyu
 		char		m_cQueryUTF8[eQUERY_MAX_LEN];
 
 		int			m_iLastError;
-		WCHAR		m_wcLastErrorMsg[128];
+		WCHAR		m_wcLastErrorMsg[1024];
 
 	};
 }

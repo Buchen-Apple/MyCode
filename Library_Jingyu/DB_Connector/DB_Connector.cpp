@@ -449,8 +449,8 @@ namespace Library_Jingyu
 	CBConnectorTLS::CBConnectorTLS(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort)
 	{
 		// ------------------- 로그 저장할 파일 셋팅
-		//g_DBLog->SetDirectory(L"DBConnector");
-		//g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
+		g_DBLog->SetDirectory(L"DB_Connector");
+		g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
 
 		// 1. DBConnector 보관용 스택
 		m_stackConnector = new CLF_Stack< CDBConnector*>(false);
