@@ -122,6 +122,9 @@ namespace Library_Jingyu
 		// 디폴트 셋팅을 utf8로 셋팅
 		mysql_set_character_set(m_pMySQL, "utf8");
 
+		// 에러 초기값 0으로 초기화
+		m_iLastError = 0;
+
 		return true;		
 	}
 
@@ -158,6 +161,8 @@ namespace Library_Jingyu
 			g_DBDump->Crash();
 		}		
 
+		m_iLastError = 0;
+
 		// 2. 쿼리 날리기
 		int Error, Count;
 		while (1)
@@ -183,10 +188,10 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
+					{
+						m_iLastError = 0;
 						break;
-
-					// 멤버변수에 에러 셋팅
-					SaveLastError();
+					}
 
 					// 카운트 1 증가
 					Count++;
@@ -197,7 +202,12 @@ namespace Library_Jingyu
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
 					if (Count > 5)
+					{
+						// 멤버변수에 에러 셋팅
+						SaveLastError();
+
 						g_DBDump->Crash();
+					}
 
 					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(200)을 한다.
 					Sleep(200);
@@ -238,6 +248,8 @@ namespace Library_Jingyu
 
 			g_DBDump->Crash();
 		}	
+
+		m_iLastError = 0;
 		
 		// 2. 쿼리 날리기
 		int Error, Count;
@@ -264,22 +276,27 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
+					{
+						m_iLastError = 0;
 						break;
-
-					// 멤버변수에 에러 셋팅
-					SaveLastError();
+					}
 
 					// 카운트 1 증가
 					Count++;
 
 					// 실패 시 로그 남김
 					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"Query() --> Connect Fail... (Count : %d)", Count);
+						L"Query() --> Connect Fail... (Count : %d). Error : %d", Count, mysql_errno(&m_MySQL));
 
 					// 5번 시도했으면 서버 끈다. 
 					// 더 이상 돌려도 어차피 저장 안됨.
 					if (Count > 5)
+					{
+						// 멤버변수에 에러 셋팅
+						SaveLastError();
+
 						g_DBDump->Crash();
+					}
 
 					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(200)을 한다.
 					Sleep(200);
@@ -298,7 +315,7 @@ namespace Library_Jingyu
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
 		mysql_free_result(m_pSqlResult);
-		m_iLastError = 0;
+		
 	}
 		
 
@@ -325,6 +342,8 @@ namespace Library_Jingyu
 			g_DBDump->Crash();
 		}
 
+		m_iLastError = 0;
+
 		// 2. 쿼리 날리기
 		int Error, Count;
 		while (1)
@@ -350,21 +369,25 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
+					{
+						m_iLastError = 0;
 						break;
-
-					// 멤버변수에 에러 셋팅
-					SaveLastError();
+					}
 
 					// 카운트 1 증가
 					Count++;
 
 					// 실패 시 로그 남김
 					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"Query() --> Connect Fail... (Count : %d)", Count);
+						L"Query() --> Connect Fail... (Count : %d). Error : %d", Count, mysql_errno(&m_MySQL));
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
 					if (Count > 5)
+					{
+						// 멤버변수에 에러 셋팅
+						SaveLastError();
 						g_DBDump->Crash();
+					}
 
 					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
 					Sleep(200);
@@ -393,8 +416,7 @@ namespace Library_Jingyu
 
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
-		mysql_free_result(m_pSqlResult);
-		m_iLastError = 0;
+		mysql_free_result(m_pSqlResult);		
 	}
 
 	//////////////////////////////////////////////////////////////////////

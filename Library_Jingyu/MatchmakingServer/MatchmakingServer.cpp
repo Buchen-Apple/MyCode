@@ -388,13 +388,23 @@ namespace Library_Jingyu
 
 			if (Error != 0)
 			{
+				// 에러가 발생했다면 로그 남기고 크래시
+				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
+					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
+
+				gMatchServerDump->Crash();
+			}
+
+			/*
+			if (Error != 0)
+			{
 				if (Error == 2013)
 				{
 					int Loop = 0;
 					cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
 						L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error, Loop);
 
-					while (Loop < 5)
+					while (Loop < 6)
 					{
 						Loop++;
 
@@ -406,9 +416,15 @@ namespace Library_Jingyu
 							break;
 						
 						cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-							L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error, Loop);
+							L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), TempError, Loop);
 						
 					}
+
+					if (Loop >= 6)
+					{
+						gMatchServerDump->Crash();
+					}
+
 				}
 
 				else
@@ -420,7 +436,7 @@ namespace Library_Jingyu
 					gMatchServerDump->Crash();
 				}
 			}			
-
+			*/
 
 		}
 
