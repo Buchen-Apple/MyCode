@@ -380,29 +380,30 @@ namespace Library_Jingyu
 			// 무엇도 아니라면 할일 한다. (시간이 되어서 깨어났거나, 누군가 일을 시켰거나)
 			// -------------------------------
 
-			// 1. 쿼리 날리기			
+			// 1. 쿼리 날리기	
 			pMatchDBcon->Query_Save(cQurey, pUmapPlayer->size(), iServerNo);
 
 			// 2. 에러 확인
-			int Error = pMatchDBcon->GetLastError();
+			int Error2 = pMatchDBcon->GetLastError();
 
-			if (Error != 0)
+			/*		
+			if (Error2 != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
 				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
+					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error2);
 
 				gMatchServerDump->Crash();
 			}
+			*/
 
-			/*
-			if (Error != 0)
+			if (Error2 != 0)
 			{
-				if (Error == 2013)
+				if (Error2 == 2013)
 				{
 					int Loop = 0;
 					cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error, Loop);
+						L"DBHeartbeatThread() --> Query Error. %s(%d). Loop", pMatchDBcon->GetLastErrorMsg(), Error2, Loop);
 
 					while (Loop < 6)
 					{
@@ -435,9 +436,7 @@ namespace Library_Jingyu
 
 					gMatchServerDump->Crash();
 				}
-			}			
-			*/
-
+			}	
 		}
 
 		delete pMatchDBcon;

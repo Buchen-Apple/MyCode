@@ -159,14 +159,13 @@ namespace Library_Jingyu
 				L"Query --> vlist Change Error...");
 
 			g_DBDump->Crash();
-		}		
-
-		m_iLastError = 0;
+		}			
 
 		// 2. 쿼리 날리기
 		int Error, Count;
 		while (1)
 		{
+			m_iLastError = 0;
 			Error = mysql_query(m_pMySQL, m_cQueryUTF8);
 
 			// 성공 시 break;
@@ -188,10 +187,7 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
-					{
-						m_iLastError = 0;
 						break;
-					}
 
 					// 카운트 1 증가
 					Count++;
@@ -247,14 +243,13 @@ namespace Library_Jingyu
 				L"Query_Save --> vlist Change Error...");
 
 			g_DBDump->Crash();
-		}	
-
-		m_iLastError = 0;
+		}			
 		
 		// 2. 쿼리 날리기
 		int Error, Count;
 		while (1)
 		{			
+			m_iLastError = 0;
 			Error = mysql_query(m_pMySQL, m_cQueryUTF8);
 
 			// 성공 시 break;
@@ -276,10 +271,7 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
-					{
-						m_iLastError = 0;
 						break;
-					}
 
 					// 카운트 1 증가
 					Count++;
@@ -314,8 +306,7 @@ namespace Library_Jingyu
 
 		// 4. 결과 받은 후, 바로 result 한다.		
 		m_pSqlResult = mysql_store_result(m_pMySQL);
-		mysql_free_result(m_pSqlResult);
-		
+		mysql_free_result(m_pSqlResult);		
 	}
 		
 
@@ -340,14 +331,13 @@ namespace Library_Jingyu
 				L"Query_Save(CreatTable) --> vlist Change Error...");
 
 			g_DBDump->Crash();
-		}
-
-		m_iLastError = 0;
+		}	
 
 		// 2. 쿼리 날리기
 		int Error, Count;
 		while (1)
 		{
+			m_iLastError = 0;
 			Error = mysql_query(m_pMySQL, m_cQueryUTF8);
 
 			// 성공 시 break;
@@ -369,10 +359,7 @@ namespace Library_Jingyu
 					// DB 연결
 					m_pMySQL = mysql_real_connect(&m_MySQL, m_cDBIP, m_cDBUser, m_cDBPassword, m_cDBName, m_iDBPort, NULL, 0);
 					if (m_pMySQL != NULL)
-					{
-						m_iLastError = 0;
 						break;
-					}
 
 					// 카운트 1 증가
 					Count++;
@@ -471,8 +458,8 @@ namespace Library_Jingyu
 	CBConnectorTLS::CBConnectorTLS(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort)
 	{
 		// ------------------- 로그 저장할 파일 셋팅
-		g_DBLog->SetDirectory(L"DB_Connector");
-		g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
+		//g_DBLog->SetDirectory(L"DB_Connector");
+		//g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
 
 		// 1. DBConnector 보관용 스택
 		m_stackConnector = new CLF_Stack< CDBConnector*>(false);
@@ -492,15 +479,15 @@ namespace Library_Jingyu
 			g_DBDump->Crash();
 
 		// 2. 사용자 이름
-		if (StringCchCopy(m_wcDBUser, 64, User) != S_OK)
+		if (StringCchCopy(m_wcDBUser, 40, User) != S_OK)
 			g_DBDump->Crash();
 
 		// 3. 비밀번호
-		if (StringCchCopy(m_wcDBPassword, 64, Password) != S_OK)
+		if (StringCchCopy(m_wcDBPassword, 40, Password) != S_OK)
 			g_DBDump->Crash();
 
 		// 4. DB 이름
-		if (StringCchCopy(m_wcDBName, 64, DBName) != S_OK)
+		if (StringCchCopy(m_wcDBName, 40, DBName) != S_OK)
 			g_DBDump->Crash();
 
 		// 5. 포트
