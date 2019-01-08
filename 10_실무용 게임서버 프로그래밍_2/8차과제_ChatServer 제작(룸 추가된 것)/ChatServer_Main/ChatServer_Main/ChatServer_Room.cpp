@@ -80,14 +80,17 @@ namespace Library_Jingyu
 				while (itor_Begin != itor_End)
 				{
 					// 마지막 패킷을 받은지 30초 이상이 되었다면
-					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 30000)
+					// !! 계산 결과 음수도 나올 수 있기 때문에, 음수도 체크되어야 함 !!
+					// !! 그래서 계산 결과 값은 int형으로 받는다 !!
+					int Time = (timeGetTime() - itor_Begin->second->m_dwLastPacketTime);
+					if (Time > 30000)
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
 
 						// 하트비트 로그 남기기
 						// 로그 찍기 (로그 레벨 : 에러)
-						g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld, State : %d", 
-							itor_Begin->second->m_i64AccountNo, itor_Begin->second->State);
+						g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld, Time : %d", 
+							itor_Begin->second->m_i64AccountNo, Time);
 
 						Size++;
 					}
@@ -409,7 +412,7 @@ namespace Library_Jingyu
 		MonitorConnect : %d, BattleConnect : %d	- 모니터링 서버에 접속 여부, 배틀 랜 서버에 접속 여부. 1이면 접속함.
 		SessionNum : 	- NetServer 의 세션수
 		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
-		HeartBeat :			- 하트비트 중인지. 1이면 하트비트 중
+		HeartBeat Flag :			- 하트비트 중인지. 1이면 하트비트 중
 
 		PlayerData_Pool :	- Player 구조체 할당량
 		Player Count : 		- Contents 파트 Player 개수
@@ -448,7 +451,7 @@ namespace Library_Jingyu
 			"MonitorConnect : %d, BattleConnect : %d\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n"
-			"HeartBeat : %d\n\n"
+			"HeartBeat Flag : %d\n\n"
 
 			"PlayerData_Pool : %d\n"
 			"Player Count : %lld\n\n"
@@ -846,8 +849,6 @@ namespace Library_Jingyu
 			*/
 		}	
 
-		// !! 테스트 !! 
-		NowPlayer->State = 2;
 
 		// 마지막으로 패킷 받은시간 갱신
 		NowPlayer->m_dwLastPacketTime = timeGetTime();
@@ -967,9 +968,6 @@ namespace Library_Jingyu
 		// 없으면 크래시
 		if (NowPlayer == nullptr)
 			g_ChatDump->Crash();
-
-		// !! 테스트 !! 
-		NowPlayer->State = 3;
 
 
 		// 2. 마샬링
@@ -1316,9 +1314,6 @@ namespace Library_Jingyu
 		// 마지막 패킷 받은 시간 갱신
 		NewPlayer->m_dwLastPacketTime = timeGetTime();
 
-		// !! 테스트 !! 
-		NewPlayer->State = 1;
-
 		// 3. 자료구조에 추가
 		InsertPlayerFunc(SessionID, NewPlayer);
 	}
@@ -1336,24 +1331,21 @@ namespace Library_Jingyu
 		if (DeletePlayer == nullptr)
 			g_ChatDump->Crash();
 
-		// !! 테스트 !! 
-		DeletePlayer->State = 4;
-
 		int RoomNo = DeletePlayer->m_iRoomNo;
 
 
 		// 2. 로그인 상태일 경우
 		if (DeletePlayer->m_bLoginCheck == true)
 		{
+			DeletePlayer->m_bLoginCheck = false;
+
 			// 로그인 유저 카운트 감소
 			InterlockedDecrement(&m_lChatLoginCount);
 
 			// 로그인 자료구조에서 제거
 			if(EraseLoginPlayerFunc(DeletePlayer->m_i64AccountNo) == false)
 				g_ChatDump->Crash();
-		}	
-
-		DeletePlayer->m_bLoginCheck = false;
+		}		
 
 
 		// 3. 룸에 들어가 있다면, 룸에서 제거
@@ -1406,9 +1398,6 @@ namespace Library_Jingyu
 				m_pRoom_Pool->Free(DeleteRoom);				
 			}
 		}
-
-		// !! 테스트 !! 
-		DeletePlayer->State = 0;
 
 		// 4. stPlayer* Free
 		m_pPlayer_Pool->Free(DeletePlayer);

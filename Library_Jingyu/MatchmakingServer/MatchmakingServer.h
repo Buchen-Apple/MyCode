@@ -87,11 +87,12 @@ namespace Library_Jingyu
 			// 마스터 서버로 방 정보 요청을 보낸 유저. true면 보낸 유저.
 			bool m_bSendMaster_RoomInfo;
 
-			// 마지막으로 패킷을 받은 시간 보관 변ㅅ
+			// 마지막으로 패킷을 받은 시간 보관 변수
 			DWORD m_dwLastPacketTime;
 
 			stPlayer()
 			{
+				m_i64AccountNo = -1;	// 최초 생성시에는 -1로 시작
 				m_bLoginCheck = false;	// 최초 생성시에는 flase로 시작
 				m_bBattleRoomEnterCheck = false;	// 최초 생성시에는 flase로 시작
 				m_bSendMaster_RoomInfo = false;
@@ -108,10 +109,6 @@ namespace Library_Jingyu
 
 		// HTTP로 통신하는 변수
 		HTTP_Exchange* m_HTTP_Post;
-
-		// DB_Connector TLS 버전
-		// MatchmakingDB와 연결
-		CBConnectorTLS* m_MatchDBcon;
 
 		// 해당 매칭서버의 No.
 		// 파싱으로 읽어온다.
@@ -263,13 +260,6 @@ namespace Library_Jingyu
 		// return : 정상적으로 셋팅 시 true
 		//		  : 그 외에는 false
 		bool SetFile(stConfigFile* pConfig);
-
-		// 매치메이킹 DB에, 초기 정보를 Insert하는 함수.
-		// 이미, 데이터가 존재하는 경우, 정보를 Update한다.
-		// 
-		// Parameter : 없음
-		// return : 없음
-		void ServerInfo_DBInsert();
 
 		// ClientKey 만드는 함수
 		//

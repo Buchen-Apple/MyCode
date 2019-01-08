@@ -115,8 +115,8 @@ namespace Library_Jingyu
 			if (iConnectCount >= 5)
 				g_DBDump->Crash();	
 
-			// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
-			Sleep(100);
+			// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(200)을 한다.
+			Sleep(200);
 		}
 
 		// 디폴트 셋팅을 utf8로 셋팅
@@ -196,11 +196,11 @@ namespace Library_Jingyu
 						L"Query() --> Connect Fail... (Error : %d)(Count : %d)", Error, Count);
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
-					if (Count >= 5)
+					if (Count > 5)
 						g_DBDump->Crash();
 
-					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
-					Sleep(0);
+					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(200)을 한다.
+					Sleep(200);
 				}
 			}
 			
@@ -276,12 +276,13 @@ namespace Library_Jingyu
 					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
 						L"Query() --> Connect Fail... (Count : %d)", Count);
 
-					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
-					if (Count >= 5)
+					// 5번 시도했으면 서버 끈다. 
+					// 더 이상 돌려도 어차피 저장 안됨.
+					if (Count > 5)
 						g_DBDump->Crash();
 
-					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
-					Sleep(0);
+					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(200)을 한다.
+					Sleep(200);
 				}
 			}
 
@@ -362,11 +363,11 @@ namespace Library_Jingyu
 						L"Query() --> Connect Fail... (Count : %d)", Count);
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
-					if (Count >= 5)
+					if (Count > 5)
 						g_DBDump->Crash();
 
 					// 바로 시도하면 실패할 가능성이 있기 때문에 Sleep(0)을 한다.
-					Sleep(0);
+					Sleep(200);
 				}
 			}
 
@@ -447,6 +448,10 @@ namespace Library_Jingyu
 	// 생성자
 	CBConnectorTLS::CBConnectorTLS(WCHAR *DBIP, WCHAR *User, WCHAR *Password, WCHAR *DBName, int DBPort)
 	{
+		// ------------------- 로그 저장할 파일 셋팅
+		//g_DBLog->SetDirectory(L"DBConnector");
+		//g_DBLog->SetLogLeve((CSystemLog::en_LogLevel)CSystemLog::en_LogLevel::LEVEL_DEBUG);
+
 		// 1. DBConnector 보관용 스택
 		m_stackConnector = new CLF_Stack< CDBConnector*>(false);
 

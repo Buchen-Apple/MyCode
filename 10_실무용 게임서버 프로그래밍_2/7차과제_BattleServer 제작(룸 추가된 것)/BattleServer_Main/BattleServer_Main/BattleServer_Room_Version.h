@@ -276,6 +276,12 @@ namespace Library_Jingyu
 			eu_ITEM_TYPE m_euType;
 			float m_fPosX;
 			float m_fPosY;
+
+			// 아이템이 존재하는 구역
+			// 0 : 유저 사망으로 인해 생성된 아이템
+			// 1 : 레드존 구역의 아이템 (라스트 레드존 제외)
+			// 2 : 레드존 구역 외의 아이템 (4개 구역)
+			BYTE m_bItemArea;
 		};
 
 		// CMMOServer의 cSession을 상속받는 세션 클래스
@@ -408,7 +414,7 @@ namespace Library_Jingyu
 			// Release용
 			virtual void OnGame_ClientRelease();			
 
-			// 테스트용
+			// GQCS에서 121에러 발생 시 호출되는 함수
 			virtual void OnSemaphore();
 
 
@@ -585,7 +591,7 @@ namespace Library_Jingyu
 			vector<CGameSession*> m_JoinUser_Vector;
 					   
 			// 입장 가능한 최대 인원 수. 고정 값
-			const int m_iMaxJoinCount = 4;	
+			const int m_iMaxJoinCount = 5;	
 
 			// ------------
 
@@ -633,7 +639,20 @@ namespace Library_Jingyu
 		
 			// ------------
 
-			DWORD StartTime;		// 테스트
+
+			// ------------
+
+			// 레드존 외 구역에 10초에 1회 아이템 생성하기
+			// 생성 위치(4구역)에 대한 배열
+			//
+			// 해당 방이 어스모드일 시 : 0
+			// 아이템이 있을 시 : 0
+			// 아이템이 없을 시 : 누군가 아이템을 획득한 시간
+			//
+			// 이 변수를 보면서 아이템 획득한 시간 기준 10초가 지나면
+			// 탄창을 생성해야 한다.
+			DWORD m_dwItemCreateTick[4];
+
 
 
 			// ------------
@@ -711,6 +730,12 @@ namespace Library_Jingyu
 			// Parameter : CGameSession* (사망한 유저)
 			// return : 없음
 			void CreateItem(CGameSession* DiePlayer);
+
+			// 좌표로 받은 위치에 받은 타입 아이템 생성
+			//
+			// Parameter : 생성될 XY좌표, 아이템 Type, 아이템 구역
+			// return : 없음
+			void CreateItem_Type(float PosX, float PosY, int Type, BYTE Area);
 
 			// 방 안의 모든 유저에게 "유저 추가됨" 패킷 보내기
 			//

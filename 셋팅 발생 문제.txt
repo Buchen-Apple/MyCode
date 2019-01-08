@@ -108,3 +108,13 @@ Mysql의 바이너리 로그는 '로그 순환' 시 삭제된다.
 즉, 문제로 안봐도 됨.
 
 찝찝해서, 일단은 wiat_timeout과 interactive_timeout의 시간을 엄청나게 길게 함.
+
+
+
+
+13. 매칭서버가 DB에 Update하다가 2013에러 (Lost connecting to MySQL server during query...)가 뜨면서 터짐
+원인 : DBConnector가 접속 실패 시, 1m/s이후에 바로 시도해서 생긴 문제..
+그동안, match가 일을 열심히 할 동안에는 1m/s동안 쉬지만 사실상 그 이상 Sleep된 상태였음
+근데, match가 널널해지다 보니 정말 1m/s만 쉬게 되어서 5m/s만에 5회 접속을 시도한 후 실패해서 크래시.
+
+해결 : Query_Save함수에서 DB접속 시도를 200m/s마다 1회씩 시도 (Sleep(200))

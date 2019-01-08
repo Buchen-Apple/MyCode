@@ -54,7 +54,8 @@ namespace Library_Jingyu
 		// --------------------
 		// 변수 선언
 		// --------------------
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+		//HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 11410);
 
 		DWORD APIType;
 		DB_WORK* pWork;
@@ -176,7 +177,8 @@ namespace Library_Jingyu
 
 		DB_WORK* pWork;
 
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+		//HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 11410);
 
 		// 출력 체크용
 		LONG* TempDBWriteTPS = &gThis->m_lDBWriteTPS;
@@ -185,7 +187,6 @@ namespace Library_Jingyu
 		{
 			// 이벤트 대기
 			DWORD Check = WaitForMultipleObjects(2, hEvent, FALSE, INFINITE);
-
 
 			// 이상한 신호라면
 			if (Check == WAIT_FAILED)
@@ -200,14 +201,9 @@ namespace Library_Jingyu
 			else if (Check == WAIT_OBJECT_0)
 				break;
 
-			int Size = pWorkerQueue->GetNodeSize();
-
 			// 1. 큐에서 일감 1개 빼오기	
-			while (Size > 0)
+			while (pWorkerQueue->Dequeue(pWork) != -1)
 			{
-				if (pWorkerQueue->Dequeue(pWork) == -1)
-					g_BattleServer_Room_Dump->Crash();
-
 				// 2. 일감 타입에 따라 로직 처리
 				switch (pWork->m_wWorkType)
 				{
@@ -217,10 +213,9 @@ namespace Library_Jingyu
 					DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)pWork;
 
 					// DB에 쿼리 날림
-					TCHAR Body[1000];
+					TCHAR Body[1000] = { 0, };
 
 					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
-					ZeroMemory(Body, sizeof(Body));
 
 					// 1. Body 만들기
 					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"playcount\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount);
@@ -235,23 +230,19 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. DBWrite TPS 증가
-					InterlockedIncrement(TempDBWriteTPS);
-
-					// 4. Json데이터 파싱하기 (UTF-16)
+					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-
-					// 5. DB 요청 결과 확인
+					// 4. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 6. DBWrite 카운트1 감소
+					// 5. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 				}
 				break;
@@ -262,10 +253,9 @@ namespace Library_Jingyu
 					DB_WORK_CONTENT_UPDATE* NowWork = (DB_WORK_CONTENT_UPDATE*)pWork;
 
 					// DB에 쿼리 날림
-					TCHAR Body[1000];
+					TCHAR Body[1000] = { 0, };
 
 					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
-					ZeroMemory(Body, sizeof(Body));
 
 					// 1. Body 만들기
 					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"kill\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount);
@@ -280,22 +270,19 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. DBWrite TPS 증가
-					InterlockedIncrement(TempDBWriteTPS);
-
-					// 4. Json데이터 파싱하기 (UTF-16)
+					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-					// 5. DB 요청 결과 확인
+					// 4. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 6. DBWrite 카운트1 감소
+					// 5. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -307,10 +294,9 @@ namespace Library_Jingyu
 					DB_WORK_CONTENT_UPDATE_2* NowWork = (DB_WORK_CONTENT_UPDATE_2*)pWork;
 
 					// DB에 쿼리 날림
-					TCHAR Body[1000];
+					TCHAR Body[1000] = { 0, };
 
 					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
-					ZeroMemory(Body, sizeof(Body));
 
 					// 1. Body 만들기
 					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"die\" : \"%d\", \"playtime\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount1, NowWork->m_iCount2);
@@ -325,23 +311,19 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. DBWrite TPS 증가
-					InterlockedIncrement(TempDBWriteTPS);
-
-					// 4. Json데이터 파싱하기 (UTF-16)
+					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-
-					// 5. DB 요청 결과 확인
+					// 4. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 6. DBWrite 카운트1 감소
+					// 5. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -353,10 +335,9 @@ namespace Library_Jingyu
 					DB_WORK_CONTENT_UPDATE_2* NowWork = (DB_WORK_CONTENT_UPDATE_2*)pWork;
 
 					// DB에 쿼리 날림
-					TCHAR Body[1000];
+					TCHAR Body[1000] = { 0, };
 
 					ZeroMemory(NowWork->m_tcResponse, sizeof(NowWork->m_tcResponse));
-					ZeroMemory(Body, sizeof(Body));
 
 					// 1. Body 만들기
 					swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld, \"win\" : \"%d\", \"playtime\" : \"%d\"}", NowWork->AccountNo, NowWork->m_iCount1, NowWork->m_iCount2);
@@ -371,22 +352,19 @@ namespace Library_Jingyu
 							gThis->m_Dump->Crash();
 					}
 
-					// 3. DBWrite TPS 증가
-					InterlockedIncrement(TempDBWriteTPS);
-
-					// 4. Json데이터 파싱하기 (UTF-16)
+					// 3. Json데이터 파싱하기 (UTF-16)
 					GenericDocument<UTF16<>> Doc;
 					Doc.Parse(NowWork->m_tcResponse);
 
 					int iResult = Doc[_T("result")].GetInt();
 
-					// 5. DB 요청 결과 확인
+					// 4. DB 요청 결과 확인
 					// 결과가 1이 아니라면 Crash.
 					// Write는 무조건 성공한다는 가정
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 6. DBWrite 카운트1 감소
+					// 5. DBWrite 카운트1 감소
 					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
 
 				}
@@ -394,12 +372,15 @@ namespace Library_Jingyu
 
 				default:
 					gThis->m_Dump->Crash();
-				}							
+				}						
 
-				// 3. DB_WORK 반환
+
+				// 3. DBWrite TPS 증가
+				InterlockedIncrement(TempDBWriteTPS);
+
+				// 4. DB_WORK 반환
 				pDBWorkPool->Free(pWork);
 
-				Size--;
 			}
 
 		}
@@ -433,11 +414,12 @@ namespace Library_Jingyu
 	void shDB_Communicate::DBWriteFunc(DB_WORK* Protocol)
 	{
 		// Wirte용 스레드에게 일감 던짐 (Normal Q 사용)
-		m_pDB_Wirte_Start_Queue->Enqueue(Protocol);
-		InterlockedIncrement(&m_lDBWriteCountTPS);
+		m_pDB_Wirte_Start_Queue->Enqueue(Protocol);		
 
 		// Write 스레드 깨우기
 		SetEvent(m_hDBWrite_Event);
+
+		InterlockedIncrement(&m_lDBWriteCountTPS);
 	}
 
 	// Battle서버 this를 받아둔다.
@@ -481,7 +463,7 @@ namespace Library_Jingyu
 
 		// DB_Read용 입출력 완료포트 생성
 		// 30개의 스레드 생성, 2개의 스레드 활성화
-		int Create = 20;
+		int Create = 30;
 		int Active = 2;
 
 		m_hDB_Read = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, Active);
@@ -507,7 +489,7 @@ namespace Library_Jingyu
 	shDB_Communicate::~shDB_Communicate()
 	{
 		// 1. DB_ReadThread 종료
-		for (int i = 0; i < 20; ++i)
+		for (int i = 0; i < 10; ++i)
 			PostQueuedCompletionStatus(m_hDB_Read, en_PHP_TYPE::EXIT, 0, 0);
 
 		WaitForMultipleObjects(4, m_hDB_Read_Thread, TRUE, INFINITE);
@@ -1124,7 +1106,10 @@ namespace Library_Jingyu
 		m_bLastDBWriteFlag = false;		
 	}
 
-	// 테스트용
+	// GQCS에서 121에러 발생 시 호출되는 함수
+	//
+	// Parameter : 없음
+	// return : 없음
 	void CBattleServer_Room::CGameSession::OnSemaphore()
 	{
 		// 에러 로그 찍기
@@ -2148,7 +2133,7 @@ namespace Library_Jingyu
 			g_BattleServer_Room_Dump->Crash();
 
 		// 생존 여부 체크
-		// 죽은 유저의 재장전 요청은 무시
+		// 죽은 유저의 아이템 획득 요청은 무시
 		if (m_bAliveFlag == false)
 			return;
 
@@ -2182,22 +2167,44 @@ namespace Library_Jingyu
 			return;
 
 		// 4. 아이템과 유저의 거리 체크.
-		// +2.8 ~ -2.8 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)
+		// +3.0f ~ -3.0f 오차까지 허용한다. (실제 좌표는, 일종의 이동 더미이기 때문에)		
+		float PosX = NowItem->m_fPosX;
+		float PosY = NowItem->m_fPosY;
+
+		// islessequal(1번인자, 2번인자) 사용법
 		// 1번인자 <= 2번인자 : true
 		// 1번인자 > 2번인자 : false
-		if (islessequal(fabs(NowItem->m_fPosX - m_fPosX), m_pParent->m_stConst.m_fGetItem_Correction) == false ||
-			islessequal(fabs(NowItem->m_fPosY - m_fPosY), m_pParent->m_stConst.m_fGetItem_Correction) == false)
+		if (islessequal(fabs(PosX - m_fPosX), m_pParent->m_stConst.m_fGetItem_Correction) == false ||
+			islessequal(fabs(PosY - m_fPosY), m_pParent->m_stConst.m_fGetItem_Correction) == false)
 		{
 			return;
 		}
 
+		// 5. 이번에 유저가 획득한 아이템이, 레드존 외 구역(4개 구역)에 생성된 아이템인지 체크
+		// 이걸 안하면, 유저가 사망하면서 남긴 아이템과 좌표가 겹칠 경우 구분방법 없음
+		if (NowItem->m_bItemArea == 2)
+		{
+			// 레드존 외 구역이라면, 아이템을 획득한 시간 갱신(즉, 아이템이 소멸한 시간)
+			int i = 0;
+			while (i < 4)
+			{
+				if (g_Data_ItemPoint_Playzone[i][0] == PosX &&
+					g_Data_ItemPoint_Playzone[i][1] == PosY)
+				{
+					NowRoom->m_dwItemCreateTick[i] = timeGetTime();
+					break;
+				}
 
-		// 5. 거리도 맞으면 정상적으로 획득한 아이템.
+				++i;
+			}
+		}
+
+		// 6. 거리도 맞으면 정상적으로 획득한 아이템.
 		// 아이템 자료구조에서 아이템 삭제
 		if (NowRoom->Item_Erase(NowItem) == false)
 			g_BattleServer_Room_Dump->Crash();
 
-		// 6. 아이템에 따라 효과 적용 및 패킷 보내기
+		// 7. 아이템에 따라 효과 적용 및 패킷 보내기
 		switch (Type)
 		{
 			// 탄창 
@@ -2762,6 +2769,7 @@ namespace Library_Jingyu
 			Item->m_fPosX = g_Data_ItemPoint_Redzone[i][0];
 			Item->m_fPosY = g_Data_ItemPoint_Redzone[i][1];
 			Item->m_euType = (eu_ITEM_TYPE)ItemType;
+			Item->m_bItemArea = 1;
 
 			// 룸 안의, 아이템 자료구조에 추가	
 			Item_Insert(m_uiItemID, Item);
@@ -2823,6 +2831,7 @@ namespace Library_Jingyu
 			Item->m_fPosX = g_Data_ItemPoint_Playzone[i][0];
 			Item->m_fPosY = g_Data_ItemPoint_Playzone[i][1];
 			Item->m_euType = (eu_ITEM_TYPE)ItemType;
+			Item->m_bItemArea = 2;
 
 			Item_Insert(m_uiItemID, Item);
 
@@ -2956,6 +2965,7 @@ namespace Library_Jingyu
 		Item->m_fPosX = itemX;
 		Item->m_fPosY = itemY;
 		Item->m_euType = (eu_ITEM_TYPE)Type;
+		Item->m_bItemArea = 0;
 
 		Item_Insert(m_uiItemID, Item);
 
@@ -2999,6 +3009,57 @@ namespace Library_Jingyu
 
 	}
 	
+	// 좌표로 받은 위치에 받은 타입 아이템 생성
+	//
+	// Parameter : 생성될 XY좌표, 아이템 Type
+	// return : 없음
+	void CBattleServer_Room::stRoom::CreateItem_Type(float PosX, float PosY, int Type, BYTE Area)
+	{
+		// 타입에 따라 아이템 생성
+
+		// 1. 탄창일 경우
+		if (Type == eu_ITEM_TYPE::CARTRIDGE)
+		{
+			// 아이템ID ++
+			++m_uiItemID;
+
+			// 룸 안의, 아이템 자료구조에 추가
+			stRoomItem* Item = m_pBattleServer->m_Item_Pool->Alloc();
+			Item->m_uiID = m_uiItemID;
+			Item->m_fPosX = PosX;
+			Item->m_fPosY = PosY;
+			Item->m_euType = (eu_ITEM_TYPE)Type;
+			Item->m_bItemArea = Area;
+
+			Item_Insert(m_uiItemID, Item);
+
+			// 패킷 보내기 ----------------------
+			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
+
+			// 타입
+			WORD Type = en_PACKET_CS_GAME_RES_CARTRIDGE_CREATE;
+			SendBuff->PutData((char*)&Type, 2);
+
+			// 아이템 ID
+			SendBuff->PutData((char*)&m_uiItemID, 4);
+
+			// 아이템 좌표
+			SendBuff->PutData((char*)&PosX, 4);
+			SendBuff->PutData((char*)&PosY, 4);
+
+			// SendPacket_브로드캐스팅
+			// 정상적인 플레이 방에 한해서 이 함수가 호출된다.
+			// 때문에, 유저가 0명일 수는 없다.
+			if (SendPacket_BroadCast(SendBuff) == false)
+				g_BattleServer_Room_Dump->Crash();
+		}
+
+		// 차후 추가될 순 있지만, 현재 이 함수는 탄창 생성할 때만 호출됨.
+		else
+			g_BattleServer_Room_Dump->Crash();
+	}
+
+
 	// 방 안의 모든 유저에게 "유저 추가됨" 패킷 보내기
 	//
 	// Parameter : 이번에 입장한 유저 CGameSession*
@@ -3759,6 +3820,7 @@ namespace Library_Jingyu
 
 		PacketPool_Net : 		- 외부에서 사용 중인 Net 직렬화 버퍼의 수
 		Accept Socket Queue :	- Accept Socket Queue 안의 일감 수
+		HeartBeat Flag	:		- 하트비트 플래그. 1이면 하트비트 중
 
 		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
 		Accept TPS :		- 초당 Accept 처리 횟수
@@ -3819,7 +3881,7 @@ namespace Library_Jingyu
 
 			"PacketPool_Net : %d\n"
 			"Accept Socket Queue : %d\n"
-			"HeartBeat : %d\n\n"
+			"HeartBeat Flag : %d\n\n"
 
 			"Accept Total : %lld\n"
 			"Accept TPS : %d\n"
@@ -4777,9 +4839,7 @@ namespace Library_Jingyu
 							// 여기서는 false가 리턴될 수 있음(자료구조 내에 유저가 0명일 수 있음)
 							// 카운트다운이 끝나기 전에 모든 유저가 나갈 가능성.
 							// 그래서 리턴값 안받는다.
-							NowRoom->SendPacket_BroadCast(SendBuff);
-
-							NowRoom->StartTime = timeGetTime();						
+							NowRoom->SendPacket_BroadCast(SendBuff);					
 
 							// 아이템 생성 후 stRoom의 아이템 자료구조에 추가.
 							// 그리고 모든 유저에게 아이템 생성 패킷 보냄
@@ -4837,10 +4897,8 @@ namespace Library_Jingyu
 						// 1) 현재 총 방 수 증가
 						InterlockedIncrement(&m_lNowTotalRoomCount);
 
-
 						// 2) 대기방 수 증가.
 						InterlockedIncrement(&m_lNowWaitRoomCount);
-
 
 						// 3) 방 Alloc
 						stRoom* NowRoom = m_Room_Pool->Alloc();
@@ -4862,12 +4920,19 @@ namespace Library_Jingyu
 						NowRoom->m_uiItemID = 0;
 						NowRoom->m_pBattleServer = this;
 						NowRoom->m_bRedZoneWarningFlag = false;
-						NowRoom->StartTime = 0;
+
+						// 10초마다 아이템 생성시킬 변수 모두 0으로 초기화
+						int i = 0;
+						while (i < 4)
+						{
+							NowRoom->m_dwItemCreateTick[i] = 0;
+							++i;
+						}
 
 						// 레드존 생성 순서 셋팅
 						int RedIndex = rand() % 24;
 
-						int i = 0;
+						i = 0;
 						while (i < 4)
 						{
 							NowRoom->m_arrayRedZone[i] = m_arrayRedZoneCreate[RedIndex][i];
@@ -5147,15 +5212,15 @@ namespace Library_Jingyu
 				// Step 5. 정상적으로 플레이 중인 방의 경우
 				else
 				{
+					// 현재 시간 구해둠
+					DWORD NowTime = timeGetTime();
+
 					// -- 레드존 관련 체크
 					// 현재 게임이 시작된 방인지 체크
 					// 룸의 상태만 PLAY로 넘어오고, 아직 모든 유저가 Game모드로 넘어오지 않았을 경우에도
 					// 이 로직을 탈 수 있으니, 정말로 모든 유저가 Game모드로 넘어와서 게임이 시작했는지 체크
 					if (NowRoom->m_dwReaZoneTime > 0)
 					{
-						// 현재 시간 구해둠
-						DWORD NowTime = timeGetTime();
-
 						// -- 레드존이 활성화 되어도 되는지 체크.
 						// 이미, 모든 레드존이 활성화 되었다면, 더 이상 활성화되면 안됨.
 						if (NowRoom->m_iRedZoneCount < m_stConst.m_iRedZoneActiveLimit)
@@ -5207,6 +5272,30 @@ namespace Library_Jingyu
 								NowRoom->m_dwTick = NowTime;
 							}						
 						}
+					}
+
+					// -- 룸 내의 정기 아이템 생성 체크
+					// 레드존 외 구역에 생성된 아이템은(총 4개 구역) 누군가가 획득 후 10초 후에 재생성되어야 한다.
+					// 이걸 안하면, 더미 테스트 시 게임이 끝나지 않는다.
+					int i = 0;
+					while (i < 4)
+					{
+						// 해당 위치에 아이템이 없을 경우 아래 로직
+						if (NowRoom->m_dwItemCreateTick[i] > 0)
+						{
+							// 현재 시간이, 해당 위치의 아이템이 소멸된 시간으로 부터 10초가 되었는지
+							if ((NowTime - NowRoom->m_dwItemCreateTick[i]) >= 10000)
+							{
+								// 되었다면, 아이템 생성되었으니 시간을 0으로 초기화
+								NowRoom->m_dwItemCreateTick[i] = 0;
+
+								// 10초가 되었다면, 해당 위치에 탄창 아이템 생성
+								NowRoom->CreateItem_Type(g_Data_ItemPoint_Playzone[i][0],
+									g_Data_ItemPoint_Playzone[i][1], eu_ITEM_TYPE::CARTRIDGE, 2);
+							}
+						}
+
+						++i;
 					}
 				}
 			}

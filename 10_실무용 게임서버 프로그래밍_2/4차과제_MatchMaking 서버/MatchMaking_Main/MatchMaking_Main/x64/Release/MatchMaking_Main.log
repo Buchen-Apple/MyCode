@@ -16,6 +16,6 @@ c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(772): warning C
   RingBuff.cpp
   MatchMaking_Main.cpp
   코드를 생성하고 있습니다.
-  All 1062 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 1061 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   MatchMaking_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\4차과제_MatchMaking 서버\MatchMaking_Main\x64\Release\MatchMaking_Main.exe

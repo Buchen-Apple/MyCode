@@ -54,16 +54,13 @@ namespace Library_Jingyu
 			// 마지막으로 패킷을 받은 시간
 			DWORD m_dwLastPacketTime;
 
-			// 현재 유저의 상태
-			// 1 : 접속 / 2 : 로그인 패킷 보냄 / 3 : 방 입장 / 4 : 삭제 예정
-			BYTE State;
-
 			stPlayer()
 			{
 				// 시작 시, 룸 번호는 -1
 				m_iRoomNo = -1;
 
-				State = 0;
+				// 로그인 여부. 최초에는 false
+				m_bLoginCheck = false;
 			}
 		};
 
@@ -128,21 +125,21 @@ namespace Library_Jingyu
 				ReleaseSRWLockExclusive(&m_Room_srwl);
 			}
 
-			// 내부의 자료구조에 인자로 받은 ClientKey 추가
+			// 내부의 자료구조에 인자로 받은 SessionID 추가
 			//
-			// Parameter : ClientKey
+			// Parameter : SessionID
 			// return : 없음
-			void Insert(ULONGLONG ClientKey)
+			void Insert(ULONGLONG SessionID)
 			{
-				m_JoinUser_vector.push_back(ClientKey);
+				m_JoinUser_vector.push_back(SessionID);
 			}
 
-			// 내부의 자료구조에서 인자로 받은 ClientKey 제거
+			// 내부의 자료구조에서 인자로 받은 SessionID 제거
 			//
-			// Parameter : ClientKey
+			// Parameter : SessionID
 			// return : 성공 시 true
 			//		  : 해당 유저가 없을 시 false
-			bool Erase(ULONGLONG ClientKey)
+			bool Erase(ULONGLONG SessionID)
 			{
 				size_t Size = m_JoinUser_vector.size();
 				bool Flag = false;
@@ -152,7 +149,7 @@ namespace Library_Jingyu
 					return false;
 
 				// 2. 자료구조 안에 유저가 1명이거나, 찾고자 하는 유저가 마지막에 있다면 바로 제거
-				if (Size == 1 || m_JoinUser_vector[Size - 1] == ClientKey)
+				if (Size == 1 || m_JoinUser_vector[Size - 1] == SessionID)
 				{
 					Flag = true;
 					m_JoinUser_vector.pop_back();
@@ -165,7 +162,7 @@ namespace Library_Jingyu
 					while (Index < Size)
 					{
 						// 내가 찾고자 하는 유저를 찾았다면
-						if (m_JoinUser_vector[Index] == ClientKey)
+						if (m_JoinUser_vector[Index] == SessionID)
 						{
 							Flag = true;
 

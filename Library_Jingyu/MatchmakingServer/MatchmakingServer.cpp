@@ -258,44 +258,6 @@ namespace Library_Jingyu
 		return true;
 	}
 	   
-	// 매치메이킹 DB에, 초기 정보를 Insert하는 함수.
-	// 이미, 데이터가 존재하는 경우, 정보를 Update한다.
-	// 
-	// Parameter : 없음
-	// return : 없음
-	void Matchmaking_Net_Server::ServerInfo_DBInsert()
-	{	
-		// 1. Insert 쿼리 날린다.	
-		char cQurey[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
-		m_MatchDBcon->Query_Save(cQurey, m_iServerNo, m_cServerIP, m_stConfig.Port);
-
-
-		// 2. 에러 확인
-		int Error = m_MatchDBcon->GetLastError();
-
-		// 에러가 0이 아닐 경우, Insert가 실패한 것.
-		if (Error != 0)
-		{
-			// 만약 중복 키 에러라면, 이미 데이터가 존재한다는 것. Update 쿼리 날림
-			if (Error == 1062)
-			{
-				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW() WHERE `serverno` = %d\0";
-				m_MatchDBcon->Query_Save(cUpdateQuery, m_iServerNo);
-
-				// 에러 체크
-				Error = m_MatchDBcon->GetLastError();				
-				if (Error != 0)				
-					gMatchServerDump->Crash();
-			}
-			
-			else
-			{
-				// 중복키가 아닌 에러가 발생했으면 크래시	
-				gMatchServerDump->Crash();
-			}
-		}	
-	}
-
 	// ClientKey 만드는 함수
 	//
 	// Parameter : 없음
@@ -358,9 +320,43 @@ namespace Library_Jingyu
 		// umapPlayer 포인터 받아두기. connectuser 측정 용도
 		unordered_map<ULONGLONG, stPlayer*>* pUmapPlayer = &g_This->m_umapPlayer;
 
-		// MatchmakingDB와 연결. 로컬로 받아둠
-		CBConnectorTLS* pMatchDBcon = g_This->m_MatchDBcon;
 
+		// ---------- 매치매이칭 켜짐을 DB에 갱신
+
+		// 1. DB_Connector TLS 버전
+		// MatchmakingDB와 연결
+		CBConnectorTLS* pMatchDBcon = new CBConnectorTLS(g_This->m_stConfig.DB_IP, g_This->m_stConfig.DB_User, g_This->m_stConfig.DB_Password, g_This->m_stConfig.DB_Name, g_This->m_stConfig.DB_Port);
+
+		// 1. Insert 쿼리 날린다.	
+		char cQurey[200] = "INSERT INTO `matchmaking_status`.`server` VALUES(%d, '%s', %d, 0, NOW())\0";
+		pMatchDBcon->Query_Save(cQurey, iServerNo, g_This->m_cServerIP, g_This->m_stConfig.Port);
+
+		// 2. 에러 확인
+		int Error = pMatchDBcon->GetLastError();
+
+		// 에러가 0이 아닐 경우, Insert가 실패한 것.
+		if (Error != 0)
+		{
+			// 만약 중복 키 에러라면, 이미 데이터가 존재한다는 것. Update 쿼리 날림
+			if (Error == 1062)
+			{
+				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW() WHERE `serverno` = %d\0";
+				pMatchDBcon->Query_Save(cUpdateQuery, iServerNo);
+
+				// 에러 체크
+				Error = pMatchDBcon->GetLastError();
+				if (Error != 0)
+					gMatchServerDump->Crash();
+			}
+
+			else
+			{
+				// 중복키가 아닌 에러가 발생했으면 크래시	
+				gMatchServerDump->Crash();
+			}
+		}
+
+		// ------- DB 하트비트 로직
 		while (1)
 		{
 			// 메치메이킹DB의 하트비트 갱신 시간만큼 잔다.
@@ -388,16 +384,18 @@ namespace Library_Jingyu
 
 			// 2. 에러 확인
 			int Error = pMatchDBcon->GetLastError();
+
 			if (Error != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
 				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), pMatchDBcon->GetLastError());
+					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
 
 				gMatchServerDump->Crash();
-			}
+			}			
 		}
 
+		delete pMatchDBcon;
 		return 0;
 	}
 	
@@ -449,13 +447,17 @@ namespace Library_Jingyu
 				while (itor_Begin != itor_End)
 				{
 					// 마지막 패킷을 받은지 10초 이상이 되었다면
-					if ((timeGetTime() - itor_Begin->second->m_dwLastPacketTime) >= 10000)
+					// !! 계산 결과 음수도 나올 수 있기 때문에, 음수도 체크되어야 함 !!
+					// !! 그래서 계산 결과 값은 int형으로 받는다 !!
+					int Time = (timeGetTime() - itor_Begin->second->m_dwLastPacketTime);
+					if (Time > 10000)
 					{
 						SessionArray[Size] = itor_Begin->second->m_ullSessionID;
 
 						// 하트비트 로그 남기기
 						// 로그 찍기 (로그 레벨 : 에러)
-						cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld", itor_Begin->second->m_i64AccountNo);
+						cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"HeartBeat!! AccountNo : %lld, Time : %d", 
+							itor_Begin->second->m_i64AccountNo, Time);
 
 						Size++;
 					}
@@ -1022,10 +1024,6 @@ namespace Library_Jingyu
 		m_lRoomEnter_OK = 0;
 		m_lHeartBeatCount = 0;
 
-
-		// ------------------- 매치메이킹 DB에 초기 데이터 생성
-		ServerInfo_DBInsert();
-
 		// ------------------- DB 하트비트 스레드 생성
 		hDB_HBThread = (HANDLE)_beginthreadex(NULL, 0, DBHeartbeatThread, this, 0, 0);
 		if (hDB_HBThread == 0)
@@ -1135,17 +1133,18 @@ namespace Library_Jingyu
 		MasterConnect  :		MonitorConnect	:		- 마스터 서버와 모니터 서버 접속 여부
 		SessionNum : 	- NetServer 의 세션수
 		PacketPool_Net : 	- 외부에서 사용 중인 Net 직렬화 버퍼의 수
-		HeartBeat :			- 하트비트 여부. 1이면 하트비트 중
+		HeartBeat_Flag :			- 하트비트 여부. 1이면 하트비트 중
 
 		PlayerData_Pool :	- Player 구조체 할당량
 		Player Count : 		- Contents 파트 Player 개수
 
 		Accept Total :		- Accept 전체 카운트 (accept 리턴시 +1)
 		Accept TPS :		- Accept 처리 횟수
-		Send TPS			- 초당 Send완료 횟수. (완료통지에서 증가)
+		Net Send TPS		- Net 서버 초당 Send완료 횟수. (완료통지에서 증가)
+		Net Recv TPS		- Net 서버 초당 Recv완료 횟수. (RecvPost에서 OnRecv 호출 전에 1 증가)
 
 		Net_BuffChunkAlloc_Count : - Net 직렬화 버퍼 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
-		Chat_MessageChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
+		Match_PlayerChunkAlloc_Count : - 플레이어 총 Alloc한 청크 수 (밖에서 사용중인 청크 수)
 
 		TokenError : 		- DB에서 찾아온 토큰과 로그인 요청한 유저가 들고온 토큰이 다름
 		AccountError : 		- Selecet.account.php에 쿼리 날렸는데, -10 에러가 뜸(회원가입하지 않은 유저)
@@ -1162,7 +1161,7 @@ namespace Library_Jingyu
 			"MonitorConnect : %d\n"
 			"SessionNum : %lld\n"
 			"PacketPool_Net : %d\n"
-			"HeartBeat : %d\n\n"
+			"HeartBeat_Flag : %d\n\n"
 
 			"PlayerData_Pool : %d\n"
 			"Player Count : %lld\n\n"
@@ -1173,7 +1172,7 @@ namespace Library_Jingyu
 			"Net Recv TPS : %d\n\n"
 
 			"Net_BuffChunkAlloc_Count : %d (Out : %d)\n"
-			"Chat_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
+			"Matcht_PlayerChunkAlloc_Count : %d (Out : %d)\n\n"
 
 			"TokenError : %d\n"
 			"AccountError : %d\n"
@@ -1337,7 +1336,6 @@ namespace Library_Jingyu
 		// 5. 배틀방 입장 플래그 변경
 		ErasePlayer->m_bBattleRoomEnterCheck = false;
 
-
 		// 6. 플레이어 구조체 반환
 		m_PlayerPool->Free(ErasePlayer);
 		InterlockedDecrement(&m_lstPlayer_AllocCount);		
@@ -1475,14 +1473,11 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_srwlLoginPlayer);
 
 		// stPlayer 구조체를 다루는 TLS 동적할당
-		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);
-
-		// DB_Connector TLS 버전
-		// MatchmakingDB와 연결
-		m_MatchDBcon = new CBConnectorTLS(m_stConfig.DB_IP, m_stConfig.DB_User, m_stConfig.DB_Password,	m_stConfig.DB_Name, m_stConfig.DB_Port);
+		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);		
 		
 		// HTTP_Exchange 동적할당
-		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.0.0.1"), 11902);
+		//m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.0.0.1"), 11902);
+		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 11410);
 
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	
@@ -1508,9 +1503,6 @@ namespace Library_Jingyu
 
 		// 구조체 메시지 TLS 메모리 풀 동적해제
 		delete m_PlayerPool;
-
-		// DBConnector 동적해제
-		delete m_MatchDBcon;
 
 		// HTTP_Exchange 동적해제
 		delete m_HTTP_Post;
