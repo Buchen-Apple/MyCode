@@ -180,7 +180,7 @@ namespace Library_Jingyu
 		m_bServerLife = false;
 
 		// Auth에게 전달할 일감 Pool 동적할당
-		m_pAcceptPool = new CMemoryPoolTLS<stAuthWork>(0, false);
+		m_pAcceptPool = new CMemoryPoolTLS<stAuthWork>(20, false);
 
 		// Auth에게 전달할 일감 보관 큐
 		m_pASQ = new CLF_Queue< stAuthWork*>(0);

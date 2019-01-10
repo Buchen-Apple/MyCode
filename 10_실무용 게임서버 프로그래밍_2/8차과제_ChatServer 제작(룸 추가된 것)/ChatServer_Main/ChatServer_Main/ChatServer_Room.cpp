@@ -1605,8 +1605,8 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_ServerEnterToken_srwl);
 
 		// TLS Pool 동적할당
-		m_pPlayer_Pool = new CMemoryPoolTLS<stPlayer>(0, false);
-		m_pRoom_Pool = new CMemoryPoolTLS<stRoom>(0, false);
+		m_pPlayer_Pool = new CMemoryPoolTLS<stPlayer>(20, false);
+		m_pRoom_Pool = new CMemoryPoolTLS<stRoom>(20, false);
 
 		// 하트비트 스레드 종료 용도 Event
 		// 

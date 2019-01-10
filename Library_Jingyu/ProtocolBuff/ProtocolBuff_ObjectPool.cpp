@@ -15,7 +15,7 @@ namespace Library_Jingyu
 #define dfNETWORK_PACKET_HEADER_SIZE 2
 
 	// static 메모리풀
-	CMemoryPoolTLS<CProtocolBuff_Lan>* CProtocolBuff_Lan::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Lan>(0, false);
+	CMemoryPoolTLS<CProtocolBuff_Lan>* CProtocolBuff_Lan::m_MPool = new CMemoryPoolTLS<CProtocolBuff_Lan>(5, false);
 
 	// 문제 생길 시 Crash 발생시킬 덤프.
 	CCrashDump* CProtocolBuff_Lan::m_Dump = CCrashDump::GetInstance();
