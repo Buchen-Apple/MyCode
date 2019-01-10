@@ -3812,6 +3812,12 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Room::ShowPrintf()
 	{
+		// 해당 프로세스의 사용량 체크할 클래스
+		static CCpuUsage_Process ProcessUsage;
+
+		// CPU 사용율 체크 클래스 (하드웨어)
+		static CCpuUsage_Processor CProcessorCPU;
+
 		// 화면 출력할 것 셋팅
 		/*
 		Total SessionNum : 					- MMOServer 의 세션수
@@ -3867,7 +3873,14 @@ namespace Library_Jingyu
 		Monitor Connect :			- 모니터 서버와 연결되는 랜 클라. 접속 여부
 		Master Connect :			- 마스터 서버와 연결되는 랜 클라. 접속여부
 
+		----------------------------------------------------
+		CPU usage [T:%.1f%% U:%.1f%% K:%.1f%%] [BattleServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세서, 프로세스 사용량.
+
 		*/
+
+		// 출력 전에, 프로세스/프로세서 사용량 갱신
+		ProcessUsage.UpdateCpuTime();
+		CProcessorCPU.UpdateCpuTime();
 
 		LONG AuthUser = GetAuthModeUserCount();
 		LONG GameUser = GetGameModeUserCount();
@@ -3929,7 +3942,8 @@ namespace Library_Jingyu
 			"Monitor Connect : %d\n"
 			"Master Connect : %d\n\n"
 
-			"========================================================\n\n",
+			"========================================================\n\n"
+			"CPU usage [T:%.1f%% U:%.1f%% K:%.1f%%] [BattleServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
 
 			// ----------- 게임 서버용
 			GetClientCount(),
@@ -3981,7 +3995,13 @@ namespace Library_Jingyu
 
 			// ----------- 랜클라 (마스터, 모니터)
 			m_Monitor_LanClient->GetClinetState(),
-			m_Master_LanClient->GetClinetState()
+			m_Master_LanClient->GetClinetState(),
+
+			// ----------- 프로세서 사용량
+			CProcessorCPU.ProcessorTotal(), CProcessorCPU.ProcessorUser(), CProcessorCPU.ProcessorKernel(),
+
+			// ----------- 프로세스 사용량 
+			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel()
 		);
 	}
 

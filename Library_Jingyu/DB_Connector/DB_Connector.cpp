@@ -15,7 +15,7 @@ namespace Library_Jingyu
 #define _MyCountof(_array)		sizeof(_array) / (sizeof(_array[0]))
 
 	CCrashDump* g_DBDump = CCrashDump::GetInstance();
-	CSystemLog* g_DBLog = CSystemLog::GetInstance();
+	//CSystemLog* g_DBLog = CSystemLog::GetInstance();
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -108,10 +108,6 @@ namespace Library_Jingyu
 			// 카운트 증가
 			iConnectCount++;
 
-			// 로그에 저장
-			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-				L"Connect() --> Connect Fail... (Error : %d)(Count : %d)", m_iLastError, iConnectCount);
-
 			if (iConnectCount >= 5)
 				g_DBDump->Crash();	
 
@@ -151,13 +147,9 @@ namespace Library_Jingyu
 		// 1. 가변인자의 값을 스트링 1개로 뽑아내기.		
 		HRESULT retval = StringCbVPrintfA(m_cQueryUTF8, eQUERY_MAX_LEN, szStringFormat, *vlist);
 
-		// 쿼리 글자 수 이상이면 로그찍고 끝.
+		// 쿼리 글자 수 이상이면 크래시
 		if (retval != S_OK)
 		{
-			// 실패 시 로그 남김
-			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-				L"Query --> vlist Change Error...");
-
 			g_DBDump->Crash();
 		}			
 
@@ -173,7 +165,7 @@ namespace Library_Jingyu
 				break;
 
 			// 연결이 끊긴거면 5회동안 재연결 시도
-			if (Error == CR_SOCKET_CREATE_ERROR ||
+			else if (Error == CR_SOCKET_CREATE_ERROR ||
 				Error == CR_CONNECTION_ERROR ||
 				Error == CR_CONN_HOST_ERROR ||
 				Error == CR_SERVER_HANDSHAKE_ERR ||
@@ -192,11 +184,8 @@ namespace Library_Jingyu
 					// 카운트 1 증가
 					Count++;
 
-					// 실패 시 로그 남김
-					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"Query() --> Connect Fail... (Error : %d)(Count : %d)", Error, Count);
-
-					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
+					// 5번 시도했으면 서버 끈다. 
+					// 더 이상 돌려도 어차피 저장 안됨.
 					if (Count > 5)
 					{
 						// 멤버변수에 에러 셋팅
@@ -209,15 +198,15 @@ namespace Library_Jingyu
 					Sleep(200);
 				}
 			}
-			
+
 			// 연결 끊긴게 아니면 에러 보관
 			else
 			{
 				SaveLastError();
 				return;
 			}
-
-		}		
+		}				
+			
 
 		// 4. 결과 받아두기
 		// 밖에서 FetchRow() 함수를 호출해서 사용.
@@ -235,13 +224,9 @@ namespace Library_Jingyu
 		// 1. 가변인자의 값을 스트링 1개로 뽑아내기.		
 		HRESULT retval = StringCbVPrintfA(m_cQueryUTF8, eQUERY_MAX_LEN, szStringFormat, *vlist);
 
-		// 쿼리 글자 수 이상이면 로그찍고 끝.
+		// 쿼리 글자 수 이상이면 크래시
 		if (retval != S_OK)
 		{
-			// 실패 시 로그 남김
-			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-				L"Query_Save --> vlist Change Error...");
-
 			g_DBDump->Crash();
 		}			
 		
@@ -274,11 +259,7 @@ namespace Library_Jingyu
 						break;
 
 					// 카운트 1 증가
-					Count++;
-
-					// 실패 시 로그 남김
-					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"Query() --> Connect Fail... (Count : %d). Error : %d", Count, mysql_errno(&m_MySQL));
+					Count++;				
 
 					// 5번 시도했으면 서버 끈다. 
 					// 더 이상 돌려도 어차피 저장 안됨.
@@ -286,7 +267,6 @@ namespace Library_Jingyu
 					{
 						// 멤버변수에 에러 셋팅
 						SaveLastError();
-
 						g_DBDump->Crash();
 					}
 
@@ -323,13 +303,9 @@ namespace Library_Jingyu
 		// 1. 가변인자의 값을 스트링 1개로 뽑아내기.		
 		HRESULT retval = StringCbVPrintfA(m_cQueryUTF8, eQUERY_MAX_LEN, szStringFormat, *vlist);
 
-		// 쿼리 글자 수 이상이면 로그찍고 끝.
+		// 쿼리 글자 수 이상이면 크래시
 		if (retval != S_OK)
 		{
-			// 실패 시 로그 남김
-			g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-				L"Query_Save(CreatTable) --> vlist Change Error...");
-
 			g_DBDump->Crash();
 		}	
 
@@ -362,11 +338,7 @@ namespace Library_Jingyu
 						break;
 
 					// 카운트 1 증가
-					Count++;
-
-					// 실패 시 로그 남김
-					g_DBLog->LogSave(false, L"DB_Connector", CSystemLog::en_LogLevel::LEVEL_ERROR,
-						L"Query() --> Connect Fail... (Count : %d). Error : %d", Count, mysql_errno(&m_MySQL));
+					Count++;				
 
 					// 5번째 돌렸으면 서버 끈다. 더 이상 돌려도 어차피 저장 안됨.
 					if (Count > 5)

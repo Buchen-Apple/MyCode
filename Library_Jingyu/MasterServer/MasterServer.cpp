@@ -1613,15 +1613,53 @@ namespace Library_Jingyu
 	// return : 없음
 	void CBattleServer_Lan::Packet_TokenChange(ULONGLONG SessionID, CProtocolBuff_Lan* Payload)
 	{
+		// 락을 안걸면, 토큰이 달라질 수 있음.
+		AcquireSRWLockExclusive(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Exclusive 락
+
+		// 1. 검색
+		auto Ret = m_BattleServer_Umap.find(SessionID);
+
+		// 2. 없으면 nullptr
+		if (Ret == m_BattleServer_Umap.end())
+		{
+			ReleaseSRWLockExclusive(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Exclusive 언락
+			g_MasterDump->Crash();
+		}
+
+		// 3. 로그인 여부 확인
+		stBattle* NowBattle = Ret->second;			   
+		
+		if (NowBattle->m_bLoginCheck == false)
+			g_MasterDump->Crash();
+
+		// 4. 마샬링 및 새로운 토큰 배틀서버에 셋팅
+		UINT ReqSequence;
+		Payload->GetData(NowBattle->m_cConnectToken, 32);
+		Payload->GetData((char*)&ReqSequence, 4);
+
+		ReleaseSRWLockExclusive(&m_srwl_BattleServer_Umap);		// ----- Battle서버 Umap Exclusive 언락
+
+		// 5. 응답 패킷 보내기
+		CProtocolBuff_Lan* SendBuff = CProtocolBuff_Lan::Alloc();
+
+		WORD Type = en_PACKET_BAT_MAS_RES_CONNECT_TOKEN;
+		SendBuff->PutData((char*)&Type, 2);
+		SendBuff->PutData((char*)&ReqSequence, 4);
+
+		SendPacket(SessionID, SendBuff);
+
+
+		/*
+
 		// 1. 배틀서버 검색
 		stBattle* NowBattle = FindBattleServerFunc(SessionID);
 
 		if (NowBattle == nullptr)
 			g_MasterDump->Crash();
 
-		// 로그인 여부 확인
 		if (NowBattle->m_bLoginCheck == false)
 			g_MasterDump->Crash();
+
 
 		// 2. 마샬링 및 새로운 토큰 배틀서버에 셋팅
 		UINT ReqSequence;
@@ -1636,6 +1674,7 @@ namespace Library_Jingyu
 		SendBuff->PutData((char*)&ReqSequence, 4);
 
 		SendPacket(SessionID, SendBuff);
+		*/
 	}
 
 	// 신규 대기방 생성

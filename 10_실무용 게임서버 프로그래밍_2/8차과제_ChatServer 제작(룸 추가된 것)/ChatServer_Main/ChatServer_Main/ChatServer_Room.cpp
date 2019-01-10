@@ -344,9 +344,14 @@ namespace Library_Jingyu
 	// return : 없음
 	void CChatServer_Room::RoomClearFunc()
 	{
+		// 1. 셧다운 날릴 유저 보관 장소.
+		// !! 락 걸고 셧다운을 날리면 데드락 위험 !!
+		ULONGLONG* SessionArray = new ULONGLONG[m_Paser.MaxJoinUser];
+		int Count = 0;
+
 		AcquireSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 락		
 
-		// 룸이 있을 경우 룸 클리어 진행
+		// 2. 룸이 있을 경우 룸 클리어 진행
 		if (m_Room_Umap.size() > 0)
 		{
 			auto itor_Now = m_Room_Umap.begin();
@@ -370,9 +375,10 @@ namespace Library_Jingyu
 					size_t Index = 0;
 					while (Index < Size)
 					{
-						// 셧다운
-						Disconnect(NowRoom->m_JoinUser_vector[Index]);
+						// 셧다운 할 SessionID를 받아둔다.
+						SessionArray[Count] = NowRoom->m_JoinUser_vector[Index];
 						++Index;
+						++Count;
 					}
 
 					++itor_Now;
@@ -382,15 +388,30 @@ namespace Library_Jingyu
 				else
 				{
 					m_pRoom_Pool->Free(itor_Now->second);
-
 					InterlockedDecrement(&m_lRoomCount);
-
 					itor_Now = m_Room_Umap.erase(itor_Now);
 				}
 			}
 		}
 
 		ReleaseSRWLockExclusive(&m_Room_Umap_srwl);		// ----- 룸 Exclusive 언락
+
+		// 3. 셧다운 유저가 있을경우, 셧다운 진행
+		if (Count > 0)
+		{
+			// Count로 인덱스 접근을 해야하기 때문에 --한다.
+			// 변수보다, 0과같은 고정값으로 비교하는것이 빠르기 때문에.
+			--Count;
+
+			while (Count >=0)
+			{
+				Disconnect(SessionArray[Count]);
+				--Count;
+			}
+			
+		}
+		
+		delete[] SessionArray;
 	}
 
 
@@ -856,11 +877,16 @@ namespace Library_Jingyu
 
 
 		// 4. "현재" 토큰 체크
+		// 토큰 비교 중 변경될 가능성이 있기 때문에 락을 건다.
+
+		AcquireSRWLockShared(&m_ServerEnterToken_srwl);		// ----- 토큰 Shared 락
+
 		if (memcmp(m_cConnectToken_Now, ConnectToken, 32) != 0)
 		{
 			// 다르면 "이전" 패킷과 비교
 			if (memcmp(m_cConnectToken_Before, ConnectToken, 32) != 0)
 			{
+				ReleaseSRWLockShared(&m_ServerEnterToken_srwl);		// ----- 토큰 Shared 언락
 				InterlockedIncrement(&m_lEnterTokenMiss);
 
 				// 에러 찍기
@@ -882,6 +908,7 @@ namespace Library_Jingyu
 			}
 		}
 		
+		ReleaseSRWLockShared(&m_ServerEnterToken_srwl);		// ----- 토큰 Shared 언락
 			
 
 		// 5. AccountNo 복사
@@ -1575,6 +1602,7 @@ namespace Library_Jingyu
 		// 락 초기화
 		InitializeSRWLock(&m_Player_Umap_srwl);
 		InitializeSRWLock(&m_LoginPlayer_Umap_srwl);
+		InitializeSRWLock(&m_ServerEnterToken_srwl);
 
 		// TLS Pool 동적할당
 		m_pPlayer_Pool = new CMemoryPoolTLS<stPlayer>(0, false);
@@ -1708,15 +1736,19 @@ namespace Library_Jingyu
 		UINT ReqSequence;
 
 		Payload->GetData((char*)Token, 32);
-		Payload->GetData((char*)&ReqSequence, 4);
+		Payload->GetData((char*)&ReqSequence, 4);		
 
-
+		// 토큰 복사 중 로그인 시, 잘못된 토큰을 비교할 수 있기 때문에 락 건다.
+		AcquireSRWLockExclusive(&m_pNetServer->m_ServerEnterToken_srwl);		// ----- 토큰 Exclusve 락
+	
 		// 2. "현재" 토큰을 "이전" 토큰에 복사
 		// 최초로 해당 패킷을 받았을 경우에도, 그냥 memcpy 한다. 
 		memcpy_s(m_pNetServer->m_cConnectToken_Before, 32, m_pNetServer->m_cConnectToken_Now, 32);
 
 		// 패킷에서 받은 토큰을 현재 토큰에 복사
 		memcpy_s(m_pNetServer->m_cConnectToken_Now, 32, Token, 32);
+
+		ReleaseSRWLockExclusive(&m_pNetServer->m_ServerEnterToken_srwl);		// ----- 토큰 Exclusve 언락
 
 
 		// 3. 응답 보내기

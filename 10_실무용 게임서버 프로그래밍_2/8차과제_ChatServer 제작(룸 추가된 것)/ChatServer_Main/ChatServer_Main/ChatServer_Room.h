@@ -282,6 +282,9 @@ namespace Library_Jingyu
 		// 새로운 토큰을 "현재" 토큰에 넣는다.
 		char m_cConnectToken_Before[32];
 
+		// 토큰용 락
+		SRWLOCK m_ServerEnterToken_srwl;
+
 
 
 

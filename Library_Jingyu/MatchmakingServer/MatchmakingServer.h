@@ -263,9 +263,9 @@ namespace Library_Jingyu
 
 		// ClientKey 만드는 함수
 		//
-		// Parameter : 없음
+		// Parameter : SessionID
 		// return : ClientKey(UINT64)
-		UINT64 CreateClientKey();
+		UINT64 CreateClientKey(ULONGLONG SessionID);
 
 		// 접속한 모든 유저에게 shutdown 하는 함수
 		//

@@ -260,13 +260,17 @@ namespace Library_Jingyu
 	   
 	// ClientKey 만드는 함수
 	//
-	// Parameter : 없음
+	// Parameter : SessionID
 	// return : ClientKey(UINT64)
-	UINT64 Matchmaking_Net_Server::CreateClientKey()
+	UINT64 Matchmaking_Net_Server::CreateClientKey(ULONGLONG SessionID)
 	{
 		// 하위 4바이트에 ServerNo. 상위 4바이트에 m_ClientKeyAdd의 값이 들어간다.
-		UINT64 TempKey = InterlockedIncrement(&m_ClientKeyAdd);
-		return ((TempKey << 16) | m_iServerNo);
+		//UINT64 TempKey = InterlockedIncrement(&m_ClientKeyAdd);
+		//return ((TempKey << 32) | m_iServerNo);
+
+		// 상위 1바이트에 ServerNo, 하위 7바이트에 SessionID가 들어간다.
+		UINT64 TempKey = m_iServerNo;
+		return (TempKey << 56) | SessionID;
 	}
 
 	// 접속한 모든 유저에게 shutdown 하는 함수
@@ -385,8 +389,7 @@ namespace Library_Jingyu
 
 			// 2. 에러 확인
 			int Error2 = pMatchDBcon->GetLastError();
-
-			/*		
+		
 			if (Error2 != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
@@ -395,8 +398,8 @@ namespace Library_Jingyu
 
 				gMatchServerDump->Crash();
 			}
-			*/
 
+			/*
 			if (Error2 != 0)
 			{
 				if (Error2 == 2013)
@@ -437,6 +440,7 @@ namespace Library_Jingyu
 					gMatchServerDump->Crash();
 				}
 			}	
+			*/
 		}
 
 		delete pMatchDBcon;
@@ -1172,6 +1176,9 @@ namespace Library_Jingyu
 	// return : 없음
 	void Matchmaking_Net_Server::ShowPrintf()
 	{
+		// 해당 프로세스의 사용량 체크할 클래스
+		static CCpuUsage_Process ProcessUsage;
+
 		// 화면 출력할 것 셋팅
 		/*
 		MasterConnect  :		MonitorConnect	:		- 마스터 서버와 모니터 서버 접속 여부
@@ -1199,7 +1206,13 @@ namespace Library_Jingyu
 		HeartBeatCount :	- 하트비트로 끊긴 유저 수
 		SemCount :			- 세마포어 카운트
 
+		----------------------------------------------------
+		CPU usage [MatchServer:%.1f%% U:%.1f%% K:%.1f%%] - 프로세스 사용량.
+
 		*/
+
+		// 출력 전에, 프로세스 사용량 갱신
+		ProcessUsage.UpdateCpuTime();
 
 		printf("==================== Match Server ====================\n"
 			"MonitorConnect : %d\n"
@@ -1232,7 +1245,8 @@ namespace Library_Jingyu
 			"Send TPS : %d\n"
 			"Recv TPS : %d\n\n"
 
-			"========================================================\n\n",
+			"========================================================\n\n"
+			"CPU usage [MatchServer:%.1f%% U:%.1f%% K:%.1f%%]\n",
 
 			// ------------ 매치메이킹 Net 서버용
 			m_pMonitorLanClient->GetClinetState(),
@@ -1263,7 +1277,10 @@ namespace Library_Jingyu
 			// --------- 마스터 랜 클라
 			m_pLanClient->GetClinetState(),
 			m_pLanClient->GetSendTPS(),
-			m_pLanClient->GetRecvTPS()
+			m_pLanClient->GetRecvTPS(),
+
+			// ----------- 프로세스 사용량 
+			ProcessUsage.ProcessTotal(), ProcessUsage.ProcessUser(), ProcessUsage.ProcessKernel()
 		
 		);
 
@@ -1292,7 +1309,7 @@ namespace Library_Jingyu
 
 		// 2. stPlayer에 SessionID, ClientKey, 마지막 패킷 시간 갱신 셋팅
 		NowPlayer->m_ullSessionID = SessionID;	
-		UINT64 TempCKey = CreateClientKey();
+		UINT64 TempCKey = CreateClientKey(SessionID);
 		NowPlayer->m_ui64ClientKey = TempCKey;
 		NowPlayer->m_dwLastPacketTime = timeGetTime();
 	
