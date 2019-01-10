@@ -183,6 +183,9 @@ namespace Library_Jingyu
 		// 출력 체크용
 		LONG* TempDBWriteTPS = &gThis->m_lDBWriteTPS;
 
+		// Write카운트를 깍을 용도의 AccountNo 보관용
+		INT64 TempAccountNo;
+
 		while (1)
 		{
 			// 이벤트 대기
@@ -242,8 +245,9 @@ namespace Library_Jingyu
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
-					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					// 5. AccountNo 받아두기.
+					// 아래에서 감소시킨다.
+					TempAccountNo = NowWork->AccountNo;
 				}
 				break;
 
@@ -282,8 +286,9 @@ namespace Library_Jingyu
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
-					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					// 5. AccountNo 받아두기.
+					// 아래에서 감소시킨다.
+					TempAccountNo = NowWork->AccountNo;
 
 				}
 				break;
@@ -323,8 +328,9 @@ namespace Library_Jingyu
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
-					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
+					// 5. AccountNo 받아두기.
+					// 아래에서 감소시킨다.
+					TempAccountNo = NowWork->AccountNo;
 
 				}
 				break;
@@ -364,9 +370,9 @@ namespace Library_Jingyu
 					if (iResult != 1)
 						g_BattleServer_Room_Dump->Crash();
 
-					// 5. DBWrite 카운트1 감소
-					//gThis->m_pBattleServer->MinDBWriteCountFunc(NowWork->AccountNo);
-
+					// 5. AccountNo 받아두기.
+					// 아래에서 감소시킨다.
+					TempAccountNo = NowWork->AccountNo;
 				}
 				break;
 
@@ -378,7 +384,10 @@ namespace Library_Jingyu
 				// 3. DBWrite TPS 증가
 				InterlockedIncrement(TempDBWriteTPS);
 
-				// 4. DB_WORK 반환
+				// 4. DBWrite 카운트1 감소
+				gThis->m_pBattleServer->MinDBWriteCountFunc(TempAccountNo);
+
+				// 5. DB_WORK 반환
 				pDBWorkPool->Free(pWork);
 
 			}
@@ -716,8 +725,8 @@ namespace Library_Jingyu
 
 				// DBWrite에서 제거 시도.
 				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-				/*if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-					g_BattleServer_Room_Dump->Crash();*/
+				if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+					g_BattleServer_Room_Dump->Crash();
 
 				m_bStructFlag = false;
 			}
@@ -844,7 +853,7 @@ namespace Library_Jingyu
 		CountWrite->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, WriteCount 증가.
-		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
@@ -967,7 +976,7 @@ namespace Library_Jingyu
 			DieWrite->AccountNo = m_Int64AccountNo;
 
 			// 요청하기
-			//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+			m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 			m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 		}
 
@@ -980,8 +989,8 @@ namespace Library_Jingyu
 
 			// DBWrite에서 제거 시도.
 			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-			/*if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();*/
+			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
 
 			m_bStructFlag = false;
 		}
@@ -1138,14 +1147,10 @@ namespace Library_Jingyu
 		INT64 AccountNo;
 		Packet->GetData((char*)&AccountNo, 8);
 
-		/*
 		// 3. 아직 DB에 Write중인지
 		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount_DB);
-
-			//if (m_pParent->m_OverlapLoginCount_DB == 300)
-				//g_BattleServer_Room_Dump->Crash();
 
 			// 중복 로그인 패킷 보내기
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -1169,7 +1174,6 @@ namespace Library_Jingyu
 
 			return;
 		}
-		*/
 		
 		// 4. 나머지 마샬링 후, 세션키, AccountNo, 클라이언트키를 멤버에 셋팅
 		Packet->GetData(m_cSessionKey, 64);
@@ -1187,12 +1191,18 @@ namespace Library_Jingyu
 
 
 		// 5. 배틀서버 입장 토큰 비교
+
+		// 락 걸고 확인.
+		AcquireSRWLockShared(&m_pParent->m_ServerEnterToken_srwl);	// ----- shasred 락
+
 		// "현재" 토큰과 먼저 비교
 		if (memcmp(ConnectToken, m_pParent->m_cConnectToken_Now, 32) != 0)
 		{
 			// 다르다면 "이전" 토큰과 비교
 			if (memcmp(ConnectToken, m_pParent->m_cConnectToken_Before, 32) != 0)
 			{
+				ReleaseSRWLockShared(&m_pParent->m_ServerEnterToken_srwl);	// ----- shasred 언락
+
 				// 에러 로그 찍기
 				// 로그 찍기 (로그 레벨 : 에러)
 				g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
@@ -1218,6 +1228,8 @@ namespace Library_Jingyu
 			}
 		}
 		
+		ReleaseSRWLockShared(&m_pParent->m_ServerEnterToken_srwl);	// ----- shasred 언락
+
 		// 6. 버전 비교 
 		if (m_pParent->m_uiVer_Code != Ver_Code)
 		{
@@ -2526,7 +2538,7 @@ namespace Library_Jingyu
 				WriteWork->AccountNo = NowPlayer->m_Int64AccountNo;
 
 				// Write 하기 전에, DBWrite카운트 올려야함.
-				//NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
+				NowPlayer->m_pParent->AddDBWriteCountFunc(NowPlayer->m_Int64AccountNo);
 
 				// DBWrite 시도
 				NowPlayer->m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
@@ -3191,7 +3203,7 @@ namespace Library_Jingyu
 		KillWrite->AccountNo = AtkAccountNo;
 
 		// 요청하기
-		//m_pBattleServer->AddDBWriteCountFunc(AtkAccountNo);
+		m_pBattleServer->AddDBWriteCountFunc(AtkAccountNo);
 		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
 
 
@@ -3216,7 +3228,7 @@ namespace Library_Jingyu
 		DieWrite->AccountNo = DieAccountNo;
 
 		// 요청하기
-		//m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
+		m_pBattleServer->AddDBWriteCountFunc(DieAccountNo);
 		m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 
 
@@ -3672,7 +3684,7 @@ namespace Library_Jingyu
 						DieWrite->AccountNo = AccountNo;
 
 						// 요청하기
-						//m_pBattleServer->AddDBWriteCountFunc(AccountNo);
+						m_pBattleServer->AddDBWriteCountFunc(AccountNo);
 						m_pBattleServer->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);	
 
 
@@ -5502,6 +5514,7 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_Room_Umap_srwl);
 		InitializeSRWLock(&m_DBWrite_Umap_srwl);
 		InitializeSRWLock(&m_Overlap_list_srwl);
+		InitializeSRWLock(&m_ServerEnterToken_srwl);
 
 		// 게임 내에서 사용되는, 거리 1당 데미지.
 		m_fFire1_Damage = g_Data_HitDamage / (float)15;	// 총알 데미지
@@ -6476,10 +6489,18 @@ namespace Library_Jingyu
 		// 토큰 재발급 시점이 되었는지 확인하기.
 		DWORD NowTime = timeGetTime();
 
-		if ((m_dwTokenSendTime + m_BattleServer->m_stConst.m_iTokenChangeSlice) <= NowTime)
+		// !! 절대 안나오겠지만, 혹시 음수가 나오는 상황이 발생할 수도 있으니 signed형으로 받는다. !!
+		// !! 그리고 그걸 비교한다 !!
+		int CheckTime = NowTime - m_dwTokenSendTime;
+		
+		//if ((m_dwTokenSendTime + m_BattleServer->m_stConst.m_iTokenChangeSlice) <= NowTime)
+		if (CheckTime > m_BattleServer->m_stConst.m_iTokenChangeSlice)
 		{
 			// 1. 토큰 발급 시간 갱신
 			m_dwTokenSendTime = NowTime;
+
+			// 락 걸기. 락 안걸면 복사하는 중 누가 체크했을 때 위험.
+			AcquireSRWLockExclusive(&m_BattleServer->m_ServerEnterToken_srwl);	// ----- Exclusive 락
 
 			// 2. "현재" 토큰을 "이전" 토큰에 복사
 			memcpy_s(m_BattleServer->m_cConnectToken_Before, 32, m_BattleServer->m_cConnectToken_Now, 32);
@@ -6492,6 +6513,8 @@ namespace Library_Jingyu
 
 				++i;
 			}
+
+			ReleaseSRWLockExclusive(&m_BattleServer->m_ServerEnterToken_srwl);	// ----- Exclusive 언락
 
 			// 4. 토큰 재발급 패킷 만들기
 			WORD Type = en_PACKET_CHAT_BAT_REQ_CONNECT_TOKEN;

@@ -279,23 +279,40 @@ namespace Library_Jingyu
 	// return : 없음
 	void Matchmaking_Net_Server::AllShutdown()
 	{
-		AcquireSRWLockShared(&m_srwlPlayer);	// ----- m_umapPlayer에 Shared 락
+		// !! 데드락을 피하기 위해, 셧다운을 날릴 세션ID를 받아둔다 !!
+		ULONGLONG* SessionArray = new ULONGLONG[m_stConfig.MaxJoinUser];
+		int Size = 0;
 
-		// 모든 유저에게 Shutdown 날림.
+		// 1. 유저 SessionID 받아두기
+		AcquireSRWLockShared(&m_srwlPlayer);	// ----- m_umapPlayer에 Shared 락
 
 		auto itor_Now = m_umapPlayer.begin();
 		auto itor_End = m_umapPlayer.end();
 
-		while (1)
+		while (itor_Now != itor_End)
 		{
-			if (itor_Now == itor_End)
-				break;
-			
-			Disconnect(itor_Now->second->m_ullSessionID);
+			// 받아두기
+			SessionArray[Size] = itor_Now->second->m_ullSessionID;
+			++Size;
 			++itor_Now;
 		}
 
 		ReleaseSRWLockShared(&m_srwlPlayer);	// ----- m_umapPlayer에 Shared 언락
+
+
+		// 2. 셧다운 할 유저가 있으면 셧다운 한다.
+		if (Size > 0)
+		{
+			--Size;
+
+			while (Size >= 0)
+			{
+				Disconnect(SessionArray[Size]);
+				--Size;
+			}
+		}
+
+		delete[] SessionArray;
 	}
 
 
