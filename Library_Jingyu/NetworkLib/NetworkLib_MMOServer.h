@@ -136,6 +136,11 @@ namespace Library_Jingyu
 			// 마지막으로 패킷을 받은 시간
 			DWORD m_dwLastPacketTime;
 
+			// 하트비트로 인한 셧다운 플래그
+			// true : 이미 하트비트로 인해 셧다운 된 유저
+			// false : 하트비트로 인한 셧다운 받지 않은 유저
+			bool m_bHeartBeatShutdown;
+
 
 		public:
 			// -----------------

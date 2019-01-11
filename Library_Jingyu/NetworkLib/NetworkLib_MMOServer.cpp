@@ -40,6 +40,7 @@ namespace Library_Jingyu
 		m_euMode = euSessionModeState::MODE_NONE;
 		m_lLogoutFlag = FALSE;
 		m_lAuthToGameFlag = FALSE;
+		m_bHeartBeatShutdown = false;
 	}
 
 	// 소멸자
@@ -1140,6 +1141,9 @@ namespace Library_Jingyu
 				// -- LastPacket 초기화
 				SessionArray[wIndex]->m_LastPacket = nullptr;
 
+				// -- 하트비트 플래그 초기화
+				SessionArray[wIndex]->m_bHeartBeatShutdown = false;
+
 				// -- 소켓
 				SessionArray[wIndex]->m_Client_sock = NowWork->m_clienet_Socket;
 
@@ -1291,12 +1295,19 @@ namespace Library_Jingyu
 							// Flag가 true라면 하트비트 체크
 							if (HeartBeatFlag)
 							{
-								// 셧다운 대상인지 체크
-								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+								// 하트비트 셧다운을 받지 않은 유저의 경우
+								if (NowSession->m_bHeartBeatShutdown == false)
 								{
-									NowSession->OnAuth_HeartBeat();
-									NowSession->Disconnect();
-									InterlockedIncrement(&g_This->m_lHeartBeatCount);
+									// 셧다운 대상인지 체크
+									if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+									{
+										// 하트비트로 인해 셧다운을 당했다는 플래그 변경
+										NowSession->m_bHeartBeatShutdown = true;
+
+										NowSession->OnAuth_HeartBeat();
+										NowSession->Disconnect();
+										InterlockedIncrement(&g_This->m_lHeartBeatCount);
+									}
 								}
 							}
 						}
@@ -1465,14 +1476,19 @@ namespace Library_Jingyu
 						// Flag가 true라면 하트비트 체크
 						if (HeartBeatFlag)
 						{
-							// 셧다운 대상인지 체크
-							if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+							if (NowSession->m_bHeartBeatShutdown == false)
 							{
-								NowSession->OnGame_HeartBeat();
-								NowSession->Disconnect();
-								InterlockedIncrement(&g_This->m_lHeartBeatCount);
-							}
+								// 셧다운 대상인지 체크
+								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+								{
+									// 하트비트로 인해 셧다운을 당했다는 플래그 변경
+									NowSession->m_bHeartBeatShutdown = true;
 
+									NowSession->OnGame_HeartBeat();
+									NowSession->Disconnect();
+									InterlockedIncrement(&g_This->m_lHeartBeatCount);
+								}
+							}
 						}
 
 					}
@@ -2187,6 +2203,53 @@ namespace Library_Jingyu
 			return false;
 		}
 
+		// 인자로 받은 노딜레이 옵션 사용 여부에 따라 네이글 옵션 결정
+		// 이게 true면 노딜레이 사용하겠다는 것(네이글 중지시켜야함)
+		if (Nodelay == true)
+		{
+			BOOL optval = TRUE;
+			retval = setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
+
+			if (retval == SOCKET_ERROR)
+			{
+				// 윈도우 에러, 내 에러 보관
+				m_iOSErrorCode = WSAGetLastError();
+				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
+
+				// 각종 핸들 반환 및 동적해제 절차.
+				ExitFunc(m_iW_ThreadCount);
+
+				// 로그 찍기 (로그 레벨 : 에러)
+				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
+					(int)m_iMyErrorCode, m_iOSErrorCode);
+
+				// false 리턴
+				return false;
+			}
+		}
+
+		// KeepAlive 적용
+		BOOL optval = TRUE;
+
+		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, sizeof(optval));
+
+		if (retval == SOCKET_ERROR)
+		{
+			// 윈도우 에러, 내 에러 보관
+			m_iOSErrorCode = WSAGetLastError();
+			m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
+
+			// 각종 핸들 반환 및 동적해제 절차.
+			ExitFunc(m_iW_ThreadCount);
+
+			// 로그 찍기 (로그 레벨 : 에러)
+			cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() KeepAlive Error : NetError(%d), OSError(%d)",
+				(int)m_iMyErrorCode, m_iOSErrorCode);
+
+			// false 리턴
+			return false;
+		}
+
 
 		// 바인딩
 		SOCKADDR_IN serveraddr;
@@ -2231,32 +2294,7 @@ namespace Library_Jingyu
 			// false 리턴
 			return false;
 		}
-
-		// 인자로 받은 노딜레이 옵션 사용 여부에 따라 네이글 옵션 결정
-		// 이게 true면 노딜레이 사용하겠다는 것(네이글 중지시켜야함)
-		if (Nodelay == true)
-		{
-			BOOL optval = TRUE;
-			retval = setsockopt(m_soListen_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&optval, sizeof(optval));
-
-			if (retval == SOCKET_ERROR)
-			{
-				// 윈도우 에러, 내 에러 보관
-				m_iOSErrorCode = WSAGetLastError();
-				m_iMyErrorCode = euError::NETWORK_LIB_ERROR__SOCKOPT_FAIL;
-
-				// 각종 핸들 반환 및 동적해제 절차.
-				ExitFunc(m_iW_ThreadCount);
-
-				// 로그 찍기 (로그 레벨 : 에러)
-				cMMOServer_Log->LogSave(false, L"MMOServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"Start() --> setsockopt() Nodelay apply Error : NetError(%d), OSError(%d)",
-					(int)m_iMyErrorCode, m_iOSErrorCode);
-
-				// false 리턴
-				return false;
-			}
-		}
-
+	
 		// 엑셉트 스레드 생성
 		m_iA_ThreadCount = AcceptThreadCount;
 		m_hAcceptHandle = new HANDLE[m_iA_ThreadCount];

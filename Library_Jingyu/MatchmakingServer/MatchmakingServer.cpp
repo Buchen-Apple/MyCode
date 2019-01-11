@@ -405,13 +405,13 @@ namespace Library_Jingyu
 			pMatchDBcon->Query_Save(cQurey, pUmapPlayer->size(), iServerNo);
 
 			// 2. 에러 확인
-			int Error2 = pMatchDBcon->GetLastError();
+			Error = pMatchDBcon->GetLastError();
 		
-			if (Error2 != 0)
+			if (Error != 0)
 			{
 				// 에러가 발생했다면 로그 남기고 크래시
 				cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR,
-					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error2);
+					L"DBHeartbeatThread() --> Query Error. %s(%d)", pMatchDBcon->GetLastErrorMsg(), Error);
 
 				gMatchServerDump->Crash();
 			}

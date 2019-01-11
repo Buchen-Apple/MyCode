@@ -13,7 +13,6 @@
 
 using namespace std;
 
-
 // --------------------------------------------
 // shDB 내부에서 메모리풀로 관리되는 구조체들
 // --------------------------------------------
@@ -237,7 +236,7 @@ namespace Library_Jingyu
 		friend class CBattle_Master_LanClient;
 		friend class CBattle_Chat_LanServer;	
 		friend class shDB_Communicate;
-
+		friend class CGameSession;
 
 
 		// -----------------------
@@ -281,7 +280,7 @@ namespace Library_Jingyu
 			// 0 : 유저 사망으로 인해 생성된 아이템
 			// 1 : 레드존 구역의 아이템 (라스트 레드존 제외)
 			// 2 : 레드존 구역 외의 아이템 (4개 구역)
-			BYTE m_bItemArea;
+			BYTE m_bItemArea;		
 		};
 
 		// CMMOServer의 cSession을 상속받는 세션 클래스
@@ -393,6 +392,82 @@ namespace Library_Jingyu
 			CGameSession();
 			virtual ~CGameSession();
 
+		public:
+			// -----------------------
+			// 외부에서 호출 가능한 함수
+			// (게터)
+			// -----------------------
+
+			// 유저 생존 여부
+			//
+			// Parameter : 없음
+			// return : 생존 시 true, 사망 시 false
+			bool GetAliveState();	
+
+
+		public:
+			// -----------------------
+			// 외부에서 호출 가능한 함수
+			// (세터)
+			// -----------------------
+
+			// 캐릭터 생성 시 셋팅되는 값
+			//
+			// Parameter : 생성될 X, Y좌표,캐릭터 생성된 시간(DWORD)
+			// return : 없음 
+			void StartSet(float PosX, float PosY, DWORD NowTime);
+
+			// 생존 상태 변경
+			//
+			// Parameter : 변경할 생존 상태(true면 생존, false면 사망)
+			// return : 없음
+			void AliveSet(bool Flag);			
+
+			// 유저 데미지 처리
+			// !! HP가 0이 되면 자동으로 사망상태가 된다 !!
+			//
+			// Parameter : 유저가 입은 데미지
+			// return : 감소 후 남은 HP
+			int Damage(int Damage);
+			
+
+		public:
+			// -----------------------
+			// 전적 셋팅
+			// -----------------------
+
+			// 유저의 승리 카운트 1 증가
+			// !! 승리 카운트와 플레이 시간을 같이 갱신 !!
+			// !! 내부에서는 승리카운트 증가, 플레이타임 갱신 후, DB에 저장까지 한다. !!
+			// 
+			// Parameter : 없음
+			// return : 없음
+			void Record_Win_Add();
+
+			// 유저의 사망 카운트 1 증가
+			// !! 사망 카운트와 플레이 시간을 같이 갱신 !!
+			// !! 내부에서는 사망 카운트 증가, 플레이타임 갱신 후, DB에 저장까지 한다. !!
+			// 
+			// Parameter : 없음
+			// return : 없음
+			void Recored_Die_Add();
+
+			// 유저의 킬 카운트 1 증가
+			// !! 내부에서 킬 카운트 증가 후, DB에 저장까지 한다 !!
+			//
+			// Parameter : 없음
+			// return : 없음
+			void Record_Kill_Add();
+
+			// 유저의 플레이 횟수 1 증가
+			// !! 내부에서 플레이 횟수 증가 후, DB에 저장까지 한다 !!
+			//
+			// Parameter : 없음
+			// return : 없음
+			void Record_PlayCount_Add();
+
+			
+
 
 		private:
 			// -----------------
@@ -488,9 +563,7 @@ namespace Library_Jingyu
 			// return : 없음
 			void Game_GetItem_Packet(CProtocolBuff_Net* Packet, int Type);	
 		};
-
-		friend class CGameSession;
-
+		
 		// 파일에서 읽어오기 용 구조체
 		struct stConfigFile
 		{
@@ -724,18 +797,18 @@ namespace Library_Jingyu
 			// return : 없음
 			void StartCreateItem();
 
-			// 해당 방에, 아이템 1개 생성 (유저 사망 시 생성)
+			// 유저가 사망한 위치에 아이템 생성
 			// 생성 후, 방 안의 유저에게 아이템 생성 패킷 보냄
 			//
 			// Parameter : CGameSession* (사망한 유저)
 			// return : 없음
-			void CreateItem(CGameSession* DiePlayer);
+			void PlayerDieCreateItem(CGameSession* DiePlayer);
 
-			// 좌표로 받은 위치에 받은 타입 아이템 생성
+			// 좌표로 받은 위치에 아이템 1개 생성
 			//
 			// Parameter : 생성될 XY좌표, 아이템 Type, 아이템 구역
 			// return : 없음
-			void CreateItem_Type(float PosX, float PosY, int Type, BYTE Area);
+			void CreateItem(float PosX, float PosY, int Type, BYTE Area);
 
 			// 방 안의 모든 유저에게 "유저 추가됨" 패킷 보내기
 			//
@@ -827,7 +900,6 @@ namespace Library_Jingyu
 			// Parameter : 없음
 			// return : 없음
 			void RedZone_Damage();
-
 		};
 
 		// 방 상태 state
@@ -1150,7 +1222,60 @@ namespace Library_Jingyu
 		//
 		// Parameter : 공격자와 피해자의 거리
 		// return : 감소시켜야하는 HP
-		int GetDamage(float Range);
+		int GunDamage(float Range);
+
+		// 방 생성 함수
+		//
+		// Parameter : 없음
+		// return : 없음
+		void RoomCreate();
+
+		// HTTP 통신 후 후처리
+		// Auth 스레드에서 루프마다 호출된다.
+		//
+		// Parameter : 없음
+		// return : 없음
+		void AuthLoop_HTTP();
+
+		// 마스터 서버 혹은 채팅서버가 죽었을 경우
+		// Auth 스레드에서 호출된다.
+		//
+		// Parameter : 없음
+		// return : 없음 
+		void AuthLoop_ServerDie();
+
+		// 방 상태 처리
+		// 방을 game모드로 변경하기 등등..
+		// Auth 스레드에서 루프마다 호출된다.
+		//
+		// Parameter : 없음
+		// return : 없음
+		void AuthLoop_RoomLogic();
+
+		// 게임모드의 중복 로그인 유저 삭제
+		// Game 스레드에서 루프마다 호출된다.
+		// 
+		// Parameter : 없음
+		// return : 없음
+		void GameLoop_OverlapLogin();
+
+		// 게임 모드의 방 체크
+		// Game 스레드에서 루프마다 호출된다.
+		//
+		// Parameter : (out)int형 배열(삭제할 룸 번호 보관용), (out)삭제할 룸의 수
+		// return : 없음
+		void GameLoop_RoomLogic(int DeleteRoomNo[], int* Index);
+
+		// 게임 모드의 방 삭제
+		// Game 스레드에서 루프마다 호출된다.
+		//
+		// Parameter : (out)int형 배열(삭제할 룸 번호 보관용), (out)삭제할 룸의 수
+		// return : 없음
+		void GameLoop_RoomDelete(int DeleteRoomNo[], int* Index);
+
+		
+		
+
 		
 
 	private:
@@ -1318,7 +1443,6 @@ namespace Library_Jingyu
 	};
 
 }
-
 
 // ----------------------------------------
 // 
@@ -1535,8 +1659,6 @@ namespace Library_Jingyu
 	};
 }
 
-
-
 // ---------------
 // CGame_MonitorClient
 // CLanClient를 상속받는 모니터링 클라. 모니터링 LanServer로 정보 전송
@@ -1681,8 +1803,6 @@ namespace Library_Jingyu
 
 	};
 }
-
-
 
 // ---------------------------
 //
