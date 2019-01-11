@@ -3,7 +3,7 @@
 
 #include "NetworkLib\NetworkLib_NetServer.h"
 #include "NetworkLib\NetworkLib_LanServer.h"
-#include "Protocol_Set\CommonProtocol.h"
+#include "Protocol_Set/CommonProtocol_2.h"
 #include "CrashDump\CrashDump.h"
 
 #include <vector>
@@ -26,8 +26,7 @@ namespace Library_Jingyu
 			int ActiveWorker;
 			int CreateAccept;
 			int HeadCode;
-			int XORCode1;
-			int XORCode2;
+			int XORCode;
 			int Nodelay;
 			int MaxJoinUser;
 			int LogLevel;			
@@ -209,6 +208,12 @@ namespace Library_Jingyu
 		//			 : 에러 코드에 대한 스트링
 		// return : 없음
 		virtual void OnError(int error, const TCHAR* errorStr);
+
+		// 세마포어 발생 시 호출되는 함수
+		//
+		// parameter : SessionID
+		// return : 없음
+		virtual void OnSemaphore(ULONGLONG SessionID);
 
 	};
 }

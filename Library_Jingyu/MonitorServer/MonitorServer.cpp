@@ -133,12 +133,8 @@ namespace Library_Jingyu
 		if (Parser.GetValue_Int(_T("HeadCode"), &pConfig->HeadCode) == false)
 			return false;
 
-		// xorcode1
-		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode1) == false)
-			return false;
-
-		// xorcode2
-		if (Parser.GetValue_Int(_T("XorCode2"), &pConfig->XORCode2) == false)
+		// xorcode
+		if (Parser.GetValue_Int(_T("XorCode1"), &pConfig->XORCode) == false)
 			return false;
 
 		// Nodelay
@@ -406,7 +402,7 @@ namespace Library_Jingyu
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD Type = en_PACKET_CS_MONITOR_TOOL_RES_LOGIN;
-			BYTE Status = dfMONITOR_TOOL_LOGIN_OK;
+			BYTE Status = 1;
 
 			SendBuff->PutData((char*)&Type, 2);
 			SendBuff->PutData((char*)&Status, 1);
@@ -420,7 +416,7 @@ namespace Library_Jingyu
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
 			WORD Type = en_PACKET_CS_MONITOR_TOOL_RES_LOGIN;
-			BYTE Status = dfMONITOR_TOOL_LOGIN_ERR_SESSIONKEY;
+			BYTE Status = 0;
 
 			SendBuff->PutData((char*)&Type, 2);
 			SendBuff->PutData((char*)&Status, 1);
@@ -449,13 +445,13 @@ namespace Library_Jingyu
 
 		// 모니터링 넷 서버 시작
 		if (Start(m_stConfig.BindIP, m_stConfig.Port, m_stConfig.CreateWorker, m_stConfig.ActiveWorker, m_stConfig.CreateAccept,
-			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode1, m_stConfig.XORCode2) == false)
+			m_stConfig.Nodelay, m_stConfig.MaxJoinUser, m_stConfig.HeadCode, m_stConfig.XORCode) == false)
 		{
 			g_MonitorDump->Crash();
 		}		
 
 		// 서버 오픈 로그 찍기		
-		cMonitorLibLog->LogSave(L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
+		cMonitorLibLog->LogSave(true, L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerOpen...");
 
 		return true;
 	}
@@ -474,7 +470,7 @@ namespace Library_Jingyu
 		Stop();			
 
 		// 서버 종료 로그 찍기		
-		cMonitorLibLog->LogSave(L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
+		cMonitorLibLog->LogSave(true, L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_SYSTEM, L"ServerStop...");
 	}
 
 
@@ -545,7 +541,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			 cMonitorLibLog->LogSave(L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			 cMonitorLibLog->LogSave(false, L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				 (TCHAR*)exc.GetExceptionText());
 
 			Disconnect(SessionID);
@@ -582,6 +578,13 @@ namespace Library_Jingyu
 	//			 : 에러 코드에 대한 스트링
 	// return : 없음
 	void CNet_Monitor_Server::OnError(int error, const TCHAR* errorStr)
+	{}
+
+	// 세마포어 발생 시 호출되는 함수
+	//
+	// parameter : SessionID
+	// return : 없음
+	void CNet_Monitor_Server::OnSemaphore(ULONGLONG SessionID)
 	{}
 }
 
@@ -1073,7 +1076,7 @@ namespace Library_Jingyu
 		catch (CException& exc)
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
-			cMonitorLibLog->LogSave(L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
+			cMonitorLibLog->LogSave(false, L"MonitorServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
 			g_MonitorDump->Crash();

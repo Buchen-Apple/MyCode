@@ -2144,8 +2144,9 @@ enum en_PACKET_SS_MONITOR_DATA_UPDATE
 
 	dfMONITOR_DATA_TYPE_ALL_MATCH_PLAYER,                         // 전체 매칭서버 접속 플레이어 수
 	dfMONITOR_DATA_TYPE_ALL_BATTLE_PLAYER,                       // 전체 배틀 접속 플레이어 수
-	dfMONITOR_DATA_TYPE_ALL_CHAT_PLAYER                         // 전체 채팅 접속 플레이어 수
+	dfMONITOR_DATA_TYPE_ALL_CHAT_PLAYER,                         // 전체 채팅 접속 플레이어 수
 
+	dfMONITOR_DATA_TYPE_END										// 모니터링 타입 마지막.
 };
 
 // MEMORY_COMMIT 사이즈는 PDH 다음 쿼리를 사용 합니다    "\\Process(NAME)\\Private Bytes"

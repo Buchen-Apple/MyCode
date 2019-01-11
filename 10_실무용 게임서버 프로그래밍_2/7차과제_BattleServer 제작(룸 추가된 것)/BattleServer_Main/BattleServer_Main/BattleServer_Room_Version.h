@@ -1063,6 +1063,14 @@ namespace Library_Jingyu
 		// 총알 공격 시 유저에게 입혀야하는 데미지(거리 1당 데미지)
 		float m_fFire1_Damage;
 
+		// AuthFPS, GameFPS 보관용
+		// 2곳에서 해당 정보가 필요하기 때문에, 출력함수에서 받아둔다.
+		// 이 값은 모니터링 클라가 가져다 쓴다.
+		LONG m_lAuthFPS;
+		LONG m_lGameFPS;
+
+
+
 		
 
 		// -----------------------

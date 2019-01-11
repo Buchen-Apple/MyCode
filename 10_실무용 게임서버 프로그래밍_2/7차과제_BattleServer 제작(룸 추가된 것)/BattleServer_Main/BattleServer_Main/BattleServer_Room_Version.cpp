@@ -383,7 +383,7 @@ namespace Library_Jingyu
 				InterlockedIncrement(TempDBWriteTPS);
 
 				// 4. DBWrite 카운트1 감소
-				gThis->m_pBattleServer->MinDBWriteCountFunc(TempAccountNo);
+				//gThis->m_pBattleServer->MinDBWriteCountFunc(TempAccountNo);
 
 				// 5. DB_WORK 반환
 				pDBWorkPool->Free(pWork);
@@ -708,7 +708,7 @@ namespace Library_Jingyu
 		WriteWork->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, DBWrite카운트 올려야함.
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite 시도
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
@@ -738,7 +738,7 @@ namespace Library_Jingyu
 		DieWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
 	}
 
@@ -761,7 +761,7 @@ namespace Library_Jingyu
 		KillWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
 	}
 
@@ -783,7 +783,7 @@ namespace Library_Jingyu
 		CountWrite->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, WriteCount 증가.
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
@@ -917,8 +917,8 @@ namespace Library_Jingyu
 
 				// DBWrite에서 제거 시도.
 				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-				if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-					g_BattleServer_Room_Dump->Crash();
+				//if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+					//g_BattleServer_Room_Dump->Crash();
 
 				m_bStructFlag = false;
 			}
@@ -1155,8 +1155,8 @@ namespace Library_Jingyu
 
 			// DBWrite에서 제거 시도.
 			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
-			if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
+			//if (m_pParent->MinDBWriteCountFunc(m_Int64AccountNo) == false)
+				//g_BattleServer_Room_Dump->Crash();
 
 			m_bStructFlag = false;
 		}
@@ -1315,6 +1315,7 @@ namespace Library_Jingyu
 		Packet->GetData((char*)&AccountNo, 8);
 
 		// 3. 아직 DB에 Write중인지
+		/*
 		if (m_pParent->InsertDBWriteCountFunc(AccountNo) == false)
 		{
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount_DB);
@@ -1341,6 +1342,7 @@ namespace Library_Jingyu
 
 			return;
 		}
+		*/
 		
 		// 4. 나머지 마샬링 후, 세션키, AccountNo, 클라이언트키를 멤버에 셋팅
 		Packet->GetData(m_cSessionKey, 64);
@@ -2912,7 +2914,7 @@ namespace Library_Jingyu
 			int ItemType = rand() % 3;
 
 			// 아이템 1개 생성
-			CreateItem(g_Data_ItemPoint_Redzone[i][0], g_Data_ItemPoint_Redzone[i][1], ItemType, 2);
+			CreateItem(g_Data_ItemPoint_Playzone[i][0], g_Data_ItemPoint_Playzone[i][1], ItemType, 2);
 
 			++i;
 		}
@@ -3636,6 +3638,8 @@ namespace Library_Jingyu
 		m_OverlapLoginCount_DB = 0;
 		m_lReadyRoomCount = 0;
 		m_lPlayRoomCount = 0;
+		m_lAuthFPS = 0;
+		m_lGameFPS = 0;
 
 		m_shDB_Communicate.ParentSet(this);
 
@@ -3784,6 +3788,8 @@ namespace Library_Jingyu
 		LONG GameUser = GetGameModeUserCount();
 		LONG TempDBWriteTPS = InterlockedExchange(&m_shDB_Communicate.m_lDBWriteTPS, 0);
 		LONG TempDBWriteCountTPS = InterlockedExchange(&m_shDB_Communicate.m_lDBWriteCountTPS, 0);
+		m_lAuthFPS = GetAuthFPS();
+		m_lGameFPS = GetGameFPS();
 
 		printf("================== Battle Server ==================\n"
 			"Total SessionNum : %lld\n"
@@ -3857,8 +3863,8 @@ namespace Library_Jingyu
 			GetSendTPS(),
 			GetRecvTPS(),
 
-			GetAuthFPS(),
-			GetGameFPS(),
+			m_lAuthFPS,
+			m_lGameFPS,
 
 			CProtocolBuff_Net::GetChunkCount(), CProtocolBuff_Net::GetOutChunkCount(),
 			GetChunkCount(), GetOutChunkCount(),
@@ -6249,10 +6255,10 @@ namespace Library_Jingyu
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_PACKET_POOL, CProtocolBuff_Net::GetNodeCount() + CProtocolBuff_Lan::GetNodeCount(), TimeStamp);
 
 				// 5. Auth 스레드 초당 루프 수
-				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_AUTH_FPS, g_This->m_BattleServer_this->GetAuthFPS(), TimeStamp);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_AUTH_FPS, g_This->m_BattleServer_this->m_lAuthFPS, TimeStamp);
 
 				// 6. Game 스레드 초당 루프 수
-				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_GAME_FPS, g_This->m_BattleServer_this->GetGameFPS(), TimeStamp);
+				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_GAME_FPS, g_This->m_BattleServer_this->m_lGameFPS, TimeStamp);
 
 				// 7. 배틀서버 접속 세션전체
 				g_This->InfoSend(dfMONITOR_DATA_TYPE_BATTLE_SESSION_ALL, (int)g_This->m_BattleServer_this->GetClientCount(), TimeStamp);
