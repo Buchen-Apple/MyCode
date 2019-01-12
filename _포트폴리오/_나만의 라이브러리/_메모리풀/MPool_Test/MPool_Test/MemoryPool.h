@@ -284,13 +284,11 @@ namespace Library_Jingyu
 			if (bContinueFlag == true)
 				continue;
 
-			// 이 아래에서는 모두 스냅샷으로 찍은 localTop을 사용. 이걸 하는 중에 m_pTop이 바뀔 수 있기 때문에!
+			// 이 아래에서는 모두 스냅샷으로 찍은 localTop을 사용. 
+			// 아래 작업 중, m_pTop 변주 가능성이 있기 때문에,
 			// 플레이스먼트 뉴를 사용한다면 사용자에게 주기전에 '객체 생성자' 호출
 			if (m_bPlacementNew == true)
 				new (&localTop.m_pTop->stData) DATA();
-
-			// 유저 사용중 카운트 증가. 새로 할당한게 아니기 때문에 Alloc카운트는 변동 없음.
-			//InterlockedIncrement(&m_iUseCount);
 
 			return &localTop.m_pTop->stData;
 		}

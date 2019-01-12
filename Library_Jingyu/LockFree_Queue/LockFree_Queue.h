@@ -181,7 +181,7 @@ namespace Library_Jingyu
 		if (InterlockedDecrement(&m_NodeCount) < 0)
 		{
 			InterlockedIncrement(&m_NodeCount);
-			return 0;
+			return -1;
 		}	
 
 		// 락프리 구조 --------------------------

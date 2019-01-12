@@ -167,7 +167,7 @@ namespace Library_Jingyu
 		// 리턴할 데이터 받아두기
 		T retval = localTop.m_pTop->m_Data;
 
-		// 안쓰는것 Free하기
+		// pop 노드 Free하기
 		m_MPool->Free(localTop.m_pTop);
 
 		// 리턴
