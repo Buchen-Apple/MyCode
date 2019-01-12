@@ -1,7 +1,6 @@
-﻿  ConsoleApplication1.cpp
+﻿  pch.cpp
+  ConsoleApplication1.cpp
   코드를 생성하고 있습니다.
+  All 41 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
-  3 of 32 functions ( 9.4%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    0 functions had inline decision re-evaluated but remain unchanged
   ConsoleApplication1.vcxproj -> C:\Git_Public\_디자인패턴 공부\Duck\ConsoleApplication1\x64\Release\ConsoleApplication1.exe
