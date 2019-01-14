@@ -772,7 +772,7 @@ namespace Library_Jingyu
 		// 디파인 정보들 모아두기
 		enum en_MonitorClient
 		{
-			dfSERVER_NO = 3	// 채팅서버는 3번이다
+			dfSERVER_NO = 23	// 채팅서버는 23번이다
 		};
 
 		// -----------------------

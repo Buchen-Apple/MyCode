@@ -583,7 +583,7 @@ namespace Library_Jingyu
 		// 디파인 정보들 모아두기
 		enum en_MonitorClient
 		{
-			dfSERVER_NO = 4	// 매치메이킹 서버는 4번이다
+			dfSERVER_NO = 21	// 매치메이킹 서버는 21번이다
 		};
 
 		// -------------

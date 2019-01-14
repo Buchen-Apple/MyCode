@@ -924,11 +924,11 @@ namespace Library_Jingyu
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
-			const LONG m_lMaxTotalRoomCount = 600;
+			const LONG m_lMaxTotalRoomCount = 700;
 
 			// 최대 존재할 수 있는 대기방 수
 			// 고정 값
-			const LONG m_lMaxWaitRoomCount = 600;
+			const LONG m_lMaxWaitRoomCount = 200;
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
@@ -1680,7 +1680,7 @@ namespace Library_Jingyu
 		// 디파인 정보들 모아두기
 		enum en_MonitorClient
 		{
-			dfSERVER_NO = 2	// 배틀서버는 2번이다
+			dfSERVER_NO = 22	// 배틀서버는 22번이다
 		};
 
 		// 모니터링 서버로 정보 전달할 스레드의 핸들.
