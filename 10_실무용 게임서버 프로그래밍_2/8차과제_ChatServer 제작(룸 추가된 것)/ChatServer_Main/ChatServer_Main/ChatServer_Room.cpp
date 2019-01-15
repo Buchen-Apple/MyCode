@@ -1880,6 +1880,10 @@ namespace Library_Jingyu
 			m_pNetServer->m_Room_Umap.erase(FindRoom);
 			ReleaseSRWLockExclusive(&m_pNetServer->m_Room_Umap_srwl);	 // ----- ·ë Exclusive ¾ð¶ô
 
+			// ·ë Free
+			m_pNetServer->m_pRoom_Pool->Free(NowRoom);
+
+			// ·ë ³»ºÎ Ä«¿îÆ® °¨¼Ò
 			InterlockedDecrement(&m_pNetServer->m_lRoomCount);
 		}		
 
