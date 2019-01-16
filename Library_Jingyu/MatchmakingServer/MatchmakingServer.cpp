@@ -940,11 +940,8 @@ namespace Library_Jingyu
 		// 7. 여기까지 왔으면 정상적인 플레이어. 셋팅 시작
 		// 1) AccountNo 셋팅
 		NowPlayer->m_i64AccountNo = AccountNo;			
-
-		// 2) 로그인 유저 수 증가
-		InterlockedIncrement(&m_lLoginUser);
-
-		// 3) 로그인 유저에 추가
+		
+		// 2) 로그인 유저에 추가
 		if (InsertLoginPlayerFunc(AccountNo, SessionID) == false)
 		{
 			InterlockedIncrement(&m_lOverlapError);
@@ -973,6 +970,9 @@ namespace Library_Jingyu
 			
 			return;
 		}
+
+		// 3) 로그인 유저 수 증가
+		InterlockedIncrement(&m_lLoginUser);
 
 		// 4) 로그인 유저 관리 자료구조에 추가됐을 시, 로그인 플래그 변경
 		NowPlayer->m_bLoginCheck = true;

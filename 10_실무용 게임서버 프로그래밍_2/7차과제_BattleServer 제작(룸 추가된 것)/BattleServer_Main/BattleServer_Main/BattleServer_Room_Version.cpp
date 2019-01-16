@@ -4575,23 +4575,30 @@ namespace Library_Jingyu
 				}
 
 				// Setp 3. 게임 종료 체크
-				// 생존자가 1명이면 게임 종료.
+				// 생존자가 1명이면서 게임모드의 유저 수와 생존자 수가 동일할 경우, 게임 종료.			
 				else if (NowRoom->m_iAliveUserCount == 1)
 				{
-					// 게임 종료 패킷 보내기
-					// - 생존자 1명에겐 승리 패킷
-					// - 나머지 접속자들에겐 패배 패킷
-					NowRoom->GameOver();
+					// !! Auth 모드에서 1명을 제외한 모든 유저가 나간 후에 !!
+					// !! 남은 1명이 Game모드로 변경되기 전에 OnGame_Update에서 해당 로직이 먼저 체크할 경우 !!
+					// !! 플레이 카운트가 저장되지 않을 수도 있다. !!
+					// !! 때문에, Game모드 유저 수와 AliveUser수가 동일한지 꼭 확인한다 !!
+					if (NowRoom->m_iAliveUserCount == NowRoom->m_iGameModeUser)
+					{
+						// 게임 종료 패킷 보내기
+						// - 생존자 1명에겐 승리 패킷
+						// - 나머지 접속자들에겐 패배 패킷
+						NowRoom->GameOver();
 
-					// 방 내 승리자에게 전적 보내기
-					NowRoom->WInRecodeSend();
+						// 방 내 승리자에게 전적 보내기
+						NowRoom->WInRecodeSend();
 
-					// 게임 방 종료 플래그 변경
-					NowRoom->m_bGameEndFlag = true;
+						// 게임 방 종료 플래그 변경
+						NowRoom->m_bGameEndFlag = true;
 
-					// 현 시점의 시간 저장
-					// 방 파괴 체크 용도
-					NowRoom->m_dwGameEndMSec = timeGetTime();
+						// 현 시점의 시간 저장
+						// 방 파괴 체크 용도
+						NowRoom->m_dwGameEndMSec = timeGetTime();
+					}
 				}
 
 				// Step 4. 생존자가 0명인 경우에도 게임 종료.

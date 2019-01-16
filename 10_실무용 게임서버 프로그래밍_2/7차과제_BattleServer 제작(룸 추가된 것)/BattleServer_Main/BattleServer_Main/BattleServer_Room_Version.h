@@ -924,7 +924,7 @@ namespace Library_Jingyu
 
 			// 최대 존재할 수 있는 방 수
 			// 고정 값
-			const LONG m_lMaxTotalRoomCount = 700;
+			const LONG m_lMaxTotalRoomCount = 1200;
 
 			// 최대 존재할 수 있는 대기방 수
 			// 고정 값
