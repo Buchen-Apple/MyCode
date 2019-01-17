@@ -699,6 +699,7 @@ namespace Library_Jingyu
 		// 승리자는, 아직 플레이 타임 갱신 안함. 여기서 갱신
 		m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 
+		/*
 		DB_WORK_CONTENT_UPDATE_2* WriteWork = (DB_WORK_CONTENT_UPDATE_2*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
@@ -708,10 +709,11 @@ namespace Library_Jingyu
 		WriteWork->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, DBWrite카운트 올려야함.
-		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite 시도
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
+		*/
 	}
 	
 	// 유저의 사망 카운트 1 증가
@@ -728,6 +730,7 @@ namespace Library_Jingyu
 		// 플레이 타임 갱신
 		m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 		
+		/*
 		// DBWrite 구조체 셋팅 (Die카운트 + 플레이 타임)
 		DB_WORK_CONTENT_UPDATE_2* DieWrite = (DB_WORK_CONTENT_UPDATE_2*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
@@ -738,8 +741,9 @@ namespace Library_Jingyu
 		DieWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
+		*/
 	}
 
 	// 유저의 킬 카운트 1 증가
@@ -752,6 +756,7 @@ namespace Library_Jingyu
 		// 킬 카운트 증가
 		++m_iRecord_Kill;
 
+		/*
 		// DBWrite 구조체 셋팅
 		DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
@@ -761,8 +766,9 @@ namespace Library_Jingyu
 		KillWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
+		*/
 	}
 
 	// 유저의 플레이 횟수 1 증가
@@ -775,6 +781,7 @@ namespace Library_Jingyu
 		// 전적 중, 플레이 횟수 증가. 그리고 DB에 저장
 		++m_iRecord_PlayCount;
 
+		/*
 		DB_WORK_CONTENT_UPDATE* CountWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
@@ -783,11 +790,11 @@ namespace Library_Jingyu
 		CountWrite->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, WriteCount 증가.
-		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
-
+		*/
 	}
 
 
@@ -912,8 +919,8 @@ namespace Library_Jingyu
 			// 자료구조에서 제거한다.
 			if (m_bStructFlag == true)
 			{
-				if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-					g_BattleServer_Room_Dump->Crash();
+				//if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+					//g_BattleServer_Room_Dump->Crash();
 
 				// DBWrite에서 제거 시도.
 				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
@@ -1150,8 +1157,8 @@ namespace Library_Jingyu
 		// 자료구조에서 제거한다.
 		if (m_bStructFlag == true)
 		{
-			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-				g_BattleServer_Room_Dump->Crash();
+			//if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+				//g_BattleServer_Room_Dump->Crash();
 
 			// DBWrite에서 제거 시도.
 			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
@@ -1427,6 +1434,8 @@ namespace Library_Jingyu
 		// 7. AccountNo 자료구조에 추가.	
 		// 이미 있으면(false 리턴) 중복 로그인으로 처리
 		// 현재 유저에게는 실패 패킷, 접속 중인 유저는 DIsconnect.
+
+		/*
 		if (m_pParent->InsertAccountNoFunc(AccountNo, this) == false)
 		{	
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
@@ -1458,6 +1467,7 @@ namespace Library_Jingyu
 
 			return;
 		}
+		*/
 
 		// 자료구조에 들어감 플래그 변경
 		m_bStructFlag = true;
