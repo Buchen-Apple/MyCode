@@ -1551,7 +1551,7 @@ namespace Library_Jingyu
 		InitializeSRWLock(&m_srwlLoginPlayer);
 
 		// stPlayer 구조체를 다루는 TLS 동적할당
-		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(20, false);		
+		m_PlayerPool = new CMemoryPoolTLS<stPlayer>(0, false);		
 		
 		// HTTP_Exchange 동적할당
 		//m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.0.0.1"), 11902);

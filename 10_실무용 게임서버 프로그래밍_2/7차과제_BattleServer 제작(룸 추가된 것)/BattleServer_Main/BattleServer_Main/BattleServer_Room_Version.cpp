@@ -5466,8 +5466,8 @@ namespace Library_Jingyu
 
 
 		// TLS 동적할당
-		m_Room_Pool = new CMemoryPoolTLS<stRoom>(20, false);	
-		m_Item_Pool = new CMemoryPoolTLS<stRoomItem>(60, false);
+		m_Room_Pool = new CMemoryPoolTLS<stRoom>(0, false);	
+		m_Item_Pool = new CMemoryPoolTLS<stRoomItem>(0, false);
 
 		// reserve 셋팅
 		m_AccountNo_Umap.reserve(m_stConfig.MaxJoinUser);

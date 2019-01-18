@@ -2151,8 +2151,8 @@ namespace Library_Jingyu
 
 		// TLS 동적할당
 		m_TLSPool_BattleServer = new CMemoryPoolTLS<stBattle>(0, false);
-		m_TLSPool_Room = new CMemoryPoolTLS<stRoom>(10, false);
-		m_TLSPool_Player = new CMemoryPoolTLS<stPlayer>(10, false);
+		m_TLSPool_Room = new CMemoryPoolTLS<stRoom>(0, false);
+		m_TLSPool_Player = new CMemoryPoolTLS<stPlayer>(0, false);
 
 		// 자료구조 공간 미리 잡아두기
 		m_BattleServer_Umap.reserve(100);
