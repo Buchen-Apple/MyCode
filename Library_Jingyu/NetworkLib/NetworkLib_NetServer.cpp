@@ -832,7 +832,8 @@ namespace Library_Jingyu
 			if (&stNowSession->m_overPQCSOverlapped == overlapped)
 			{		
 				// 1. SendPost()
-				g_This->SendPost(stNowSession);				
+				if (g_This->SendPost(stNowSession) == 2)
+					continue;
 			}
 
 			// -----------------
@@ -922,7 +923,8 @@ namespace Library_Jingyu
 					stNowSession->m_lSendFlag = FALSE;
 
 					// Send 다시 시도
-					g_This->SendPost(stNowSession);
+					if (g_This->SendPost(stNowSession) == 2)
+						continue;
 				}					
 			}
 

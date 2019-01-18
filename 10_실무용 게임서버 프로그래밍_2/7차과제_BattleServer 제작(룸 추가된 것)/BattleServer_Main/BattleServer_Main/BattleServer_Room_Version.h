@@ -1150,6 +1150,7 @@ namespace Library_Jingyu
 		// -----------------------
 
 		// AccountNo를 이용해 CGameSession* 관리
+		// 중복 로그인 체크 용도
 		//
 		// 접속 중인 유저의 AccountNo를 기준으로 CGameSession* 관리
 		// Key : AccountNo, Value : CGameSession*

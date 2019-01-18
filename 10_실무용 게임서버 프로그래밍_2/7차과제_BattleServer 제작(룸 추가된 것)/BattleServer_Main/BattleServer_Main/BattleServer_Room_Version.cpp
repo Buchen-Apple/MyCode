@@ -699,7 +699,6 @@ namespace Library_Jingyu
 		// 승리자는, 아직 플레이 타임 갱신 안함. 여기서 갱신
 		m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 
-		/*
 		DB_WORK_CONTENT_UPDATE_2* WriteWork = (DB_WORK_CONTENT_UPDATE_2*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		WriteWork->m_wWorkType = eu_DB_AFTER_TYPE::eu_WIN_UPDATE;
@@ -709,11 +708,10 @@ namespace Library_Jingyu
 		WriteWork->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, DBWrite카운트 올려야함.
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite 시도
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)WriteWork);
-		*/
 	}
 	
 	// 유저의 사망 카운트 1 증가
@@ -730,7 +728,6 @@ namespace Library_Jingyu
 		// 플레이 타임 갱신
 		m_iRecord_PlayTime = m_iRecord_PlayTime + ((timeGetTime() - m_dwGameStartTime) / 1000);
 		
-		/*
 		// DBWrite 구조체 셋팅 (Die카운트 + 플레이 타임)
 		DB_WORK_CONTENT_UPDATE_2* DieWrite = (DB_WORK_CONTENT_UPDATE_2*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
@@ -741,9 +738,8 @@ namespace Library_Jingyu
 		DieWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)DieWrite);
-		*/
 	}
 
 	// 유저의 킬 카운트 1 증가
@@ -756,7 +752,6 @@ namespace Library_Jingyu
 		// 킬 카운트 증가
 		++m_iRecord_Kill;
 
-		/*
 		// DBWrite 구조체 셋팅
 		DB_WORK_CONTENT_UPDATE* KillWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
@@ -766,9 +761,8 @@ namespace Library_Jingyu
 		KillWrite->AccountNo = m_Int64AccountNo;
 
 		// 요청하기
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)KillWrite);
-		*/
 	}
 
 	// 유저의 플레이 횟수 1 증가
@@ -781,7 +775,6 @@ namespace Library_Jingyu
 		// 전적 중, 플레이 횟수 증가. 그리고 DB에 저장
 		++m_iRecord_PlayCount;
 
-		/*
 		DB_WORK_CONTENT_UPDATE* CountWrite = (DB_WORK_CONTENT_UPDATE*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
 
 		CountWrite->m_wWorkType = eu_DB_AFTER_TYPE::eu_PLAYCOUNT_UPDATE;
@@ -790,11 +783,10 @@ namespace Library_Jingyu
 		CountWrite->AccountNo = m_Int64AccountNo;
 
 		// Write 하기 전에, WriteCount 증가.
-		m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
+		//m_pParent->AddDBWriteCountFunc(m_Int64AccountNo);
 
 		// DBWrite
 		m_pParent->m_shDB_Communicate.DBWriteFunc((DB_WORK*)CountWrite);
-		*/
 	}
 
 
@@ -919,8 +911,8 @@ namespace Library_Jingyu
 			// 자료구조에서 제거한다.
 			if (m_bStructFlag == true)
 			{
-				//if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-					//g_BattleServer_Room_Dump->Crash();
+				if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+					g_BattleServer_Room_Dump->Crash();
 
 				// DBWrite에서 제거 시도.
 				// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
@@ -1095,28 +1087,28 @@ namespace Library_Jingyu
 		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room 자료구조 Shard 언락 
 
 
-		// 2. 현재 룸 안에 있는 유저 수, 게임모드 유저 수 감소
-		--NowRoom->m_iJoinUserCount;
-		--NowRoom->m_iGameModeUser;
+		// 2. 현재 룸 안에 있는 유저 수 감소
+		--NowRoom->m_iJoinUserCount;		
 
-		// 감소 후, 룸 안의 유저 수가 0보다 작거나,
-		// 게임 모드 유저 수가 0보다 작으면 말도 안됨. Crash
-		if (NowRoom->m_iJoinUserCount < 0 || NowRoom->m_iGameModeUser < 0)
+		// 감소 후, 룸 안의 유저 수가 0보다 작으면 말도 안됨. Crash
+		if (NowRoom->m_iJoinUserCount < 0)
 			g_BattleServer_Room_Dump->Crash();
 
 
-		// 3. 나가는 유저가 생존한 유저였을 경우, 생존한 유저 수 감소.
+		// 3. 나가는 유저가 생존한 유저였을 경우, 생존한 유저 수, Game모드 유저 수 감소.
 		// 생존한 유저 수로 승리여부를 판단해야 하기 때문에 
 		// 유저가 게임에서 나가거나 HP가 0이되어 사망할 경우 감소시켜야 함
 		if (m_bAliveFlag == true)
 		{
 			--NowRoom->m_iAliveUserCount;
+			--NowRoom->m_iGameModeUser;
+			
+			// 감소 후, 0보다 적으면 말도 안됨.
+			if (NowRoom->m_iAliveUserCount < 0 || NowRoom->m_iGameModeUser < 0)
+				g_BattleServer_Room_Dump->Crash();
+
 			m_bAliveFlag = false;
 		}
-
-		// 감소 후, 0보다 적으면 말도 안됨.
-		if (NowRoom->m_iAliveUserCount < 0)
-			g_BattleServer_Room_Dump->Crash();
 
 
 
@@ -1157,8 +1149,8 @@ namespace Library_Jingyu
 		// 자료구조에서 제거한다.
 		if (m_bStructFlag == true)
 		{
-			//if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
-				//g_BattleServer_Room_Dump->Crash();
+			if (m_pParent->EraseAccountNoFunc(m_Int64AccountNo) == false)
+				g_BattleServer_Room_Dump->Crash();
 
 			// DBWrite에서 제거 시도.
 			// m_bStructFlag가 true라면, DBWrite 횟수 자료구조에 없을 수가 없음.
@@ -1434,8 +1426,6 @@ namespace Library_Jingyu
 		// 7. AccountNo 자료구조에 추가.	
 		// 이미 있으면(false 리턴) 중복 로그인으로 처리
 		// 현재 유저에게는 실패 패킷, 접속 중인 유저는 DIsconnect.
-
-		/*
 		if (m_pParent->InsertAccountNoFunc(AccountNo, this) == false)
 		{	
 			InterlockedIncrement(&m_pParent->m_OverlapLoginCount);
@@ -1467,7 +1457,6 @@ namespace Library_Jingyu
 
 			return;
 		}
-		*/
 
 		// 자료구조에 들어감 플래그 변경
 		m_bStructFlag = true;
@@ -3125,8 +3114,10 @@ namespace Library_Jingyu
 			g_BattleServer_Room_Dump->Crash();
 
 
-		// 4. 룸의 생존 유저 수 카운트 1 감소
+		// 4. 룸의 생존 유저 수, GameMode 유저 수 감소 카운트 1 감소
 		--m_iAliveUserCount;
+		--m_iGameModeUser;
+
 
 
 		// 5. 패킷 보내기
@@ -3564,8 +3555,9 @@ namespace Library_Jingyu
 						if (m_iAliveUserCount == 0)
 							g_BattleServer_Room_Dump->Crash();
 
-						// 룸의 생존 유저 수 카운트 1 감소
+						// 룸의 생존 유저 수, GameMode 유저 카운트 1 감소
 						--m_iAliveUserCount;
+						--m_iGameModeUser;
 
 						// 패킷 보내기
 						CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -4615,6 +4607,9 @@ namespace Library_Jingyu
 				// 방 내의 생존자들이 같은 프레임에 hp가 0이되어 죽을 경우.
 				else if (NowRoom->m_iAliveUserCount == 0)
 				{
+					if (NowRoom->m_iGameModeUser != 0)
+						g_BattleServer_Room_Dump->Crash();
+
 					// 게임 종료 패킷 보내기
 					// - 모든 유저에게 패배 패킷 보냄. 승리자 없음
 					CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -4916,7 +4911,7 @@ namespace Library_Jingyu
 
 		// 5. 닉네임 복사
 		const TCHAR* TempNick = Doc[_T("nick")].GetString();
-		ZeroMemory(&NowPlayer->m_tcNickName, _Mycountof(NowPlayer->m_tcNickName));
+		ZeroMemory(&NowPlayer->m_tcNickName, sizeof(NowPlayer->m_tcNickName));
 		StringCchCopy(NowPlayer->m_tcNickName, _Mycountof(NowPlayer->m_tcNickName), TempNick);
 
 
