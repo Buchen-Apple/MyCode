@@ -38,7 +38,8 @@ namespace Library_Jingyu
 
 			NETWORK_LIB_ERROR__IOCP_ERROR,					// IOCP 자체 에러
 			NETWORK_LIB_ERROR__NOT_FIND_CLINET,				// map 검색 등을 할때 클라이언트를 못찾은경우.
-			NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL,		// Enqueue사이즈가 꽉찬 유저
+			NETWORK_LIB_ERROR__SEND_QUEUE_SIZE_FULL,		// SendQ가 꽉찬 유저
+			NETWORK_LIB_ERROR__RECV_QUEUE_SIZE_FULL,		// RecvQ가 꽉찬 유저
 			NETWORK_LIB_ERROR__QUEUE_DEQUEUE_EMPTY,			// Dequeue 시, 큐가 비어있는 유저. Peek을 시도하는데 큐가 비었을 상황은 없음
 			NETWORK_LIB_ERROR__WSASEND_FAIL,				// SendPost에서 WSASend 실패			
 			NETWORK_LIB_ERROR__A_THREAD_ABNORMAL_EXIT,		// 엑셉트 스레드 비정상 종료. 보통 accept()함수에서 이상한 에러가 나온것.
@@ -140,6 +141,9 @@ namespace Library_Jingyu
 			// true : 이미 하트비트로 인해 셧다운 된 유저
 			// false : 하트비트로 인한 셧다운 받지 않은 유저
 			bool m_bHeartBeatShutdown;
+
+			// CancelIO요청 플래그
+			LONG m_lCancelIOExFlag;
 
 
 		public:

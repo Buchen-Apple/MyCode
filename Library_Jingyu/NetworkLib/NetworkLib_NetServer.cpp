@@ -408,8 +408,7 @@ namespace Library_Jingyu
 			OnError((int)euError::NETWORK_LIB_ERROR__WFSO_ERROR, L"Stop() --> Accept Thread EXIT Error");
 		}
 
-		// 2. 모든 유저에게 Shutdown
-		// 모든 유저에게 Disconnect
+		// 2. 모든 유저에게 Disconnect
 		for (int i = 0; i < m_iMaxJoinUser; ++i)
 		{
 			if (m_stSessionArray[i].m_lReleaseFlag == FALSE)

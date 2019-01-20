@@ -1,5 +1,4 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppClean.targets(76,5): warning : 'c:\git_public\10_실무용 게임서버 프로그래밍_2\6차과제_masterserver 제작\masterserver_main\x64\release\masterserver_main.ipdb' 파일은 다른 프로세스에서 사용 중이므로 프로세스에서 액세스할 수 없습니다.
-  pch.cpp
+﻿  pch.cpp
   CrashDump.cpp
   Log.cpp
   MasterServer.cpp
@@ -9,6 +8,6 @@
   RingBuff.cpp
   MasterServer_Main.cpp
   코드를 생성하고 있습니다.
-  코드를 생성했습니다.
   All 1589 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  코드를 생성했습니다.
   MasterServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\6차과제_MasterServer 제작\MasterServer_Main\x64\Release\MasterServer_Main.exe

@@ -88,6 +88,9 @@ namespace Library_Jingyu
 		// PQCS overlapped구조체
 		OVERLAPPED m_overPQCSOverlapped;
 
+		// CancelIO요청 플래그
+		LONG m_lCancelIOExFlag;
+
 		// 생성자 
 		stSession()
 		{
@@ -379,12 +382,13 @@ namespace Library_Jingyu
 			OnError((int)euError::NETWORK_LIB_ERROR__WFSO_ERROR, L"Stop() --> Accept Thread EXIT Error");
 		}
 
-		// 2. 모든 유저에게 Shutdown
-		// 모든 유저에게 셧다운 날림
+		// 2. 모든 유저에게 Disconnect
 		for (int i = 0; i < m_iMaxJoinUser; ++i)
 		{
 			if (m_stSessionArray[i].m_lReleaseFlag == FALSE)
-				shutdown(m_stSessionArray[i].m_Client_sock, SD_BOTH);
+			{
+				Disconnect(m_stSessionArray[i].m_ullSessionID);
+			}
 		}
 
 		// 모든 유저가 종료되었는지 체크
@@ -515,11 +519,20 @@ namespace Library_Jingyu
 		if (DeleteSession == nullptr)
 			return;
 
+		/*
 		// 2. 끊어야하는 유저는 셧다운 날린다.
 		// 차후 자연스럽게 I/O카운트가 감소되어서 디스커넥트된다.
 		shutdown(DeleteSession->m_Client_sock, SD_BOTH);
+		*/
 
-		// 3. 세션 락 해제
+		// 2. CancelIOEx Flag 변경
+		// Flag를 먼저 변경해야 동기화 방어 가능
+		DeleteSession->m_lCancelIOExFlag = TRUE;
+
+		// 3. CancelIOEx 요청
+		CancelIoEx((HANDLE)DeleteSession->m_Client_sock, NULL);
+
+		// 4. 세션 락 해제
 		// 여기서 삭제된 유저는, 정상적으로 삭제된 유저일 수도 있기 때문에 (shutdown 날렸으니!) false체크 안한다.
 		GetSessionUnLOCK(DeleteSession);
 	}
@@ -769,6 +782,26 @@ namespace Library_Jingyu
 			// GQCS 깨어날 시 함수호출
 			g_This->OnWorkerThreadBegin();
 
+			// --------------
+			// CancelioEx 후처리
+			// --------------
+
+			// CancelioEx 대상일 경우, WSASend / WSARecv를 호출하지 않도록 하기 위해, 여기서 우선 체크한다.
+			// CancelioEx는, 내부적으로 커널의 I/O Queue를 확인하기 때문에 overlapped를 채워준다. 
+			// 즉, CancelioEx로 인해 overlapped가 NULL이 나올 수 없다
+			if (stNowSession->m_lCancelIOExFlag == TRUE)
+			{
+				// CancelioEx 호출
+				CancelIoEx((HANDLE)stNowSession->m_Client_sock, NULL);
+
+				// I/O카운트 감소 체크
+				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
+					g_This->InDisconnect(stNowSession);
+
+				// 아래 로직은 타지 않는다.
+				continue;
+			}
+
 			// -----------------
 			// PQCS 요청 로직
 			// -----------------
@@ -791,16 +824,24 @@ namespace Library_Jingyu
 				g_This->RecvProc(stNowSession);
 
 				// 2. 리시브 다시 걸기.
+				// 리시브 큐가 꽉찼으면 접속 끊는다.
 				if (g_This->RecvPost(stNowSession) == 1)
 				{
-					if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					{
-						g_This->InDisconnect(stNowSession);
-						continue;
-					}
+					// OnError 함수 호출
+					// 윈도우 에러, 내 에러 보관
+					g_This->m_iOSErrorCode = 0;
+					g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_QUEUE_SIZE_FULL;
 
-					shutdown(stNowSession->m_Client_sock, SD_BOTH);
-					continue;
+					// 에러 스트링 만들고
+					TCHAR tcErrorString[300];
+					StringCchPrintf(tcErrorString, 300, L"RecvQ Size Full : NetError(%d), OSError(%d)",
+						(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
+
+					// 에러 발생 함수 호출
+					g_This->OnError((int)euError::NETWORK_LIB_ERROR__RECV_QUEUE_SIZE_FULL, tcErrorString);
+
+					// 디스커넥트
+					g_This->Disconnect(stNowSession->m_ullSessionID);
 				}
 			}
 
@@ -965,6 +1006,9 @@ namespace Library_Jingyu
 			// -- 소켓
 			g_This->m_stSessionArray[iIndex].m_Client_sock = client_sock;
 
+			// -- CancelIoEx 초기화
+			g_This->m_stSessionArray[iIndex].m_lCancelIOExFlag = FALSE;
+
 			// -- IP와 Port
 			StringCchCopy(g_This->m_stSessionArray[iIndex].m_IP, _MyCountof(g_This->m_stSessionArray[iIndex].m_IP), tcTempIP);
 			g_This->m_stSessionArray[iIndex].m_prot = port;
@@ -1021,7 +1065,21 @@ namespace Library_Jingyu
 			// ret가 1이라면 접속 끊는다.
 			else if (ret == 1)
 			{
-				shutdown(g_This->m_stSessionArray[iIndex].m_Client_sock, SD_BOTH);
+				// OnError 함수 호출
+				// 윈도우 에러, 내 에러 보관
+				g_This->m_iOSErrorCode = 0;
+				g_This->m_iMyErrorCode = euError::NETWORK_LIB_ERROR__RECV_QUEUE_SIZE_FULL;
+
+				// 에러 스트링 만들고
+				TCHAR tcErrorString[300];
+				StringCchPrintf(tcErrorString, 300, L"RecvQ Size Full : NetError(%d), OSError(%d)",
+					(int)g_This->m_iMyErrorCode, g_This->m_iOSErrorCode);
+
+				// 에러 발생 함수 호출
+				g_This->OnError((int)euError::NETWORK_LIB_ERROR__RECV_QUEUE_SIZE_FULL, tcErrorString);
+
+				// 디스커넥트
+				g_This->Disconnect(g_This->m_stSessionArray[iIndex].m_ullSessionID);
 			}
 
 		}
@@ -1257,16 +1315,20 @@ namespace Library_Jingyu
 					cLanLibLog->LogSave(false, L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSARecv --> %s : NetError(%d), OSError(%d)",
 						tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
-					// 끊어야하니 셧다운 호출
-					shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 					// 에러 함수 호출
 					OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
+
+					// 끊어야하니 디스커넥트
+					Disconnect(NowSession->m_ullSessionID);				
 				}
 
 				return 3;
 			}
 		}
+
+		// 5. WSARecv를 성공했을 경우, CancelioEx플래그를 체크해 한번 더 호출
+		if (NowSession->m_lCancelIOExFlag == TRUE)
+			CancelIoEx((HANDLE)NowSession->m_Client_sock, NULL);
 
 		return 0;
 	}
@@ -1378,16 +1440,20 @@ namespace Library_Jingyu
 						cLanLibLog->LogSave(false, L"LanServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"WSASend --> %s : NetError(%d), OSError(%d)",
 							tcErrorString, (int)m_iMyErrorCode, m_iOSErrorCode);
 
-						// 끊는다.
-						shutdown(NowSession->m_Client_sock, SD_BOTH);
-
 						// 에러 함수 호출
 						OnError((int)euError::NETWORK_LIB_ERROR__WSAENOBUFS, tcErrorString);
+
+						// 끊는다.
+						Disconnect(NowSession->m_ullSessionID);
 					}
 				}
 			}
 			break;
 		}
+
+		// 5. WSASend를 성공했을 경우, CancelioEx플래그를 체크해 한번 더 호출
+		if (NowSession->m_lCancelIOExFlag == TRUE)
+			CancelIoEx((HANDLE)NowSession->m_Client_sock, NULL);
 
 		return true;
 	}

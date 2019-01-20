@@ -6,10 +6,10 @@
   NetworkLib_LanClient.cpp
   NetworkLib_LanServer.cpp
   NetworkLib_MMOServer.cpp
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1049): warning C4311: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 포인터가 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1049): warning C4302: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1383): warning C4311: '형식 캐스트': 'int *'에서 'UINT'(으)로 포인터가 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1383): warning C4302: '형식 캐스트': 'int *'에서 'UINT'(으)로 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1095): warning C4311: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1095): warning C4302: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1448): warning C4311: '형식 캐스트': 'int *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1448): warning C4302: '형식 캐스트': 'int *'에서 'UINT'(으)로 잘립니다.
   Parser_Class.cpp
   PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp
@@ -19,6 +19,6 @@ c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1383): warning 
   BattleServer_Main.cpp
   BattleServer_Room_Version.cpp
   코드를 생성하고 있습니다.
-  All 1903 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  All 1904 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.
   BattleServer_Main.vcxproj -> C:\Git_Public\10_실무용 게임서버 프로그래밍_2\7차과제_BattleServer 제작(룸 추가된 것)\BattleServer_Main\x64\Release\BattleServer_Main.exe
