@@ -6,10 +6,10 @@
   NetworkLib_LanClient.cpp
   NetworkLib_LanServer.cpp
   NetworkLib_MMOServer.cpp
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1095): warning C4311: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 포인터가 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1095): warning C4302: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1448): warning C4311: '형식 캐스트': 'int *'에서 'UINT'(으)로 포인터가 잘립니다.
-c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1448): warning C4302: '형식 캐스트': 'int *'에서 'UINT'(으)로 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1096): warning C4311: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1096): warning C4302: '형식 캐스트': 'ULONGLONG *'에서 'UINT'(으)로 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1449): warning C4311: '형식 캐스트': 'int *'에서 'UINT'(으)로 포인터가 잘립니다.
+c:\git_public\library_jingyu\networklib\networklib_mmoserver.cpp(1449): warning C4302: '형식 캐스트': 'int *'에서 'UINT'(으)로 잘립니다.
   Parser_Class.cpp
   PDHCheck.cpp
   ProtocolBuff(Net)_ObjectPool.cpp

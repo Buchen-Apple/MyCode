@@ -5,6 +5,7 @@
 
 #include <process.h>
 #include <strsafe.h>
+#include <mstcpip.h>
 
 #include "NetworkLib_MMOServer.h"
 #include "Log\Log.h"
@@ -842,9 +843,9 @@ namespace Library_Jingyu
 				// CancelioEx 호출
 				CancelIoEx((HANDLE)stNowSession->m_Client_sock, NULL);
 
-				// I/O카운트 감소 체크
-				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)
-					stNowSession->Disconnect();
+				// I/O카운트 감소 후, 0이라면접속 로그아웃 플래그 변경
+				if (InterlockedDecrement(&stNowSession->m_lIOCount) == 0)					
+					stNowSession->m_lLogoutFlag = TRUE;	
 
 				// 아래 로직은 타지 않는다.
 				continue;
@@ -2270,9 +2271,16 @@ namespace Library_Jingyu
 		}
 
 		// KeepAlive 적용
-		BOOL optval = TRUE;
+		tcp_keepalive tcpkl;
+		tcpkl.onoff = 1;					// KEEPALIVE ON
+		tcpkl.keepalivetime = 10000;		// 10초 마다 KEEPALIVE 신호를 보내기.
+		tcpkl.keepaliveinterval = 1000;		// keepalive 신호를 보내고 응답이 없으면 1초마다 재 전송.
 
-		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, sizeof(optval));
+		DWORD dwRet;
+		retval = WSAIoctl(m_soListen_sock, SIO_KEEPALIVE_VALS, &tcpkl, sizeof(tcp_keepalive), 0, 0, &dwRet, 0, 0);
+
+		//BOOL optval = TRUE;
+		//retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, sizeof(optval));
 
 		if (retval == SOCKET_ERROR)
 		{

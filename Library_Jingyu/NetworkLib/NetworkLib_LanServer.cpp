@@ -9,6 +9,7 @@
 
 #include <process.h>
 #include <strsafe.h>
+#include <mstcpip.h>
 
 #include "NetworkLib_LanServer.h"
 #include "CrashDump\CrashDump.h"
@@ -240,9 +241,17 @@ namespace Library_Jingyu
 		}
 
 		// KeepAlive 적용
-		BOOL optval = TRUE;
+		tcp_keepalive tcpkl;
+		tcpkl.onoff = 1;					// KEEPALIVE ON
+		tcpkl.keepalivetime = 10000;		// 10초 마다 KEEPALIVE 신호를 보내기.
+		tcpkl.keepaliveinterval = 1000;		// keepalive 신호를 보내고 응답이 없으면 1초마다 재 전송.
 
-		retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, sizeof(optval));
+		DWORD dwRet;
+		retval = WSAIoctl(m_soListen_sock, SIO_KEEPALIVE_VALS, &tcpkl, sizeof(tcp_keepalive), 0, 0, &dwRet, 0, 0);
+
+		// KeepAlive 적용
+		//BOOL optval = TRUE;
+		//retval = setsockopt(m_soListen_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, sizeof(optval));
 
 		if (retval == SOCKET_ERROR)
 		{
