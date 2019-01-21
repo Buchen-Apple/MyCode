@@ -1,0 +1,68 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('50','50');
+	header("Setting - CUBRID Manager Configuration");
+
+
+	createItem('cm_port', '<input type="text" name="cm_port" value="" size="6"  maxlength="6">');
+
+	createItem('monitor_interval', '<input type="text" name="monitor_interval" value="" size="4"  maxlength="6" style="text-align:right"> second(s)');
+
+	createItem('allow_user_multi_connection', '<input type="radio" name="allow_user_multi_connection" value="YES" class="borderNone">yes <input type="radio" name="allow_user_multi_connection" value="NO" class="borderNone">no');
+
+	createItem('auto_start_broker', '<input type="radio" name="auto_start_broker" value="YES" class="borderNone">yes <input type="radio" name="auto_start_broker" value="NO" class="borderNone">no');
+
+	createItem('Execute diagnostics', '<input type="radio" name="execute_diag" value="ON" class="borderNone">ON <input type="radio" name="execute_diag" value="OFF" class="borderNone">OFF');
+
+	createItem('Server long query time', '<input type="text" name="server_long_query_time"  value="" size="4"  maxlength="6" style="text-align:right"> second(s)');
+
+
+	footer('apply');
+	createDesc('Two port numbers are used, one is the configured port and the other is the port+1. Note that both 8001 and 8002 are used if 8001 is configured.');
+</script>
+
+</body>
+</html>

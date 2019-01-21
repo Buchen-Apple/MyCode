@@ -1,0 +1,72 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function delete_form(frm)
+	{
+		if (confirm("호스트를 정말 삭제하시겠습니까?") == true)
+		{
+			frm.asoVAR_cmdDeleteSubmit.value = 'DoEvent|' + frm.ServerName.value;
+		}
+		else
+		{
+			frm.asoVAR_cmdDeleteSubmit.value = 'nothing';
+		}
+	}
+	function vhost_list()
+	{
+		var frm = document.forms.asofrm;
+		frm.asoVAR_cmdList.value = 'DoEvent'; 
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 가상 호스트 관리 > 상세설정 보기");
+
+	createForm('asoVAR_cmdList','nothing');
+	createForm('asoVAR_cmdDeleteSubmit','nothing');
+	//createForm('asoVAR_cmdSubmit','nothing');
+	//createForm('asoVAR_cmdOpenDir','nothing');
+	createForm('oldIPAddr','');
+	createForm('oldPort','');
+
+	createItem('연결 주 도메인', '<input type="hidden" name="ServerName" value=""><input type="text" name="ServerNameDisplay" value="" size="28"  maxlength="256" style="border:none;" readonly>');
+
+	createItem('연결 부 도메인(옵션)', '<input type="text" name="ServerAlias" value="" size="28"  maxlength="256">');
+</script>
+<tr>
+	<td style="border-bottom:1px solid #d4d4d4;">연결되는 IP주소</td>
+	<td style="border-bottom:1px solid #d4d4d4;"><input type="text" name="IPAddr" value="" size="28"  maxlength="256" onclick="if (this.value == '(모든 IP주소에 대한 연결허용)') this.value = '*';" onblur="if (this.value == '*') this.value = '(모든 IP주소에 대한 연결허용)';"></td>
+</tr>
+<script type="text/javascript">
+	createItem('연결되는 포트', '<input type="text" name="Port" value="" size="6"  maxlength="6">');
+
+	createItem('홈 디렉토리', '<input type="text" name="DocumentRoot" value="" size="16"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기" ></a>');
+
+	createItem('관리자 E-mail', '<input type="text" name="ServerAdmin" value="" size="28"  maxlength="256">');
+
+	createItem('액세스 로그', '<input type="text" name="CustomLog" value="" size="28"  maxlength="256">');
+
+	createItem('오류 로그', '<input type="text" name="ErrorLog" value="" size="28"  maxlength="256">');
+
+	footer('vhost');
+
+	//createDesc();
+</script>
+
+</body>
+</html>

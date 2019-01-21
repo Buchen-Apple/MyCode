@@ -1,0 +1,51 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	var cnt = 0;
+	function find_file(frm)
+	{
+		frm.asoVAR_cmdOpenFile.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function selectDB_form(frm)
+	{
+		if (frm.database.selectedIndex >= 0)
+		{
+			frm.asoVar_select_db.value = frm.database.options[frm.database.selectedIndex].value;
+		}
+	}
+	function addDBRecord(dbName)
+	{
+		var frm = document.forms.asofrm;
+		OptionStr = document.createElement("OPTION");
+		OptionStr.value = dbName;
+		OptionStr.text = dbName;
+		frm.database.add(OptionStr);
+	}
+</script>
+<script type="text/javascript">
+	header("Backup - Import MySQL data");
+	createForm('asoVar_select_db');
+	createItem('Choose a database to deploy on the following.');
+	createItem('<select name="database" style="width:100%;" size="5" onclick="selectDB_form(this.form)"></select>');
+	createItem('SQL File','<input type="text" name="SQLPath" value="" size="24" maxlength="256"> <a href="javascript:find_file(document.forms.asofrm);"><img src="../../img/btn_find_file_en.gif" alt="Browse"></a>');
+	footer('confirm');
+	createDesc(' The SQL file is executable when MySQL server is running for each database.');
+</script>
+
+</body>
+</html>

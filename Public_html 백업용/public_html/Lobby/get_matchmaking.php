@@ -1,29 +1,19 @@
 <?php
-// ******************************
-// MatchMaking 서버(스테이트 풀)를 알아와서 돌려준다.
-// ******************************
+require($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
+require($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Lobby_Library.php");
 
-// ---------------------------------------
-// startUp 체크.
-// 이 안에서는 [ 프로파일러 생성, 게임로그 생성]를 한다.
-require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
-require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Lobby_Library.php");
-// ---------------------------------------
+// 1. 클라이언트에서 받은 RAW 데이터 받음
+$Body = file_get_contents('php://input');
 
-// 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
-$Body = explode("\r\n", file_get_contents('php://input'));
-
-
-// 2. 컨텐츠 부분 decoding
-// 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
-if(isset($Body[0]) === false)
+// 2. 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
+if(isset($Body) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
      global $cnf_ERROR_PARAMETER;
      OnError($cnf_ERROR_PARAMETER);  
 }
 
-$Content_Body = json_decode($Body[0], true);
+$Content_Body = json_decode($Body, true);
 
 // 3. Parameter 체크
 // accountno가 왔는지 체크
@@ -65,8 +55,6 @@ if(isset($Content_Body['sessionkey']) === false)
     OnError($cnf_ERROR_PARAMETER);  
 }
 
-
-
 // 4. sbdb/Select.account.php에서 유저 정보 얻어오기
 // Reqeust 데이터 셋팅
 $Request = array();
@@ -97,14 +85,4 @@ $ClientResponse['ip'] = $ServerInfo['ip'];
 $ClientResponse['port'] = intval($ServerInfo['port']);
 
 ResponseJSON($ClientResponse, $Response['accountno']);
-
-
-// ---------------------------------------
-// cleanup 체크.
-// 이 안에서는 [DB 연결 해제, 프로파일러 보내기, 게임로그 보내기]를 한다.
-// 이 안에서 프로파일링 저장 시 accountno를 쓰기때문에, 그 전용으로 만든다. accountno를 모르는 경우에는 이 변수자체를 안만든다.
-$ClearAccountNo = $Response['accountno'];
-require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
-// --------------------------------------
-
 ?>

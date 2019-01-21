@@ -1,0 +1,73 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > PHP 세부 설정 > 확장모듈 - MySQL 설정");
+
+	createItem('allow_persistent', '<input type="text" name="allow_persistent" value="" size="30"  maxlength="255"  >');
+
+	createItem('max_persistent', '<input type="text" name="max_persistent" value="" size="30"  maxlength="255"  >');
+
+	createItem('max_links', '<input type="text" name="max_links" value="" size="30"  maxlength="255"  >');
+
+	createItem('default_port', '<input type="text" name="default_port" value="" size="30"  maxlength="255"  >');
+
+	createItem('default_socket', '<input type="text" name="default_socket" value="" size="30"  maxlength="255"  >');
+
+	createItem('default_host', '<input type="text" name="default_host" value="" size="30"  maxlength="255"  >');
+
+	createItem('default_user', '<input type="text" name="default_user" value="" size="30"  maxlength="255"  >');
+
+	createItem('default_password', '<input type="text" name="default_password" value="" size="30"  maxlength="255"  >');
+
+	createItem('connect_timeout', '<input type="text" name="connect_timeout" value="" size="30"  maxlength="255"  >');
+
+	createItem('trace_mode', '<input type="text" name="trace_mode" value="" size="30"  maxlength="255"  >');
+
+	footer('apply');
+	createDesc('설정 변경 후, 웹 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

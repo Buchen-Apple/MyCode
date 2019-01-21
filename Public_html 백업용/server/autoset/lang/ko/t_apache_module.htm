@@ -1,0 +1,74 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function apacheExtListHTML(extensionName,checkedopt)
+	{
+		var cHtml = "";
+		var c = 0;
+		lim = asofrm.limit.value;
+		cHtml = "<div id=asoRS_" + lim + ">";
+		cHtml += "<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">";
+		cHtml += "<tr>";
+		cHtml += "<td style=\"font-size:9pt;\" width=\"40\" align=\"right\" nowrap><input type=\"checkbox\" name=\"extension\" value=\""+extensionName+"\"";
+		if (checkedopt == "true")
+		{
+			cHtml += " checked";
+		}
+		cHtml += " class='borderNone'></td>";
+		cHtml += "<td style=\"font-size:9pt;\" width=\"100%\">"+extensionName+"</td>";
+		cHtml += "</tr>";
+		cHtml += "</table>";
+		cHtml += "</div>";
+		apacheExtList.insertAdjacentHTML("BeforeEnd",cHtml);
+	}
+	function init_dirList()
+	{
+		asofrm.limit.value = 0;
+	}
+	function addExtRecord(extensionName,checkedopt)
+	{
+		lim = asofrm.limit.value;
+		asofrm.limit.value =  ++lim;
+		cnt = asofrm.cnt.value;
+		asofrm.cnt.value =  ++cnt;
+		apacheExtListHTML(extensionName,checkedopt);
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 세부 설정 > 웹서버 모듈 관리");
+
+	createForm('cnt','0');
+	createForm('limit','0');
+</script>
+<tr>
+	<td colspan="2"><div id="apacheExtList" name="apacheExtList"></div></td>
+</tr>
+<input type="checkbox" name="extension" value="NULL" checked style="display:none">
+<script type="text/javascript">
+	footer('confirm');
+
+	createDesc('사용할 웹서버 확장모듈을 체크하면, 사용 할 수 있습니다.<br>설정 > 오토셋 설정 > 오토셋 설치 정보의 httpd.conf 파일을 참조합니다.<br><br>설정 변경 후, 웹 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

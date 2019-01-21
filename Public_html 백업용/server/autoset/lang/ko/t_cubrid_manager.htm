@@ -1,0 +1,66 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('50','50');
+	header("설정 > CUBRID 매니저 설정");
+
+	createItem('CUBRID 매니저 포트', '<input type="text" name="cm_port" value="" size="6"  maxlength="6">');
+
+	createItem('모니터링 주기', '<input type="text" name="monitor_interval" value="" size="4"  maxlength="6" style="text-align:right"> 초');
+
+	createItem('다중 접속', '<input type="radio" name="allow_user_multi_connection" value="YES" class="borderNone">허용 <input type="radio" name="allow_user_multi_connection" value="NO" class="borderNone">불허');
+
+	createItem('브로커 자동 시작', '<input type="radio" name="auto_start_broker" value="YES" class="borderNone">사용 <input type="radio" name="auto_start_broker" value="NO" class="borderNone">사용않음');
+
+	createItem('Execute diagnostics', '<input type="radio" name="execute_diag" value="ON" class="borderNone">ON <input type="radio" name="execute_diag" value="OFF" class="borderNone">OFF');
+
+	createItem('Server long query time', '<input type="text" name="server_long_query_time"  value="" size="4"  maxlength="6" style="text-align:right"> 초');
+
+
+	footer('apply');
+	createDesc('설정된 포트와 설정된 포트 번호+1 두 개의 포트가 사용됩니다. 즉, 8001 포트를 설정하면 8001, 8002 두 개의 포트가 사용됨에 유의하세요.');
+</script>
+
+</body>
+</html>

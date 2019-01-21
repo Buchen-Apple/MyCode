@@ -1,0 +1,73 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - Web Server Default Settings");
+
+
+	createForm('asoVAR_cmdCheckPort', 'nothing');
+
+	createItem('Server Name', '<input type="text" name="ServerName" value="" size="30" maxlength="256">');
+
+	createItem('Listen Port', '<input type="text" name="Port" value="" size="30" maxlength="256">');
+
+	createItem('Server Admin E-mail', '<input type="text" name="ServerAdmin" value="" size="30" maxlength="256">');
+
+	createItem('Document Root', '<input type="text" name="DocumentRoot" value="" size="18" maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder_en.gif" alt="Browse"></a>');
+
+	createItem('Directory Index Files', '<input type="text" name="DocumentIndex" value="" size="30" maxlength="256">');
+
+	createItem('PHP Extension', '<input type="text" name="PHPexe" value="" size="30" maxlength="256">');
+	
+	//createItem('CGI Extension', '<input type="text" name="CGIexe" value="" size="30" maxlength="256">');
+	
+	//createItem('SSI Extension', '<input type="text" name="SSIexe" value="" size="30" maxlength="256">');
+	
+	footer('apply');
+	createDesc('Changed settings will be reflected after restarting.');
+</script>
+
+</body>
+</html>

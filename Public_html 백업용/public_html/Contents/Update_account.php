@@ -1,20 +1,19 @@
 <?php
-require($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_StartUp.php");
-require($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
+require($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_StartUp.php");
+require($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Update_Library.php");
 
-// 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
-$Body = explode("\r\n", file_get_contents('php://input'));
+// 1. 클라이언트에서 받은 RAW 데이터 받음
+$Body = file_get_contents('php://input');
 
-// 2. 컨텐츠 부분 decoding
-// 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
-if(isset($Body[0]) === false)
+// 2. 파라미터가 안왔을 경우, 실패패킷 보냄
+if(isset($Body) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
      global $cnf_ERROR_PARAMETER;
      OnError($cnf_ERROR_PARAMETER);  
 }
 
-$Content_Body = json_decode($Body[0], true);
+$Content_Body = json_decode($Body, true);
 
 // accountno가 왔는지 체크
 if(isset($Content_Body['accountno']) === false)
@@ -53,22 +52,11 @@ $Data = SearchUser($DataKey , $Content_Body[$DataKey]);
 // email 혹은 accountno 파라미터 삭제. 
 unset($Content_Body[$DataKey]);
 
-// 4. 접속할 shDB_Data 알아온 후 Conenct
-$DBInfo = shDB_Data_ConnectInfo($Data['dbno'], $Data['accountno']);
-$shDB_Data = shDB_Data_Conenct($DBInfo);
+// 4. 접속할 shDB_Data에 정보 Update
+shDB_Data_Update($Data['dbno'], $Data['accountno'], 'account', $Content_Body);
 
-// 5. 해당 DB의 TBL에, 인자로 던진 AccountNo가 존재하는지 확인
-shDB_Data_AccountNoCheck($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
-
-// 6. 해당 DB의 TBL에, Update
-shDB_Data_Update($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account', $Content_Body);
-
-// 7. Disconenct
-DB_Disconnect($shDB_Data);
-
-// 8. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
+// 5. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
 
-require_once($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Clenup.php");
 ResponseJSON($Response, $Data['accountno']);
 ?>

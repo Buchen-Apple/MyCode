@@ -1,0 +1,37 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 세부 설정 > 리디렉트 설정");
+
+	createForm('limit','0');
+	createForm('cnt','0');
+
+	createItem('리디렉트 경로', '<input type="text" name="RedirectName" value="" size="28"  maxlength="256">');
+
+	createItem('이동될 경로', '<input type="text" name="RedirectPath" value="" size="28"  maxlength="256">');
+
+	footer('confirm');
+
+	createDesc('리디렉트 경로에 설정된 경로로 접근 시, 이동될 경로로 이동하도록 설정 할 수 있습니다.<br><br><u>설정 예시</u>:<br><br><ul style="margin-bottom:0px;"><li>리디렉트 경로 : /cafe	<li>이동될 경로 : http://cafe.naver.com/autoset.cafe</ul><br>http://localhost/cafe/307 로 접속 시,<br>http://cafe.naver.com/autoset.cafe/307 로 이동됩니다.');
+</script>
+
+</body>
+</html>

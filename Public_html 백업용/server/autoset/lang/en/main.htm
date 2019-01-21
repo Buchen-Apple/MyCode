@@ -1,0 +1,35 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+<script>
+window.document.onloadautoset = function()
+{
+	alert('onLoadAutoSet');
+}
+</script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+
+<script type="text/javascript">
+	var htmls = [];
+	htmls.push('<center>');
+	htmls.push('<button type="button" id="btnCtrlApache" style="width:120px;height:80px;">웹서버 시작/중지</button>');
+	htmls.push('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
+	htmls.push('<button type="button" id="btnCtrlMySQL" style="width:120px;height:80px;">MySQL서버 시작/중지</button>');
+	htmls.push('</center>');
+
+	createDesc(htmls.join(""), "Control Servers");
+</script>
+
+<script type="text/javascript">
+	var htmls = [];
+	htmls.push('AutoSet is a GUI based installer and administrative tool which enables to install Apache HTTP Server, PHP, MySQL and Other packages at once and helps easy set-ups and management.');
+	createDesc(htmls.join("<br />"), "AutoSet");
+</script>
+
+</body>
+</html>

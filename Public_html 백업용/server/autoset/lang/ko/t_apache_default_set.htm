@@ -1,0 +1,71 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 기본 설정");
+
+	createForm('asoVAR_cmdCheckPort', 'nothing');
+
+	createItem('서버 이름', '<input type="text" name="ServerName" value="" size="30" maxlength="256">');
+
+	createItem('포트 번호', '<input type="text" name="Port" value="" size="30" maxlength="256">');
+
+	createItem('관리자 메일주소', '<input type="text" name="ServerAdmin" value="" size="30" maxlength="256">');
+
+	createItem('홈 디렉토리', '<input type="text" name="DocumentRoot" value="" size="18" maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('기본 액세스파일', '<input type="text" name="DocumentIndex" value="" size="30" maxlength="256">');
+
+	createItem('PHP 실행 확장자', '<input type="text" name="PHPexe" value="" size="30" maxlength="256">');
+	
+	//createItem('CGI 실행 확장자', '<input type="text" name="CGIexe" value="" size="30" maxlength="256">');
+	
+	//createItem('SSI 실행 확장자', '<input type="text" name="SSIexe" value="" size="30" maxlength="256">');
+	
+	footer('apply');
+	createDesc('설정 변경 후, 웹 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

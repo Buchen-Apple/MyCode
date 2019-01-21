@@ -1,0 +1,71 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > PHP 세부 설정 > Session 설정");
+
+	createItem('세션 핸들러', '<input type="text" name="save_handler" value="" size="10"  maxlength="255"  >');
+
+	createItem('데이터 저장폴더', '<input type="text" name="save_path" value="" size="30"  maxlength="255"  ><br>(핸들러가 files 인 경우)');
+
+	createItem('쿠키 사용 여부', '<input type="radio" name="use_cookies" value="1" class="borderNone">사용  <input type="radio" name="use_cookies" value="0" class="borderNone">사용않음');
+
+	createItem('세션 변수 명', '<input type="text" name="name" value="" size="30"  maxlength="255">');
+
+	createItem('세션 자동 시작', '<input type="radio" name="auto_start" value="1" class="borderNone">사용  <input type="radio" name="auto_start" value="0" class="borderNone">사용않음');
+
+	createItem('쿠키 적용 시간', '<input type="text" name="cookie_lifetime" value="" size="4" style="text-align:right"> 초');
+
+	createItem('쿠키 적용 경로', '<input type="text" name="cookie_path" value="" size="30" >');
+
+	createItem('쿠키 도메인', '<input type="text" name="cookie_domain" value="" size="30" >');
+
+
+
+	footer('apply');
+	createDesc('설정 변경 후, 웹 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

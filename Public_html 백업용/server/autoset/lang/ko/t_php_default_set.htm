@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('40','60');
+	header("설정 > PHP 기본 설정");
+
+	createItem('짧은 시작 태그', '<input type="radio" name="short_open_tag" value="On" class="borderNone">사용  <input type="radio" name="short_open_tag" value="Off" class="borderNone">사용않음');
+
+	//createItem('ASP형식의 시작 태그', '<input type="radio" name="asp_tags" value="On" class="borderNone">사용  <input type="radio" name="asp_tags" value="Off" class="borderNone">사용않음');
+
+	//createItem('함수 참조 무시 기능', '<input type="radio" name="allow_call_time_pass_reference" value="On" class="borderNone">사용  <input type="radio" name="allow_call_time_pass_reference" value="Off" class="borderNone">사용않음');
+
+	createItem('실행시간 제한', '<input type="text" name="max_execution_time" value="" size="5"  maxlength="5" style="text-align:right"> 초');
+
+	createItem('최대 메모리 할당 제한', '<input type="text" name="memory_limit" value="" size="8" style="text-align:right">');
+
+	createItem('실행오류 화면에 표시', '<input type="radio" name="display_errors" value="On" class="borderNone">사용  <input type="radio" name="display_errors" value="Off" class="borderNone">사용않음');
+
+	createItem('PHP 변수 인식 순서', '<input type="text" name="variables_order" value="" size="8"  maxlength="6" >');
+
+	//createItem('전역 변수화', '<input type="radio" name="register_globals" value="On" class="borderNone">사용  <input type="radio" name="register_globals" value="Off" class="borderNone">사용않음');
+
+	createItem('POST 전송량 제한', '<input type="text" name="post_max_size" value="" size="8"  class="input_default">');
+
+	createItem('업로드 파일크기 제한', '<input type="text" name="upload_max_filesize" value="" size="8"  class="input_default">');
+
+	createItem('fopen의 URL접근', '<input type="radio" name="allow_url_fopen" value="On" class="borderNone">허용  <input type="radio" name="allow_url_fopen" value="Off" class="borderNone">허용않음');
+
+	createItem('오류 표시 범위', '<input type="text" name="error_reporting" value="" size="25"  maxlength="255" >');
+
+
+	footer('apply');
+	createDesc('설정 변경 후, 웹 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

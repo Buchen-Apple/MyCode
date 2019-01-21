@@ -1,0 +1,2 @@
+ERROR_Handler --> (2) FILE: C:\AutoSet10\public_html\LOG\LOG_Profile_Server.php / LINE: 42 / MSG:  mysqli_connect(): (HY000/2002): Only one usage of each socket address (protocol/network address/port) is normally permitted.
+ 

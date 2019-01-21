@@ -1,0 +1,43 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 세부 설정 > 오류 페이지 설정");
+
+	createForm('limit','0');
+	createForm('cnt','0');
+
+	var arrCode = [
+		400,401,403,404,405,408,410,411,412,413,414,415,500,501,502,503,506
+	];
+
+	for (var i = 0; i < arrCode.length ; i++ )
+	{
+		createItem(arrCode[i] + ' 오류', '<input type="text" name="ErrorDocument' + arrCode[i] + '" value="" size="28"  maxlength="256">');
+		
+	}
+
+	footer('confirm');
+
+	createDesc('서버가 처리함에 있어서 발생하는 오류에 대하여 아래의 설정 방법을 지원합니다.<br><ul style="margin-bottom:0px;">	<li>내부 주소로의 이동<br><em>예:</em> error/404errorpage.htm<br><br><li>외부 주소로의 이동<br><em>예:</em> http://www.autoset.org/error/404errorpage.htm</ul>');
+</script>
+
+</body>
+</html>

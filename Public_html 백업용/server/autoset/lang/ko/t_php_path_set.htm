@@ -1,0 +1,63 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > PHP 기본 경로 설정");
+
+	createItem('include 기본경로', '<input type="text" name="include_path" value="" size="16"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('확장 모듈 경로', '<input type="text" name="extension_dir" value="" size="16"  maxlength="256"> <a href="javascript:find_dir2(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('SMTP 서버주소', '<input type="text" name="SMTP" value="" size="30"  maxlength="256">');
+
+	createItem('Sendmail 경로', '<input type="text" name="sendmail_path" value="" size="30"  maxlength="256">');
+
+
+
+	footer('apply');
+	createDesc('SMTP 또는 Sendmail 프로그램 경로를 지정하지 않는 경우에는 mail() 함수를 이용한 메일발송이 되지 않습니다. 또한, SMTP 주소를 입력하는 경우에는 현재 사용중인 인터넷회선에서 접근 가능한 별도의 인증 과정이 없는 SMTP 주소여야만 오류 없이 mail() 함수를 사용할 수 있습니다.');
+</script>
+
+</body>
+</html>

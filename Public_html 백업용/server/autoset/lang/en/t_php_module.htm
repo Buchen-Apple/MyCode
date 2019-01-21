@@ -1,0 +1,74 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function phpExtListHTML(extensionName,checkedopt)
+	{
+		var cHtml = "";
+		var c = 0;
+		lim = asofrm.limit.value;
+		cHtml = "<div id=asoRS_" + lim + ">";
+		cHtml += "<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">";
+		cHtml += "<tr>";
+		cHtml += "<td style=\"font-size:9pt;\" width=\"40\" align=\"right\" nowrap><input type=\"checkbox\" name=\"extension\" value=\""+extensionName+"\"";
+		if (checkedopt == "true")
+		{
+			cHtml += " checked";
+		}
+		cHtml += " class=\"borderNone\"></td>";
+		cHtml += "<td style=\"font-size:9pt;\" width=\"100%\">"+extensionName+"</td>";
+		cHtml += "</tr>";
+		cHtml += "</table>";
+		cHtml += "</div>";
+		phpExtList.insertAdjacentHTML("BeforeEnd",cHtml);
+	}
+	function init_dirList()
+	{
+		asofrm.limit.value = 0;
+	}
+	function addExtRecord(extensionName,checkedopt)
+	{
+		lim = asofrm.limit.value;
+		asofrm.limit.value =  ++lim;
+		cnt = asofrm.cnt.value;
+		asofrm.cnt.value =  ++cnt;
+		phpExtListHTML(extensionName,checkedopt);
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - PHP Advanced Settings - PHP Extension List");
+
+	createForm('cnt','0');
+	createForm('limit','0');
+</script>
+<tr>
+	<td colspan="2"><div id="phpExtList" name="phpExtList"></div></td>
+</tr>
+<script type="text/javascript">
+	footer('apply');
+
+	createDesc('If you check PHP extension mode to use, it enabled.<br><br>Changed settings will be reflected after restarting. ');
+</script>
+
+</body>
+</html>

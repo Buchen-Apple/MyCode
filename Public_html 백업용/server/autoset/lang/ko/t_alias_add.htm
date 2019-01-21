@@ -1,0 +1,38 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setColumn('35','75');
+	header("설정 > 웹서버 세부 설정 > 가상 디렉토리 설정");
+
+	createForm('limit', 0);
+	createForm('cnt', 0);
+
+	createItem('가상 디렉토리명', '<input type="text" name="AliasName" value="" size="28"  maxlength="256">');
+
+	createItem('연결 디렉토리', '<input type="text" name="AliasPath" value="" size="14"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기" ></a>');
+
+
+	footer('confirm');
+
+	createDesc('가상 디렉토리 설정은 Apache 웹 서버 설정 키워드 중, Alias 에 해당 하는 것으로 "설정-웹서버 기본 설정" 매뉴에서 지정한 홈 디렉토리에 실제로 존재하지는 않지만, 홈 디렉토리 내의 디렉토리인 것 처럼 만들어 주는 과정입니다.<br><br>홈 디렉토리 내의 디렉토리를 가상 디렉토리로 설정하는 것은 또다른 별칭 디렉토리를 만드는 것이므로 비효율적인 운영 효과를 가져오게 되므로, 이러한 설정은 지양바랍니다.');
+</script>
+
+</body>
+</html>

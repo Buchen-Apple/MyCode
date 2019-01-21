@@ -1,0 +1,55 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('40','60');
+	header("Setting - Sendmail Settings");
+
+	createItem('smtp_server', '<input type="text" name="smtp_server" value="" size="26"  maxlength="256">');
+
+	createItem('smtp_port', '<input type="text" name="smtp_port" value="" size="10"  maxlength="256">');
+
+	createItem('default_domain', '<input type="text" name="default_domain" value="" size="26"  maxlength="256">');
+
+	createItem('error_logfile', '<input type="text" name="error_logfile" value="" size="26"  maxlength="256">');
+
+	createItem('auth_username', '<input type="text" name="auth_username" value="" size="26"  maxlength="256">');
+
+	createItem('auth_password', '<input type="text" name="auth_password" value="" size="26"  maxlength="256">');
+
+	createItem('smtp_ssl', '<input type="radio" name="smtp_ssl" value="auto" class="borderNone">auto <input type="radio" name="smtp_ssl" value="ssl" class="borderNone">ssl <input type="radio" name="smtp_ssl" value="tls" class="borderNone">tls <input type="radio" name="smtp_ssl" value="none" class="borderNone">none');
+
+	createItem('pop3_server', '<input type="text" name="pop3_server" value="" size="26"  maxlength="256">');
+
+	createItem('pop3_username', '<input type="text" name="pop3_username" value="" size="26"  maxlength="256">');
+
+	createItem('pop3_password', '<input type="text" name="pop3_password" value="" size="26"  maxlength="256">');
+
+	createItem('force_sender', '<input type="text" name="force_sender" value="" size="26"  maxlength="256">');
+
+	createItem('hostname', '<input type="text" name="hostname" value="" size="26"  maxlength="256">');
+
+	footer('apply');
+
+	createDesc('If your smtp server uses pop3 before smtp authentication, modify the following pop3_server/username/password. Do not enable unless it is required.<br />Sendmail will use your hostname and your default_domain in the ehlo/helo smtp greeting. You can manually set the ehlo/helo name if required.');
+</script>
+
+</body>
+</html>

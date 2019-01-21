@@ -1,0 +1,35 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+<script>
+window.document.onloadautoset = function()
+{
+	alert('onLoadAutoSet');
+}
+</script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+
+<script type="text/javascript">
+	var htmls = [];
+	htmls.push('<center>');
+	htmls.push('<button type="button" id="btnCtrlApache" style="width:120px;height:80px;">웹서버 시작/중지</button>');
+	htmls.push('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;');
+	htmls.push('<button type="button" id="btnCtrlMySQL" style="width:120px;height:80px;">MySQL서버 시작/중지</button>');
+	htmls.push('</center>');
+
+	createDesc(htmls.join(""), "서버 제어");
+</script>
+
+<script type="text/javascript">
+	var htmls = [];
+	htmls.push('오토셋은 윈도우 운영체제에 Apache HTTP Server, PHP, MySQL 등의 서버 제품을 한번에 설치해 주는 기능과 이렇게 설치된 프로그램을 그래픽 사용자 인터페이스(GUI)를 통해 쉽게 설정의 변경, 관리를 할 수 있도록 지원하는 프로그램입니다.');
+	createDesc(htmls.join("<br />"), "AutoSet");
+</script>
+
+</body>
+</html>

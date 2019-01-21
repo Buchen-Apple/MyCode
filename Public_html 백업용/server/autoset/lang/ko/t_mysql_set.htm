@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function isolation_level_select_func(frm)
+	{
+		frm.isolation_level.value = frm.isolation_level_select.value;
+	}
+</script>
+<script type="text/javascript">
+	setColumn('40','60');
+	header("설정 > MySQL 설정");
+
+	createItem('MySQL 서버 포트', '<input type="text" name="port" value="" size="10"  maxlength="256">');
+
+	createItem('MySQL 설치 경로', '<input type="text" name="basedir" value="" size="26"  maxlength="256">');
+
+	createItem('데이터 저장 경로', '<input type="text" name="datadir" value="" size="26"  maxlength="256">');
+
+	//createItem('언어팩 경로', '<input type="text" name="language" value="" size="26"  maxlength="256">');
+
+	createItem('init connect', '<input type="text" name="init_connect" value="" size="26"  maxlength="256">');
+
+	//createItem('default character set', '<input type="text" name="default_character_set" value="" size="26"  maxlength="256">');
+
+	createItem('character set server', '<input type="text" name="character_set_server" value="" size="26"  maxlength="256">');
+
+	createItem('collation server', '<input type="text" name="collation_server" value="" size="26"  maxlength="256">');
+
+	createItem('socket', '<input type="text" name="socket" value="" size="26"  maxlength="256">');
+
+	//createItem('key buffer', '<input type="text" name="key_buffer" value="" size="26"  maxlength="256">');
+
+	createItem('max allowed packet', '<input type="text" name="max_allowed_packet" value="" size="26"  maxlength="256">');
+
+	//createItem('table cache', '<input type="text" name="table_cache" value="" size="26"  maxlength="256">');
+
+	createItem('sort buffer size', '<input type="text" name="sort_buffer_size" value="" size="26"  maxlength="256">');
+
+	//createItem('net buffer length', '<input type="text" name="net_buffer_length" value="" size="26"  maxlength="256">');
+
+	createItem('read buffer size', '<input type="text" name="read_buffer_size" value="" size="26"  maxlength="256">');
+
+	createItem('read rnd buffer size', '<input type="text" name="read_rnd_buffer_size" value="" size="26"  maxlength="256">');
+
+	createItem('MyISAM sort buffer_size', '<input type="text" name="myisam_sort_buffer_size" value="" size="26"  maxlength="256">');
+
+
+	footer('apply');
+	createDesc('설정 변경 후, MySQL 서버를 재시작하셔야 적용됩니다.');
+</script>
+
+</body>
+</html>

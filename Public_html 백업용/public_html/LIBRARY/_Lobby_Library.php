@@ -3,8 +3,6 @@
 // get_matchmakinh.php 에서 사용할 Library.
 // ******************************
 require_once('_Error_Handling_LIbrary.php');
-require_once('_StartUp.php');
-require_once('_LOG_Profile.php');
 require_once('_DB_Library.php');
 require_once('_DB_Config.php');
 require_once('_ErrorCode.php');
@@ -23,7 +21,7 @@ function shDBAPI_GetUserData($Request)
         $PF->startCheck(PF_EXTAPI);
 
     // 1. select.accountdb에게 Request  (CURL 사용)  
-    $ret = http_post("http://127.0.0.1/Contents/Select_account.php", json_encode($Request));
+    $ret = http_post("http://127.0.0.1:11902/Contents/Select_account.php", json_encode($Request));
     
     if(isset($PF))
         $PF->stopCheck(PF_EXTAPI);
@@ -88,12 +86,7 @@ function GetMatchMakingServer($accountno)
     $Index = rand() % $Matchmaking_SlaveCount;
 
     // 2. MatchMakingDB에 Connect
-    global $Matchmaking_Slave_DB_IP;
-    global $Matchmaking_Slave_DB_ID;
-    global $Matchmaking_Slave_DB_Password;
-    global $Matchmaking_Slave_DB_PORT;
-    global $Matchmaking_Slave_DB_Name;
-    $MatchDB;
+    global $Matchmaking_Slave_DB_IP, $Matchmaking_Slave_DB_ID, $Matchmaking_Slave_DB_Password, $Matchmaking_Slave_DB_PORT, $Matchmaking_Slave_DB_Name;
 
     if(DB_Connect($MatchDB, $Matchmaking_Slave_DB_IP[$Index], $Matchmaking_Slave_DB_ID[$Index], 
         $Matchmaking_Slave_DB_Password[$Index], $Matchmaking_Slave_DB_Name[$Index], $Matchmaking_Slave_DB_PORT[$Index]) === false)
@@ -107,9 +100,6 @@ function GetMatchMakingServer($accountno)
     global $cnf_LOBBY_METCHSERVER_COMPTIME;
     $Result = DB_Query("SELECT * FROM `matchmaking_status`.`server` WHERE TIMEDIFF(NOW(), `heartbeat`) < '$cnf_LOBBY_METCHSERVER_COMPTIME' ORDER BY `heartbeat` DESC LIMIT 1", $MatchDB, $accountno);
 
-
-    // MatchMakingDB 연결 해제
-    DB_Disconnect($MatchDB);
 
     // 쿼리 실패했을 경우
     if($Result === false)

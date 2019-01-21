@@ -1,0 +1,88 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function onChangeAuthCode()
+	{
+		var f = document.getElementById('authcode');
+		var f2 = document.getElementById('idname');
+		var offline_tr = document.getElementById('offline_tr');
+		var host_tr = document.getElementById('host_tr');
+
+		var elems = document.forms['asofrm'].elements;
+		var ddns_provider = '';
+		for (var i=0;i<elems.length;i++)
+		{
+			var elem = elems[i];
+			if (elem.type.toLowerCase() == "radio" && elem.name == 'ddns_provider' && elem.checked)
+			{
+				ddns_provider = elem.value;
+			}
+		}
+
+		if (ddns_provider == 'dnsever')
+		{
+			f.innerText = '인증코드';
+			f2.innerText = 'DNS Ever 아이디';
+			host_tr.style.display = 'inline';
+			offline_tr.style.display = 'inline';
+		}
+		else
+		{
+			f.innerText = '패스워드';
+			f2.innerText = '도메인';
+			host_tr.style.display = 'none';
+			offline_tr.style.display = 'none';
+		}
+	}
+</script>
+<script type="text/javascript">
+	setColumn('35','75');
+	header("부가기능 > DDNS 서비스 정보");
+
+	createItem('서비스 업체', '<input type="radio" name="ddns_provider" value="dnsever" onclick="onChangeAuthCode()" class="borderNone">DNS Ever.com <input type="radio" name="ddns_provider" value="dnip" onclick="onChangeAuthCode()" class="borderNone">DNIP.net');
+
+	createItem('<span id="idname">DNS Ever 아이디</span>', '<input type="text" name="dnsever_uid" value="" size="28" maxlength="256">');
+
+	createItem('<span id="authcode">인증코드</span>', '<input type="text" name="dnsever_authcode" value="" size="28" maxlength="256">');
+
+</script>
+<tr id="host_tr">
+	<td style="border-bottom:1px solid #d4d4d4;">호스트 이름</td>
+	<td style="border-bottom:1px solid #d4d4d4;"><input type="text" name="dnsever_host" value="" size="28" maxlength="512"><br>
+	쉼표(,)로 호스트 이름 복수개 나열</td>
+</tr>
+<tr id="offline_tr">
+	<td style="border-bottom:1px solid #d4d4d4;">서버 운영 상태</td>
+	<td style="border-bottom:1px solid #d4d4d4;"><input type="checkbox" name="ddns_offline" class="borderNone">오프라인 상태로 업데이트</td>
+</tr>
+<script type="text/javascript">
+
+	createItem('업데이트 주기', '<input type="text" name="ddns_interval" value="60" size="4" maxlength="3" style="text-align:right;"> 분 간격으로 업데이트');
+
+
+	footer('apply');
+
+	createDesc('DDNS 서비스에 관한 정보는 <a href="http://cafe.naver.com/autoset/67" target="cafe">이곳</a>을 참고하세요.');
+</script>
+
+</body>
+</html>

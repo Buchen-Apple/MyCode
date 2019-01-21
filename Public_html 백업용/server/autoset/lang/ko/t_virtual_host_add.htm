@@ -1,0 +1,41 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 세부 설정 > 가상 호스트 설정");
+
+	createItem('연결 주 도메인', '<input type="text" name="ServerName" value="" size="28"  maxlength="256">');
+
+	createItem('연결 부 도메인(옵션)', '<input type="text" name="ServerAlias" value="" size="28"  maxlength="256">');
+
+	createItem('홈 디렉토리', '<input type="text" name="DocumentRoot" value="" size="16"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기" ></a>');
+
+	createItem('관리자 E-mail', '<input type="text" name="ServerAdmin" value="" size="28"  maxlength="256">');
+
+	createItem('기타 옵션', '<input type="checkbox" name="CustomLog" value="Y" class="borderNone"> Access Log를 남깁니다.<br/><input type="checkbox" name="ErrorLog" value="Y" class="borderNone"> Error Log를 남깁니다.<br/><input type="checkbox" name="php_admin_value:open_basedir" value="Y" class="borderNone"> PHP를 통한 홈디렉토리를 벗어난<br>　　접근을 차단(비 권장)');
+
+
+	footer('confirm');
+
+	createDesc('가상 호스트 설정은 Apache 웹 서버의 버추얼 호스트(Virtual Host)에 해당 하는 것으로 "설정-웹서버 기본 설정" 매뉴에서 지정한 설정사항 보다 우선합니다. 가상 호스트 설정은 한 서버에서 여러개의 도메인네임으로 웹사이트를 운영 할 수 있도록합니다.<br><br> 소유한 도메인이 없다면, 이 기능을 사용하지 마십시오.');
+</script>
+
+</body>
+</html>

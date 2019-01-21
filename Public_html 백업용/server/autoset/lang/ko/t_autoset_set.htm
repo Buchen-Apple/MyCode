@@ -1,0 +1,83 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 오토셋 설정 > 오토셋 설치 정보");
+
+	createItem('httpd.conf 파일', '<input type="text" name="ConfFile" value="" size="30" maxlength="256">');
+
+	createItem('vhost.conf 파일', '<input type="text" name="VConfFile" value="" size="30" maxlength="256">');
+
+	createItem('백업 폴더', '<input type="text" name="BackupDir" value="" size="18" maxlength="256"> <a href="javascript:find_dir2(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('웹서버<br>실행 파일', '<input type="text" name="httpdFileName" value="" size="30" maxlength="256">');
+
+	createItem('CUBRID<br>설치 폴더', '<input type="text" name="cubrid_install_path" value="" size="18" maxlength="256"> <a href="javascript:find_dir5(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('CUBRID<br>DB 폴더', '<input type="text" name="cubrid_database_path" value="" size="18" maxlength="256"> <a href="javascript:find_dir6(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('MySQL<br>설치 폴더', '<input type="text" name="setdir" value="" size="18" maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('MySQL<br>실행 파일', '<input type="text" name="mysqldFileName" value="" size="30" maxlength="256">');
+
+	createItem('MySQL<br>Root ID', '<input type="text" name="default_user" value="" size="30" maxlength="256">');
+
+	createItem('MySQL<br>Root 암호', '<input type="text" name="default_pass" value="" size="30" maxlength="256">');
+
+	createItem('Subversion<br>설치 폴더', '<input type="text" name="svn_root" value="" size="18" maxlength="256"> <a href="javascript:find_dir3(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('Subversion<br>저장소 폴더', '<input type="text" name="svn_repo_path" value="" size="18" maxlength="256"> <a href="javascript:find_dir4(document.forms.asofrm);"><img src="../../img/btn_find_folder.gif" alt="폴더 찾기"></a>');
+
+	createItem('웹서버 서비스명', '<input type="text" name="NTServiceApache" value="" size="30" maxlength="256">');
+
+	createItem('MySQL 서비스명', '<input type="text" name="NTServiceMySQL" value="" size="30" maxlength="256">');
+
+	
+	
+	footer('apply');
+	createDesc('일부 설정은 프로그램을 닫고 다시 실행해야 적용됩니다.');
+</script>
+
+</body>
+</html>

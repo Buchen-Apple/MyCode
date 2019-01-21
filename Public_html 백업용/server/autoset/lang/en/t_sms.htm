@@ -1,0 +1,45 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('35','75');
+	header("Additional Feature - SMS Service Settings");
+
+	createItem('cafe24.com ID', '<input type="text" name="cafe24_uid" value="" size="28" maxlength="256">');
+
+	createItem('SMS Domain', '<input type="text" name="cafe24_domain" value="" size="28" maxlength="256">');
+
+	createItem('Password', '<input type="text" name="cafe24_upw" value="" size="28" maxlength="256">');
+
+	createItem('Sender Phone', '<input type="text" name="cafe24_phone" value="" size="28" maxlength="256">');
+
+	createForm('cafe24_authcode','');
+
+	footer('apply');
+
+	createDesc('본 서비스는 <a href="http://www.cafe24.com" target="cafeSMS">카페24</a>의 SMS 호스팅 서비스를 신청 후, 이용 가능합니다. 모든 데이터는 Base64 인코딩되어 카페24 서버에 전송됩니다. (오토셋개발자그룹 서버를 경유하지 않습니다)');
+</script>
+
+</body>
+</html>

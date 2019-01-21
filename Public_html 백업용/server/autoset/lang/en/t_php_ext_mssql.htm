@@ -1,0 +1,85 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - PHP Advanced Settings - MSSQL Extension Settings");
+
+	createItem('allow_persistent', '<input type="text" name="allow_persistent" value="" size="26"  maxlength="255">');
+
+	createItem('max_persistent', '<input type="text" name="max_persistent" value="" size="26"  maxlength="255">');
+
+	createItem('max_links', '<input type="text" name="max_links" value="" size="26"  maxlength="255">');
+
+	createItem('min_error_severity', '<input type="text" name="min_error_severity" value="" size="26"  maxlength="255">');
+
+	createItem('min_message_severity', '<input type="text" name="min_message_severity" value="" size="26"  maxlength="255">');
+
+	createItem('compatability_mode', '<input type="text" name="compatability_mode" value="" size="26"  maxlength="255">');
+
+	createItem('connect_timeout', '<input type="text" name="connect_timeout" value="" size="26"  maxlength="255">');
+
+	createItem('timeout', '<input type="text" name="timeout" value="" size="26"  maxlength="255">');
+
+	createItem('textlimit', '<input type="text" name="textlimit" value="" size="26"  maxlength="255">');
+
+	createItem('textsize', '<input type="text" name="textsize" value="" size="26"  maxlength="255">');
+
+	createItem('batchsize', '<input type="text" name="batchsize" value="" size="26"  maxlength="255">');
+
+	createItem('datetimeconvert', '<input type="text" name="datetimeconvert" value="" size="26"  maxlength="255">');
+
+	createItem('secure_connection', '<input type="text" name="secure_connection" value="" size="26"  maxlength="255">');
+
+	createItem('max_procs', '<input type="text" name="max_procs" value="" size="26"  maxlength="255">');
+
+
+	createItem('charset', '<input type="text" name="charset" value="" size="26"  maxlength="255">');
+
+	footer('apply');
+	createDesc('Changed settings will be reflected after restarting. ');
+</script>
+
+</body>
+</html>

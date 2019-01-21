@@ -1,0 +1,89 @@
+<!-- 매뉴위치 : 설정(&S) - 웹서버 세부 설정(&D) - 디렉토리 관리(&T) -->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel=STYLESHEET href="public.css"></link>
+<style type="text/css" media="screen">
+@import url(public.css);
+</style>
+<script language="javascript" src="public.js"></script>
+<script language="javascript">
+function submit_form(frm, dirName)
+{
+	frm.asoVAR_dirName.value = dirName;
+	frm.asoVAR_cmdSubmit.value = 'DoEvent';
+}
+function find_dir(frm)
+{
+	frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+}
+function MakeHTML(dirName)
+{
+	var cHtml = [];
+	var c = 0;
+	lim = asofrm.limit.value;
+	cHtml.push("<div id=asoRS_" + lim + " style=\"border-bottom:1px solid #cccccc\">");
+	cHtml.push("<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">");
+	cHtml.push("<tr>");
+	cHtml.push("<td height=\"26\" style=\"font-size:9pt;\" width=\"100%\">");
+	cHtml.push(dirName);
+	cHtml.push("&nbsp;<font color=\"#999999\">[<a href=\"javascript:submit_form(document.forms.asofrm, '" + dirName + "');\" style=\"color:#999999\">상세 설정</a>]</font>");
+	cHtml.push("</td>");
+	cHtml.push("</tr>");
+	cHtml.push("</table>");
+	cHtml.push("</div>");
+	vDirectoryList.insertAdjacentHTML("BeforeEnd",cHtml.join(""));
+}
+function init_dirList()
+{
+	asofrm.limit.value = 0;
+}
+function addExtRecord(dirName)
+{
+	lim = asofrm.limit.value;
+	asofrm.limit.value =  ++lim;
+	cnt = asofrm.cnt.value;
+	asofrm.cnt.value =  ++cnt;
+	MakeHTML(dirName);
+}
+</script>
+</head>
+<body leftmargin="5" marginwidth="5" topmargin="5" marginheight="5" scroll="yes"  style="border:none;">
+<div align="center">
+<form name="asofrm">
+<input type="hidden" name="limit" value="0">
+<input type="hidden" name="cnt" value="0">
+<input type="hidden" name="asoVAR_cmdOpenDir" value="nothing">
+<input type="hidden" name="asoVAR_cmdSubmit" value="nothing">
+<input type="hidden" name="asoVAR_dirName" value="">
+<table border="0" cellpadding="5" cellspacing="0" width="100%">
+<tr>
+ <td height="26" bgcolor="#9F8AB5"><font color="white" style="height:1;filter:dropshadow(color:#555555,offx:1,offy:1,positive:1);" size="2">▒ 설정 &gt; 웹서버 세부 설정 &gt;</font>&nbsp;<font color="white" style="height:1;filter:dropshadow(color:#777777,offx:1,offy:1,positive:1);" size="2"><b>디렉토리 관리</b></font></td>
+</tr>
+</table>
+<p>
+<table border="0" cellpadding="1" cellspacing="0" width="100%">
+<tr>
+ <td style="font-size:9pt;" bgcolor="#efeeef" height="40"><p style="margin:5px;"><b>[참고사항]</b> 디렉토리 설정을 통해 각 디렉토리별 웹서버가 지원하는 설정을 할 수 있습니다.</td>
+</tr>
+</table>
+<p>
+<table border="0" cellpadding="1" cellspacing="0" width="100%" align="center">
+<tr>
+<td bgcolor="#D5D6D6"><table border="0" cellpadding="3" cellspacing="0" width="100%">
+<tr><td bgcolor="#EAEBEB"><table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+ <td bgcolor="white" height="5"></td>
+</tr>
+<tr>
+ <td bgcolor="white" valign="top" align="center" style="font-size:9pt;"><div id="vDirectoryList" name="vDirectoryList"></div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+</table>
+<input type="hidden" name="endposition" value="END"></form>
+</div>
+</body>
+</html>

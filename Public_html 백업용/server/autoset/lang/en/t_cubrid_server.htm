@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function isolation_level_select_func(frm)
+	{
+		frm.isolation_level.value = frm.isolation_level_select.value;
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('50','50');
+	header("Setting - CUBRID Server Configuration");
+
+	createItem('service', '<input type="text" name="service" value="" size="26"  maxlength="">');
+
+	createItem('server', '<input type="text" name="server" value="" size="26"  maxlength="">');
+
+	createItem('data buffer pages', '<input type="text" name="data_buffer_pages" value="" size="26"  maxlength="">');
+
+	createItem('sort buffer pages', '<input type="text" name="sort_buffer_pages" value="" size="26"  maxlength="">');
+
+	createItem('log buffer pages', '<input type="text" name="log_buffer_pages" value="" size="26"  maxlength="">');
+
+	createItem('lock escalation', '<input type="text" name="lock_escalation" value="" size="26"  maxlength="">');
+
+	createItem('lock timeout in secs', '<input type="text" name="lock_timeout_in_secs" value="" size="26"  maxlength="">');
+
+	createItem('deadlock detection interval in secs', '<input type="text" name="deadlock_detection_interval_in_secs" value="" size="26"  maxlength="">');
+
+	createItem('checkpoint interval in mins', '<input type="text" name="checkpoint_interval_in_mins" value="" size="26"  maxlength="">');
+
+	var arrSelect = [];
+
+	arrSelect.push('<select id="isolation_level_select" name="isolation_level_select" onchange="isolation_level_select_func(this.form);" style="width:200px;">');
+	arrSelect.push('<option value="TRAN_SERIALIZABLE">SERIALIZABLE</option>');
+	arrSelect.push('<option value="TRAN_REP_CLASS_REP_INSTANCE">REP_CLASS_REP</option>');
+	arrSelect.push('<option value="TRAN_REP_CLASS_COMMIT_INSTANCE">REP_CLASS_COMMIT</option>');
+	arrSelect.push('<option value="TRAN_REP_CLASS_UNCOMMIT_INSTANCE">REP_CLASS_UNCOMMIT</option>');
+	arrSelect.push('<option value="TRAN_COMMIT_CLASS_COMMIT_INSTANCE">COMMIT_CLASS_COMMIT</option>');
+	arrSelect.push('<option value="TRAN_COMMIT_CLASS_UNCOMMIT_INSTANCE">COMMIT_CLASS_UNCOMMIT</option>');
+	arrSelect.push('</select> <input type="hidden" name="isolation_level" value="" />');
+
+	createItem('isolation level', arrSelect.join(""));
+
+	createItem('cubrid port id', '<input type="text" name="cubrid_port_id" value="" size="26"  maxlength="">');
+
+	createItem('max clients', '<input type="text" name="max_clients" value="" size="26"  maxlength="">');
+
+	createItem('auto restart server', '<input type="text" name="auto_restart_server" value="" size="26"  maxlength="">');
+
+	createItem('replication', '<input type="radio" name="replication" value="yes" class="borderNone">yes <input type="radio" name="replication" value="no" class="borderNone">no');
+
+	createItem('java stored procedure', '<input type="radio" name="java_stored_procedure" value="yes" class="borderNone">yes <input type="radio" name="java_stored_procedure" value="no" class="borderNone">no');
+
+
+	footer('apply');
+	createDesc('Server parameters can be modified. In order to configure additional paramters, you may directly modify cubrid.conf file.');
+</script>
+
+</body>
+</html>

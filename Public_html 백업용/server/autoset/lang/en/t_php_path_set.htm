@@ -1,0 +1,64 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - PHP Path Settings");
+
+	createItem('include_path', '<input type="text" name="include_path" value="" size="16"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder_en.gif" alt="Browse"></a>');
+
+	createItem('extension_dir', '<input type="text" name="extension_dir" value="" size="16"  maxlength="256"> <a href="javascript:find_dir2(document.forms.asofrm);"><img src="../../img/btn_find_folder_en.gif" alt="Browse"></a>');
+
+	createItem('SMTP', '<input type="text" name="SMTP" value="" size="30"  maxlength="256">');
+
+	createItem('sendmail_path', '<input type="text" name="sendmail_path" value="" size="30"  maxlength="256">');
+
+
+
+	footer('apply');
+	createDesc('It\'s not available to use mail() function to send a mail without specifying SMTP or sendmail_path. The mail() function can be used when the SMTP address is entered, it is accessible via the current Internet and an authentication process is not required.');
+</script>
+
+</body>
+</html>

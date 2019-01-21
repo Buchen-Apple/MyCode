@@ -1,0 +1,50 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	var cnt = 0;
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function selectDB_form(frm)
+	{
+		if (frm.database.selectedIndex >= 0)
+		{
+			frm.asoVar_select_db.value = frm.database.options[frm.database.selectedIndex].value;
+		}
+	}
+	function addDBRecord(dbName)
+	{
+		var frm = document.forms.asofrm;
+		OptionStr = document.createElement("OPTION");
+		OptionStr.value = dbName;
+		OptionStr.text = dbName;
+		frm.database.add(OptionStr);
+	}
+</script>
+<script type="text/javascript">
+	header("Backup - Export MySQL data");
+	createForm('asoVar_select_db');
+	createItem('Choose a database to backup on the following.');
+	createItem('<select name="database" style="width:100%;" size="7" onclick="selectDB_form(this.form)"></select>');
+	footer('confirm');
+	createDesc('Backup is available for each database when MySQL server is running.');
+</script>
+
+</body>
+</html>

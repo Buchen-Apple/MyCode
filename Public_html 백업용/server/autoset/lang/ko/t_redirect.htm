@@ -1,0 +1,78 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript1.2">
+	function dirSel(no,alias_name)
+	{
+		var frm = document.forms.asofrm;
+		var TargetName = eval("frm.TargetName_" + no);
+		frm.asoVAR_cmddirSel.value = 'DoEvent|'+no+'|'+alias_name;
+	}
+	function dirDel(no,alias_name)
+	{
+		var frm = document.forms.asofrm;
+		frm.asoVAR_cmddirDel.value = 'DoEvent|'+alias_name;
+		delcase(no);
+	}
+	function aliasDirListHTML(alias_name,dir_path)
+	{
+		var cHtml = "";
+		var c = 0;
+		lim = asofrm.limit.value;
+		cHtml = "<div id=asoRS_" + lim + ">";
+		cHtml += "<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">";
+
+		cHtml += "<tr>";
+		cHtml += "<td style=\"font-size:9pt;\"><b>"+lim+"</b>. 리디렉트 경로 <input type=\"text\" name=\"AliasName_"+lim+"\" value=\""+alias_name+"\" size=\"30\"  maxlength=\"256\" style=\"background:#EFEFEF;\" readonly></td>";
+		cHtml += "</tr>";
+
+		cHtml += "<tr>";
+		cHtml += "<td style=\"font-size:9pt;border-bottom:1px solid #d4d4d4;padding-bottom:5px;\">이동될 경로 <input type=\"text\" name=\"TargetName_"+lim+"\" value=\""+dir_path+"\" size=\"20\"  maxlength=\"256\"> <a href=\"javascript:dirSel('"+lim+"','"+alias_name+"');\"><img src=\"../../img/btn_modify.gif\" alt=\"수정\"></a> <a href=\"javascript:dirDel('"+lim+"','"+alias_name+"');\"><img src=\"../../img/btn_delete.gif\" alt=\"삭제\"></a></td>";
+		cHtml += "</tr>";
+
+		cHtml += "</table>";
+		cHtml += "</div>";
+		aliasDirList.insertAdjacentHTML("BeforeEnd",cHtml);
+	}
+	function init_dirList()
+	{
+		asofrm.limit.value = 0;
+	}
+	function addDirRecord(alias_name,dir_path)
+	{
+		lim = asofrm.limit.value;
+		asofrm.limit.value =  ++lim;
+		cnt = asofrm.cnt.value;
+		asofrm.cnt.value =  ++cnt;
+		aliasDirListHTML(alias_name,dir_path);
+	}
+	function delcase(caseno)
+	{
+		asofrm.cnt.value--;
+		document.all["asoRS_"+caseno].outerHTML = "";
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 웹서버 세부 설정 > 리디렉트 관리");
+
+	createForm('cnt','0');
+	createForm('limit','0');
+	createForm('asoVAR_cmddirSel','nothing');
+	createForm('asoVAR_cmddirDel','nothing');
+</script>
+<tr>
+	<td colspan="2"><div id="aliasDirList" name="aliasDirList"></div></td>
+</tr>
+<script type="text/javascript">
+	footer('');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setColumn('40','60');
+	header("설정 > 센드메일 설정");
+
+	createItem('SMTP 서버 주소', '<input type="text" name="smtp_server" value="" size="26"  maxlength="256">');
+
+	createItem('SMTP 서버 포트', '<input type="text" name="smtp_port" value="" size="10"  maxlength="256">');
+
+	createItem('기본 도메인', '<input type="text" name="default_domain" value="" size="26"  maxlength="256">');
+
+	createItem('오류 기록 파일명', '<input type="text" name="error_logfile" value="" size="26"  maxlength="256">');
+
+	createItem('SMTP 인증용 ID', '<input type="text" name="auth_username" value="" size="26"  maxlength="256">');
+
+	createItem('SMTP 인증용 패스워드', '<input type="text" name="auth_password" value="" size="26"  maxlength="256">');
+
+	createItem('SMTPS(SSL) 지원', '<input type="radio" name="smtp_ssl" value="auto" class="borderNone">auto <input type="radio" name="smtp_ssl" value="ssl" class="borderNone">ssl <input type="radio" name="smtp_ssl" value="tls" class="borderNone">tls <input type="radio" name="smtp_ssl" value="none" class="borderNone">none');
+
+	createItem('POP3 서버 주소', '<input type="text" name="pop3_server" value="" size="26"  maxlength="256">');
+
+	createItem('POP3 인증용 ID', '<input type="text" name="pop3_username" value="" size="26"  maxlength="256">');
+
+	createItem('POP3 인증용 패스워드', '<input type="text" name="pop3_password" value="" size="26"  maxlength="256">');
+
+	createItem('발신자 메일 고정', '<input type="text" name="force_sender" value="" size="26"  maxlength="256">');
+
+	createItem('호스트네임', '<input type="text" name="hostname" value="" size="26"  maxlength="256">');
+
+	footer('apply');
+
+	createDesc('(1) SMTP 인증 전에 POP3 정보를 사용하는 경우에만 POP3 서버 주소/인증용 ID/패스워드를 합니다.<br />(2) 발신자 메일 고정에는 메일 헤더에서 From: 절이 특정 주소로 고정되어야 하는 경우 기입합니다.<br/>(3) 호스트네임 값은 ehlo/helo 네임이 필수적으로 전달되어야 하는 경우 전달됩니다.');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,51 @@
+﻿<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	var cnt = 0;
+	function find_file(frm)
+	{
+		frm.asoVAR_cmdOpenFile.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function selectDB_form(frm)
+	{
+		if (frm.database.selectedIndex >= 0)
+		{
+			frm.asoVar_select_db.value = frm.database.options[frm.database.selectedIndex].value;
+		}
+	}
+	function addDBRecord(dbName)
+	{
+		var frm = document.forms.asofrm;
+		OptionStr = document.createElement("OPTION");
+		OptionStr.value = dbName;
+		OptionStr.text = dbName;
+		frm.database.add(OptionStr);
+	}
+</script>
+<script type="text/javascript">
+	header("백업 > MySQL 데이터 가져오기");
+	createForm('asoVar_select_db');
+	createItem('적용될 데이터베이스를 아래에서 선택하세요.');
+	createItem('<select name="database" style="width:100%;" size="5" onclick="selectDB_form(this.form)"></select>');
+	createItem('SQL 파일','<input type="text" name="SQLPath" value="" size="24" maxlength="256"> <a href="javascript:find_file(document.forms.asofrm);"><img src="../../img/btn_find_file.gif" alt="파일 선택"></a>');
+	footer('confirm');
+	createDesc('MySQL 서버가 실행중인 경우에만, SQL 파일을 실행 할 수 있습니다.');
+</script>
+
+</body>
+</html>

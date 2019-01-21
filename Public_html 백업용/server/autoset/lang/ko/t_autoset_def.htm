@@ -1,0 +1,61 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function rss_select_func(frm)
+	{
+		frm.rss.value = frm.rss_select.value;
+	}
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("설정 > 오토셋 설정 > 오토셋 기본 설정");
+
+	//createItem('구독할 RSS', '<input type="text" name="rss" value="" size="30"  maxlength="255">');
+
+	createItem('시작 옵션', '<input type="checkbox" name="runWeb" class="borderNone">웹서버  <input type="checkbox" name="runMySQL" class="borderNone">MySQL<br>(<u>시작</u>시 실행될 서버를 선택)');
+
+	createItem('종료 옵션', '<input type="checkbox" name="exitWeb" class="borderNone">웹서버  <input type="checkbox" name="exitMySQL" class="borderNone">MySQL<br>(<u>종료</u>시 종료될 서버를 선택합니다.)');
+
+	createItem('자동 재시작', '<input type="checkbox" name="auto_restart" class="borderNone"> 재시작 후 적용되는 서버 설정 변경 시 자동 재시작(웹 서버 설정)');
+
+	createItem('트레이 모드', '<input type="checkbox" name="runtray" class="borderNone">트레이모드로 실행<br>(실행시, 트레이모드로 시작하려는 경우)');
+
+	createItem('창 닫기 옵션', '<input type="checkbox" name="closetray" class="borderNone">트레이모드로 전환');
+
+	createItem('버전 확인', '<input type="checkbox" name="autoupdate" class="borderNone">실행 시, 업데이트 정보를 확인');
+
+	createItem('창 고정', '<input type="checkbox" name="alwaysup" class="borderNone">항상 위 고정 기능 사용');
+
+	//createItem('오류 안내', '<input type="checkbox" name="tts" class="borderNone">음성 안내 (<input type="radio" name="ttsSex" value="male" class="borderNone">남성 <input type="radio" name="ttsSex" value="female" class="borderNone">여성)<br><input type="checkbox" name="sms" class="borderNone">SMS(문자메시지)안내');
+
+	createItem('업데이트 서버', '<input type="text" name="update" value="www.autoset.org" size="30"  maxlength="255">');
+
+	createItem('업데이트 파일', '<input type="radio" name="updatefile" value="zip" class="borderNone">ZIP 압축파일  <input type="radio" name="updatefile" value="exe" class="borderNone">EXE');
+
+	
+	
+	footer('apply');
+	createDesc('일부 설정은 프로그램을 닫고 다시 실행해야 적용됩니다.');
+</script>
+
+</body>
+</html>

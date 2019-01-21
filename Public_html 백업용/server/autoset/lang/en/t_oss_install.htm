@@ -1,0 +1,81 @@
+<!-- 매뉴위치 : 부가기능(&A) - 오픈 소스 프로그램 내려받기(&O) -->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<link rel=STYLESHEET href="public.css"></link>
+<style type="text/css" media="screen">
+@import url(public.css);
+</style>
+<script language="javascript" src="public.js"></script>
+<script language="javascript1.2">
+function Install(no,downloadURL,installURL,bFee,sMsg)
+{
+	var frm = document.forms.asofrm;
+	frm.asoVAR_Install.value = 'DoEvent|'+no+'|'+downloadURL+'|'+installURL+'|'+bFee+'|'+sMsg+'|';
+}
+function addListHTML(programName, downloadURL, siteURL, installURL, bFee, sMsg)
+{
+	var cHtml = "";
+	var c = 0;
+	lim = asofrm.limit.value;
+	cHtml = "<div id=asoRS_" + lim + ">";
+	cHtml += "<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">";
+	cHtml += "<tr>";
+	cHtml += "<td width=\"20\" style=\"font-size:9pt;\">" + lim + ".</td>";
+	cHtml += "<td style=\"font-size:9pt;\"><a href=\"" + siteURL + "\" target=\"_blank\" style=\"color:#555555;text-decoration:none\">" + programName + "</a></td>";
+	cHtml += "<td width=\"80\" style=\"font-size:9pt;\"><font color=\"#999999\">[<a href=\"javascript:Install('"+lim+"','"+downloadURL+"','"+installURL+"','"+bFee+"','"+sMsg+"');\"><font color=\"#999999\">설치하기</font></a>]</font></td>";
+	cHtml += "</tr>";
+	cHtml += "</table>";
+	cHtml += "</div>";
+	aliasDirList.insertAdjacentHTML("BeforeEnd",cHtml);
+}
+function init_dirList()
+{
+	asofrm.limit.value = 0;
+}
+function addRecord(programName, downloadURL, siteURL, installURL, bFee, sMsg)
+{
+	lim = asofrm.limit.value;
+	asofrm.limit.value =  ++lim;
+	cnt = asofrm.cnt.value;
+	asofrm.cnt.value =  ++cnt;
+	addListHTML(programName, downloadURL, siteURL, installURL, bFee, sMsg);
+}
+function delcase(caseno)
+{
+	asofrm.cnt.value--;
+	document.all["asoRS_"+caseno].outerHTML = "";
+}
+</script>
+</head>
+<body leftmargin="5" marginwidth="5" topmargin="5" marginheight="5" scroll="no" onload="init_dirList();"  style="border:none;">
+<div align="center">
+<form name="asofrm">
+<input type="hidden" name="limit" value="0">
+<input type="hidden" name="cnt" value="0">
+<input type="hidden" name="asoVAR_Install" value="nothing">
+<table border="0" cellpadding="5" cellspacing="0" width="100%">
+<tr>
+ <td height="26" bgcolor="#91AF64"><font color="white" style="height:1;filter:dropshadow(color:#555555,offx:1,offy:1,positive:1);" size="2">▒ 부가기능 &gt;</font>&nbsp;<font color="white" style="height:1;filter:dropshadow(color:#777777,offx:1,offy:1,positive:1);" size="2"><b>오픈 소스 프로그램 내려받기</b></font></td>
+</tr>
+</table>
+<p>
+<table border="0" cellpadding="1" cellspacing="0" width="100%" align="center">
+<tr>
+<td bgcolor="#D5D6D6"><table border="0" cellpadding="3" cellspacing="0" width="100%">
+<tr><td bgcolor="#EAEBEB"><table border="0" cellpadding="0" cellspacing="0" width="100%">
+<tr>
+ <td bgcolor="white" height="5"></td>
+</tr>
+<tr>
+ <td bgcolor="white" valign="top" align="center" style="font-size:9pt;"><div id="aliasDirList" name="aliasDirList"></div></td>
+</tr>
+</table></td>
+</tr>
+</table></td>
+</tr>
+</table>
+</form>
+</div>
+</body>
+</html>

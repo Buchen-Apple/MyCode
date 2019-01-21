@@ -1,0 +1,63 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function rss_select_func(frm)
+	{
+		frm.rss.value = frm.rss_select.value;
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - Setting AutoSet - Default Settings");
+
+
+	//createItem('RSS to subscribe', '<input type="text" name="rss" value="" size="30"  maxlength="255">');
+
+	createItem('Start option', '<input type="checkbox" name="runWeb" class="borderNone">Web server  <input type="checkbox" name="runMySQL" class="borderNone">MySQL<br>(Choose a server to run when starting)');
+
+	createItem('Exit option', '<input type="checkbox" name="exitWeb" class="borderNone">Web server  <input type="checkbox" name="exitMySQL" class="borderNone">MySQL<br>(Choose a server to stop when closing)');
+
+	createItem('Automatic restart', '<input type="checkbox" name="auto_restart" class="borderNone"> Restart the Web server automatically when its settings are changed');
+
+	createItem('Tray mode', '<input type="checkbox" name="runtray" class="borderNone">Run on tray mode<br>(Starting on tray mode when executing)');
+
+	createItem('Close option', '<input type="checkbox" name="closetray" class="borderNone">Convert to tray mode');
+
+	createItem('Check version', '<input type="checkbox" name="autoupdate" class="borderNone">Check update information when executing');
+
+	createItem('Freezed window', '<input type="checkbox" name="alwaysup" class="borderNone">Freezed window always on top');
+
+	//createItem('오류 안내', '<input type="checkbox" name="tts" class="borderNone">음성 안내 (<input type="radio" name="ttsSex" value="male" class="borderNone">남성 <input type="radio" name="ttsSex" value="female" class="borderNone">여성)<br><input type="checkbox" name="sms" class="borderNone">SMS(문자메시지)안내');
+
+	createItem('Update server', '<input type="text" name="update" value="www.autoset.org" size="30"  maxlength="255">');
+
+	createItem('Update file', '<input type="radio" name="updatefile" value="zip" class="borderNone">ZIP Archive  <input type="radio" name="updatefile" value="exe" class="borderNone">EXE');
+
+	
+	
+	footer('apply');
+	createDesc('Some of configurations will be applied after restarting the program.');
+</script>
+
+</body>
+</html>

@@ -1,20 +1,19 @@
 <?php
 require($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_StartUp.php");
-require($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Content_Library.php");
+require($_SERVER['DOCUMENT_ROOT']. "/LIBRARY/_Select_Library.php");
 
-// 1. 클라이언트에서 받은 RAW 데이터를 \r\n으로 분리해서 받음
-$Body = explode("\r\n", file_get_contents('php://input'));
+// 1. 클라이언트에서 받은 RAW 데이터 받음
+$Body = file_get_contents('php://input');
 
-// 2. 컨텐츠 부분 decoding
-// 컨텐츠쪽 파라미터가 안왔을 경우, 실패패킷 보냄
-if(isset($Body[0]) === false)
+// 2. 파라미터가 안왔을 경우, 실패패킷 보냄
+if(isset($Body) === false)
 {
      // 실패 패킷 전송 후 php 종료하기 (Parameter 에러)
      global $cnf_ERROR_PARAMETER;
      OnError($cnf_ERROR_PARAMETER);  
 }
 
-$Content_Body = json_decode($Body[0], true);
+$Content_Body = json_decode($Body, true);
 
 // accountno가 왔는지 체크
 if(isset($Content_Body['accountno']) === false)
@@ -47,29 +46,25 @@ else
     $DataKey = 'accountno';
 }
 
-
 // 3. 해당 유저가 저장되어있는 dbno와 해당 유저의 accountNo를 알아온다.
 $Data = SearchUser($DataKey , $Content_Body[$DataKey]);
 
-// 4. 접속할 shDB_Data 알아온 후 Conenct
-$DBInfo = shDB_Data_ConnectInfo($Data['dbno'], $Data['accountno']);
-$shDB_Data = shDB_Data_Conenct($DBInfo);
+// 4. shDB_Data에서 유저 정보 가져오기(Select)
+$SelectData = shDB_Data_Select($Data['dbno'], $Data['accountno'], 'account');
 
-// 5. accountTBL에서 정보 Select.
-$SelectData = shDB_Data_Select($Data['accountno'], $shDB_Data, $DBInfo['dbname'], 'account');
-
-// 6. Disconenct
-DB_Disconnect($shDB_Data);
-
-// 7. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
+// // 5. 돌려줄 결과 셋팅 (여기까지 오면 정상적인 결과)
 $Response['result'] = $cnf_COMPLETE;
-$Response['accountno'] = intval($SelectData['accountno']);
-$Response['email'] = $SelectData['email'];
-$Response['password'] = $SelectData['password'];
-$Response['sessionkey'] = $SelectData['sessionkey'];
-$Response['nick'] = $SelectData['nick'];
 
-// 8. 결과 돌려주기
-require_once($_SERVER['DOCUMENT_ROOT'] . "/LIBRARY/_Clenup.php");
+$Key = key($SelectData);
+$Response["$Key"] = intval(current($SelectData));
+
+while(next($SelectData) !== false)
+{
+    $Key = key($SelectData);
+    $Value = current($SelectData);
+    $Response["$Key"] = current($SelectData);
+}
+
+// 6. 결과 돌려주기
 ResponseJSON($Response, $Data['accountno']);
 ?>

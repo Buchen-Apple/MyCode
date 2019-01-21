@@ -1,0 +1,83 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function ChkLen()
+	{
+		var pos;
+		var msglen = 0;
+		var len = asofrm.strData.value.length;
+		for (i=0;i<len;i++){
+			pos = asofrm.strData.value.charAt(i);
+			if (escape(pos).length > 4)
+				msglen += 2;
+			else
+				msglen++;
+		}
+		
+		asofrm.strDataCount.value = msglen;
+	}
+</script>
+<script type="text/javascript">
+	setColumn('35','75');
+	header("부가기능 > SMS 보내기");
+
+</script>
+<tr>
+	<td colspan="2">
+		<table width="148" border="0" cellspacing="0" cellpadding="0" height="110" align="center">
+			<tr>
+				<td><img src="../../img/sms_top.gif"></td>
+			</tr>
+			<tr> 
+				<td background="../../img/sms_back.gif" width="149" height="147" valign="bottom" align="center"> 
+					<!-- 액정화면 -->
+					<table width="100" border="0" cellspacing="0" cellpadding="0">
+						<tr> 
+							<td>
+								<textarea name="strData" onChange="ChkLen()" onKeyUp="ChkLen()" style="border-color:#000000; border:solid 0; height: 90px; background-color: #9bd9ff; width: 100px; FONT-SIZE: 9pt; overflow:hidden" onChange="" onKeyUp="" rows=6 cols=22></textarea>
+							 </td>
+						</tr>
+						<tr> 
+							<td align="right" height="40">
+								<input type="text" name="strDataCount" size="2" style="border-color:#000000; border:solid 0; height: 14px; width: 18px; background-color: #9bd9ff; FONT-SIZE: 9pt;" maxlength="2" value="0" readonly name="">
+								/80 bytes
+							</td>
+						</tr>
+					</table>
+					<!-- 액정화면 -->
+				</td>
+			</tr>
+		</table>
+	</td>
+</tr>
+<script type="text/javascript">
+
+	createItem('받는이 휴대전화', '<input type="text" name="to" value="" size="15"  maxlength="15">');
+
+
+	footer('confirm');
+
+	createDesc('본 서비스는 <a href="http://www.cafe24.com" target="cafeSMS">카페24</a>의 SMS 호스팅 서비스를 신청 후, 이용 가능합니다.<br>모든 데이터는 Base64 인코딩되어 카페24 서버에 바로 전송됩니다.(오토셋개발자그룹 서버를 경유하지 않습니다)<br>SMS 호스팅 신청 후, [부가기능] &gt;[SMS 서비스 정보]를 설정해주셔야 문자 메시지가 전송됩니다.');
+</script>
+
+</body>
+</html>

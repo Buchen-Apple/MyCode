@@ -1,0 +1,1 @@
+ERROR_Handler --> (2) FILE: C:\AutoSet10\public_html\LIBRARY\_DB_Library.php / LINE: 10 / MSG:  mysqli_connect(): (HY000/1045): Access denied for user 'shDBslave'@'172.16.2.1' (using password: YES) 

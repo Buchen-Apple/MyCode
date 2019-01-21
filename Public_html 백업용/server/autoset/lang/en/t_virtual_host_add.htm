@@ -1,0 +1,42 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - Add &lt;VirtualHost&gt;");
+
+	createItem('Server Name', '<input type="text" name="ServerName" value="" size="28"  maxlength="256">');
+
+	createItem('Server Alias (optional)', '<input type="text" name="ServerAlias" value="" size="28"  maxlength="256">');
+
+	createItem('Document Root', '<input type="text" name="DocumentRoot" value="" size="16"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder_en.gif" alt="Browse" ></a>');
+
+	createItem('Server Admin E-mail', '<input type="text" name="ServerAdmin" value="" size="28"  maxlength="256">');
+
+	createItem('Option', '<input type="checkbox" name="CustomLog" value="Y" class="borderNone"> Writing Access Logs<br/><input type="checkbox" name="ErrorLog" value="Y" class="borderNone"> Writing Error Logs<br/><input type="checkbox" name="php_admin_value:open_basedir" value="Y" class="borderNone"> Blocking access attempts out of HOME dirctory(Not recommended)');
+
+
+	footer('confirm');
+
+	createDesc('Virtual Host Settings enable to run your Website with multiple domains on a single server as same as <VirtualHost> of Apache HTTP Server.<br />The Virtual Host Settings would be applied over settings on the "Setting - Web Server Default Settings" menu.<br />If you don\'t own any domain, do not use the feature.');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('35','75');
+	header("Setting - Web Server Advanced Settings - Add Alias");
+
+	createForm('limit', 0);
+	createForm('cnt', 0);
+
+	createItem('Alias Name', '<input type="text" name="AliasName" value="" size="28"  maxlength="256">');
+
+	createItem('Target Path', '<input type="text" name="AliasPath" value="" size="14"  maxlength="256"> <a href="javascript:find_dir(document.forms.asofrm);"><img src="../../img/btn_find_folder_en.gif" alt="Browse" ></a>');
+
+
+	footer('confirm');
+
+	createDesc('Virtual directory setting is as same as "Alias" among keywords of Apache Web server. It makes not a real directory but a virtual directory in the home directory which is selected on the menu "Setting-Web server default setup".<br><br>It is not recommend to set a sub-directory of home directory to a virtual directory because it makes the server run inefficiently by creating another alias directory.');
+</script>
+
+</body>
+</html>

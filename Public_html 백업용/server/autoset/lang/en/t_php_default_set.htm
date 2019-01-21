@@ -1,0 +1,79 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('40','60');
+	header("Setting - PHP Global Settings");
+
+	createItem('short_open_tag', '<input type="radio" name="short_open_tag" value="On" class="borderNone">사용  <input type="radio" name="short_open_tag" value="Off" class="borderNone">사용않음');
+
+	//createItem('asp_tags', '<input type="radio" name="asp_tags" value="On" class="borderNone">사용  <input type="radio" name="asp_tags" value="Off" class="borderNone">사용않음');
+
+	//createItem('allow_call_time_pass_reference', '<input type="radio" name="allow_call_time_pass_reference" value="On" class="borderNone">사용  <input type="radio" name="allow_call_time_pass_reference" value="Off" class="borderNone">사용않음');
+
+	createItem('max_execution_time', '<input type="text" name="max_execution_time" value="" size="5"  maxlength="5" style="text-align:right"> 초');
+
+	createItem('memory_limit', '<input type="text" name="memory_limit" value="" size="8" style="text-align:right">');
+
+	createItem('display_errors', '<input type="radio" name="display_errors" value="On" class="borderNone">사용  <input type="radio" name="display_errors" value="Off" class="borderNone">사용않음');
+
+	createItem('variables_order', '<input type="text" name="variables_order" value="" size="8"  maxlength="6" >');
+
+	//createItem('register_globals', '<input type="radio" name="register_globals" value="On" class="borderNone">사용  <input type="radio" name="register_globals" value="Off" class="borderNone">사용않음');
+
+	createItem('post_max_size', '<input type="text" name="post_max_size" value="" size="8"  class="input_default">');
+
+	createItem('upload_max_filesize', '<input type="text" name="upload_max_filesize" value="" size="8"  class="input_default">');
+
+	createItem('allow_url_fopen', '<input type="radio" name="allow_url_fopen" value="On" class="borderNone">허용  <input type="radio" name="allow_url_fopen" value="Off" class="borderNone">허용않음');
+
+	createItem('error_reporting', '<input type="text" name="error_reporting" value="" size="25"  maxlength="255" >');
+
+
+	footer('apply');
+	createDesc('Changed settings will be reflected after restarting. ');
+</script>
+
+</body>
+</html>

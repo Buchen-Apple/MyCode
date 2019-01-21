@@ -1,0 +1,38 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - Web Server Advanced Settings - Add Redirect");
+
+	createForm('limit','0');
+	createForm('cnt','0');
+
+	createItem('Redirect Path', '<input type="text" name="RedirectName" value="" size="28"  maxlength="256">');
+
+	createItem('Target Path', '<input type="text" name="RedirectPath" value="" size="28"  maxlength="256">');
+
+	footer('confirm');
+
+	createDesc('Redirection can be set to redirect to a Target Path from a Redirect Path.<br><br><u>Example</u>:<br><br><ul style="margin-bottom:0px;"><li>Redirect Path: /cafe	<li>Target path: http://cafe.naver.com/autoset.cafe<br><br >When connecting to http://localhost/cafe/307, it will be redirected to http://cafe.naver.com/autoset.cafe/307.');
+</script>
+
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function find_dir3(frm)
+	{
+		frm.asoVAR_cmdOpenDir3.value = 'DoEvent';
+	}
+	function find_dir4(frm)
+	{
+		frm.asoVAR_cmdOpenDir4.value = 'DoEvent';
+	}
+	function find_dir5(frm)
+	{
+		frm.asoVAR_cmdOpenDir5.value = 'DoEvent';
+	}
+	function find_dir6(frm)
+	{
+		frm.asoVAR_cmdOpenDir6.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+</script>
+<script type="text/javascript">
+	setLang('en');
+	setColumn('30','70');
+	header("Setting - PHP Advanced Settings - Session Settings");
+
+	createItem('save_handler', '<input type="text" name="save_handler" value="" size="10"  maxlength="255"  >');
+
+	createItem('save_path', '<input type="text" name="save_path" value="" size="30"  maxlength="255"  ><br>(In the case of files, this is the path where data files are stored.)');
+
+	createItem('use_cookies', '<input type="radio" name="use_cookies" value="1" class="borderNone">yes  <input type="radio" name="use_cookies" value="0" class="borderNone">no');
+
+	createItem('name', '<input type="text" name="name" value="" size="30"  maxlength="255">');
+
+	createItem('auto_start', '<input type="radio" name="auto_start" value="1" class="borderNone">yes  <input type="radio" name="auto_start" value="0" class="borderNone">no');
+
+	createItem('cookie_lifetime', '<input type="text" name="cookie_lifetime" value="" size="4" style="text-align:right"> Second(s)');
+
+	createItem('cookie_path', '<input type="text" name="cookie_path" value="" size="30" >');
+
+	createItem('cookie_domain', '<input type="text" name="cookie_domain" value="" size="30" >');
+
+
+
+	footer('apply');
+	createDesc('Changed settings will be reflected after restarting. ');
+</script>
+
+</body>
+</html>

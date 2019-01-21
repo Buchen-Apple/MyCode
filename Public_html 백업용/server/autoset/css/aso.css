@@ -1,0 +1,44 @@
+/* ASO 스타일 */
+html {
+	border:none;
+}
+
+body {
+	border:none;
+	margin:0;
+	padding:5px;
+	scrollbar-face-color:#dddddd;
+	scrollbar-highlight-color:#ffffff;
+	scrollbar-shadow-color:#aaaaaa;
+	scrollbar-3dlight-color:#999999;
+	scrollbar-arrow-color:#ffffff;
+	scrollbar-track-color:#eeeeee;
+	scrollbar-darkshadow-color:#ffffff;
+}
+
+td, body {
+	font-size:9pt;
+	font-family:tahoma,dotum;
+	color:#555555;
+	line-height:150%;
+}
+
+input, select, textarea {
+	vertical-align:middle;
+}
+
+img {
+	border:none;
+	vertical-align:middle;
+}
+
+input {
+	border-top:1px solid #acacac;
+	border-left:1px solid #acacac;
+	border-right:1px solid #d9d9d9;
+	border-bottom:1px solid #d9d9d9;
+}
+
+.borderNone {
+	border:none !important;
+}

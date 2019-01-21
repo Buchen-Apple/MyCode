@@ -1,0 +1,64 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script type="text/javascript">
+var gIdx = 1;
+
+function addHost(ipaddr, hostname, description)
+{
+	var htmls = [];
+
+	htmls.push("<table border=\"0\" cellpadding=\"2\" cellspacing=\"1\" width=\"100%\">");
+	htmls.push("<tr>");
+	htmls.push("<td style=\"font-size:9pt;\"><b>" + gIdx +"</b>. 호스트명 : " + hostname + "</td>");
+	htmls.push("</tr>");
+	htmls.push("<tr>");
+	htmls.push("<td style=\"font-size:9pt;\">설명 : <input type=\"text\" name=\"Description_"+gIdx+"\" value=\""+description+"\" size=\"35\" maxlength=\"256\"></td>");
+	htmls.push("</tr>");
+	htmls.push("<tr>");
+	htmls.push("<td style=\"font-size:9pt;border-bottom:1px solid #d4d4d4;padding-bottom:5px;\">IP 주소 : <input type=\"text\" name=\"Ipaddr_"+gIdx+"\" value=\""+ipaddr+"\" size=\"16\"  maxlength=\"256\"> <a href=\"javascript:onModify('"+gIdx+"','"+hostname+"');\"><img src=\"../../img/btn_modify.gif\" alt=\"수정\"></a> <a href=\"javascript:onDelete('"+gIdx+"','"+hostname+"');\"><img src=\"../../img/btn_delete.gif\" alt=\"삭제\"></a></td>");
+	htmls.push("</tr>");
+	htmls.push("</table>");
+
+	document.getElementById('hostList').innerHTML += htmls.join("");
+
+	gIdx++;
+}
+
+function onModify(idx, hostname)
+{
+	var frm = document.forms.asofrm;
+	frm.asoVAR_cmdModify.value = 'DoEvent|'+idx+'|'+hostname;
+}
+
+function onDelete(idx, hostname)
+{
+	var frm = document.forms.asofrm;
+	frm.asoVAR_cmdDelete.value = 'DoEvent|'+idx+'|'+hostname;
+}
+
+</script>
+<script type="text/javascript">
+	setColumn('30','70');
+	header("부가기능 > hosts 파일 수정");
+
+	createForm('cnt','0');
+	createForm('limit','0');
+	createForm('asoVAR_cmdDelete','nothing');
+	createForm('asoVAR_cmdModify','nothing');
+</script>
+<tr>
+	<td colspan="2"><div id="hostList" name="hostList"></div></td>
+</tr>
+<script type="text/javascript">
+	footer('');
+</script>
+
+</body>
+</html>

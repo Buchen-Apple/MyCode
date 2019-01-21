@@ -1,0 +1,63 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<style type="text/css">@import url(../../css/aso.css);</style>
+<script type="text/javascript" src="../../js/aso.js"></script>
+</head>
+<body style="background-color:#f2f2f2;">
+
+<script language="javascript">
+	function find_dir(frm)
+	{
+		frm.asoVAR_cmdOpenDir.value = 'DoEvent';
+	}
+	function find_dir2(frm)
+	{
+		frm.asoVAR_cmdOpenDir2.value = 'DoEvent';
+	}
+	function submit_form(frm)
+	{
+		frm.asoVAR_cmdSubmit.value = 'DoEvent';
+	}
+	function reset_form(frm)
+	{
+		frm.reset();
+	}
+	function isolation_level_select_func(frm)
+	{
+		frm.isolation_level.value = frm.isolation_level_select.value;
+	}
+</script>
+<script type="text/javascript">
+	setColumn('40','60');
+	header("설정 > CUBRID 브로커 설정");
+
+	createItem('서비스 구동 여부', '<input type="radio" name="SERVICE" value="ON" class="borderNone">ON <input type="radio" name="SERVICE" value="OFF" class="borderNone">OFF');
+
+	createItem('브로커 포트 번호', '<input type="text" name="BROKER_PORT" value="" size="6"  maxlength="6">');
+
+	createItem('응용서버의 최소 개수', '<input type="text" name="MIN_NUM_APPL_SERVER" value="" size="10"  maxlength="256">');
+
+	createItem('응용서버의 최대 개수', '<input type="text" name="MAX_NUM_APPL_SERVER" value="" size="10"  maxlength="256">');
+
+	createItem('APPL_SERVER_SHM_ID', '<input type="text" name="APPL_SERVER_SHM_ID" value="" size="10"  maxlength="256">');
+
+	createItem('LOG_DIR', '<input type="text" name="LOG_DIR" value="" size="24"  maxlength="256">');
+
+	createItem('ERROR_LOG_DIR', '<input type="text" name="ERROR_LOG_DIR" value="" size="24"  maxlength="256">');
+
+	createItem('SQL_LOG', '<input type="radio" name="SQL_LOG" value="ON" class="borderNone">ON <input type="radio" name="SQL_LOG" value="OFF" class="borderNone">OFF');
+
+	createItem('TIME_TO_KILL', '<input type="text" name="TIME_TO_KILL" value="" size="24"  maxlength="256">');
+
+	createItem('SESSION_TIMEOUT', '<input type="text" name="SESSION_TIMEOUT" value="" size="24"  maxlength="256">');
+
+	createItem('KEEP_CONNECTION', '<input type="radio" name="KEEP_CONNECTION" value="ON" class="borderNone">ON <input type="radio" name="KEEP_CONNECTION" value="OFF" class="borderNone">OFF <input type="radio" name="KEEP_CONNECTION" value="AUTO" class="borderNone">AUTO');
+
+	footer('apply');
+	createDesc('첫번째 브로커에 대한 개별적으로 적용되는 파라미터를 설정 할 수 있습니다.');
+</script>
+
+</body>
+</html>

@@ -1,2 +1,0 @@
-ERROR_Handler --> (2) FILE: C:\AutoSet10\public_html\LIBRARY\_DB_Library.php / LINE: 18 / MSG:  mysqli_connect(): (HY000/2002): An operation on a socket could not be performed because the system lacked sufficient buffer space or because a queue was full.
- 
