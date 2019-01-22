@@ -14,9 +14,7 @@
 namespace Library_Jingyu
 {
 	// --------------
-	// CNetServer 클래스는, 내부 서버 간 통신에 사용된다.
-	// 내부 서버간 통신은, 접속 받는쪽을 서버 / 접속하는 쪽을 클라로 나눠서 생각한다 (개념적으로)
-	// 그 중 서버 부분이다.
+	// CNetServer 클래스는, 외부와의 통신에 사용된다.
 	// --------------
 	class CNetServer
 	{	
@@ -146,6 +144,7 @@ namespace Library_Jingyu
 		//		  : I/O카운트가 0이되어 삭제된 유저는, false
 		bool GetSessionUnLOCK(stSession* NowSession);
 
+	private:
 		// 워커 스레드
 		static UINT	WINAPI	WorkerThread(LPVOID lParam);
 
@@ -215,15 +214,13 @@ namespace Library_Jingyu
 		// ----------------------------- 기능 함수들 ---------------------------		
 
 		// 지정한 유저를 끊을 때 호출하는 함수. 외부 에서 사용.
-		// 라이브러리한테 끊어줘!라고 요청하는 것 뿐
 		//
 		// Parameter : SessionID
 		// return : 없음
 		void Disconnect(ULONGLONG SessionID);
 
 		// 외부에서, 어떤 데이터를 보내고 싶을때 호출하는 함수.
-		// SendPacket은 그냥 아무때나 하면 된다.
-		// 해당 유저의 SendQ에 넣어뒀다가 때가 되면 보낸다.
+		// 해당 세션의 SendQ에 전달받은 패킷을 저장.
 		//
 		// Parameter : SessionID, SendBuff, LastFlag(디폴트 FALSE)
 		// return : 없음

@@ -843,7 +843,6 @@ namespace Library_Jingyu
 			// --------------
 			// CancelioEx 후처리
 			// --------------
-
 			// CancelioEx 대상일 경우, WSASend / WSARecv를 호출하지 않도록 하기 위해, 여기서 우선 체크한다.
 			// CancelioEx는, 내부적으로 커널의 I/O Queue를 확인하기 때문에 overlapped를 채워준다. 
 			// 즉, CancelioEx로 인해 overlapped가 NULL이 나올 수 없다

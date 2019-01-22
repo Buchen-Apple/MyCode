@@ -822,13 +822,14 @@ namespace Library_Jingyu
 		int TryCount = 5;
 		swprintf_s(Body, _Mycountof(Body), L"{\"accountno\" : %lld}", AccountNo);
 
-		while (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, RequestBody) == false)
+		//while (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, RequestBody) == false)
+		while (m_HTTP_Post->HTTP_ReqANDRes((TCHAR*)_T("select_account.php"), Body, RequestBody) == false)
 		{
 			TryCount--;
 			if (TryCount == 0)
 				gMatchServerDump->Crash();
 
-			Sleep(1);
+			Sleep(200);
 		}
 		
 
@@ -1555,7 +1556,8 @@ namespace Library_Jingyu
 		
 		// HTTP_Exchange 동적할당
 		//m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.0.0.1"), 11902);
-		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 11410);
+		//m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("127.0.0.1"), 11410);
+		m_HTTP_Post = new HTTP_Exchange((TCHAR*)_T("10.10.10.1"), 80);
 
 		// 플레이어를 관리하는 umap의 용량을 할당해둔다.
 		m_umapPlayer.reserve(m_stConfig.MaxJoinUser);	

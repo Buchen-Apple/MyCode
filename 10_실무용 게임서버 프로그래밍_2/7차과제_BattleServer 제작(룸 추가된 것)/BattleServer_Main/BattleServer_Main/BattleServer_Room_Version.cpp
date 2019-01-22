@@ -54,8 +54,7 @@ namespace Library_Jingyu
 		// --------------------
 		// 변수 선언
 		// --------------------
-		//HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 11410);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.10.10.1"), 80);
 
 		DWORD APIType;
 		DB_WORK* pWork;
@@ -95,12 +94,14 @@ namespace Library_Jingyu
 
 				// 2. http 통신 및 결과 얻기
 				int TryCount = 5;
-				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_account.php"), Body, NowWork->m_tcResponse) == false)
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("select_account.php"), Body, NowWork->m_tcResponse) == false)
 				{
 					TryCount--;
 
 					if (TryCount == 0)
 						gThis->m_Dump->Crash();
+
+					Sleep(100);
 				}
 
 				// 3. Read 완료 큐에 넣기
@@ -124,12 +125,14 @@ namespace Library_Jingyu
 
 				// 2. http 통신 및 결과 얻기
 				int TryCount = 5;
-				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Select_contents.php"), Body, NowWork->m_tcResponse) == false)
+				while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("select_contents.php"), Body, NowWork->m_tcResponse) == false)
 				{
 					TryCount--;
 
 					if (TryCount == 0)
 						gThis->m_Dump->Crash();
+
+					Sleep(100);
 				}
 
 				// 3. Read 완료 큐에 넣기
@@ -175,8 +178,7 @@ namespace Library_Jingyu
 
 		DB_WORK* pWork;
 
-		//HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.0.0.1"), 11902);
-		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("127.0.0.1"), 11410);
+		HTTP_Exchange m_HTTP_Post((TCHAR*)_T("10.10.10.1"), 80);
 
 		// 출력 체크용
 		LONG* TempDBWriteTPS = &gThis->m_lDBWriteTPS;
@@ -223,12 +225,14 @@ namespace Library_Jingyu
 
 					// 2. HTTP 통신
 					int TryCount = 5;
-					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("update_contents.php"), Body, NowWork->m_tcResponse) == false)
 					{
 						TryCount--;
 
 						if (TryCount == 0)
 							gThis->m_Dump->Crash();
+
+						Sleep(100);
 					}
 
 					// 3. Json데이터 파싱하기 (UTF-16)
@@ -264,12 +268,14 @@ namespace Library_Jingyu
 
 					// 2. HTTP 통신
 					int TryCount = 5;
-					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("update_contents.php"), Body, NowWork->m_tcResponse) == false)
 					{
 						TryCount--;
 
 						if (TryCount == 0)
 							gThis->m_Dump->Crash();
+
+						Sleep(100);
 					}
 
 					// 3. Json데이터 파싱하기 (UTF-16)
@@ -306,12 +312,14 @@ namespace Library_Jingyu
 
 					// 2. HTTP 통신
 					int TryCount = 5;
-					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("update_contents.php"), Body, NowWork->m_tcResponse) == false)
 					{
 						TryCount--;
 
 						if (TryCount == 0)
 							gThis->m_Dump->Crash();
+
+						Sleep(100);
 					}
 
 					// 3. Json데이터 파싱하기 (UTF-16)
@@ -348,12 +356,14 @@ namespace Library_Jingyu
 
 					// 2. HTTP 통신
 					int TryCount = 5;
-					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("Contents/Update_contents.php"), Body, NowWork->m_tcResponse) == false)
+					while (m_HTTP_Post.HTTP_ReqANDRes((TCHAR*)_T("update_contents.php"), Body, NowWork->m_tcResponse) == false)
 					{
 						TryCount--;
 
 						if (TryCount == 0)
 							gThis->m_Dump->Crash();
+
+						Sleep(100);
 					}
 
 					// 3. Json데이터 파싱하기 (UTF-16)

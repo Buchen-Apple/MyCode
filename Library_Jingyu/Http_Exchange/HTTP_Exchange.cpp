@@ -128,7 +128,9 @@ namespace Library_Jingyu
 		// 실패하면 밖으로 false던진다.
 		// 밖에서 일정 횟수만큼 HTTP_ReqANDRes() 함수를 호출해보는 형태로 로직 진행해야 함.
 		if (HTTP_Connect(sock) == false)
+		{			
 			return false;
+		}
 
 
 
@@ -401,7 +403,9 @@ namespace Library_Jingyu
 
 			// 쓰기셋에 반응온 것이 아니면 무조건 false 리턴
 			if (wset.fd_count <= 0)
+			{		
 				return false;
+			}
 		}
 		
 		/*
