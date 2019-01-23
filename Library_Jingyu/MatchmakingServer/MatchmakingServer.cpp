@@ -361,8 +361,8 @@ namespace Library_Jingyu
 			// 만약 중복 키 에러라면, 이미 데이터가 존재한다는 것. Update 쿼리 날림
 			if (Error == 1062)
 			{
-				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW() WHERE `serverno` = %d\0";
-				pMatchDBcon->Query_Save(cUpdateQuery, iServerNo);
+				char cUpdateQuery[200] = "UPDATE `matchmaking_status`.`server` SET `heartbeat` = NOW(), `connectuser` = %lld, `port` = %d WHERE `serverno` = %d\0";
+				pMatchDBcon->Query_Save(cUpdateQuery, 0, g_This->m_stConfig.Port, iServerNo);
 
 				// 에러 체크
 				Error = pMatchDBcon->GetLastError();

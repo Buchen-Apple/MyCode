@@ -928,11 +928,11 @@ namespace Library_Jingyu
 
 			// 최대 존재할 수 있는 대기방 수
 			// 고정 값
-			const LONG m_lMaxWaitRoomCount = 200;
+			const LONG m_lMaxWaitRoomCount = 500;
 
 			// Auth_Update에서 한 프레임에 생성 가능한 방 수
 			// 고정 값
-			const int m_iLoopCreateRoomCount = 200;
+			const int m_iLoopCreateRoomCount = 500;
 
 			// Auth_Update에서 한 프레임에, Game모드로 넘기는 방 수
 			// 즉, Ready 상태의 방을 Play로 변경하는 수
