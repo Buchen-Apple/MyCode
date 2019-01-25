@@ -2903,7 +2903,7 @@ namespace Library_Jingyu
 		// 3. 레드존 구역에 21개의 아이템 생성
 		// 생성과 동시에 방 안의 모든 유저에게 해당 아이템 생성 패킷 보내기.
 		int i = 0;
-		while (i < 17)
+		while (i < 16)
 		{
 			// 레드존에는 탄창, 헬멧 중 1개 생성.
 			int ItemType = rand() % 2;			
