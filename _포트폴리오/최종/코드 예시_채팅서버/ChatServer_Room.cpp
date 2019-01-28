@@ -23,8 +23,10 @@ namespace Library_Jingyu
 	// 각 서버에 전역 변수로 존재해야 함.
 	LONG g_lNET_BUFF_SIZE = 512;
 
-	// 덤프용 
+	// 덤프 클래스(싱글톤)
 	CCrashDump* g_ChatDump = CCrashDump::GetInstance();
+
+	// 로그 클래스 (싱글톤)
 	CSystemLog* g_ChatLog = CSystemLog::GetInstance();
 
 
@@ -1062,8 +1064,6 @@ namespace Library_Jingyu
 		stRoom* NowRoom = FindRoom->second;
 
 		// 6. 토큰 검사
-		// !! 룸 락 걸고 할 필요 없다. !!
-		// !! 룸 락은, 서버 입장 토큰처럼 중간에 변경되는 경우가 없기 때문에, 룸 테이블 락만 걸면 안전하다 !!
 		if (memcmp(EnterToken, NowRoom->m_cEnterToken, 32) != 0)
 		{	
 			ReleaseSRWLockShared(&m_Room_Umap_srwl);		// ----- 룸 Shared 언락
