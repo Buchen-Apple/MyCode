@@ -156,8 +156,8 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
-    <ClCompile Include="..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\Library_Jingyu\CrashDump\CrashDump.cpp" />
+    <ClCompile Include="..\..\..\..\..\..\Library_Jingyu\profiling\Profiling_Class.cpp" />
     <ClCompile Include="MPoolTLS_Test.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
