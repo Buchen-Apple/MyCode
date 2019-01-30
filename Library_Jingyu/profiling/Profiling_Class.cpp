@@ -6,7 +6,7 @@
 namespace Library_Jingyu
 {
 
-#define PROFILING_SIZE		50			// 스레드 별로 몇 개의 태그가 가능한지.
+#define PROFILING_SIZE		100			// 스레드 별로 몇 개의 태그가 가능한지.
 #define MIN_SET				100000000	// 최초 생성 시, Min의 값. 체크용도.
 #define MAX_PROFILE_COUNT	1000		// 최대 몇 개의 스레드가 프로파일링 가능한지
 
