@@ -253,24 +253,16 @@ namespace Library_Jingyu
 	// 프로파일링 정보 전체 보기
 	void PROFILING_SHOW()
 	{
-		// 스레드의 TLS 가져오기
-		stThread_Profile* MyProfile = (stThread_Profile*)TlsGetValue(g_TLSIndex);
-
-		// 만약, nullptr이라면 에러.
-		if (MyProfile == nullptr)
+		for (int i = 0; i <= g_pThread_Profile_Array_Count; ++i)
 		{
-			DWORD Error = GetLastError();
-			g_ProfileDump->Crash();
-		}
+			Profiling* NowSaveProfile = g_pThread_Profile_Array[i]->m_Profile;
 
-		for (int i = 0; i <= MyProfile->m_NowProfiling_Size; ++i)
-		{
-			printf("\n이름 : %s\n", MyProfile->m_Profile[i].m_Name);
-			printf("호출 횟수 :%d\n", MyProfile->m_Profile[i].m_CallCount);
-			printf("총 시간 : %0.6lf\n", MyProfile->m_Profile[i].m_TotalTime);
-			printf("평균 : %0.6lf\n", MyProfile->m_Profile[i].m_TotalTime / MyProfile->m_Profile[i].m_CallCount);
-			printf("최소 시간1 / 2 : %0.6lf / %0.6lf\n", MyProfile->m_Profile[i].m_MInTime[0], MyProfile->m_Profile[i].m_MInTime[1]);
-			printf("최대 시간1 / 2 : %0.6lf / %0.6lf\n", MyProfile->m_Profile[i].m_MaxTime[0], MyProfile->m_Profile[i].m_MaxTime[1]);
+			printf("\n이름 : %s\n", NowSaveProfile->m_Name);
+			printf("호출 횟수 :%d\n", NowSaveProfile->m_CallCount);
+			printf("총 시간 : %0.6lf\n", NowSaveProfile->m_TotalTime);
+			printf("평균 : %0.6lf\n", NowSaveProfile->m_TotalTime / NowSaveProfile->m_CallCount);
+			printf("최소 시간1 / 2 : %0.6lf / %0.6lf\n", NowSaveProfile->m_MInTime[0], NowSaveProfile->m_MInTime[1]);
+			printf("최대 시간1 / 2 : %0.6lf / %0.6lf\n", NowSaveProfile->m_MaxTime[0], NowSaveProfile->m_MaxTime[1]);
 		}
 	}
 
