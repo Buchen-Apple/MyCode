@@ -1,0 +1,19 @@
+C와 완전히 동일한 캐스팅은?
+- Reinterpret Cast
+
+C++ 형변환 시 주의점
+- 업 캐스팅은 언제나 안전. 다운 캐스팅은 언제나 위험
+
+static cast와 dynamic cast의 차이점
+- static cast는 컴파일 타임에 형변환 체크
+- dynamic cast는 컴파일 타임에 형변환 체크
+
+안전한 다운 캐스팅을 하려면?
+- Dynamic_Cast를 사용
+- 이유 : 클래스 생성 시, virtual table에 RTTI(런타임 타입 인포)가 저장된다. 때문에 런타임에 캐스팅을 체크하는 dynamic cast를 사용하면 RTTI를 확인해 안전한 캐스팅 가능
+- 이유 : Dymamic_Cast는 런타임에 클래스 가상함수 테이블을 참조해 Type을 확인하기 때문에 안전한 다운캐스팅 가능
+
+Dynamic cast에 참조형 vs 포인터 차이점
+- 잘못된 형변환일 시
+- 참조형 : bad_cast 예외 발생
+- 포인터 : null 반환
