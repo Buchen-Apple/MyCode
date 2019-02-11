@@ -849,6 +849,9 @@ namespace Library_Jingyu
 		INT64	AccountNo;
 		char	ConnectToken[32];
 
+		ZeroMemory(NowPlayer->m_tcID, 40);
+		ZeroMemory(NowPlayer->m_tcNick, 40);
+
 		Packet->GetData((char*)&AccountNo, 8);
 		Packet->GetData((char*)NowPlayer->m_tcID, 40);
 		Packet->GetData((char*)NowPlayer->m_tcNick, 40);

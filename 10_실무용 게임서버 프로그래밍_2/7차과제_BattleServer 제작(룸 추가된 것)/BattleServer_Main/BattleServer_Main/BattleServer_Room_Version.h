@@ -243,6 +243,20 @@ namespace Library_Jingyu
 		// 이너 클래스
 		// -----------------------
 
+		// 디버깅용. 현재 유저의 상태
+		enum eu_USER_TYPE_DEBUG
+		{
+			LOGOUT = 0,	// 커넥트도 안된 상태. 할당되지 않음.
+			CONNECT,
+			LOGIN_SEND,	// 로그인 요청을 보낸 상태. 각종 인증이 끝나면 OK로 변경
+			LOGIN_OK,	// 로그인 응답 패킷을 보낸 상태. 인증까지 다 됨.
+			ROOMENTER,
+			COUNTDOWN,	// 카운트 다운 중인 유저.
+			AUTO_TO_GAME,	// auth to game 플래그 true
+			INGAME,			// 실제 게임으로 넘어온 유저. 아직 게임 시작은 안함.
+			GAME_START		// 서버에서 게임 시작 패킷을 보낸 유저.
+		};
+
 		// 아이템 타입
 		enum eu_ITEM_TYPE
 		{
@@ -336,6 +350,10 @@ namespace Library_Jingyu
 
 			// 유저의 모드 타입. 컨텐츠 레벨의 타입
 			eu_PLATER_MODE m_euModeType;
+
+			// 디버깅용. 현재 유저의 상태
+			// 0:로그아웃, 1:커넥트, 2:로그인, 3:방입장, 4:인게임
+			eu_USER_TYPE_DEBUG m_euDebugMode;
 
 
 			// -----------------------
@@ -478,13 +496,13 @@ namespace Library_Jingyu
 			virtual void OnAuth_ClientJoin();
 			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
-			virtual void OnAuth_HeartBeat();
+			virtual void OnAuth_HeartBeat(DWORD DelayTime);
 
 			// Game 스레드에서 처리
 			virtual void OnGame_ClientJoin();
 			virtual void OnGame_ClientLeave();
 			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
-			virtual void OnGame_HeartBeat();
+			virtual void OnGame_HeartBeat(DWORD DelayTime);
 
 			// Release용
 			virtual void OnGame_ClientRelease();			

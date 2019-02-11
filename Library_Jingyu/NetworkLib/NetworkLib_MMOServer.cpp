@@ -127,13 +127,13 @@ namespace Library_Jingyu
 	void CMMOServer::cSession::OnAuth_ClientJoin() {}
 	void CMMOServer::cSession::OnAuth_ClientLeave(bool bGame) {}
 	void CMMOServer::cSession::OnAuth_Packet(CProtocolBuff_Net* Packet) {}
-	void CMMOServer::cSession::OnAuth_HeartBeat() {}
+	void CMMOServer::cSession::OnAuth_HeartBeat(DWORD DelayTime) {}
 
 	// Game 스레드에서 처리
 	void CMMOServer::cSession::OnGame_ClientJoin() {}
 	void CMMOServer::cSession::OnGame_ClientLeave() {}
 	void CMMOServer::cSession::OnGame_Packet(CProtocolBuff_Net* Packet) {}
-	void CMMOServer::cSession::OnGame_HeartBeat() {}
+	void CMMOServer::cSession::OnGame_HeartBeat(DWORD DelayTime) {}
 
 	// Release용
 	void CMMOServer::cSession::OnGame_ClientRelease() {}
@@ -1364,13 +1364,15 @@ namespace Library_Jingyu
 								// 하트비트 셧다운을 받지 않은 유저의 경우
 								if (NowSession->m_bHeartBeatShutdown == false)
 								{
+									DWORD Time = NowSession->m_dwLastPacketTime + shutdownCheck;
+
 									// 셧다운 대상인지 체크
-									if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+									if (Time <= timeGetTime())
 									{
 										// 하트비트로 인해 셧다운을 당했다는 플래그 변경
 										NowSession->m_bHeartBeatShutdown = true;
 
-										NowSession->OnAuth_HeartBeat();
+										NowSession->OnAuth_HeartBeat(Time);
 										NowSession->Disconnect();
 										InterlockedIncrement(&g_This->m_lHeartBeatCount);
 									}
@@ -1544,13 +1546,15 @@ namespace Library_Jingyu
 						{
 							if (NowSession->m_bHeartBeatShutdown == false)
 							{
+								DWORD Time = NowSession->m_dwLastPacketTime + shutdownCheck;
+
 								// 셧다운 대상인지 체크
-								if (NowSession->m_dwLastPacketTime + shutdownCheck <= timeGetTime())
+								if (Time <= timeGetTime())
 								{
 									// 하트비트로 인해 셧다운을 당했다는 플래그 변경
 									NowSession->m_bHeartBeatShutdown = true;
 
-									NowSession->OnGame_HeartBeat();
+									NowSession->OnGame_HeartBeat(Time);
 									NowSession->Disconnect();
 									InterlockedIncrement(&g_This->m_lHeartBeatCount);
 								}

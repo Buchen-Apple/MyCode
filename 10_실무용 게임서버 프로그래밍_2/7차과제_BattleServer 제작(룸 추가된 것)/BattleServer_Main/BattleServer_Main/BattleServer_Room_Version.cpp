@@ -599,6 +599,8 @@ namespace Library_Jingyu
 
 		// 최초는 로그아웃 상태
 		m_euModeType = eu_PLATER_MODE::LOG_OUT;
+
+		m_euDebugMode = eu_USER_TYPE_DEBUG::LOGOUT;
 	}
 
 	// 소멸자
@@ -819,6 +821,8 @@ namespace Library_Jingyu
 			g_BattleServer_Room_Dump->Crash();
 
 		m_euModeType = eu_PLATER_MODE::AUTH;
+
+		m_euDebugMode = eu_USER_TYPE_DEBUG::CONNECT;
 	}
 
 	// 유저가 Auth 모드에서 나감
@@ -835,6 +839,8 @@ namespace Library_Jingyu
 				g_BattleServer_Room_Dump->Crash();
 
 			m_euModeType = eu_PLATER_MODE::GAME;
+
+			m_euDebugMode = eu_USER_TYPE_DEBUG::AUTO_TO_GAME;
 		}
 
 		// 실제 게임 종료일 경우
@@ -845,6 +851,7 @@ namespace Library_Jingyu
 				g_BattleServer_Room_Dump->Crash();
 
 			m_euModeType = eu_PLATER_MODE::LOG_OUT;
+			m_euDebugMode = eu_USER_TYPE_DEBUG::LOGOUT;
 
 			// ClientKey 초기값으로 셋팅.
 			// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
@@ -986,12 +993,12 @@ namespace Library_Jingyu
 	//
 	// Parameter : 없음
 	// return : 없음
-	void CBattleServer_Room::CGameSession::OnAuth_HeartBeat()
+	void CBattleServer_Room::CGameSession::OnAuth_HeartBeat(DWORD DelayTime)
 	{
 		// 에러 로그 찍기
 		// 로그 찍기 (로그 레벨 : 에러)
 		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
-			L"Auth HeartBeat!! AccoutnNo : %lld", m_Int64AccountNo);
+			L"Auth HeartBeat!! AccoutnNo : %lld, Time : %d, State : %d", m_Int64AccountNo, DelayTime, m_euDebugMode);
 	}
 
 
@@ -1025,9 +1032,7 @@ namespace Library_Jingyu
 			g_BattleServer_Room_Dump->Crash();
 
 		// 락 푼다
-		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락
-
-
+		ReleaseSRWLockShared(&m_pParent->m_Room_Umap_srwl);		// ----- Room Umap Shared 언락		
 
 		// 2. 게임 모드로 전환된 유저 카운트 증가.
 
@@ -1037,7 +1042,7 @@ namespace Library_Jingyu
 
 		++NowRoom->m_iGameModeUser;
 
-
+		m_euDebugMode = eu_USER_TYPE_DEBUG::INGAME;
 
 		// 3. 증가 후, JoinUser와 같아진다면 방 내의 모든 유저에게 [내 캐릭터 생성] 과 [다른 유저 캐릭터 생성]을 보낸다.
 		// OnGame_ClientJoin 마다 호출하는게 아니라, 모두 접속했는지 확인 후 보낸다. 동시에 캐릭터 생성을 하기 위해서.
@@ -1060,6 +1065,7 @@ namespace Library_Jingyu
 			g_BattleServer_Room_Dump->Crash();
 
 		m_euModeType = eu_PLATER_MODE::LOG_OUT;
+		m_euDebugMode = eu_USER_TYPE_DEBUG::LOGOUT;
 
 		// ClientKey 초기값으로 셋팅.
 		// !! 이걸 안하면, Release되는 중에 HTTP응답이 올 경우 !!
@@ -1263,12 +1269,12 @@ namespace Library_Jingyu
 	//
 	// Parameter : 없음
 	// return : 없음
-	void CBattleServer_Room::CGameSession::OnGame_HeartBeat()
+	void CBattleServer_Room::CGameSession::OnGame_HeartBeat(DWORD DelayTime)
 	{
 		// 에러 로그 찍기
 		// 로그 찍기 (로그 레벨 : 에러)
 		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR,
-			L"Game HeartBeat!! AccoutnNo : %lld", m_Int64AccountNo);
+			L"Game HeartBeat!! AccoutnNo : %lld, Time : %d, State : %d", m_Int64AccountNo, DelayTime, m_euDebugMode);
 	}
 
 
@@ -1471,6 +1477,8 @@ namespace Library_Jingyu
 		// 자료구조에 들어감 플래그 변경
 		m_bStructFlag = true;
 
+		m_euDebugMode = eu_USER_TYPE_DEBUG::LOGIN_SEND;
+
 		// 8. 로그인 인증처리를 위한 HTTP 통신
 		// 통신 후, 해당 패킷에 대한 후처리는 Auth_Update에게 넘긴다.
 		DB_WORK_LOGIN* Send_A = (DB_WORK_LOGIN*)m_pParent->m_shDB_Communicate.m_pDB_Work_Pool->Alloc();
@@ -1654,6 +1662,7 @@ namespace Library_Jingyu
 		// 플레이어에게 방 할당
 		m_iRoomNo = NowRoom->m_iRoomNo;
 
+		m_euDebugMode = eu_USER_TYPE_DEBUG::ROOMENTER;
 
 		// 9. 정상적인 방 입장 응답 보내기
 		CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
@@ -2279,9 +2288,9 @@ namespace Library_Jingyu
 
 
 		// 2. 내 탄창 수 확인
-		//	-------- 탄창이 없다면 총알을 0 으로
+		//	-------- 탄창이 없다면 패킷 무시.
 		if (m_iCartridge == 0)
-			m_iBullet = 0;
+			return;
 
 		//	-------- 탄창이 있다면 탄창 -1 후  총알을 g_Data_Cartridge_Bullet 로 셋팅
 		else
@@ -2522,6 +2531,7 @@ namespace Library_Jingyu
 
 		while (Index < Size)
 		{
+			m_JoinUser_Vector[Index]->m_euDebugMode = eu_USER_TYPE_DEBUG::COUNTDOWN;
 			m_JoinUser_Vector[Index]->SendPacket(SendBuff);
 			++Index;
 		}
@@ -2766,6 +2776,8 @@ namespace Library_Jingyu
 
 		while (Index < Size)
 		{
+			m_JoinUser_Vector[Index]->m_euDebugMode = eu_USER_TYPE_DEBUG::GAME_START;
+
 			// 캐릭터 초기 정보 셋팅
 			m_JoinUser_Vector[Index]->StartSet(g_Data_Position[SourceIndex][0], 
 												g_Data_Position[SourceIndex][1], NowTime);
@@ -4933,6 +4945,8 @@ namespace Library_Jingyu
 			// 로그인 패킷 처리 Flag 변경
 			NowPlayer->m_bLoginFlag = true;
 
+			NowPlayer->m_euDebugMode = eu_USER_TYPE_DEBUG::LOGIN_OK;
+
 			// 정상 응답 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();
 
@@ -5021,6 +5035,8 @@ namespace Library_Jingyu
 		{
 			// 로그인 패킷 처리 Flag 변경
 			NowPlayer->m_bLoginFlag = true;
+
+			NowPlayer->m_euDebugMode = eu_USER_TYPE_DEBUG::LOGIN_OK;
 
 			// 정상 응답 패킷 보냄
 			CProtocolBuff_Net* SendBuff = CProtocolBuff_Net::Alloc();

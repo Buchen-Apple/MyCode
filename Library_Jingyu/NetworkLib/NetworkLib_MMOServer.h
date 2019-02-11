@@ -162,13 +162,13 @@ namespace Library_Jingyu
 			virtual void OnAuth_ClientJoin();
 			virtual void OnAuth_ClientLeave(bool bGame = false);
 			virtual void OnAuth_Packet(CProtocolBuff_Net* Packet);
-			virtual void OnAuth_HeartBeat();
+			virtual void OnAuth_HeartBeat(DWORD DelayTime);
 
 			// Game 스레드에서 처리
 			virtual void OnGame_ClientJoin();
 			virtual void OnGame_ClientLeave();
 			virtual void OnGame_Packet(CProtocolBuff_Net* Packet);
-			virtual void OnGame_HeartBeat();
+			virtual void OnGame_HeartBeat(DWORD DelayTime);
 
 			// Release용
 			virtual void OnGame_ClientRelease();
