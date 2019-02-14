@@ -463,8 +463,8 @@ soft RTOS와 hard RTOS
 함수 호출 규약(Calling Convention)
 - 함수 호출 시 인자 전달 순서 결정
 - 함수 종료 시, 스택 프레임 반환 주체(Caller, Callee) 결정
-- Visual Studio에서 디폴트 호출 규약 지정 가능
-- 윈도우 : __stdcall(C스타일 인자 전달 / 호출된 함수가 스택프레임 정리)를 따른다.
+- Visual Studio에서 디폴트 호출 규약 지정 가능 (디폴트 __cdecl)
+- 함수 호출규약은 언어차원에서 제공. OS 아님.
 
 __cdecl만 caller(호출자)가 스택을 정리하며, 나머지는 callee가 스택 정리
 모두 인자 전달은 C스타일
