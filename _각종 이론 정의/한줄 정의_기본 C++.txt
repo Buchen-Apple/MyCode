@@ -655,9 +655,104 @@ new / delete 연산자는 static이다.
 펑터 사용 이유
 - 펑터로 전달되는 것에 따라 사용되는 기준이 달라진다.
 
-형변환 연산자
+형변환 연산자 오버로딩
+- 객체를 일반 자료형으로 형변환 할 수 있는 연산자 오버로딩
+- 특징 : 반환형이 없다. 하지만 반환은 된다. 
+- Number num = num1 + 10; << 했을 때, 형변환 연산자가 오버로딩 되어있으면 num1을 int로 형변환 한다.
+- operator int()	{return num} 과 같은 형태로 선언
 
+템플릿
+- 함수/클래스를 만드는 도구
+- 컴파일 타임에 자료형을 결정해 함수/클래스를 만들어 준다.
 
+템플릿 함수
+- 템플릿으로 인해 만들어진 함수
+
+템플릿 함수와 동일한 일반함수가 같이 정의되어 있으면?
+- 일반 함수가 호출된다.
+- Add<int>(10, 20)처럼 명시적으로 지정하면 템플릿 함수가 호출된다.
+
+함수 템플릿의 특수화
+- 어떤 특수한 형에 대해서는 사용자가 지정한 형을 사용하라는 것.
+- template<> char* Max<char*> (char* a, char*b) { .... }  << Max옆에 <char*>는 생략해도 된다.
+- "char*형 함수는 별도로 만들지 말고 이걸 써라!" 라는 뜻이다.
+
+템플릿 클래스
+- 템플릿으로 인해 만들어진 클래스.
+- 기능은 모두 동일한데, 저장 대상의 타입만 다를 경우 템플릿 클래스를 사용한다.
+- 호출 시, <>를 꼭 붙여줘야 한다. 함수 템플릿과는 다름
+
+템플릿 클래스와 일반 클래스가 같이 정의되어 있으면?
+- 동시에 정의할 수 없음.
+
+클래스 선언과 정의 분리
+- 정의에도 template<typename T>를 같이 적어줘야 함.
+
+템플릿은 함수 선언부와 정의부를 분리할 수 없다.
+- 컴파일 타임에 이루어져야 하기 때문에 다 알려줘야 함
+
+클래스 템플릿의 특수화
+- 함수 템플릿의 특수화화 동일. 특정한 자료형을 사용하는 클래스.
+
+부분 특수화
+- template<T1>	class MySys<T1, int> {..} <<< T2에 대해서만 특수화를 했다.
+
+템플릿 매개변수
+- 템플릿 시 사용하는 T, T1, T2와 같은 문자
+
+C++ 캐스팅
+- static_cast
+- dynamic_cast
+- const_cast
+- reinterpret_cast
+
+static_cast
+- 일반 자료형 간 형변환 + 클래스 상속관계의 형변환 제공.
+- 부모 <-> 자식간 형변환 제공.
+- 단점 : 책임은 프로그래머 몫
+
+dynamic_cast
+- 포인터/참조자만 사용 가능
+- 클래스 상속관계의 형변환 제공.
+- 자식 -> 부모로 형변환 제공.
+- 부모가 Polymorphic 클래스라면(가상 함수가 하나라도 있음) 부모->자식 컴파일도 허용. (RTTI를 확인해, 런타임에 안전성 체크)
+
+const_cast
+- 포인터/참조자만 사용 가능
+- const 속성 제거
+
+reinterpret_cast
+- 포인터와 관련있는 모든 연산 허용
+
+static cast와 dynamic cast의 차이점
+- static cast : 무조건 부모<-> 자식간 형변환 제공
+- dynamic cast : 자식 -> 부모간 형변환 제공. 
+- 부모가 Polymorphic 클래스라면 부모 -> 자식 형변환도 제공. 
+
+static cast와 dynamic ast의 차이점2
+- static cast는 런타임에 안전성 검사 안함.
+- dynamic_cast는 런타임에 안전성 검사를 한다. --> 때문에 static이 좀 더 빠르다.
+
+Dynamic cast에 참조형 vs 포인터 차이점
+- 잘못된 형변환일 시
+- 참조형 : bad_cast 예외 발생
+- 포인터 : null 반환
+
+객체 대입 업캐스팅
+- Super{}가 있고, 상속받는 Sub : public Super{}가 있다.
+- 이때, 이미 생성된 Sub객체를 새로 생성하는 Super에 대입 가능? [Sub aa; Super bb = aa;] 아니 불가능.
+
+객체 대입 업캐스팅 해결
+- static_cast를 사용하면 가능 [Super bb = static_cast<Super>(aa);]
+- dynamic_cast를 사용하면, 포인터만 가능 [Super* cc = dynamic_cast<Super*>(&aa);]
+
+C++ 형변환 시 주의점
+- 업 캐스팅은 언제나 안전. 다운 캐스팅은 언제나 위험
+
+안전한 다운 캐스팅을 하려면?
+- Dynamic_Cast를 사용
+- 이유 : 클래스 생성 시, virtual table에 RTTI(런타임 타입 인포)가 저장된다. 때문에 런타임에 캐스팅을 체크하는 dynamic cast를 사용하면 RTTI를 확인해 안전한 캐스팅 가능
+- 이유 : Dymamic_Cast는 런타임에 클래스 가상함수 테이블을 참조해 Type을 확인하기 때문에 안전한 다운캐스팅 가능
 
 this 콜
 - 멤버함수나 멤버변수에 접근할 때 사용되는 함수호출규약
@@ -673,34 +768,6 @@ explicit 키워드
 - 묵시적 형변환을 막는다.
 - Test c; c+10을 막기도 하며, Test c = 3이 Test c(30)으로 변하는것도 막는다(Test c(30)만 되도록 한다)
 - 애초에 C++스타일은 Test c(30)이다. =를 이용한 대입은 C++스타일이 아니다.
-
-객체 대입 업캐스팅
-- Super{}가 있고, 상속받는 Sub : public Super{}가 있다.
-- 이때, 이미 생성된 Sub객체를 새로 생성하는 Super에 대입 가능? [Sub aa; Super bb = aa;] 아니 불가능.
-
-객체 대입 업캐스팅 해결
-- static_cast를 사용하면 가능 [Super bb = static_cast<Super>(aa);]
-- dynamic_cast를 사용하면, 포인터만 가능 [Super* cc = dynamic_cast<Super*>(&aa);]
-
-C와 완전히 동일한 캐스팅은?
-- Reinterpret Cast
-
-C++ 형변환 시 주의점
-- 업 캐스팅은 언제나 안전. 다운 캐스팅은 언제나 위험
-
-static cast와 dynamic cast의 차이점
-- static cast는 컴파일 타임에 형변환 체크
-- dynamic cast는 컴파일 타임에 형변환 체크
-
-안전한 다운 캐스팅을 하려면?
-- Dynamic_Cast를 사용
-- 이유 : 클래스 생성 시, virtual table에 RTTI(런타임 타입 인포)가 저장된다. 때문에 런타임에 캐스팅을 체크하는 dynamic cast를 사용하면 RTTI를 확인해 안전한 캐스팅 가능
-- 이유 : Dymamic_Cast는 런타임에 클래스 가상함수 테이블을 참조해 Type을 확인하기 때문에 안전한 다운캐스팅 가능
-
-Dynamic cast에 참조형 vs 포인터 차이점
-- 잘못된 형변환일 시
-- 참조형 : bad_cast 예외 발생
-- 포인터 : null 반환
 
 클래스 메서드와 가상함수의 차이점은?
 - 가상함수 테이블에 등록되는지 마는지.
