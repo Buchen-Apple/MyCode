@@ -984,8 +984,8 @@ namespace Library_Jingyu
 			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
-			// 덤프
-			g_BattleServer_Room_Dump->Crash();
+			// 접속 끊기 요청
+			Disconnect();
 		}
 	}
 
@@ -1260,8 +1260,8 @@ namespace Library_Jingyu
 			g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
-			// 덤프
-			g_BattleServer_Room_Dump->Crash();
+			// 접속 끊기 요청
+			Disconnect();
 		}
 	}
 
@@ -5441,6 +5441,8 @@ namespace Library_Jingyu
 		// 로그 찍기 (로그 레벨 : 에러)
 		g_BattleServer_RoomLog->LogSave(false, L"CBattleServer_Room", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);
+
+		// 이후, 엔진에서 접속 끊김.
 	}
 
 	   	  

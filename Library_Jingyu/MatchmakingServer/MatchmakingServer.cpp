@@ -1462,13 +1462,10 @@ namespace Library_Jingyu
 		{
 			// 로그 찍기 (로그 레벨 : 에러)
 			cMatchServerLog->LogSave(false, L"MatchServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
-				(TCHAR*)exc.GetExceptionText());	
-
-			// Crash
-			gMatchServerDump->Crash();
+				(TCHAR*)exc.GetExceptionText());
 
 			// 접속 끊기 요청
-			//Disconnect(SessionID);
+			Disconnect(SessionID);
 		}
 	}
 

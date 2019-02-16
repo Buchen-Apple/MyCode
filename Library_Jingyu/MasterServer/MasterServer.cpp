@@ -792,11 +792,8 @@ namespace Library_Jingyu
 			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
-			// Crash
-			g_MasterDump->Crash();
-
 			// 立加 谗扁 夸没
-			//Disconnect(SessionID);
+			Disconnect(SessionID);
 		}
 	}
 
@@ -2110,11 +2107,8 @@ namespace Library_Jingyu
 			g_MasterLog->LogSave(false, L"MasterServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
-			// Crash
-			g_MasterDump->Crash();
-
 			// 立加 谗扁 夸没
-			//Disconnect(SessionID);
+			Disconnect(SessionID);
 		}
 		
 	}

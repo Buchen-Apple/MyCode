@@ -1,5 +1,4 @@
-﻿C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Common7\IDE\VC\VCTargets\Microsoft.CppClean.targets(76,5): warning : 'c:\git_public\10_실무용 게임서버 프로그래밍_2\8차과제_chatserver 제작(룸 추가된 것)\chatserver_main\x64\release\chatserver_main.pdb' 경로에 대한 액세스가 거부되었습니다.
-  pch.cpp
+﻿  pch.cpp
   CPUUsage.cpp
   CrashDump.cpp
   Log.cpp
@@ -14,7 +13,7 @@ c:\git_public\library_jingyu\networklib\networklib_netserver.cpp(789): warning C
   RingBuff.cpp
   ChatServer_Main.cpp
   ChatServer_Room.cpp
-c:\git_public\10_실무용 게임서버 프로그래밍_2\8차과제_chatserver 제작(룸 추가된 것)\chatserver_main\chatserver_main\chatserver_room.cpp(1866): warning C4267: '=': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+c:\git_public\10_실무용 게임서버 프로그래밍_2\8차과제_chatserver 제작(룸 추가된 것)\chatserver_main\chatserver_main\chatserver_room.cpp(1864): warning C4267: '=': 'size_t'에서 'int'(으)로 변환하면서 데이터가 손실될 수 있습니다.
   코드를 생성하고 있습니다.
   All 1120 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   코드를 생성했습니다.

@@ -1490,10 +1490,8 @@ namespace Library_Jingyu
 			g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s",
 				(TCHAR*)exc.GetExceptionText());
 
-			g_ChatDump->Crash();
-
 			// 접속 끊기 요청
-			//Disconnect(SessionID);
+			Disconnect(SessionID);
 		}
 
 	}
@@ -1538,7 +1536,7 @@ namespace Library_Jingyu
 		g_ChatLog->LogSave(false, L"ChatServer", CSystemLog::en_LogLevel::LEVEL_ERROR, L"%s (ErrorCode : %d)",
 			errorStr, error);
 
-		g_ChatDump->Crash();
+		// 이미 엔진에서 접속은 끊김.
 	}
 
 	// 세마포어 발생 시 호출되는 함수
