@@ -106,7 +106,7 @@ P2P모델이란?
 
 도메인 이름 서버(DNS 서버)
 - 도메인과 IP를 기억하는 서버
-
+ 
 도메인 이름 시스템(DNS)의 작동 구조
 - 재귀적 호출(Recursive Query) 절차.
 - www.naver.com을 치는 순간 Local NS서버에게 www.naver.com의 IP를 아냐고 물어본다
@@ -133,7 +133,7 @@ DNS의 프로토콜
 - listen()함수를 호출할 때
 
 서버에 접속한 원격 IP와 원격 포트를 알 수 있는 시점
-- accept라 리턴된 후 구조체 확인.
+- accept가 리턴된 후 구조체 확인.
 
 클라이언트 입장에서 IP와 Port가 결정되는 순간
 - connect 함수 호출 시 지역,원격 Ip와 Port가 모두 결정
@@ -373,7 +373,7 @@ WSASend / WSARecv의 특징
 Overlapped I/O모델(2) 작동법
 - APC 큐를 사용하는 비동기 입출력 모델
 - 요청한 비동기 입출력 작업이 끝나면 운영체제는, 관련 내용을 APC큐에 저장한다.
-- 그리고, CompletionToutine 함수를 등록한 스레드가 alertable wait 상태가 되면 APC큐에 저장된 내용을 기준으로, 등록한 완료 루틴이 실행된다.
+- 그리고, CompletionRoutine 함수를 등록한 스레드가 alertable wait 상태가 되면 APC큐에 저장된 내용을 기준으로, 등록한 완료 루틴이 실행된다.
 - 완료루틴은 WSARecv / WSASend에 등록한다.
 - 소켓 제한 없이 사용 가능
 
