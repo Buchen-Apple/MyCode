@@ -3,7 +3,7 @@
 #include <strsafe.h>
 #include <direct.h>		//_mkdir or _wmkdir
 
-#pragma comment(lib, "Mysql/lib/vs14/mysqlclient.lib")
+#pragma comment(lib, "Library_Jingyu/Mysql/lib/vs14/mysqlclient.lib")
 
 namespace Library_Jingyu
 {
